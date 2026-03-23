@@ -1,0 +1,146 @@
+// ─── Purpose ──────────────────────────────────────────────────────────────────
+// Central User schema for all three roles: user, worker, admin.
+// Using a single collection with a role discriminator is simpler to query and
+// manage than separate collections, and role-specific fields are optional so
+// they don't pollute documents that don't need them.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const mongoose = require('mongoose');
+const bcrypt   = require('bcryptjs');
+
+const SALT_ROUNDS = 12; // OWASP recommends ≥12 for bcrypt
+
+const userSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: [true, 'Name is required'],
+      trim: true,
+      maxlength: [100, 'Name cannot exceed 100 characters'],
+    },
+
+    email: {
+      type:     String,
+      required: [true, 'Email is required'],
+      unique:   true,
+      lowercase: true,
+      trim:     true,
+      match: [/^\S+@\S+\.\S+$/, 'Please provide a valid email address'],
+    },
+
+    phone: {
+      type:  String,
+      trim:  true,
+      match: [/^[+]?[\d\s\-().]{7,20}$/, 'Please provide a valid phone number'],
+    },
+
+    // Never returned in queries by default — use .select('+password') explicitly
+    password: {
+      type:     String,
+      required: [true, 'Password is required'],
+      minlength: [8, 'Password must be at least 8 characters'],
+      select:   false,
+    },
+
+    role: {
+      type:    String,
+      enum:    ['user', 'worker', 'admin'],
+      default: 'user',
+    },
+
+    profileImage: {
+      type:    String,
+      default: null,
+    },
+
+    isActive: {
+      type:    Boolean,
+      default: true,
+    },
+
+    // workers must be verified by admin before appearing in listings
+    isVerified: {
+      type:    Boolean,
+      default: false,
+    },
+
+    // ── Worker-specific ──────────────────────────────────────────────────────
+    // Categories the worker operates in (mirrors Service.category enum)
+    categories: {
+      type: [String],
+      enum: ['plumbing', 'electrical', 'painting', 'flooring', 'carpentry', 'cleaning', 'other'],
+    },
+
+    // GeoJSON Point for location-based worker search
+    location: {
+      type: {
+        type:        String,
+        enum:        ['Point'],
+        default:     'Point',
+      },
+      coordinates: {
+        type:    [Number], // [longitude, latitude]
+        default: [0, 0],
+      },
+    },
+
+    // Computed rating kept in sync by a post-save hook on Review
+    averageRating: {
+      type:    Number,
+      default: 0,
+      min:     0,
+      max:     5,
+    },
+
+    totalReviews: {
+      type:    Number,
+      default: 0,
+    },
+
+    // Weekly availability slots stored as { day: 'monday', from: '08:00', to: '18:00' }
+    availability: [
+      {
+        day:  { type: String, enum: ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'] },
+        from: { type: String },
+        to:   { type: String },
+      },
+    ],
+  },
+  {
+    timestamps: true, // adds createdAt, updatedAt automatically
+  }
+);
+
+// ── Geospatial index ──────────────────────────────────────────────────────────
+// Required for $near and $geoWithin queries used in worker search.
+userSchema.index({ location: '2dsphere' });
+
+// ── Pre-save hook — password hashing ─────────────────────────────────────────
+// Only re-hash if the password field was actually modified (prevents double
+// hashing on save calls that only update, e.g., isActive).
+userSchema.pre('save', async function (next) {
+  if (!this.isModified('password')) return next();
+  this.password = await bcrypt.hash(this.password, SALT_ROUNDS);
+  next();
+});
+
+// ── Instance method — password comparison ────────────────────────────────────
+// Using bcrypt.compare instead of plain equality to guard against timing attacks.
+userSchema.methods.comparePassword = async function (candidatePassword) {
+  return bcrypt.compare(candidatePassword, this.password);
+};
+
+// ── toJSON transform — strip sensitive fields ─────────────────────────────────
+// Belt-and-suspenders: even if password is accidentally fetched, strip it from
+// any JSON serialisation so it never appears in API responses.
+userSchema.set('toJSON', {
+  transform(doc, ret) {
+    delete ret.password;
+    delete ret.__v;
+    return ret;
+  },
+});
+
+const User = mongoose.model('User', userSchema);
+
+module.exports = User;
