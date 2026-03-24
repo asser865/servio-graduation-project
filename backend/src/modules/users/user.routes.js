@@ -62,4 +62,7 @@ router.patch('/workers/:id/verify', protect, authorize('admin'), userController.
 // GET /api/v1/users/analytics — admin: counts and stats
 router.get('/analytics', protect, authorize('admin'), userController.getAnalytics);
 
+// GET /api/v1/users/analytics/payments — admin: payment revenue and financials
+router.get('/analytics/payments', protect, authorize('admin'), userController.getPaymentAnalytics);
+
 module.exports = router;

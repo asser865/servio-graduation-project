@@ -200,6 +200,126 @@
 						"header": [],
 						"url": { "raw": "{{BASE_URL}}/users/analytics", "host": ["{{BASE_URL}}"], "path": ["users", "analytics"] }
 					}
+				},
+				{
+					"name": "Admin Payment Analytics",
+					"description": "WHAT: Financial dashboard — revenue, escrow, refunds, disputes.\nWHO: Admin Only.",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{TOKEN}}", "type": "string" }] },
+						"method": "GET",
+						"header": [],
+						"url": { "raw": "{{BASE_URL}}/users/analytics/payments", "host": ["{{BASE_URL}}"], "path": ["users", "analytics", "payments"] }
+					}
+				}
+			]
+		},
+		{
+			"name": "6. Payments (Escrow)",
+			"item": [
+				{
+					"name": "Create Payment Intent",
+					"description": "WHAT: Start payment flow. Returns clientSecret for Stripe.js.\nHOW: Body needs bookingId (must be 'accepted' status).\nWHO: User Only.\nFAILURES: 403 if not your booking | 409 if already paid | 400 if booking not accepted.",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{TOKEN}}", "type": "string" }] },
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"bookingId\": \"BOOKING_ID_HERE\"\n}",
+							"options": { "json": { "language": "json" } }
+						},
+						"url": { "raw": "{{BASE_URL}}/payments/intent", "host": ["{{BASE_URL}}"], "path": ["payments", "intent"] }
+					}
+				},
+				{
+					"name": "Confirm Completion (User → Release Escrow)",
+					"description": "WHAT: User confirms service done → funds released to worker.\nHOW: bookingId in URL (must be 'completed' status).\nWHO: User Only (must be booking owner).\nFAILURES: 403 if not your booking | 400 if booking not completed.",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{TOKEN}}", "type": "string" }] },
+						"method": "POST",
+						"header": [],
+						"url": { "raw": "{{BASE_URL}}/payments/confirm/:bookingId", "host": ["{{BASE_URL}}"], "path": ["payments", "confirm", ":bookingId"], "variable": [{ "key": "bookingId", "value": "BOOKING_ID_HERE" }] }
+					}
+				},
+				{
+					"name": "Get Payment for Booking",
+					"description": "WHAT: View payment details for a specific booking.\nWHO: User (own booking), Worker (own booking), Admin (any).",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{TOKEN}}", "type": "string" }] },
+						"method": "GET",
+						"header": [],
+						"url": { "raw": "{{BASE_URL}}/payments/booking/:bookingId", "host": ["{{BASE_URL}}"], "path": ["payments", "booking", ":bookingId"], "variable": [{ "key": "bookingId", "value": "BOOKING_ID_HERE" }] }
+					}
+				},
+				{
+					"name": "Worker Earnings Dashboard",
+					"description": "WHAT: View wallet balance + payment history.\nHOW: Optional ?dateFrom, ?dateTo, ?status filters.\nWHO: Worker Only.",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{TOKEN}}", "type": "string" }] },
+						"method": "GET",
+						"header": [],
+						"url": { "raw": "{{BASE_URL}}/payments/earnings", "host": ["{{BASE_URL}}"], "path": ["payments", "earnings"] }
+					}
+				},
+				{
+					"name": "Admin Refund Payment",
+					"description": "WHAT: Admin manually refunds a held or disputed payment.\nWHO: Admin Only.\nFAILURES: 400 if payment already released or refunded.",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{TOKEN}}", "type": "string" }] },
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"reason\": \"Admin investigation complete — user refunded.\"\n}",
+							"options": { "json": { "language": "json" } }
+						},
+						"url": { "raw": "{{BASE_URL}}/payments/refund/:paymentId", "host": ["{{BASE_URL}}"], "path": ["payments", "refund", ":paymentId"], "variable": [{ "key": "paymentId", "value": "PAYMENT_ID_HERE" }] }
+					}
+				}
+			]
+		},
+		{
+			"name": "7. Disputes",
+			"item": [
+				{
+					"name": "Open Dispute",
+					"description": "WHAT: User opens a dispute to freeze escrow and request admin review.\nHOW: Booking must be in_progress or completed with held payment.\nWHO: User Only.\nFAILURES: 409 if dispute already open | 400 if payment not held.",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{TOKEN}}", "type": "string" }] },
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"bookingId\": \"BOOKING_ID_HERE\",\n  \"reason\": \"The worker did not complete work as described in the service agreement.\",\n  \"evidence\": [\"https://example.com/photo1.jpg\"]\n}",
+							"options": { "json": { "language": "json" } }
+						},
+						"url": { "raw": "{{BASE_URL}}/payments/disputes", "host": ["{{BASE_URL}}"], "path": ["payments", "disputes"] }
+					}
+				},
+				{
+					"name": "Resolve Dispute (Admin)",
+					"description": "WHAT: Admin resolves dispute — decision to refund user OR release to worker.\nHOW: decision = 'refund' | 'release'\nWHO: Admin Only.",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{TOKEN}}", "type": "string" }] },
+						"method": "PATCH",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"resolution\": \"After reviewing evidence, the worker did not meet service requirements.\",\n  \"decision\": \"refund\"\n}",
+							"options": { "json": { "language": "json" } }
+						},
+						"url": { "raw": "{{BASE_URL}}/payments/disputes/:id/resolve", "host": ["{{BASE_URL}}"], "path": ["payments", "disputes", ":id", "resolve"], "variable": [{ "key": "id", "value": "DISPUTE_ID_HERE" }] }
+					}
+				},
+				{
+					"name": "Get All Disputes (Admin)",
+					"description": "WHAT: Paginated list of all disputes.\nHOW: Optional ?status=open|reviewing|resolved_refund|resolved_release\nWHO: Admin Only.",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{TOKEN}}", "type": "string" }] },
+						"method": "GET",
+						"header": [],
+						"url": { "raw": "{{BASE_URL}}/payments/disputes?status=open", "host": ["{{BASE_URL}}"], "path": ["payments", "disputes"], "query": [{ "key": "status", "value": "open" }] }
+					}
 				}
 			]
 		}

@@ -21,6 +21,7 @@ const serviceRoutes  = require('./modules/services/service.routes');
 const bookingRoutes  = require('./modules/bookings/booking.routes');
 const reviewRoutes   = require('./modules/reviews/review.routes');
 const aiRoutes       = require('./modules/ai/ai.routes');
+const paymentRoutes  = require('./modules/payments/payment.routes');
 
 // ── Global error middleware ───────────────────────────────────────────────────
 const { notFound, errorHandler } = require('./middleware/error.middleware');
@@ -50,6 +51,19 @@ if (process.env.NODE_ENV !== 'test') {
   app.use(morgan('dev'));
 }
 
+// ── Payment routes (BEFORE express.json) ─────────────────────────────────────
+// ⚠️  CRITICAL ORDER: The payment router MUST be registered here, BEFORE the
+// global express.json() middleware below.
+//
+// Reason: The Stripe webhook route (/payments/webhook) uses express.raw() to
+// receive the request body as a raw Buffer. If express.json() middleware runs
+// first on that route, the Buffer is parsed into a JS object. This invalidates
+// the Stripe cryptographic signature, and ALL webhook events get rejected.
+//
+// The payment router applies express.raw() ONLY to the /webhook sub-route,
+// so all other payment routes still receive parsed JSON bodies normally.
+app.use(`/api/v1/payments`, paymentRoutes);
+
 // ── Body parsing ──────────────────────────────────────────────────────────────
 // Parse incoming JSON request bodies (max 10 MB to prevent payload attacks).
 app.use(express.json({ limit: '10mb' }));
@@ -78,6 +92,7 @@ app.use(`${API_PREFIX}/services`, serviceRoutes);
 app.use(`${API_PREFIX}/bookings`, bookingRoutes);
 app.use(`${API_PREFIX}/reviews`,  reviewRoutes);
 app.use(`${API_PREFIX}/ai`,       aiRoutes);
+// Note: payment routes are already mounted above express.json() for webhook support
 
 // ── 404 + error handlers ──────────────────────────────────────────────────────
 // These MUST be last — any unmatched route hits notFound first, then the thrown

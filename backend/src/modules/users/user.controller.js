@@ -8,6 +8,8 @@ const { StatusCodes } = require('http-status-codes');
 const User            = require('./user.model');
 const Review          = require('../reviews/review.model');
 const Booking         = require('../bookings/booking.model');
+const Payment         = require('../payments/payment.model');
+const Dispute         = require('../payments/dispute.model');
 const ApiError        = require('../../utils/ApiError');
 const ApiResponse     = require('../../utils/ApiResponse');
 
@@ -179,6 +181,73 @@ const getAnalytics = async (req, res) => {
   });
 };
 
+// ── GET PAYMENT ANALYTICS (Admin Only) ────────────────────────────────────────
+// WHAT: Financial dashboard for admins — revenue, escrow, refunds, disputes.
+// HOW:  GET /api/v1/users/analytics/payments
+const getPaymentAnalytics = async (req, res) => {
+  const twelveMonthsAgo = new Date();
+  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+
+  const [
+    revenueResult,
+    totalEscrow,
+    totalRefunded,
+    totalDisputes,
+    openDisputes,
+    paymentStatusStats,
+    revenueByMonth,
+  ] = await Promise.all([
+    // Sum of all platform fees from released payments (actual revenue)
+    Payment.aggregate([
+      { $match: { status: 'released' } },
+      { $group: { _id: null, total: { $sum: '$platformFee' } } },
+    ]),
+    // Total funds currently held in escrow
+    Payment.aggregate([
+      { $match: { status: { $in: ['held', 'disputed'] } } },
+      { $group: { _id: null, total: { $sum: '$amount' } } },
+    ]),
+    // Total refunded amount
+    Payment.aggregate([
+      { $match: { status: 'refunded' } },
+      { $group: { _id: null, total: { $sum: '$amount' } } },
+    ]),
+    Dispute.countDocuments({}),
+    Dispute.countDocuments({ status: 'open' }),
+    // Payment count grouped by status
+    Payment.aggregate([
+      { $group: { _id: '$status', count: { $sum: 1 } } },
+    ]),
+    // Monthly revenue (platform fee) for last 12 months
+    Payment.aggregate([
+      { $match: { status: 'released', createdAt: { $gte: twelveMonthsAgo } } },
+      {
+        $group: {
+          _id:     { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },
+          revenue: { $sum: '$platformFee' },
+          count:   { $sum: 1 },
+        },
+      },
+      { $sort: { '_id.year': 1, '_id.month': 1 } },
+    ]),
+  ]);
+
+  const paymentsByStatus = paymentStatusStats.reduce((acc, item) => {
+    acc[item._id] = item.count;
+    return acc;
+  }, {});
+
+  return ApiResponse.success(res, StatusCodes.OK, 'Payment analytics retrieved.', {
+    totalRevenue:    revenueResult[0]?.total  || 0,
+    totalEscrow:     totalEscrow[0]?.total    || 0,
+    totalRefunded:   totalRefunded[0]?.total  || 0,
+    totalDisputes,
+    openDisputes,
+    paymentsByStatus,
+    revenueByMonth,
+  });
+};
+
 module.exports = {
   getWorkers,
   getWorkerProfile,
@@ -188,4 +257,5 @@ module.exports = {
   updateUserStatus,
   verifyWorker,
   getAnalytics,
+  getPaymentAnalytics,
 };
