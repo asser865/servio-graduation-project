@@ -9,8 +9,9 @@ const Booking         = require('../bookings/booking.model');
 const ApiError        = require('../../utils/ApiError');
 const ApiResponse     = require('../../utils/ApiResponse');
 
-// ── createReview ──────────────────────────────────────────────────────────────
-// Only allow a review if the booking is completed, and belongs to this user.
+// ── CREATE REVIEW (User Only) ────────────────────────────────────────────────
+// WHAT: Allows users to rate a worker after a booking is "completed".
+// WHY:  Ensures data integrity (cannot review workers you didn't book).
 const createReview = async (req, res) => {
   const { bookingId, rating, comment } = req.body;
   const userId = req.user.id;
@@ -38,7 +39,8 @@ const createReview = async (req, res) => {
   return ApiResponse.success(res, StatusCodes.CREATED, 'Review submitted successfully.', review);
 };
 
-// ── getWorkerReviews ──────────────────────────────────────────────────────────
+// ── GET WORKER REVIEWS (Public) ──────────────────────────────────────────────
+// WHAT: Fetches all reviews for a specific worker.
 const getWorkerReviews = async (req, res) => {
   const reviews = await Review.find({ worker: req.params.workerId })
     .populate('user', 'name profileImage')
@@ -47,7 +49,8 @@ const getWorkerReviews = async (req, res) => {
   return ApiResponse.success(res, StatusCodes.OK, 'Reviews retrieved successfully.', reviews);
 };
 
-// ── deleteReview (admin only) ─────────────────────────────────────────────────
+// ── DELETE REVIEW (Admin Only) ────────────────────────────────────────────────
+// WHAT: Allows admins to remove inappropriate or fake reviews.
 const deleteReview = async (req, res) => {
   const review = await Review.findByIdAndDelete(req.params.id);
   if (!review) {

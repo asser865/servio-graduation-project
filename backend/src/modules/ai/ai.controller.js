@@ -10,7 +10,9 @@ const { StatusCodes } = require('http-status-codes');
 const ApiError        = require('../../utils/ApiError');
 const ApiResponse     = require('../../utils/ApiResponse');
 
-// ── getServiceRecommendation ──────────────────────────────────────────────────
+// ── GET AI RECOMMENDATION (Authenticated) ────────────────────────────────────
+// WHAT: Forwards a service request description to the Python AI microservice.
+// HOW:  Expects { description, location, budget }.
 const getServiceRecommendation = async (req, res) => {
   const { description, location, budget } = req.body;
 

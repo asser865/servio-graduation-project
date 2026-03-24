@@ -8,7 +8,9 @@ const { StatusCodes } = require('http-status-codes');
 const authService    = require('./auth.service');
 const ApiResponse    = require('../../utils/ApiResponse');
 
-// ── register ──────────────────────────────────────────────────────────────────
+// ── REGISTER METHOD ──────────────────────────────────────────────────────────
+// WHAT: Creates a new user account (User or Worker).
+// HOW:  Expects { name, email, password, role } in body. Returns User + JWT.
 const register = async (req, res) => {
   const { user, token } = await authService.registerUser(req.body);
 
@@ -18,7 +20,9 @@ const register = async (req, res) => {
   });
 };
 
-// ── login ─────────────────────────────────────────────────────────────────────
+// ── LOGIN METHOD ─────────────────────────────────────────────────────────────
+// WHAT: Authenticates a user and starts their session.
+// HOW:  Expects { email, password }. Returns User + JWT if credentials match.
 const login = async (req, res) => {
   const { user, token } = await authService.loginUser(req.body);
 

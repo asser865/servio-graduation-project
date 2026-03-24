@@ -17,7 +17,11 @@ const TRANSITION_RULES = {
   admin:  ['pending', 'accepted', 'rejected', 'in_progress', 'completed', 'cancelled'],
 };
 
-// ── createBooking ──────────────────────────────────────────────────────────────
+/**
+ * CREATE NEW BOOKING
+ * WHAT: Reserves a service from a specific worker.
+ * HOW:  Checks if worker and service are valid/active before creating.
+ */
 const createBooking = async (userId, data) => {
   const { workerId, serviceId, scheduledDate, address, description, images } = data;
 
@@ -47,7 +51,11 @@ const createBooking = async (userId, data) => {
   return booking.populate(['user', 'worker', 'service']);
 };
 
-// ── getUserBookings ────────────────────────────────────────────────────────────
+/**
+ * GET USER BOOKINGS
+ * WHAT: Returns all bookings made by the logged-in user.
+ * HOW:  Optional ?status filter (pending, completed, etc.).
+ */
 const getUserBookings = async (userId, { status, page = 1, limit = 10 }) => {
   const filter = { user: userId };
   if (status) filter.status = status;
@@ -67,7 +75,11 @@ const getUserBookings = async (userId, { status, page = 1, limit = 10 }) => {
   return { bookings, pagination: { total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) } };
 };
 
-// ── getWorkerBookings ─────────────────────────────────────────────────────────
+/**
+ * GET WORKER BOOKINGS
+ * WHAT: Returns all bookings assigned to the logged-in worker.
+ * HOW:  Helps workers see their incoming work schedule.
+ */
 const getWorkerBookings = async (workerId, { status, page = 1, limit = 10 }) => {
   const filter = { worker: workerId };
   if (status) filter.status = status;
@@ -87,7 +99,10 @@ const getWorkerBookings = async (workerId, { status, page = 1, limit = 10 }) => 
   return { bookings, pagination: { total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) } };
 };
 
-// ── getAllBookings (admin) ─────────────────────────────────────────────────────
+/**
+ * GET ALL BOOKINGS (Admin Only)
+ * WHAT: Global view of every booking in the system.
+ */
 const getAllBookings = async ({ status, page = 1, limit = 10 }) => {
   const filter = {};
   if (status) filter.status = status;
@@ -108,7 +123,11 @@ const getAllBookings = async ({ status, page = 1, limit = 10 }) => {
   return { bookings, pagination: { total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) } };
 };
 
-// ── updateBookingStatus ───────────────────────────────────────────────────────
+/**
+ * UPDATE BOOKING STATUS
+ * WHAT: Transitions a booking (pending -> accepted -> in_progress -> completed).
+ * WHY:  Enforces rules (e.g., users can cancel, but only workers can accept).
+ */
 const updateBookingStatus = async (bookingId, newStatus, actorId, actorRole) => {
   const booking = await Booking.findById(bookingId);
   if (!booking) {

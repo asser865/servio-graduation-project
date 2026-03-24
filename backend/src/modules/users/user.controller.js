@@ -11,7 +11,9 @@ const Booking         = require('../bookings/booking.model');
 const ApiError        = require('../../utils/ApiError');
 const ApiResponse     = require('../../utils/ApiResponse');
 
-// ── getWorkers — public ───────────────────────────────────────────────────────
+// ── GET WORKERS (Public) ─────────────────────────────────────────────────────
+// WHAT: Returns a list of all active and verified workers.
+// HOW:  Optional ?category filter. Supports pagination (?page, ?limit).
 const getWorkers = async (req, res) => {
   const { category, page = 1, limit = 10 } = req.query;
 
@@ -36,7 +38,9 @@ const getWorkers = async (req, res) => {
   });
 };
 
-// ── getWorkerProfile — public ─────────────────────────────────────────────────
+// ── GET WORKER PROFILE (Public) ──────────────────────────────────────────────
+// WHAT: Returns full details for one worker plus their 10 most recent reviews.
+// HOW:  GET /api/v1/users/workers/:id
 const getWorkerProfile = async (req, res) => {
   const worker = await User.findOne({ _id: req.params.id, role: 'worker' })
     .select('-password');
@@ -54,7 +58,9 @@ const getWorkerProfile = async (req, res) => {
   return ApiResponse.success(res, StatusCodes.OK, 'Worker profile retrieved.', { worker, reviews });
 };
 
-// ── updateProfile — authenticated ─────────────────────────────────────────────
+// ── UPDATE OWN PROFILE (Authenticated) ───────────────────────────────────────
+// WHAT: Allows any logged-in user to update their name, phone, or photo.
+// HOW:  PATCH /api/v1/users/me
 const updateProfile = async (req, res) => {
   // Prevent users from changing their role via this endpoint
   const allowedFields = ['name', 'phone', 'profileImage'];
@@ -70,7 +76,9 @@ const updateProfile = async (req, res) => {
   return ApiResponse.success(res, StatusCodes.OK, 'Profile updated successfully.', user);
 };
 
-// ── updateAvailability — worker only ─────────────────────────────────────────
+// ── UPDATE WORKER AVAILABILITY (Worker Only) ──────────────────────────────────
+// WHAT: Allows workers to set their weekly schedule days/times.
+// HOW:  PATCH /api/v1/users/me/availability
 const updateAvailability = async (req, res) => {
   const user = await User.findByIdAndUpdate(
     req.user.id,
@@ -80,7 +88,9 @@ const updateAvailability = async (req, res) => {
   return ApiResponse.success(res, StatusCodes.OK, 'Availability updated.', user);
 };
 
-// ── getAllUsers — admin ────────────────────────────────────────────────────────
+// ── GET ALL USERS (Admin Only) ───────────────────────────────────────────────
+// WHAT: Returns a list of all users in the system.
+// HOW:  Optional ?role filter. Supports pagination.
 const getAllUsers = async (req, res) => {
   const { role, page = 1, limit = 20 } = req.query;
   const filter = {};
@@ -98,7 +108,9 @@ const getAllUsers = async (req, res) => {
   });
 };
 
-// ── updateUserStatus — admin ──────────────────────────────────────────────────
+// ── UPDATE USER STATUS (Admin Only) ──────────────────────────────────────────
+// WHAT: Enables or disables a user account (banning/unbanning).
+// HOW:  PATCH /api/v1/users/:id/status { "isActive": false }
 const updateUserStatus = async (req, res) => {
   const { isActive } = req.body;
   if (typeof isActive !== 'boolean') {
@@ -115,7 +127,9 @@ const updateUserStatus = async (req, res) => {
   return ApiResponse.success(res, StatusCodes.OK, `User ${isActive ? 'activated' : 'deactivated'}.`, user);
 };
 
-// ── verifyWorker — admin ──────────────────────────────────────────────────────
+// ── VERIFY WORKER (Admin Only) ────────────────────────────────────────────────
+// WHAT: Approves a worker so they can appear in search and receive bookings.
+// HOW:  PATCH /api/v1/users/workers/:id/verify { "isVerified": true }
 const verifyWorker = async (req, res) => {
   const { isVerified } = req.body;
   if (typeof isVerified !== 'boolean') {
@@ -132,7 +146,9 @@ const verifyWorker = async (req, res) => {
   return ApiResponse.success(res, StatusCodes.OK, `Worker ${isVerified ? 'approved' : 'rejected'}.`, worker);
 };
 
-// ── getAnalytics — admin ──────────────────────────────────────────────────────
+// ── GET ANALYTICS (Admin Only) ────────────────────────────────────────────────
+// WHAT: Returns counts of users, workers, and bookings by status.
+// HOW:  GET /api/v1/users/analytics
 const getAnalytics = async (req, res) => {
   // Run all aggregations in parallel for speed
   const [

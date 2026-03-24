@@ -118,10 +118,11 @@ userSchema.index({ location: '2dsphere' });
 // ── Pre-save hook — password hashing ─────────────────────────────────────────
 // Only re-hash if the password field was actually modified (prevents double
 // hashing on save calls that only update, e.g., isActive).
-userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
+// In Mongoose v7+, async pre-hooks resolve via the returned promise.
+// Do NOT accept or call next() — doing so throws "next is not a function".
+userSchema.pre('save', async function () {
+  if (!this.isModified('password')) return;
   this.password = await bcrypt.hash(this.password, SALT_ROUNDS);
-  next();
 });
 
 // ── Instance method — password comparison ────────────────────────────────────

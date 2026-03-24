@@ -58,7 +58,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // ── Health check ──────────────────────────────────────────────────────────────
 // Simple endpoint for load balancers / uptime monitors to verify the service
 // is running without touching the database.
-app.get('/health', (req, res) => {
+app.get(['/health', '/api/v1/health'], (req, res) => {
   res.status(StatusCodes.OK).json({
     success: true,
     message: 'SERVIO API is running',

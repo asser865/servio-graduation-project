@@ -7,7 +7,11 @@ const { StatusCodes } = require('http-status-codes');
 const Service        = require('./service.model');
 const ApiError       = require('../../utils/ApiError');
 
-// ── getAllServices ─────────────────────────────────────────────────────────────
+/**
+ * LIST ALL SERVICES
+ * WHAT: Returns a paginated list of available services.
+ * HOW:  Supports ?category filtering.
+ */
 const getAllServices = async ({ category, page = 1, limit = 10 }) => {
   const filter = { isActive: true };
   if (category) filter.category = category;
@@ -34,7 +38,10 @@ const getAllServices = async ({ category, page = 1, limit = 10 }) => {
   };
 };
 
-// ── getServiceById ─────────────────────────────────────────────────────────────
+/**
+ * GET SINGLE SERVICE
+ * WHAT: Returns full details of one service by its ID.
+ */
 const getServiceById = async (id) => {
   const service = await Service.findById(id).populate('createdBy', 'name email');
   if (!service) {
@@ -43,13 +50,19 @@ const getServiceById = async (id) => {
   return service;
 };
 
-// ── createService ──────────────────────────────────────────────────────────────
+/**
+ * CREATE SERVICE (Admin Only)
+ * WHAT: Adds a new service type to the system catalog.
+ */
 const createService = async (data, adminId) => {
   const service = await Service.create({ ...data, createdBy: adminId });
   return service;
 };
 
-// ── updateService ──────────────────────────────────────────────────────────────
+/**
+ * UPDATE SERVICE (Admin Only)
+ * WHAT: Modifies an existing service's details.
+ */
 const updateService = async (id, data) => {
   const service = await Service.findByIdAndUpdate(id, data, {
     new:         true,  // return updated document
@@ -61,9 +74,11 @@ const updateService = async (id, data) => {
   return service;
 };
 
-// ── deleteService ──────────────────────────────────────────────────────────────
-// Soft-delete by setting isActive = false rather than removing the document.
-// This preserves booking history that references this service.
+/**
+ * DELETE SERVICE (Admin Only)
+ * WHAT: Deactivates a service (soft-delete).
+ * WHY:  We don't remove it completely to preserve history of old bookings.
+ */
 const deleteService = async (id) => {
   const service = await Service.findByIdAndUpdate(
     id,

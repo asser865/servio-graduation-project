@@ -8,10 +8,11 @@ const { StatusCodes } = require('http-status-codes');
 const User           = require('../users/user.model');
 const ApiError       = require('../../utils/ApiError');
 
-// ── generateToken ─────────────────────────────────────────────────────────────
-// Signs a JWT containing only { id, role } — minimal payload to keep tokens
-// compact. The secret and expiry are driven by environment variables so they
-// can be rotated without code changes.
+/**
+ * GENERATE JWT TOKEN
+ * WHAT: Creates a cryptographically signed "Passport" (JWT) for the user.
+ * WHY:  Allows the client to stay logged in without sending password every time.
+ */
 const generateToken = (userId, role) => {
   return jwt.sign(
     { id: userId, role },
@@ -20,7 +21,11 @@ const generateToken = (userId, role) => {
   );
 };
 
-// ── registerUser ─────────────────────────────────────────────────────────────
+/**
+ * REGISTER NEW USER
+ * WHAT: Validates email uniqueness and saves a new user to MongoDB.
+ * HOW:  Hashes password automatically via Model pre-save hook.
+ */
 const registerUser = async (data) => {
   const { name, email, password, phone, role } = data;
 
@@ -39,7 +44,11 @@ const registerUser = async (data) => {
   return { user, token };
 };
 
-// ── loginUser ─────────────────────────────────────────────────────────────────
+/**
+ * LOGIN USER
+ * WHAT: Verifies email and password against the database.
+ * HOW:  Uses bcrypt.compare to check hashed password. Checks if account is active.
+ */
 const loginUser = async ({ email, password }) => {
   // Explicitly select password because the schema marks it select: false.
   // We ONLY bring it into memory here, for comparison — never expose it.
