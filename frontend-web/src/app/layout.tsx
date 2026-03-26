@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Servio Frontend',
-  description: 'AI-powered home maintenance and finishing services platform',
+  title: 'SERVIO',
+  description: 'Trusted Home Services, Intelligently Matched',
 };
 
 export default function RootLayout({

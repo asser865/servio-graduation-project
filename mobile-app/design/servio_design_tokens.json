@@ -1,0 +1,167 @@
+{
+  "meta": {
+    "name": "SERVIO Mobile Design Tokens",
+    "version": "1.0",
+    "target": "Flutter",
+    "market": "Egypt"
+  },
+  "color": {
+    "light": {
+      "background": "#FAF8F5",
+      "backgroundSoft": "#F3EDE7",
+      "surface": "#FFFFFF",
+      "surfaceAlt": "#F7F3EF",
+      "textPrimary": "#222831",
+      "textSecondary": "#6B6560",
+      "border": "#DDD5CC",
+      "accent": "#9A8C73",
+      "accentLight": "#BFB09A",
+      "neutralWarm": "#E3D5CA",
+      "deepBrown": "#3C2415",
+      "navyDark": "#222831"
+    },
+    "dark": {
+      "background": "#1A1D23",
+      "backgroundSoft": "#222831",
+      "surface": "#222831",
+      "surfaceRaised": "#2D323B",
+      "textPrimary": "#E3D5CA",
+      "textSecondary": "#9A8C73",
+      "border": "#393E46"
+    },
+    "semantic": {
+      "success": {
+        "base": "#27AE60",
+        "tint12": "#27AE6020"
+      },
+      "warning": {
+        "base": "#E67E22",
+        "tint12": "#E67E2220"
+      },
+      "info": {
+        "base": "#2980B9",
+        "tint12": "#2980B920"
+      },
+      "danger": {
+        "base": "#C0392B",
+        "tint12": "#C0392B20"
+      }
+    }
+  },
+  "gradients": {
+    "brandGradient": {
+      "angle": 135,
+      "colors": [
+        "#3C2415",
+        "#222831"
+      ]
+    },
+    "accentGradient": {
+      "angle": 135,
+      "colors": [
+        "#9A8C73",
+        "#BFB09A"
+      ]
+    },
+    "warmGradient": {
+      "angle": 135,
+      "colors": [
+        "#E3D5CA",
+        "#C8B9AA"
+      ]
+    }
+  },
+  "typography": {
+    "fontFamily": {
+      "heading": "Poppins",
+      "body": "Inter"
+    },
+    "scale": {
+      "display": {
+        "sizeSp": 32,
+        "font": "Poppins",
+        "weight": 700,
+        "letterSpacingEm": -0.02
+      },
+      "h1": {
+        "sizeSp": 24,
+        "font": "Poppins",
+        "weight": "600-700",
+        "letterSpacingEm": -0.02
+      },
+      "h2": {
+        "sizeSp": 20,
+        "font": "Poppins",
+        "weight": 600,
+        "letterSpacingEm": -0.02
+      },
+      "cardTitle": {
+        "sizeSp": "16-18",
+        "font": "Poppins",
+        "weight": 600,
+        "letterSpacingEm": -0.01
+      },
+      "body": {
+        "sizeSp": "14-15",
+        "font": "Inter",
+        "weight": 400,
+        "letterSpacingEm": 0
+      },
+      "label": {
+        "sizeSp": 12,
+        "font": "Inter",
+        "weight": "500-600",
+        "letterSpacingEm": 0
+      },
+      "caption": {
+        "sizeSp": 12,
+        "font": "Inter",
+        "weight": 400,
+        "letterSpacingEm": 0
+      },
+      "metadata": {
+        "sizeSp": 11,
+        "font": "Inter",
+        "weight": 400,
+        "letterSpacingEm": 0
+      }
+    }
+  },
+  "radius": {
+    "sm": 10,
+    "md": 14,
+    "lg": 18,
+    "xl": 22,
+    "full": 9999
+  },
+  "shadow": {
+    "rest": "0 8px 20px rgba(34,40,49,0.06)",
+    "elevated": "0 14px 36px rgba(34,40,49,0.10)",
+    "darkOverlay": "rgba(34,40,49,0.40)"
+  },
+  "spacing": {
+    "screenHorizontal": 20,
+    "sectionGap": 32,
+    "cardPadding": 16,
+    "minimumTapTarget": 44
+  },
+  "motion": {
+    "masterCurve": "cubic-bezier(0.2, 0.8, 0.2, 1)",
+    "durationsMs": {
+      "micro": 300,
+      "page": 700,
+      "stackNavigation": 350,
+      "tabSwitch": 300,
+      "bottomSheet": 400,
+      "toast": 300
+    }
+  },
+  "localization": {
+    "defaultPhonePrefix": "+20",
+    "currencyFormat": "1,500 EGP",
+    "dateFormat": "DD/MM/YYYY",
+    "timeFormat": "12-hour with AM/PM",
+    "arabicTimeFormat": "12-hour with \u0635/\u0645",
+    "rtlRequired": true
+  }
+}
