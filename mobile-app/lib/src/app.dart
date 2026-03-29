@@ -3,7 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'design_system/servio_theme.dart';
 import 'design_system/servio_tokens.dart';
-import 'features/onboarding/onboarding_screen.dart';
+import 'features/customer/customer_home_screen.dart';
 
 class ServioApp extends StatelessWidget {
   const ServioApp({super.key});
@@ -27,7 +27,7 @@ class ServioApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      home: const OnboardingScreen(),
+      home: const CustomerHomeScreen(),
     );
   }
 }

@@ -9,7 +9,7 @@ import '../../design_system/widgets/servio_status_chip.dart';
 import 'ai_smart_match_screen.dart';
 import 'ai_finishing_estimator_screen.dart';
 import 'customer_profile_screen.dart';
-import 'service_detail_screen.dart';
+import 'my_bookings_screen.dart';
 import 'services_marketplace_screen.dart';
 import 'technician_profile_screen.dart';
 import '../shared/notifications_screen.dart';
@@ -39,10 +39,22 @@ class CustomerHomeScreen extends StatelessWidget {
         ],
         currentIndex: 0,
         onTap: (int index) {
-          if (index == 2) {
+          if (index == 1) {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const ServicesMarketplaceScreen(),
+              ),
+            );
+          } else if (index == 2) {
             Navigator.of(context).push(
               MaterialPageRoute<void>(
                 builder: (_) => const AiSmartMatchScreen(),
+              ),
+            );
+          } else if (index == 3) {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const MyBookingsScreen(),
               ),
             );
           } else if (index == 4) {
@@ -63,6 +75,7 @@ class CustomerHomeScreen extends StatelessWidget {
                 minExtentValue: 84,
                 maxExtentValue: 84,
                 child: Container(
+                  height: 84,
                   color: Theme.of(context).scaffoldBackgroundColor,
                   padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
                   child: Row(

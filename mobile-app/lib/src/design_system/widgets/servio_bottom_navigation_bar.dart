@@ -35,9 +35,9 @@ class ServioBottomNavigationBar extends StatelessWidget {
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.only(left: 16, right: 16, bottom: 12),
+        padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
         child: Container(
-          height: 64,
+          height: 76,
           decoration: BoxDecoration(
             color: isDark ? servio.surfaceRaised : Theme.of(context).colorScheme.surface,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(ServioRadius.xl)),
@@ -53,7 +53,7 @@ class ServioBottomNavigationBar extends StatelessWidget {
 
               return Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                   child: InkWell(
                     borderRadius: BorderRadius.circular(ServioRadius.xl),
                     onTap: () => onTap(index),
@@ -68,22 +68,24 @@ class ServioBottomNavigationBar extends StatelessWidget {
                             : Colors.transparent,
                       ),
                       padding: EdgeInsets.symmetric(
-                        vertical: item.highlighted ? 4 : 6,
+                        vertical: item.highlighted ? 6 : 8,
                         horizontal: 8,
                       ),
-                      transform: Matrix4.identity()..translate(0.0, item.highlighted ? -6.0 : 0.0),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: <Widget>[
                           Icon(
                             item.icon,
+                            size: item.highlighted ? 24 : 22,
                             color: isActive
                                 ? (item.highlighted ? Colors.white : servio.accent)
                                 : servio.textSecondary,
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 2),
                           Text(
                             item.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.labelSmall?.copyWith(
                                   color: isActive
                                       ? (item.highlighted ? Colors.white : servio.accent)
