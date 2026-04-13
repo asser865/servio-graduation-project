@@ -1,0 +1,331 @@
+{
+	"info": {
+		"_postman_id": "8b9cad0e-1f20-4192-bff0-e1e043ce43ce",
+		"name": "SERVIO API - Documented",
+		"description": "Complete documentation for the SERVIO Backend API. Includes automated token saving.\n\n### Setup\n1. Import this collection.\n2. Create an Environment named `SERVIO Local`.\n3. Add variable `BASE_URL` with value `http://localhost:5000/api/v1`.\n4. Add variable `TOKEN` (leave blank).",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "0. Health Check",
+			"description": "WHAT: Verifies the server is alive.\nHOW: Response 200 means OK.\nWHO: Public (No Auth).",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{BASE_URL}}/../../health",
+					"host": ["{{BASE_URL}}"],
+					"path": ["..", "..", "health"]
+				}
+			}
+		},
+		{
+			"name": "1. Authentication",
+			"item": [
+				{
+					"name": "Register User",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"const res = pm.response.json();",
+									"if (res.success && res.data.token) {",
+									"    pm.environment.set(\"TOKEN\", res.data.token);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"description": "WHAT: Creates a new User or Worker account.\nHOW: Provide name, email, password, and role ('user' or 'worker').\nWHO: Public.",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Ahmed Ali\",\n  \"email\": \"ahmed@test.com\",\n  \"password\": \"secret123\",\n  \"role\": \"user\"\n}",
+							"options": { "json": { "language": "json" } }
+						},
+						"url": { "raw": "{{BASE_URL}}/auth/register", "host": ["{{BASE_URL}}"], "path": ["auth", "register"] }
+					}
+				},
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"const res = pm.response.json();",
+									"if (res.success && res.data.token) {",
+									"    pm.environment.set(\"TOKEN\", res.data.token);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"description": "WHAT: Logs in and returns a JWT token.\nNOTE: The token is automatically saved to your 'TOKEN' environment variable.\nWHO: Public.",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"ahmed@test.com\",\n  \"password\": \"secret123\"\n}",
+							"options": { "json": { "language": "json" } }
+						},
+						"url": { "raw": "{{BASE_URL}}/auth/login", "host": ["{{BASE_URL}}"], "path": ["auth", "login"] }
+					}
+				}
+			]
+		},
+		{
+			"name": "2. Services",
+			"item": [
+				{
+					"name": "List All Services",
+					"description": "WHAT: Get all active services.\nWHO: Public.",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": { "raw": "{{BASE_URL}}/services?category=plumbing", "host": ["{{BASE_URL}}"], "path": ["services"], "query": [{ "key": "category", "value": "plumbing" }] }
+					}
+				},
+				{
+					"name": "Create Service (Admin)",
+					"description": "WHAT: Create a new service category.\nWHO: Admin Only.",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{TOKEN}}", "type": "string" }] },
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Plumbing Repair\",\n  \"description\": \"Fix leaks and pipes\",\n  \"category\": \"plumbing\",\n  \"basePrice\": 200,\n  \"priceUnit\": \"per_hour\"\n}",
+							"options": { "json": { "language": "json" } }
+						},
+						"url": { "raw": "{{BASE_URL}}/services", "host": ["{{BASE_URL}}"], "path": ["services"] }
+					}
+				}
+			]
+		},
+		{
+			"name": "3. Users & Workers",
+			"item": [
+				{
+					"name": "Find Workers",
+					"description": "WHAT: List verified workers by category.\nWHO: Public.",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": { "raw": "{{BASE_URL}}/users/workers?category=plumbing", "host": ["{{BASE_URL}}"], "path": ["users", "workers"], "query": [{ "key": "category", "value": "plumbing" }] }
+					}
+				},
+				{
+					"name": "Verify Worker (Admin)",
+					"description": "WHAT: Approve a worker account.\nWHO: Admin Only.",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{TOKEN}}", "type": "string" }] },
+						"method": "PATCH",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"isVerified\": true}",
+							"options": { "json": { "language": "json" } }
+						},
+						"url": { "raw": "{{BASE_URL}}/users/workers/:id/verify", "host": ["{{BASE_URL}}"], "path": ["users", "workers", ":id", "verify"], "variable": [{ "key": "id", "value": "WORKER_ID_HERE" }] }
+					}
+				}
+			]
+		},
+		{
+			"name": "4. Bookings",
+			"item": [
+				{
+					"name": "Create Booking",
+					"description": "WHAT: Book a worker for a service.\nWHO: User Only.",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{TOKEN}}", "type": "string" }] },
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"workerId\": \"WORKER_ID\",\n  \"serviceId\": \"SERVICE_ID\",\n  \"scheduledDate\": \"2026-05-01T10:00:00Z\",\n  \"address\": \"Cairo, Egypt\",\n  \"description\": \"Sink leaking\"\n}",
+							"options": { "json": { "language": "json" } }
+						},
+						"url": { "raw": "{{BASE_URL}}/bookings", "host": ["{{BASE_URL}}"], "path": ["bookings"] }
+					}
+				},
+				{
+					"name": "Update Status (Role Based)",
+					"description": "WHAT: Change booking status (accepted, in_progress, completed, cancelled).\nWHO: Worker, User, or Admin.",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{TOKEN}}", "type": "string" }] },
+						"method": "PATCH",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"status\": \"accepted\"}",
+							"options": { "json": { "language": "json" } }
+						},
+						"url": { "raw": "{{BASE_URL}}/bookings/:id/status", "host": ["{{BASE_URL}}"], "path": ["bookings", ":id", "status"], "variable": [{ "key": "id", "value": "ID" }] }
+					}
+				}
+			]
+		},
+		{
+			"name": "5. AI & Analytics",
+			"item": [
+				{
+					"name": "AI Recommendation",
+					"description": "WHAT: Get a worker recommendation based on description.\nWHO: Authenticated Users.",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{TOKEN}}", "type": "string" }] },
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"description\": \"My wall needs painting and I have a small budget\",\n  \"budget\": 300\n}",
+							"options": { "json": { "language": "json" } }
+						},
+						"url": { "raw": "{{BASE_URL}}/ai/recommend", "host": ["{{BASE_URL}}"], "path": ["ai", "recommend"] }
+					}
+				},
+				{
+					"name": "Admin Analytics",
+					"description": "WHAT: Get total counts of users and bookings by status.\nWHO: Admin Only.",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{TOKEN}}", "type": "string" }] },
+						"method": "GET",
+						"header": [],
+						"url": { "raw": "{{BASE_URL}}/users/analytics", "host": ["{{BASE_URL}}"], "path": ["users", "analytics"] }
+					}
+				},
+				{
+					"name": "Admin Payment Analytics",
+					"description": "WHAT: Financial dashboard — revenue, escrow, refunds, disputes.\nWHO: Admin Only.",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{TOKEN}}", "type": "string" }] },
+						"method": "GET",
+						"header": [],
+						"url": { "raw": "{{BASE_URL}}/users/analytics/payments", "host": ["{{BASE_URL}}"], "path": ["users", "analytics", "payments"] }
+					}
+				}
+			]
+		},
+		{
+			"name": "6. Payments (Escrow)",
+			"item": [
+				{
+					"name": "Create Payment Intent",
+					"description": "WHAT: Start payment flow. Returns clientSecret for Stripe.js.\nHOW: Body needs bookingId (must be 'accepted' status).\nWHO: User Only.\nFAILURES: 403 if not your booking | 409 if already paid | 400 if booking not accepted.",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{TOKEN}}", "type": "string" }] },
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"bookingId\": \"BOOKING_ID_HERE\"\n}",
+							"options": { "json": { "language": "json" } }
+						},
+						"url": { "raw": "{{BASE_URL}}/payments/intent", "host": ["{{BASE_URL}}"], "path": ["payments", "intent"] }
+					}
+				},
+				{
+					"name": "Confirm Completion (User → Release Escrow)",
+					"description": "WHAT: User confirms service done → funds released to worker.\nHOW: bookingId in URL (must be 'completed' status).\nWHO: User Only (must be booking owner).\nFAILURES: 403 if not your booking | 400 if booking not completed.",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{TOKEN}}", "type": "string" }] },
+						"method": "POST",
+						"header": [],
+						"url": { "raw": "{{BASE_URL}}/payments/confirm/:bookingId", "host": ["{{BASE_URL}}"], "path": ["payments", "confirm", ":bookingId"], "variable": [{ "key": "bookingId", "value": "BOOKING_ID_HERE" }] }
+					}
+				},
+				{
+					"name": "Get Payment for Booking",
+					"description": "WHAT: View payment details for a specific booking.\nWHO: User (own booking), Worker (own booking), Admin (any).",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{TOKEN}}", "type": "string" }] },
+						"method": "GET",
+						"header": [],
+						"url": { "raw": "{{BASE_URL}}/payments/booking/:bookingId", "host": ["{{BASE_URL}}"], "path": ["payments", "booking", ":bookingId"], "variable": [{ "key": "bookingId", "value": "BOOKING_ID_HERE" }] }
+					}
+				},
+				{
+					"name": "Worker Earnings Dashboard",
+					"description": "WHAT: View wallet balance + payment history.\nHOW: Optional ?dateFrom, ?dateTo, ?status filters.\nWHO: Worker Only.",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{TOKEN}}", "type": "string" }] },
+						"method": "GET",
+						"header": [],
+						"url": { "raw": "{{BASE_URL}}/payments/earnings", "host": ["{{BASE_URL}}"], "path": ["payments", "earnings"] }
+					}
+				},
+				{
+					"name": "Admin Refund Payment",
+					"description": "WHAT: Admin manually refunds a held or disputed payment.\nWHO: Admin Only.\nFAILURES: 400 if payment already released or refunded.",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{TOKEN}}", "type": "string" }] },
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"reason\": \"Admin investigation complete — user refunded.\"\n}",
+							"options": { "json": { "language": "json" } }
+						},
+						"url": { "raw": "{{BASE_URL}}/payments/refund/:paymentId", "host": ["{{BASE_URL}}"], "path": ["payments", "refund", ":paymentId"], "variable": [{ "key": "paymentId", "value": "PAYMENT_ID_HERE" }] }
+					}
+				}
+			]
+		},
+		{
+			"name": "7. Disputes",
+			"item": [
+				{
+					"name": "Open Dispute",
+					"description": "WHAT: User opens a dispute to freeze escrow and request admin review.\nHOW: Booking must be in_progress or completed with held payment.\nWHO: User Only.\nFAILURES: 409 if dispute already open | 400 if payment not held.",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{TOKEN}}", "type": "string" }] },
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"bookingId\": \"BOOKING_ID_HERE\",\n  \"reason\": \"The worker did not complete work as described in the service agreement.\",\n  \"evidence\": [\"https://example.com/photo1.jpg\"]\n}",
+							"options": { "json": { "language": "json" } }
+						},
+						"url": { "raw": "{{BASE_URL}}/payments/disputes", "host": ["{{BASE_URL}}"], "path": ["payments", "disputes"] }
+					}
+				},
+				{
+					"name": "Resolve Dispute (Admin)",
+					"description": "WHAT: Admin resolves dispute — decision to refund user OR release to worker.\nHOW: decision = 'refund' | 'release'\nWHO: Admin Only.",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{TOKEN}}", "type": "string" }] },
+						"method": "PATCH",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"resolution\": \"After reviewing evidence, the worker did not meet service requirements.\",\n  \"decision\": \"refund\"\n}",
+							"options": { "json": { "language": "json" } }
+						},
+						"url": { "raw": "{{BASE_URL}}/payments/disputes/:id/resolve", "host": ["{{BASE_URL}}"], "path": ["payments", "disputes", ":id", "resolve"], "variable": [{ "key": "id", "value": "DISPUTE_ID_HERE" }] }
+					}
+				},
+				{
+					"name": "Get All Disputes (Admin)",
+					"description": "WHAT: Paginated list of all disputes.\nHOW: Optional ?status=open|reviewing|resolved_refund|resolved_release\nWHO: Admin Only.",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{TOKEN}}", "type": "string" }] },
+						"method": "GET",
+						"header": [],
+						"url": { "raw": "{{BASE_URL}}/payments/disputes?status=open", "host": ["{{BASE_URL}}"], "path": ["payments", "disputes"], "query": [{ "key": "status", "value": "open" }] }
+					}
+				}
+			]
+		}
+	],
+	"variable": [
+		{ "key": "BASE_URL", "value": "http://localhost:5000/api/v1" },
+		{ "key": "TOKEN", "value": "" }
+	]
+}
