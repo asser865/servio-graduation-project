@@ -161,6 +161,33 @@ if (booking === DEFAULT_BOOKING) {
   } catch (_) {}
 }
 
+// Date/Time Translation Helper
+function translateDateTime(str) {
+  if (!str) return '—';
+  const lang = localStorage.getItem('servio_lang') || 'en';
+  if (lang !== 'ar') return str;
+
+  const monthsMap = {
+    'Jan': 'يناير', 'Feb': 'فبراير', 'Mar': 'مارس', 'Apr': 'أبريل',
+    'May': 'مايو', 'Jun': 'يونيو', 'Jul': 'يوليو', 'Aug': 'أغسطس',
+    'Sep': 'سبتمبر', 'Oct': 'أكتوبر', 'Nov': 'نوفمبر', 'Dec': 'ديسمبر',
+    'January': 'يناير', 'February': 'فبراير', 'March': 'مارس', 'April': 'أبريل',
+    'June': 'يونيو', 'July': 'يوليو', 'August': 'أغسطس',
+    'September': 'سبتمبر', 'October': 'أكتوبر', 'November': 'نوفمبر', 'December': 'ديسمبر',
+    'Sun': 'الأحد', 'Mon': 'الاثنين', 'Tue': 'الثلاثاء', 'Wed': 'الأربعاء', 'Thu': 'الخميس', 'Fri': 'الجمعة', 'Sat': 'السبت'
+  };
+
+  const ampmMap = {
+    'AM': 'صباحاً',
+    'PM': 'مساءً'
+  };
+
+  let res = str;
+  Object.keys(monthsMap).forEach(k => { res = res.replace(new RegExp('\\b' + k + '\\b', 'g'), monthsMap[k]); });
+  Object.keys(ampmMap).forEach(k => { res = res.replace(new RegExp('\\b' + k + '\\b', 'g'), ampmMap[k]); });
+  return res;
+}
+
 // ─── Render ───────────────────────────────────────────────────────────────────
 function renderPage(bk) {
   const t = (window.t || function(k){ return k; });
@@ -174,8 +201,8 @@ function renderPage(bk) {
     bkService.removeAttribute('data-i18n');
     bkService.textContent = bk.service;
   }
-  bkDate.textContent    = bk.date;
-  bkTime.textContent    = bk.time;
+  bkDate.textContent    = translateDateTime(bk.date);
+  bkTime.textContent    = translateDateTime(bk.time);
 
   // Status badge
   const statusKey = bk.status || 'Booked';
@@ -200,7 +227,9 @@ function renderPage(bk) {
   const tech = bk.technician || {};
   bkTechInitials.textContent = tech.initials || getInitials(tech.name || '');
   bkTechName.textContent     = tech.name      || '—';
-  bkTechSpecialty.textContent = tech.specialty || '—';
+  const roleKey = 'tech_role_hvac';
+  bkTechSpecialty.setAttribute('data-i18n', roleKey);
+  bkTechSpecialty.textContent = t(roleKey) || tech.specialty || '—';
   bkTechRating.textContent   = tech.rating    || '—';
   if (tech.phone) bkCallLink.href = `tel:${tech.phone}`;
 
@@ -210,8 +239,8 @@ function renderPage(bk) {
   bkCategory.textContent = t(catKey) || bk.category || bk.service || '—';
 
   bkLocation.textContent             = bk.location       || '—';
-  bkScheduledDate.textContent        = bk.scheduledDate  || bk.date || '—';
-  bkScheduledTime.textContent        = bk.scheduledTime  || bk.time || '—';
+  bkScheduledDate.textContent        = translateDateTime(bk.scheduledDate  || bk.date);
+  bkScheduledTime.textContent        = translateDateTime(bk.scheduledTime  || bk.time);
   bkDuration.textContent             = bk.duration       || '—';
 
   const payMethKey = 'payment_' + (bk.paymentMethod || '').toLowerCase().replace(' ', '_');

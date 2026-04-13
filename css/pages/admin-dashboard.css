@@ -540,7 +540,31 @@
 }
 
 /* ── Tables ─────────────────────────────────── */
-.admin-table-wrap { overflow-x: auto; }
+.admin-table-wrap { 
+  overflow-x: auto; 
+  position: relative;
+}
+/* Visual indicator that there's more content to scroll */
+.admin-table-wrap::after {
+  content: '';
+  position: absolute;
+  top: 0; right: 0; bottom: 0;
+  width: 30px;
+  background: linear-gradient(to right, transparent, rgba(0,0,0,0.03));
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.3s;
+}
+.admin-table-wrap::-webkit-scrollbar {
+  height: 6px;
+}
+.admin-table-wrap::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 10px;
+}
+.admin-table-wrap::-webkit-scrollbar-track {
+  background: transparent;
+}
 .admin-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
 .admin-table th {
   text-align: left;
@@ -557,7 +581,7 @@
 .admin-table .is-hidden { display: none; }
 .table-actions {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   flex-wrap: nowrap;
   align-items: center;
 }
@@ -588,12 +612,11 @@
 
 /* ── modern User ID column styling ── */
 .user-id-monospace {
-  font-family: 'Space Mono', monospace;
-  font-weight: 600;
+  font-family: 'Space Mono', 'Cascadia Code', monospace;
+  font-weight: 700;
   color: var(--color-accent);
   font-size: 0.85rem;
   letter-spacing: -0.01em;
-  opacity: 0.9;
 }
 
 /* ── Centered Headers & Actions utility ── */
@@ -1108,6 +1131,8 @@
   background: var(--color-surface);
   color: var(--color-text);
   font-family: inherit;
+  white-space: nowrap;
+  min-width: max-content;
 }
 
 .dispute-btn svg { flex-shrink: 0; }
@@ -2290,14 +2315,14 @@
   border-spacing: 0;
 }
 .bk-table th {
-  padding: 12px 16px;
-  font-size: 0.75rem;
+  padding: 10px 12px;
+  font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--color-text-light);
   border-bottom: 1px solid var(--color-border);
   background: var(--color-surface);
-  font-weight: 600;
+  font-weight: 700;
   white-space: nowrap;
   text-align: start;
 }
@@ -2316,18 +2341,17 @@
 .bk-action-btn[data-action="delete-service"]:hover { background: var(--color-danger) !important; color: #fff !important; }
 
 .bk-table td {
-  padding: 14px 16px;
-  font-size: 0.875rem;
+  padding: 10px 12px;
+  font-size: 0.85rem;
   border-bottom: 1px solid var(--color-border);
   color: var(--color-text);
   vertical-align: middle;
-  white-space: nowrap;
 }
 .bk-table td span:not([class*="bk-badge"]):not([class*="bk-pay-badge"]),
 .bk-table td div {
-  font-weight: 500 !important;
+  font-weight: 500;
   font-family: inherit !important;
-  font-size: 0.875rem !important;
+  font-size: 0.85rem !important;
   color: var(--color-text) !important;
 }
 .bk-table td div[style*="font-size:0.75rem"] {
@@ -2351,6 +2375,12 @@
 .bk-table td.center-align,
 .center-align { 
   text-align: center !important; 
+}
+.bk-table td.t-specialty,
+.bk-table td div[data-i18n*="loc_"] {
+  white-space: normal !important;
+  min-width: 140px;
+  line-height: 1.4;
 }
 
 /* Badges */
@@ -2420,6 +2450,8 @@
   font-weight: 500;
   transition: all 0.2s;
   cursor: pointer;
+  white-space: nowrap;
+  min-width: max-content;
 }
 .bk-action-btn--xs {
   padding: 4px 10px;

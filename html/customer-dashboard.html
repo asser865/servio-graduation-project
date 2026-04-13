@@ -144,17 +144,6 @@
     </li>
     <li role="none">
       <button class="dash-nav__btn" role="tab" aria-selected="false"
-              aria-controls="panel-settings" id="tab-settings" data-tab="settings" title="Settings">
-        <span class="dash-nav__icon-slot" aria-hidden="true">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M5.34 17.66l-1.41 1.41M21 12h-2M5 12H3M18.36 18.36l-1.41-1.41M7.05 7.05L5.64 5.64M12 3V1M12 21v2"/>
-        </svg>
-        </span>
-        <span class="dash-nav__label" data-i18n="cust_nav_settings">Settings</span>
-      </button>
-    </li>
-    <li role="none">
-      <button class="dash-nav__btn" role="tab" aria-selected="false"
               aria-controls="panel-job-posts" id="tab-job-posts" data-tab="job-posts"
               title="Job Posts">
         <span class="dash-nav__icon-slot" aria-hidden="true">
@@ -175,6 +164,18 @@
         </svg>
         </span>
         <span class="dash-nav__label" data-i18n="cust_nav_proposals">Proposals</span>
+      </button>
+    </li>
+    <li role="none">
+      <button class="dash-nav__btn" role="tab" aria-selected="false"
+              aria-controls="panel-settings" id="tab-settings" data-tab="settings" title="Settings">
+        <span class="dash-nav__icon-slot" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>
+          <circle cx="8" cy="6" r="2" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="10" cy="18" r="2" fill="currentColor" stroke="none"/>
+        </svg>
+        </span>
+        <span class="dash-nav__label" data-i18n="cust_nav_settings">Settings</span>
       </button>
     </li>
   </ul>
@@ -300,11 +301,11 @@
                     <path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
                   </svg>
                 </div>
-                <span class="dash-stat-card__change dash-stat-card__change--blue">This month</span>
+                <span class="dash-stat-card__change dash-stat-card__change--blue" data-i18n="cust_stat_this_month">This month</span>
               </div>
               <div class="dash-stat-card__value dash-stat-card__value--lg dash-stat-card__value--currency" data-stat="total-spent">— EGP</div>
-              <div class="dash-stat-card__label">Total Spent</div>
-              <p class="dash-stat-card__context">Across all completed bookings this period.</p>
+              <div class="dash-stat-card__label" data-i18n="cust_stat_total_spent">Total Spent</div>
+              <p class="dash-stat-card__context" data-i18n="cust_stat_total_spent_ctx">Across all completed bookings this period.</p>
               <div class="dash-stat-card__bar"><div class="dash-stat-card__bar-fill" style="width:55%;background:#2563EB;"></div></div>
             </div>
           </div>
@@ -355,32 +356,32 @@
             <div class="dash-overview-card dash-schedule-card">
               <div class="dash-overview-card__header">
                 <h3 class="dash-overview-card__title">
-                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:inline;vertical-align:-2px;margin-right:6px;opacity:.7"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                  Upcoming Schedule
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:inline;vertical-align:-2px;margin-inline-end:6px;opacity:.7"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  <span data-i18n="cust_schedule_title">Upcoming Schedule</span>
                 </h3>
                 <button class="dash-overview-card__link" type="button" data-tab-link="bookings" data-i18n="cust_view_all">View all</button>
               </div>
 
               <!-- Next appointment spotlight -->
               <div class="dash-next-appt">
-                <div class="dash-next-appt__badge">NEXT UP</div>
+                <div class="dash-next-appt__badge" data-i18n="cust_next_up">NEXT UP</div>
                 <div class="dash-next-appt__body">
                   <div class="dash-next-appt__service-icon">
                     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#9A8C73" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"/><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"/></svg>
                   </div>
                   <div class="dash-next-appt__info">
-                    <span class="dash-next-appt__title">Plumbing Repair</span>
+                    <span class="dash-next-appt__title" data-i18n="home_cat_plumbing">Plumbing Repair</span>
                     <span class="dash-next-appt__pro">Mohamed Ali</span>
                   </div>
                   <div class="dash-next-appt__time">
-                    <span class="dash-next-appt__countdown">Today</span>
+                    <span class="dash-next-appt__countdown" data-i18n="cust_today">Today</span>
                     <span class="dash-next-appt__hour">10:00 AM</span>
                   </div>
                 </div>
                 <div class="dash-next-appt__track">
                   <div class="dash-next-appt__track-fill" style="width:40%"></div>
                 </div>
-                <span class="dash-next-appt__track-label">In ~3 hours</span>
+                <span class="dash-next-appt__track-label" data-i18n="cust_in_relative">In ~3 hours</span>
               </div>
 
               <!-- Upcoming timeline -->
@@ -388,14 +389,14 @@
                 <li class="dash-schedule-item">
                   <div class="dash-schedule-item__dot dash-schedule-item__dot--pending"></div>
                   <div class="dash-schedule-item__date">
-                    <span class="dash-schedule-item__day">Tomorrow</span>
+                    <span class="dash-schedule-item__day" data-i18n="cust_tomorrow">Tomorrow</span>
                     <span class="dash-schedule-item__hour">2:00 PM</span>
                   </div>
                   <div class="dash-schedule-item__detail">
-                    <span class="dash-schedule-item__service">Electrical Wiring</span>
+                    <span class="dash-schedule-item__service" data-i18n="home_cat_electrical">Electrical Wiring</span>
                     <span class="dash-schedule-item__pro">Khaled Hassan</span>
                   </div>
-                  <span class="dash-schedule-item__status dash-schedule-item__status--pending">Pending</span>
+                  <span class="dash-schedule-item__status dash-schedule-item__status--pending" data-i18n="status_pending">Pending</span>
                 </li>
                 <li class="dash-schedule-item">
                   <div class="dash-schedule-item__dot dash-schedule-item__dot--done"></div>
@@ -404,14 +405,14 @@
                     <span class="dash-schedule-item__hour">9:00 AM</span>
                   </div>
                   <div class="dash-schedule-item__detail">
-                    <span class="dash-schedule-item__service">Interior Painting</span>
+                    <span class="dash-schedule-item__service" data-i18n="home_cat_painting">Interior Painting</span>
                     <span class="dash-schedule-item__pro">Ahmed Salah</span>
                   </div>
-                  <span class="dash-schedule-item__status dash-schedule-item__status--done">Done</span>
+                  <span class="dash-schedule-item__status dash-schedule-item__status--done" data-i18n="status_complete">Done</span>
                 </li>
               </ul>
 
-              <a class="dash-schedule-cta" href="./booking.html">
+              <a class="dash-schedule-cta" href="./booking.html" data-i18n="cust_book_new">
                 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 Book a new service
               </a>
@@ -456,7 +457,7 @@
                 <div class="booking-card__provider-wrap">
                   <img src="https://i.pravatar.cc/150?u=omar" alt="Omar" class="provider-avatar">
                   <div class="booking-card__provider-info">
-                    <span class="provider-tech-label">Technician</span>
+                    <span class="provider-tech-label" data-i18n="cust_technician_label">Technician</span>
                     <span class="provider-name">Omar Tarek</span>
                   </div>
                   <a href="./technician-profile.html" class="provider-view-profile" data-i18n="cust_view_profile">View Profile</a>
@@ -560,13 +561,13 @@
           <div class="invoice-content">
             <h4 class="invoice-content__title" data-i18n="cust_invoice_breakdown">Service Invoice Breakdown</h4>
             <div class="invoice-table">
-              <div class="invoice-table__row"><span>Pipe Inspection</span><span>250.00 EGP</span></div>
-              <div class="invoice-table__row"><span>Leak Repair</span><span>150.00 EGP</span></div>
-              <div class="invoice-table__row"><span>Parts & Materials</span><span>100.00 EGP</span></div>
+              <div class="invoice-table__row"><span data-i18n="cust_invoice_pipe_ins">Pipe Inspection</span><span>250.00 EGP</span></div>
+              <div class="invoice-table__row"><span data-i18n="cust_invoice_leak_rep">Leak Repair</span><span>150.00 EGP</span></div>
+              <div class="invoice-table__row"><span data-i18n="cust_invoice_parts">Parts & Materials</span><span>100.00 EGP</span></div>
               <div class="invoice-table__row is-total"><span data-i18n="cust_grand_total">Grand Total</span><span>500.00 EGP</span></div>
             </div>
             <div class="booking-card__invoice-footer">
-              <p>Payment Method: <strong>Credit Card (Ending 4242)</strong></p>
+              <p><span data-i18n="cust_payment_method">Payment Method</span>: <strong data-i18n="cust_pay_card_visa">Credit Card (Ending 4242)</strong></p>
             </div>
           </div>
         </div>
@@ -589,7 +590,7 @@
                 <div class="booking-card__provider-wrap">
                   <img src="https://i.pravatar.cc/150?u=khaled" alt="Khaled" class="provider-avatar">
                   <div class="booking-card__provider-info">
-                    <span class="provider-tech-label">Technician</span>
+                    <span class="provider-tech-label" data-i18n="cust_technician_label">Technician</span>
                     <span class="provider-name">Khaled Samir</span>
                   </div>
                   <a href="./technician-profile.html" class="provider-view-profile" data-i18n="cust_view_profile">View Profile</a>
@@ -695,12 +696,12 @@
           <div class="invoice-content">
             <h4 class="invoice-content__title" data-i18n="cust_invoice_breakdown">Service Invoice Breakdown</h4>
             <div class="invoice-table">
-              <div class="invoice-table__row"><span>Panel Inspection</span><span>400.00 EGP</span></div>
-              <div class="invoice-table__row"><span>Wiring Optimization</span><span>500.00 EGP</span></div>
+              <div class="invoice-table__row"><span data-i18n="cust_invoice_panel_ins">Panel Inspection</span><span>400.00 EGP</span></div>
+              <div class="invoice-table__row"><span data-i18n="cust_invoice_wiring">Wiring Optimization</span><span>500.00 EGP</span></div>
               <div class="invoice-table__row is-total"><span data-i18n="cust_grand_total">Grand Total</span><span>900.00 EGP</span></div>
             </div>
             <div class="booking-card__invoice-footer">
-              <p>Payment Method: <strong>Cash on Arrival</strong></p>
+              <p><span data-i18n="cust_payment_method">Payment Method</span>: <strong data-i18n="cust_pay_cash_arrival">Cash on Arrival</strong></p>
             </div>
           </div>
         </div>
@@ -728,7 +729,7 @@
                 <div class="booking-card__provider-wrap">
                   <img src="https://i.pravatar.cc/150?u=sara" alt="Sara" class="provider-avatar">
                   <div class="booking-card__provider-info">
-                    <span class="provider-tech-label">Technician</span>
+                    <span class="provider-tech-label" data-i18n="cust_technician_label">Technician</span>
                     <span class="provider-name">Sara Mahmoud</span>
                   </div>
                   <a href="./technician-profile.html" class="provider-view-profile" data-i18n="cust_view_profile">View Profile</a>
@@ -830,12 +831,12 @@
           <div class="invoice-content">
             <h4 class="invoice-content__title" data-i18n="cust_invoice_breakdown">Service Invoice Breakdown</h4>
             <div class="invoice-table">
-              <div class="invoice-table__row"><span>Deep Cleaning Base</span><span>800.00 EGP</span></div>
-              <div class="invoice-table__row"><span>Filter Replacement</span><span>400.00 EGP</span></div>
+              <div class="invoice-table__row"><span data-i18n="cust_invoice_ac_clean">Deep Cleaning Base</span><span>800.00 EGP</span></div>
+              <div class="invoice-table__row"><span data-i18n="cust_invoice_filter">Filter Replacement</span><span>400.00 EGP</span></div>
               <div class="invoice-table__row is-total"><span data-i18n="cust_grand_total">Grand Total</span><span>1,200.00 EGP</span></div>
             </div>
             <div class="booking-card__invoice-footer">
-              <p>Payment Method: <strong>SERVIO Wallet</strong></p>
+              <p><span data-i18n="cust_payment_method">Payment Method</span>: <strong data-i18n="cust_pay_wallet">SERVIO Wallet</strong></p>
             </div>
           </div>
         </div>
@@ -1158,8 +1159,8 @@
       <h3 class="fav-card-v2__name">Omar Tarek</h3>
       <div class="fav-card-v2__meta">
         <span class="fav-card-v2__rating">★ 4.9</span>
-        <span class="fav-card-v2__specialty">Master Plumber</span>
-        <span style="font-size:0.72rem;color:var(--color-text-light);">47 jobs</span>
+        <span class="fav-card-v2__specialty" data-i18n="tech_role_master_plumber">Master Plumber</span>
+        <span class="fav-card-v2__jobs-count" style="font-size:0.72rem;color:var(--color-text-light);">47 jobs</span>
       </div>
     </div>
     <div class="fav-card-v2__actions">
@@ -1174,8 +1175,8 @@
       <h3 class="fav-card-v2__name">Khaled Samir</h3>
       <div class="fav-card-v2__meta">
         <span class="fav-card-v2__rating">★ 4.7</span>
-        <span class="fav-card-v2__specialty">Electrician</span>
-        <span style="font-size:0.72rem;color:var(--color-text-light);">31 jobs</span>
+        <span class="fav-card-v2__specialty" data-i18n="tech_role_electrician">Electrician</span>
+        <span class="fav-card-v2__jobs-count" style="font-size:0.72rem;color:var(--color-text-light);">31 jobs</span>
       </div>
     </div>
     <div class="fav-card-v2__actions">
@@ -1190,8 +1191,8 @@
       <h3 class="fav-card-v2__name">Youssef Ali</h3>
       <div class="fav-card-v2__meta">
         <span class="fav-card-v2__rating">★ 4.8</span>
-        <span class="fav-card-v2__specialty">Painter</span>
-        <span style="font-size:0.72rem;color:var(--color-text-light);">22 jobs</span>
+        <span class="fav-card-v2__specialty" data-i18n="tech_role_painter">Painter</span>
+        <span class="fav-card-v2__jobs-count" style="font-size:0.72rem;color:var(--color-text-light);">22 jobs</span>
       </div>
     </div>
     <div class="fav-card-v2__actions">
@@ -1270,11 +1271,61 @@
     <p class="dash-panel__subtitle" data-i18n="cust_settings_sub">Update your profile and account details.</p>
   </div>
 
-  <div class="settings-form-wrap">
+  <!-- ── Settings horizontal tab bar ── -->
+  <nav class="stab-bar" role="tablist" aria-label="Settings sections" id="settings-tab-bar">
+    <button class="stab-btn stab-btn--active" role="tab" aria-selected="true" aria-controls="stab-profile" data-stab="profile" id="stab-btn-profile">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <span data-i18n="cust_stab_profile">Profile</span>
+    </button>
+    <button class="stab-btn" role="tab" aria-selected="false" aria-controls="stab-security" data-stab="security" id="stab-btn-security">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      <span data-i18n="cust_stab_security">Security</span>
+    </button>
+    <button class="stab-btn" role="tab" aria-selected="false" aria-controls="stab-notifications" data-stab="notifications" id="stab-btn-notifications">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span data-i18n="cust_stab_notifications">Notifications</span>
+    </button>
+    <button class="stab-btn" role="tab" aria-selected="false" aria-controls="stab-language" data-stab="language" id="stab-btn-language">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+      <span data-i18n="cust_stab_language">Language</span>
+    </button>
+    <button class="stab-btn" role="tab" aria-selected="false" aria-controls="stab-appearance" data-stab="appearance" id="stab-btn-appearance">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      <span data-i18n="cust_stab_appearance">Appearance</span>
+    </button>
+    <button class="stab-btn" role="tab" aria-selected="false" aria-controls="stab-addresses" data-stab="addresses" id="stab-btn-addresses">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+      <span data-i18n="cust_stab_addresses">Addresses</span>
+    </button>
+    <button class="stab-btn" role="tab" aria-selected="false" aria-controls="stab-account" data-stab="account" id="stab-btn-account">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <span data-i18n="cust_stab_account">Account</span>
+    </button>
+  </nav>
 
+  <!-- ══════════════════════════════════════════
+       TAB 1 — PROFILE
+  ══════════════════════════════════════════ -->
+  <div class="stab-pane stab-pane--active" id="stab-profile" role="tabpanel" aria-labelledby="stab-btn-profile">
+
+    <!-- Profile completeness -->
+    <div class="settings-section">
+      <div class="profile-complete-row">
+        <div class="profile-complete-info">
+          <span class="settings-section__heading" data-i18n="cust_profile_complete_title">Profile Completeness</span>
+          <span class="profile-complete-pct" id="profile-complete-pct">0%</span>
+        </div>
+        <div class="profile-complete-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="profile-complete-bar">
+          <div class="profile-complete-fill" id="profile-complete-fill"></div>
+        </div>
+        <p class="settings-section__desc" data-i18n="cust_profile_complete_desc">Complete your profile so technicians can reach you and trust your requests.</p>
+      </div>
+    </div>
+
+    <!-- Avatar + basic info -->
     <div class="settings-section">
       <h2 class="settings-section__heading">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         <span data-i18n="cust_settings_profile">Profile Information</span>
       </h2>
       <p class="settings-section__desc" data-i18n="cust_settings_profile_desc">Your name, email and contact details shown to technicians.</p>
@@ -1283,10 +1334,13 @@
         <div class="settings-avatar-preview" data-avatar-preview>
           <span data-dash-initials>?</span>
         </div>
-        <button type="button" class="btn-change-photo" id="btn-change-photo">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-          <span data-i18n="cust_change_photo">Change Photo</span>
-        </button>
+        <div class="settings-avatar-actions">
+          <button type="button" class="btn-change-photo" id="btn-change-photo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            <span data-i18n="cust_change_photo">Change Photo</span>
+          </button>
+          <p class="settings-avatar-hint" data-i18n="cust_photo_hint">JPG or PNG, max 2 MB. Square images work best.</p>
+        </div>
         <input type="file" id="photo-upload-input" accept="image/*" hidden />
       </div>
 
@@ -1310,66 +1364,486 @@
             <span class="form-hint" data-i18n="cust_hint_phone">Technicians may contact you on this number.</span>
           </div>
           <div class="form-field">
-            <label class="form-label" for="settings-address" data-i18n="cust_label_address">Address</label>
-            <input class="form-input" type="text" id="settings-address" name="address" data-settings-field="address" placeholder="Your address" data-i18n-placeholder="cust_ph_address" autocomplete="street-address" />
-            <span class="form-hint" data-i18n="cust_hint_address">Default location for service requests.</span>
+            <label class="form-label" for="settings-city" data-i18n="cust_label_city">City</label>
+            <input class="form-input" type="text" id="settings-city" name="city" data-settings-field="city" placeholder="e.g. Cairo" data-i18n-placeholder="cust_ph_city" autocomplete="address-level2" />
+            <span class="form-hint" data-i18n="cust_hint_city">Used to match you with nearby technicians.</span>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field form-field--full">
+            <label class="form-label" for="settings-bio" data-i18n="cust_label_bio">Short Bio <span class="form-label-optional" data-i18n="cust_optional">(Optional)</span></label>
+            <textarea class="form-input form-textarea" id="settings-bio" name="bio" data-settings-field="bio" rows="2" placeholder="A few words about yourself or your home service needs…" data-i18n-placeholder="cust_ph_bio" autocomplete="off"></textarea>
+            <span class="form-hint" data-i18n="cust_hint_bio">Visible to technicians you work with regularly.</span>
           </div>
         </div>
         <div class="settings-submit-row">
-          <button class="btn" type="submit" data-i18n="cust_save_changes">Save Changes</button>
+          <button class="btn btn--primary" type="submit" data-i18n="cust_save_changes">Save Changes</button>
         </div>
       </form>
     </div>
 
+  </div><!-- /stab-profile -->
+
+  <!-- ══════════════════════════════════════════
+       TAB 2 — SECURITY
+  ══════════════════════════════════════════ -->
+  <div class="stab-pane" id="stab-security" role="tabpanel" aria-labelledby="stab-btn-security" hidden>
+
+    <!-- Change password -->
     <div class="settings-section">
       <h2 class="settings-section__heading">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
         <span data-i18n="cust_settings_security">Security</span>
       </h2>
       <p class="settings-section__desc" data-i18n="cust_settings_security_desc">Change your password to keep your account secure.</p>
-      <div class="form-row">
-        <div class="form-field">
-          <label class="form-label" for="settings-new-password" data-i18n="cust_label_new_pass">New Password</label>
-          <div class="input-password-wrap">
-            <input class="form-input" type="password" id="settings-new-password" name="newPassword" data-settings-field="newPassword" placeholder="New password" autocomplete="new-password" />
-            <button type="button" class="btn-toggle-password" aria-label="Show password">
-              <svg class="eye-icon eye-icon--open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              <svg class="eye-icon eye-icon--closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-            </button>
+
+      <form class="dash-settings-security-form" id="security-form" novalidate>
+        <div class="form-row">
+          <div class="form-field form-field--full">
+            <label class="form-label" for="settings-current-password" data-i18n="cust_label_current_pass">Current Password <span class="required-mark" aria-hidden="true">*</span></label>
+            <div class="input-password-wrap">
+              <input class="form-input" type="password" id="settings-current-password" name="currentPassword" placeholder="Your current password" data-i18n-placeholder="cust_ph_current_pass" autocomplete="current-password" />
+              <button type="button" class="btn-toggle-password" aria-label="Show password">
+                <svg class="eye-icon eye-icon--open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="eye-icon eye-icon--closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              </button>
+            </div>
           </div>
         </div>
-        <div class="form-field">
-          <label class="form-label" for="settings-confirm-password" data-i18n="cust_label_confirm_pass">Confirm Password</label>
-          <div class="input-password-wrap">
-            <input class="form-input" type="password" id="settings-confirm-password" name="confirmPassword" data-settings-field="confirmPassword" placeholder="Confirm new password" autocomplete="new-password" />
-            <button type="button" class="btn-toggle-password" aria-label="Show password">
-              <svg class="eye-icon eye-icon--open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              <svg class="eye-icon eye-icon--closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-            </button>
+        <div class="form-row">
+          <div class="form-field">
+            <label class="form-label" for="settings-new-password" data-i18n="cust_label_new_pass">New Password <span class="required-mark" aria-hidden="true">*</span></label>
+            <div class="input-password-wrap">
+              <input class="form-input" type="password" id="settings-new-password" name="newPassword" data-settings-field="newPassword" placeholder="New password" data-i18n-placeholder="cust_ph_new_pass" autocomplete="new-password" />
+              <button type="button" class="btn-toggle-password" aria-label="Show password">
+                <svg class="eye-icon eye-icon--open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="eye-icon eye-icon--closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              </button>
+            </div>
+            <!-- Strength meter -->
+            <div class="pw-strength-wrap" id="pw-strength-wrap" hidden>
+              <div class="pw-strength-bar">
+                <div class="pw-strength-fill" id="pw-strength-fill"></div>
+              </div>
+              <span class="pw-strength-label" id="pw-strength-label"></span>
+            </div>
+            <!-- Live checklist -->
+            <ul class="pw-checklist" id="pw-checklist" aria-label="Password requirements">
+              <li class="pw-check" id="pwc-length" data-i18n="cust_pwc_length">At least 8 characters</li>
+              <li class="pw-check" id="pwc-upper" data-i18n="cust_pwc_upper">One uppercase letter</li>
+              <li class="pw-check" id="pwc-number" data-i18n="cust_pwc_number">One number</li>
+              <li class="pw-check" id="pwc-special" data-i18n="cust_pwc_special">One special character (!@#$…)</li>
+            </ul>
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="settings-confirm-password" data-i18n="cust_label_confirm_pass">Confirm Password <span class="required-mark" aria-hidden="true">*</span></label>
+            <div class="input-password-wrap">
+              <input class="form-input" type="password" id="settings-confirm-password" name="confirmPassword" data-settings-field="confirmPassword" placeholder="Confirm new password" data-i18n-placeholder="cust_ph_confirm_pass" autocomplete="new-password" />
+              <button type="button" class="btn-toggle-password" aria-label="Show password">
+                <svg class="eye-icon eye-icon--open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="eye-icon eye-icon--closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              </button>
+            </div>
+            <span class="pw-match-hint" id="pw-match-hint" hidden></span>
           </div>
         </div>
-      </div>
-      <div class="password-requirements">
-        <span data-i18n="cust_password_req">Password must be at least 8 characters, include one uppercase letter, one number, and one special character.</span>
+        <div class="settings-submit-row">
+          <button class="btn btn--primary" type="submit" data-i18n="cust_update_password">Update Password</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- 2-Factor Authentication -->
+    <div class="settings-section">
+      <h2 class="settings-section__heading">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <span data-i18n="cust_2fa_title">Two-Factor Authentication</span>
+      </h2>
+      <p class="settings-section__desc" data-i18n="cust_2fa_desc">Add an extra layer of security. We'll send a code to your phone when you log in.</p>
+      <div class="settings-toggle-row">
+        <div class="settings-toggle-info">
+          <span class="settings-toggle-label" data-i18n="cust_2fa_label">Enable SMS verification on login</span>
+          <span class="settings-toggle-sub" data-i18n="cust_2fa_sub">A 6-digit code will be sent to your registered phone number.</span>
+        </div>
+        <button type="button" class="stab-toggle" id="toggle-2fa" role="switch" aria-checked="false" data-pref="2fa">
+          <span class="stab-toggle__track"><span class="stab-toggle__thumb"></span></span>
+        </button>
       </div>
     </div>
 
-    <div class="settings-danger-zone">
-      <div class="dash-card danger-zone-card">
-        <h3 class="danger-zone__title" data-i18n="cust_danger_zone">Danger Zone</h3>
-        <p class="danger-zone__desc" data-i18n="cust_danger_zone_desc">Once you delete your account, there is no going back. Please be certain.</p>
-        <button class="btn danger-zone__btn" type="button" id="btn-delete-account" data-i18n="cust_delete_account">Delete Account</button>
+    <!-- Active sessions / last login -->
+    <div class="settings-section">
+      <h2 class="settings-section__heading">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        <span data-i18n="cust_sessions_title">Login Activity</span>
+      </h2>
+      <p class="settings-section__desc" data-i18n="cust_sessions_desc">Your recent sign-in history. If you see anything unexpected, change your password immediately.</p>
+      <div class="sessions-list">
+        <div class="session-item session-item--current">
+          <div class="session-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+          </div>
+          <div class="session-details">
+            <span class="session-device" data-i18n="cust_session_this_device">This device — Chrome on Windows</span>
+            <span class="session-meta"><span data-i18n="cust_session_active_now">Active now</span> · Cairo, Egypt</span>
+          </div>
+          <span class="session-badge" data-i18n="cust_session_current">Current</span>
+        </div>
+        <div class="session-item">
+          <div class="session-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+          </div>
+          <div class="session-details">
+            <span class="session-device" data-i18n="cust_session_mobile">Mobile — Safari on iPhone</span>
+            <span class="session-meta"><span data-i18n="cust_session_2d_ago">2 days ago</span> · Cairo, Egypt</span>
+          </div>
+          <button type="button" class="btn-session-revoke" data-i18n="cust_session_revoke">Revoke</button>
+        </div>
       </div>
     </div>
 
+  </div><!-- /stab-security -->
+
+  <!-- ══════════════════════════════════════════
+       TAB 3 — NOTIFICATIONS
+  ══════════════════════════════════════════ -->
+  <div class="stab-pane" id="stab-notifications" role="tabpanel" aria-labelledby="stab-btn-notifications" hidden>
+
+    <div class="settings-section">
+      <h2 class="settings-section__heading">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span data-i18n="cust_notif_pref_title">Notification Preferences</span>
+      </h2>
+      <p class="settings-section__desc" data-i18n="cust_notif_pref_desc">Choose what you want to be notified about and how.</p>
+
+      <!-- Booking updates -->
+      <p class="stab-notif-group-label" data-i18n="cust_notif_group_bookings">Booking Updates</p>
+      <div class="stab-notif-list">
+        <div class="settings-toggle-row">
+          <div class="settings-toggle-info">
+            <span class="settings-toggle-label" data-i18n="cust_notif_booking_confirmed">Booking Confirmed</span>
+            <span class="settings-toggle-sub" data-i18n="cust_notif_booking_confirmed_sub">When a technician accepts your booking request.</span>
+          </div>
+          <button type="button" class="stab-toggle stab-toggle--on" role="switch" aria-checked="true" data-pref="notif-booking-confirmed">
+            <span class="stab-toggle__track"><span class="stab-toggle__thumb"></span></span>
+          </button>
         </div>
-      </section>
+        <div class="settings-toggle-row">
+          <div class="settings-toggle-info">
+            <span class="settings-toggle-label" data-i18n="cust_notif_tech_assigned">Technician Assigned</span>
+            <span class="settings-toggle-sub" data-i18n="cust_notif_tech_assigned_sub">When a specific technician is matched to your job.</span>
+          </div>
+          <button type="button" class="stab-toggle stab-toggle--on" role="switch" aria-checked="true" data-pref="notif-tech-assigned">
+            <span class="stab-toggle__track"><span class="stab-toggle__thumb"></span></span>
+          </button>
+        </div>
+        <div class="settings-toggle-row">
+          <div class="settings-toggle-info">
+            <span class="settings-toggle-label" data-i18n="cust_notif_tech_otw">Technician On the Way</span>
+            <span class="settings-toggle-sub" data-i18n="cust_notif_tech_otw_sub">When your technician is en route to your location.</span>
+          </div>
+          <button type="button" class="stab-toggle stab-toggle--on" role="switch" aria-checked="true" data-pref="notif-tech-otw">
+            <span class="stab-toggle__track"><span class="stab-toggle__thumb"></span></span>
+          </button>
+        </div>
+        <div class="settings-toggle-row">
+          <div class="settings-toggle-info">
+            <span class="settings-toggle-label" data-i18n="cust_notif_job_completed">Job Completed</span>
+            <span class="settings-toggle-sub" data-i18n="cust_notif_job_completed_sub">When a technician marks your job as done.</span>
+          </div>
+          <button type="button" class="stab-toggle stab-toggle--on" role="switch" aria-checked="true" data-pref="notif-job-completed">
+            <span class="stab-toggle__track"><span class="stab-toggle__thumb"></span></span>
+          </button>
+        </div>
+        <div class="settings-toggle-row">
+          <div class="settings-toggle-info">
+            <span class="settings-toggle-label" data-i18n="cust_notif_booking_cancelled">Booking Cancelled</span>
+            <span class="settings-toggle-sub" data-i18n="cust_notif_booking_cancelled_sub">When a booking is cancelled by you or the technician.</span>
+          </div>
+          <button type="button" class="stab-toggle stab-toggle--on" role="switch" aria-checked="true" data-pref="notif-booking-cancelled">
+            <span class="stab-toggle__track"><span class="stab-toggle__thumb"></span></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Payments -->
+      <p class="stab-notif-group-label" data-i18n="cust_notif_group_payments">Payments</p>
+      <div class="stab-notif-list">
+        <div class="settings-toggle-row">
+          <div class="settings-toggle-info">
+            <span class="settings-toggle-label" data-i18n="cust_notif_payment_receipt">Payment Receipt</span>
+            <span class="settings-toggle-sub" data-i18n="cust_notif_payment_receipt_sub">Get a receipt by email after each completed job.</span>
+          </div>
+          <button type="button" class="stab-toggle stab-toggle--on" role="switch" aria-checked="true" data-pref="notif-payment-receipt">
+            <span class="stab-toggle__track"><span class="stab-toggle__thumb"></span></span>
+          </button>
+        </div>
+        <div class="settings-toggle-row">
+          <div class="settings-toggle-info">
+            <span class="settings-toggle-label" data-i18n="cust_notif_payment_reminder">Payment Reminder</span>
+            <span class="settings-toggle-sub" data-i18n="cust_notif_payment_reminder_sub">Remind me if an outstanding payment is due.</span>
+          </div>
+          <button type="button" class="stab-toggle stab-toggle--on" role="switch" aria-checked="true" data-pref="notif-payment-reminder">
+            <span class="stab-toggle__track"><span class="stab-toggle__thumb"></span></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Promotions -->
+      <p class="stab-notif-group-label" data-i18n="cust_notif_group_promos">Promotions &amp; Tips</p>
+      <div class="stab-notif-list">
+        <div class="settings-toggle-row">
+          <div class="settings-toggle-info">
+            <span class="settings-toggle-label" data-i18n="cust_notif_promos">Promotional Offers</span>
+            <span class="settings-toggle-sub" data-i18n="cust_notif_promos_sub">Discounts and seasonal deals from SERVIO.</span>
+          </div>
+          <button type="button" class="stab-toggle" role="switch" aria-checked="false" data-pref="notif-promos">
+            <span class="stab-toggle__track"><span class="stab-toggle__thumb"></span></span>
+          </button>
+        </div>
+        <div class="settings-toggle-row">
+          <div class="settings-toggle-info">
+            <span class="settings-toggle-label" data-i18n="cust_notif_tips">Home Maintenance Tips</span>
+            <span class="settings-toggle-sub" data-i18n="cust_notif_tips_sub">Monthly tips to help you maintain your home.</span>
+          </div>
+          <button type="button" class="stab-toggle" role="switch" aria-checked="false" data-pref="notif-tips">
+            <span class="stab-toggle__track"><span class="stab-toggle__thumb"></span></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Channels -->
+      <p class="stab-notif-group-label" data-i18n="cust_notif_group_channels">Delivery Channels</p>
+      <div class="stab-notif-list">
+        <div class="settings-toggle-row">
+          <div class="settings-toggle-info">
+            <span class="settings-toggle-label" data-i18n="cust_notif_channel_email">Email Notifications</span>
+            <span class="settings-toggle-sub" data-i18n="cust_notif_channel_email_sub">Send all enabled notifications to your email address.</span>
+          </div>
+          <button type="button" class="stab-toggle stab-toggle--on" role="switch" aria-checked="true" data-pref="notif-channel-email">
+            <span class="stab-toggle__track"><span class="stab-toggle__thumb"></span></span>
+          </button>
+        </div>
+        <div class="settings-toggle-row">
+          <div class="settings-toggle-info">
+            <span class="settings-toggle-label" data-i18n="cust_notif_channel_sms">SMS Notifications</span>
+            <span class="settings-toggle-sub" data-i18n="cust_notif_channel_sms_sub">Receive urgent alerts via text message on your phone.</span>
+          </div>
+          <button type="button" class="stab-toggle stab-toggle--on" role="switch" aria-checked="true" data-pref="notif-channel-sms">
+            <span class="stab-toggle__track"><span class="stab-toggle__thumb"></span></span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /stab-notifications -->
+
+  <!-- ══════════════════════════════════════════
+       TAB 4 — LANGUAGE & REGION
+  ══════════════════════════════════════════ -->
+  <div class="stab-pane" id="stab-language" role="tabpanel" aria-labelledby="stab-btn-language" hidden>
+
+    <div class="settings-section">
+      <h2 class="settings-section__heading">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        <span data-i18n="cust_lang_title">Language &amp; Region</span>
+      </h2>
+      <p class="settings-section__desc" data-i18n="cust_lang_desc">Choose your preferred language. The interface will update instantly.</p>
+
+      <div class="lang-cards" role="radiogroup" aria-label="Language selection" id="lang-cards">
+        <button type="button" class="lang-card" data-lang="en" role="radio" aria-checked="false" id="lang-card-en">
+          <span class="lang-card__flag" aria-hidden="true">🇬🇧</span>
+          <span class="lang-card__name">English</span>
+          <span class="lang-card__native">English</span>
+          <span class="lang-card__dir" data-i18n="cust_lang_ltr">Left to right</span>
+          <svg class="lang-card__check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+        </button>
+        <button type="button" class="lang-card" data-lang="ar" role="radio" aria-checked="false" id="lang-card-ar">
+          <span class="lang-card__flag" aria-hidden="true">🇪🇬</span>
+          <span class="lang-card__name">Arabic</span>
+          <span class="lang-card__native">العربية</span>
+          <span class="lang-card__dir" data-i18n="cust_lang_rtl">Right to left</span>
+          <svg class="lang-card__check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+        </button>
+      </div>
+    </div>
+
+  </div><!-- /stab-language -->
+
+  <!-- ══════════════════════════════════════════
+       TAB 5 — APPEARANCE
+  ══════════════════════════════════════════ -->
+  <div class="stab-pane" id="stab-appearance" role="tabpanel" aria-labelledby="stab-btn-appearance" hidden>
+
+    <div class="settings-section">
+      <h2 class="settings-section__heading">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <span data-i18n="cust_appearance_title">Appearance</span>
+      </h2>
+      <p class="settings-section__desc" data-i18n="cust_appearance_desc">Choose how SERVIO looks for you. Your preference is saved on this device.</p>
+
+      <div class="theme-cards" role="radiogroup" aria-label="Theme selection" id="theme-cards">
+        <button type="button" class="theme-card" data-theme-choice="light" role="radio" aria-checked="false" id="theme-card-light">
+          <div class="theme-card__preview theme-card__preview--light">
+            <div class="thp-bar"></div>
+            <div class="thp-content">
+              <div class="thp-line thp-line--lg"></div>
+              <div class="thp-line thp-line--sm"></div>
+            </div>
+          </div>
+          <span class="theme-card__label" data-i18n="cust_theme_light">Light</span>
+          <svg class="theme-card__check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+        </button>
+        <button type="button" class="theme-card" data-theme-choice="dark" role="radio" aria-checked="false" id="theme-card-dark">
+          <div class="theme-card__preview theme-card__preview--dark">
+            <div class="thp-bar"></div>
+            <div class="thp-content">
+              <div class="thp-line thp-line--lg"></div>
+              <div class="thp-line thp-line--sm"></div>
+            </div>
+          </div>
+          <span class="theme-card__label" data-i18n="cust_theme_dark">Dark</span>
+          <svg class="theme-card__check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+        </button>
+        <button type="button" class="theme-card" data-theme-choice="system" role="radio" aria-checked="false" id="theme-card-system">
+          <div class="theme-card__preview theme-card__preview--system">
+            <div class="thp-half thp-half--light">
+              <div class="thp-bar"></div>
+            </div>
+            <div class="thp-half thp-half--dark">
+              <div class="thp-bar"></div>
+            </div>
+          </div>
+          <span class="theme-card__label" data-i18n="cust_theme_system">System Default</span>
+          <svg class="theme-card__check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+        </button>
+      </div>
+    </div>
+
+  </div><!-- /stab-appearance -->
+
+  <!-- ══════════════════════════════════════════
+       TAB 6 — ADDRESSES
+  ══════════════════════════════════════════ -->
+  <div class="stab-pane" id="stab-addresses" role="tabpanel" aria-labelledby="stab-btn-addresses" hidden>
+
+    <div class="settings-section">
+      <h2 class="settings-section__heading">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        <span data-i18n="cust_addr_title">Saved Addresses</span>
+      </h2>
+      <p class="settings-section__desc" data-i18n="cust_addr_desc">Save your frequently used addresses for faster booking. Select one at checkout.</p>
+
+      <div class="addr-list" id="addr-list">
+        <!-- Home address -->
+        <div class="addr-card" data-addr-id="home">
+          <div class="addr-card__icon addr-card__icon--home">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          </div>
+          <div class="addr-card__body">
+            <span class="addr-card__type" data-i18n="cust_addr_home">Home</span>
+            <span class="addr-card__value" id="addr-home-value" data-i18n="cust_addr_not_set">Not set yet — add your home address</span>
+          </div>
+          <button type="button" class="btn-addr-edit" data-addr-target="home" aria-label="Edit home address">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            <span data-i18n="cust_addr_edit">Edit</span>
+          </button>
+        </div>
+        <!-- Work address -->
+        <div class="addr-card" data-addr-id="work">
+          <div class="addr-card__icon addr-card__icon--work">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+          </div>
+          <div class="addr-card__body">
+            <span class="addr-card__type" data-i18n="cust_addr_work">Work</span>
+            <span class="addr-card__value" id="addr-work-value" data-i18n="cust_addr_not_set">Not set yet — add your work address</span>
+          </div>
+          <button type="button" class="btn-addr-edit" data-addr-target="work" aria-label="Edit work address">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            <span data-i18n="cust_addr_edit">Edit</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Add address form (toggled) -->
+      <div class="addr-form-wrap" id="addr-form-wrap" hidden>
+        <div class="addr-form-header">
+          <span class="addr-form-title" id="addr-form-title" data-i18n="cust_addr_edit_title">Edit Address</span>
+          <button type="button" class="btn-addr-cancel" id="btn-addr-cancel" data-i18n="cust_addr_cancel">Cancel</button>
+        </div>
+        <div class="form-row">
+          <div class="form-field form-field--full">
+            <label class="form-label" for="addr-input-street" data-i18n="cust_addr_street">Street Address</label>
+            <input class="form-input" type="text" id="addr-input-street" placeholder="Street, building, apartment…" data-i18n-placeholder="cust_ph_addr_street" autocomplete="street-address" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label class="form-label" for="addr-input-district" data-i18n="cust_addr_district">District / Area</label>
+            <input class="form-input" type="text" id="addr-input-district" placeholder="e.g. Maadi" data-i18n-placeholder="cust_ph_addr_district" />
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="addr-input-city" data-i18n="cust_label_city">City</label>
+            <input class="form-input" type="text" id="addr-input-city" placeholder="e.g. Cairo" data-i18n-placeholder="cust_ph_city" autocomplete="address-level2" />
+          </div>
+        </div>
+        <div class="settings-submit-row">
+          <button class="btn btn--primary" type="button" id="btn-addr-save" data-i18n="cust_addr_save_btn">Save Address</button>
+        </div>
+      </div>
+
+      <button type="button" class="btn-addr-add" id="btn-addr-add">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        <span data-i18n="cust_addr_add_other">Add Another Address</span>
+      </button>
+    </div>
+
+  </div><!-- /stab-addresses -->
+
+  <!-- ══════════════════════════════════════════
+       TAB 7 — ACCOUNT
+  ══════════════════════════════════════════ -->
+  <div class="stab-pane" id="stab-account" role="tabpanel" aria-labelledby="stab-btn-account" hidden>
+
+    <!-- Export data -->
+    <div class="settings-section">
+      <h2 class="settings-section__heading">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span data-i18n="cust_export_title">Export My Data</span>
+      </h2>
+      <p class="settings-section__desc" data-i18n="cust_export_desc">Download a copy of all your SERVIO data — bookings, messages, and profile — in JSON format.</p>
+      <button type="button" class="btn btn--outline" id="btn-export-data" data-i18n="cust_export_btn">Request Data Export</button>
+    </div>
+
+    <!-- Deactivate account -->
+    <div class="settings-section settings-section--warning">
+      <h2 class="settings-section__heading">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="10" y1="15" x2="10" y2="9"/><line x1="14" y1="15" x2="14" y2="9"/></svg>
+        <span data-i18n="cust_deactivate_title">Deactivate Account</span>
+      </h2>
+      <p class="settings-section__desc" data-i18n="cust_deactivate_desc">Temporarily hide your profile and pause all activity. You can reactivate at any time by logging back in.</p>
+      <button type="button" class="btn btn--warning-outline" id="btn-deactivate-account" data-i18n="cust_deactivate_btn">Deactivate Account</button>
+    </div>
+
+    <!-- Delete account -->
+    <div class="settings-section settings-section--danger">
+      <h2 class="settings-section__heading">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+        <span data-i18n="cust_delete_title">Delete Account</span>
+      </h2>
+      <p class="settings-section__desc" data-i18n="cust_delete_desc">Permanently delete your account and all associated data. This action cannot be undone and all your bookings, history, and saved data will be erased.</p>
+      <button class="btn btn--danger" type="button" id="btn-delete-account" data-i18n="cust_delete_account">Delete My Account</button>
+    </div>
+
+  </div><!-- /stab-account -->
+
+        </section>
 
         <!-- ── Job Posts tab ──────────────────── -->
         <section class="dash-panel" id="panel-job-posts" role="tabpanel"
                  aria-labelledby="tab-job-posts" data-panel="job-posts" hidden>
-          <div class="dash-panel__header">
-            <h2 class="dash-panel__title" data-i18n="cust_nav_job_posts">Job Posts</h2>
+          <div class="dash-panel__header dash-panel__header-row" style="align-items: center;">
+            <h2 class="dash-panel__title" data-i18n="cust_nav_job_posts" style="margin-bottom: 0;">Job Posts</h2>
             <button class="btn btn--primary" id="postJobBtn" data-i18n="cust_post_new_job">+ Post New Job</button>
           </div>
 
@@ -1415,51 +1889,108 @@
 
           <!-- Post New Job modal -->
           <div class="modal-overlay" id="postJobModal" hidden>
-            <div class="modal-box">
-              <div class="modal-box__header">
+            <div class="modal-box pjm-box">
+              <div class="modal-box__header pjm-header">
+                <div class="pjm-header__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                </div>
                 <h3 data-i18n="cust_modal_post_title">Post a New Job</h3>
-                <button class="modal-close" id="closePostJobModal" aria-label="Close">&times;</button>
+                <button class="modal-close pjm-close" id="closePostJobModal" aria-label="Close">&times;</button>
               </div>
-              <form id="postJobForm" class="modal-box__body">
-                <label class="form-label" data-i18n="cust_modal_cat">Service Category
-                  <select name="category" required class="form-control">
-                    <option value="" data-i18n="cust_modal_select">Select…</option>
-                    <option data-i18n="cust_cat_plumbing">Plumbing</option><option data-i18n="cust_cat_electrical">Electrical</option>
-                    <option data-i18n="cust_cat_hvac">A/C Maintenance &amp; HVAC</option><option data-i18n="cust_cat_carpentry">Carpentry</option>
-                    <option data-i18n="cust_cat_appliance">Appliance Services</option><option data-i18n="cust_cat_handyman">Handyman Tasks</option>
-                    <option data-i18n="cust_cat_finishing">Home Finishing &amp; Renovation</option><option data-i18n="cust_cat_painting">Painting</option>
-                    <option data-i18n="cust_cat_flooring">Flooring</option><option data-i18n="cust_cat_drywall">Drywall</option><option data-i18n="cust_cat_roofing">Roofing</option>
-                    <option data-i18n="cust_cat_pest">Pest Control</option><option data-i18n="cust_cat_cleaning">Professional Cleaning</option>
-                    <option data-i18n="cust_cat_landscaping">Landscaping</option><option data-i18n="cust_cat_installation">Installation Services</option>
-                  </select>
-                </label>
-                <label class="form-label" data-i18n="cust_modal_job_title">Job Title
-                  <input type="text" name="title" required class="form-control" placeholder="e.g. Fix kitchen sink leak" data-i18n-placeholder="cust_modal_title_ph" />
-                </label>
-                <label class="form-label" data-i18n="cust_modal_desc">Description
-                  <textarea name="description" rows="3" class="form-control" placeholder="Describe the issue…" data-i18n-placeholder="cust_modal_desc_ph"></textarea>
-                </label>
-                <label class="form-label" data-i18n="cust_modal_location">Location
-                  <input type="text" name="location" class="form-control" placeholder="e.g. Maadi, Cairo" data-i18n-placeholder="cust_modal_loc_ph" />
-                </label>
-                <div class="form-row">
-                  <label class="form-label" data-i18n="cust_modal_pref_from">Preferred From <input type="date" name="dateFrom" class="form-control" /></label>
-                  <label class="form-label" data-i18n="cust_modal_pref_to">Preferred To   <input type="date" name="dateTo"   class="form-control" /></label>
-                </div>
-                <div class="form-row">
-                  <label class="form-label" data-i18n="cust_modal_budget_min">Budget Min (EGP) <input type="number" name="budgetMin" class="form-control" /></label>
-                  <label class="form-label" data-i18n="cust_modal_budget_max">Budget Max (EGP) <input type="number" name="budgetMax" class="form-control" /></label>
-                </div>
-                <label class="form-label" data-i18n="cust_modal_pay_pref">Payment Preference
-                  <select name="paymentPref" class="form-control">
-                    <option value="any" data-i18n="cust_modal_pay_any">Any</option>
-                    <option value="online" data-i18n="cust_modal_pay_online">Online Payment</option>
-                    <option value="cash" data-i18n="cust_pay_cash">Cash</option>
-                  </select>
-                </label>
-                <div class="modal-box__footer">
+              <form id="postJobForm" novalidate>
+                <div class="pjm-body">
+                  <!-- Service Category -->
+                  <div class="form-field form-field--full">
+                    <label class="form-label" for="pjm-category">
+                      <span data-i18n="cust_modal_cat">Service Category</span>
+                      <span class="required-mark" aria-hidden="true">*</span>
+                    </label>
+                    <select class="form-input" id="pjm-category" name="category" required>
+                      <option value="" data-i18n="cust_modal_select">Select…</option>
+                      <option data-i18n="cust_cat_plumbing">Plumbing</option>
+                      <option data-i18n="cust_cat_electrical">Electrical</option>
+                      <option data-i18n="cust_cat_hvac">A/C Maintenance &amp; HVAC</option>
+                      <option data-i18n="cust_cat_carpentry">Carpentry</option>
+                      <option data-i18n="cust_cat_appliance">Appliance Services</option>
+                      <option data-i18n="cust_cat_handyman">Handyman Tasks</option>
+                      <option data-i18n="cust_cat_finishing">Home Finishing &amp; Renovation</option>
+                      <option data-i18n="cust_cat_painting">Painting</option>
+                      <option data-i18n="cust_cat_flooring">Flooring</option>
+                      <option data-i18n="cust_cat_drywall">Drywall</option>
+                      <option data-i18n="cust_cat_roofing">Roofing</option>
+                      <option data-i18n="cust_cat_pest">Pest Control</option>
+                      <option data-i18n="cust_cat_cleaning">Professional Cleaning</option>
+                      <option data-i18n="cust_cat_landscaping">Landscaping</option>
+                      <option data-i18n="cust_cat_installation">Installation Services</option>
+                    </select>
+                  </div>
+                  <!-- Job Title -->
+                  <div class="form-field form-field--full">
+                    <label class="form-label" for="pjm-title">
+                      <span data-i18n="cust_modal_job_title">Job Title</span>
+                      <span class="required-mark" aria-hidden="true">*</span>
+                    </label>
+                    <input class="form-input" type="text" id="pjm-title" name="title" required placeholder="e.g. Fix kitchen sink leak" data-i18n-placeholder="cust_modal_title_ph" />
+                  </div>
+                  <!-- Description -->
+                  <div class="form-field form-field--full">
+                    <label class="form-label" for="pjm-description">
+                      <span data-i18n="cust_modal_desc">Description</span>
+                    </label>
+                    <textarea class="form-input form-textarea" id="pjm-description" name="description" rows="3" placeholder="Describe the issue…" data-i18n-placeholder="cust_modal_desc_ph"></textarea>
+                  </div>
+                  <!-- Location -->
+                  <div class="form-field form-field--full">
+                    <label class="form-label" for="pjm-location">
+                      <span data-i18n="cust_modal_location">Location</span>
+                    </label>
+                    <input class="form-input" type="text" id="pjm-location" name="location" placeholder="e.g. Maadi, Cairo" data-i18n-placeholder="cust_modal_loc_ph" />
+                  </div>
+                  <!-- Preferred dates -->
+                  <div class="form-row">
+                    <div class="form-field">
+                      <label class="form-label" for="pjm-date-from">
+                        <span data-i18n="cust_modal_pref_from">Preferred From</span>
+                      </label>
+                      <input class="form-input" type="date" id="pjm-date-from" name="dateFrom" />
+                    </div>
+                    <div class="form-field">
+                      <label class="form-label" for="pjm-date-to">
+                        <span data-i18n="cust_modal_pref_to">Preferred To</span>
+                      </label>
+                      <input class="form-input" type="date" id="pjm-date-to" name="dateTo" />
+                    </div>
+                  </div>
+                  <!-- Budget -->
+                  <div class="form-row">
+                    <div class="form-field">
+                      <label class="form-label" for="pjm-budget-min">
+                        <span data-i18n="cust_modal_budget_min">Budget Min (EGP)</span>
+                      </label>
+                      <input class="form-input" type="number" id="pjm-budget-min" name="budgetMin" min="0" placeholder="0" />
+                    </div>
+                    <div class="form-field">
+                      <label class="form-label" for="pjm-budget-max">
+                        <span data-i18n="cust_modal_budget_max">Budget Max (EGP)</span>
+                      </label>
+                      <input class="form-input" type="number" id="pjm-budget-max" name="budgetMax" min="0" placeholder="0" />
+                    </div>
+                  </div>
+                  <!-- Payment preference -->
+                  <div class="form-field form-field--full">
+                    <label class="form-label" for="pjm-payment">
+                      <span data-i18n="cust_modal_pay_pref">Payment Preference</span>
+                    </label>
+                    <select class="form-input" id="pjm-payment" name="paymentPref">
+                      <option value="any" data-i18n="cust_modal_pay_any">Any</option>
+                      <option value="online" data-i18n="cust_modal_pay_online">Online Payment</option>
+                      <option value="cash" data-i18n="cust_pay_cash">Cash</option>
+                    </select>
+                  </div>
+                </div><!-- /pjm-body -->
+                <div class="pjm-footer">
+                  <button type="button" class="btn btn--outline" id="cancelPostJob" data-i18n="cust_cancel">Cancel</button>
                   <button type="submit" class="btn btn--primary" data-i18n="cust_modal_post_btn">Post Job</button>
-                  <button type="button" class="btn btn--ghost" id="cancelPostJob" data-i18n="cust_cancel">Cancel</button>
                 </div>
               </form>
             </div>
@@ -1761,6 +2292,94 @@
     initDashTabs();
   })();
   </script>
+
+    <!-- ── Deactivate Account modal ────────────────────────── -->
+    <div class="modal-overlay acct-modal" id="modal-deactivate" hidden role="dialog" aria-modal="true" aria-labelledby="modal-deactivate-title">
+      <div class="modal-box acct-modal__box">
+        <div class="modal-box__header acct-modal__header acct-modal__header--warning">
+          <div class="acct-modal__icon acct-modal__icon--warning" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="10" y1="15" x2="10" y2="9"/><line x1="14" y1="15" x2="14" y2="9"/></svg>
+          </div>
+          <h3 id="modal-deactivate-title" data-i18n="cust_modal_deactivate_title">Deactivate Your Account?</h3>
+          <button class="modal-close acct-modal__close" id="btn-close-deactivate" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-box__body acct-modal__body">
+          <p class="acct-modal__lead" data-i18n="cust_modal_deactivate_lead">Your account will be put on pause. Here's what that means:</p>
+          <ul class="acct-modal__consequences">
+            <li>
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <span data-i18n="cust_modal_deactivate_c1">Your profile will be hidden from technicians and search results.</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <span data-i18n="cust_modal_deactivate_c2">Active bookings will be kept but no new ones can be made.</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <span data-i18n="cust_modal_deactivate_c3">You can reactivate at any time by logging back in.</span>
+            </li>
+          </ul>
+          <label class="acct-modal__confirm-check">
+            <input type="checkbox" id="deactivate-confirm-check" />
+            <span data-i18n="cust_modal_deactivate_understand">I understand my account will be deactivated</span>
+          </label>
+        </div>
+        <div class="modal-box__footer acct-modal__footer">
+          <button type="button" class="btn btn--outline" id="btn-deactivate-cancel" data-i18n="cust_modal_cancel">Cancel</button>
+          <button type="button" class="btn btn--warning-solid" id="btn-deactivate-confirm" disabled data-i18n="cust_modal_deactivate_confirm">Deactivate Account</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Delete Account modal ──────────────────────────── -->
+    <div class="modal-overlay acct-modal" id="modal-delete" hidden role="dialog" aria-modal="true" aria-labelledby="modal-delete-title">
+      <div class="modal-box acct-modal__box">
+        <div class="modal-box__header acct-modal__header acct-modal__header--danger">
+          <div class="acct-modal__icon acct-modal__icon--danger" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+          </div>
+          <h3 id="modal-delete-title" data-i18n="cust_modal_delete_title">Permanently Delete Your Account?</h3>
+          <button class="modal-close acct-modal__close" id="btn-close-delete" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-box__body acct-modal__body">
+          <div class="acct-modal__warning-banner" role="alert">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <span data-i18n="cust_modal_delete_warning">This action is permanent and cannot be undone.</span>
+          </div>
+          <p class="acct-modal__lead" data-i18n="cust_modal_delete_lead">The following data will be permanently erased:</p>
+          <ul class="acct-modal__consequences acct-modal__consequences--danger">
+            <li>
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+              <span data-i18n="cust_modal_delete_c1">Your profile, photo, and all personal information</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+              <span data-i18n="cust_modal_delete_c2">All booking history and receipts</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+              <span data-i18n="cust_modal_delete_c3">Saved addresses and preferences</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+              <span data-i18n="cust_modal_delete_c4">All reviews you've submitted</span>
+            </li>
+          </ul>
+          <div class="acct-modal__type-confirm">
+            <label class="form-label" for="delete-confirm-input">
+              <span data-i18n="cust_modal_delete_type_label">Type</span>
+              <strong class="acct-modal__type-keyword">DELETE</strong>
+              <span data-i18n="cust_modal_delete_type_label2">to confirm</span>
+            </label>
+            <input class="form-input acct-modal__type-input" type="text" id="delete-confirm-input" autocomplete="off" spellcheck="false" placeholder="DELETE" />
+          </div>
+        </div>
+        <div class="modal-box__footer acct-modal__footer">
+          <button type="button" class="btn btn--outline" id="btn-delete-cancel" data-i18n="cust_modal_cancel">Cancel</button>
+          <button type="button" class="btn btn--danger" id="btn-delete-confirm" disabled data-i18n="cust_modal_delete_confirm">Delete My Account</button>
+        </div>
+      </div>
+    </div>
 
     <script src="../js/lang.js"></script>
     <script type="module" src="../js/main.js"></script>

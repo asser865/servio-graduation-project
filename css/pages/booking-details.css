@@ -426,9 +426,16 @@
   letter-spacing: 0.05em;
 }
 
-.bk-tech__rating-val {
+.bk-tech__rating-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
   font-size: 0.8rem;
   font-weight: 600;
+  color: var(--color-text-light);
+}
+
+.bk-tech__rating-val {
   color: var(--color-text);
 }
 
@@ -594,13 +601,19 @@
   gap: 0.5rem;
   font-size: 0.875rem;
   padding: 0.6rem 1rem;
-  transition: all 200ms;
+  transition: all 600ms;
 }
 
 .bk-action-btn svg {
   width: 15px;
   height: 15px;
   flex-shrink: 0;
+}
+
+.btn--outline:hover {
+  background: var(--color-accent);
+  color: #fff;
+  border-color: var(--color-accent);
 }
 
 /* Danger outline variant */
@@ -613,8 +626,15 @@
   cursor: pointer;
 }
 
+#bkCancelBtn:hover {
+  background: var(--color-danger) !important;
+  color: #fff !important;
+  border-color: var(--color-danger) !important;
+}
+
 .btn--outline-danger:hover {
-  background: var(--color-danger-bg);
+  background: var(--color-danger);
+  color: #fff;
 }
 
 /* Danger filled */
@@ -629,7 +649,9 @@
 }
 
 .btn--danger:hover {
-  opacity: 0.88;
+  background: #a5281b; /* Darker red */
+  border-color: #a5281b;
+  opacity: 1;
 }
 
 /* ===================== EMPTY STATE ===================== */
@@ -828,7 +850,7 @@
   cursor: pointer;
   padding: 0.55rem 1.25rem;
   font-size: 0.875rem;
-  transition: background 150ms;
+  transition: all 500ms ease;
 }
 
 .btn--ghost:hover {

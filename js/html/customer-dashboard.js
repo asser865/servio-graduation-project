@@ -174,6 +174,9 @@ function populateStats() {
   if (aEl) aEl.textContent = '2';
   if (sEl) sEl.textContent = '2';
 
+  const spentEl = document.querySelector('[data-stat="total-spent"]');
+  if (spentEl) spentEl.textContent = '1,250 EGP';
+
   // Update Goal Context & Progress Bar
   const ctxE = document.querySelector('.dash-stat-card__context[data-i18n-html]');
   if (ctxE) {
@@ -321,6 +324,7 @@ function initSettingsForm() {
     }
     populateProfile();
     updateWelcomeText();
+    updateProfileCompleteness();
   });
 }
 
@@ -627,24 +631,458 @@ initSettingsForm();
 initDeleteAccount();
 initPasswordToggles();
 initSettingsValidation();
+initSettingsTabs();
+initSecurityForm();
+initPasswordStrength();
+initSettingToggles();
+initLanguageCards();
+initThemeCards();
+initAddressTab();
+initAccountTab();
 initDashLogout();
 
-/* ── Live language switch: re-render all JS-generated strings ── */
+/* ── Settings horizontal tab switching ─────────────────── */
+function initSettingsTabs() {
+  const bar = document.getElementById('settings-tab-bar');
+  if (!bar) return;
+  bar.addEventListener('click', (e) => {
+    const btn = e.target.closest('.stab-btn');
+    if (!btn) return;
+    const target = btn.dataset.stab;
+    bar.querySelectorAll('.stab-btn').forEach(b => {
+      b.classList.toggle('stab-btn--active', b === btn);
+      b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
+    });
+    document.querySelectorAll('.stab-pane').forEach(p => {
+      const isTarget = p.id === 'stab-' + target;
+      p.classList.toggle('stab-pane--active', isTarget);
+      if (isTarget) p.removeAttribute('hidden');
+      else p.setAttribute('hidden', '');
+    });
+    if (target === 'profile') updateProfileCompleteness();
+  });
+  // Run once on load so the bar shows the correct percentage immediately
+  updateProfileCompleteness();
+}
+
+/* ── Security form (separate from profile form) ──────────── */
+function initSecurityForm() {
+  const form = document.getElementById('security-form');
+  if (!form) return;
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
+    const currentPw = form.querySelector('#settings-current-password');
+    const newPw     = form.querySelector('#settings-new-password');
+    const confirmPw = form.querySelector('#settings-confirm-password');
+    if (!currentPw.value.trim()) {
+      showToast(_t('toast_enter_current_pw'), 'info');
+      currentPw.focus(); return;
+    }
+    if (newPw.value.length < 8) {
+      showToast(_t('toast_pw_min_length'), 'info');
+      newPw.focus(); return;
+    }
+    if (!/(?=.*[A-Za-z])(?=.*\d)/.test(newPw.value)) {
+      showToast(_t('toast_pw_needs_letter_num'), 'info');
+      newPw.focus(); return;
+    }
+    if (newPw.value !== confirmPw.value) {
+      showToast(_t('toast_pw_mismatch'), 'info');
+      confirmPw.focus(); return;
+    }
+    currentPw.value = '';
+    newPw.value = '';
+    confirmPw.value = '';
+    document.getElementById('pw-strength-wrap')?.setAttribute('hidden', '');
+    document.querySelectorAll('.pw-check').forEach(c => c.classList.remove('is-met'));
+    showToast(_t('toast_pw_updated'), 'success');
+  });
+}
+
+/* ── Password strength meter + live checklist ────────────── */
+function initPasswordStrength() {
+  const newPw     = document.getElementById('settings-new-password');
+  const confirmPw = document.getElementById('settings-confirm-password');
+  const wrap      = document.getElementById('pw-strength-wrap');
+  const fill      = document.getElementById('pw-strength-fill');
+  const label     = document.getElementById('pw-strength-label');
+  const matchHint = document.getElementById('pw-match-hint');
+  if (!newPw || !wrap) return;
+
+  const checks = {
+    length:  { el: document.getElementById('pwc-length'),  test: v => v.length >= 8 },
+    upper:   { el: document.getElementById('pwc-upper'),   test: v => /[A-Z]/.test(v) },
+    number:  { el: document.getElementById('pwc-number'),  test: v => /\d/.test(v) },
+    special: { el: document.getElementById('pwc-special'), test: v => /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(v) },
+  };
+
+  const strengthLabels = ['', 'cust_pw_strength_weak', 'cust_pw_strength_fair', 'cust_pw_strength_good', 'cust_pw_strength_strong'];
+
+  newPw.addEventListener('input', () => {
+    const v = newPw.value;
+    if (!v) { wrap.setAttribute('hidden', ''); return; }
+    wrap.removeAttribute('hidden');
+
+    let met = 0;
+    Object.values(checks).forEach(c => {
+      const pass = c.test(v);
+      c.el?.classList.toggle('is-met', pass);
+      if (pass) met++;
+    });
+
+    fill.setAttribute('data-level', met);
+    fill.style.width = (met * 25) + '%';
+    const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
+    label.textContent = _t(strengthLabels[met]);
+    label.setAttribute('data-level', met);
+
+    if (confirmPw.value) checkMatch();
+  });
+
+  function checkMatch() {
+    if (!matchHint || !confirmPw.value) return;
+    const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
+    const match = newPw.value === confirmPw.value;
+    matchHint.removeAttribute('hidden');
+    matchHint.textContent = _t(match ? 'cust_pw_match' : 'cust_pw_no_match');
+    matchHint.className = 'pw-match-hint ' + (match ? 'is-match' : 'is-mismatch');
+  }
+  confirmPw?.addEventListener('input', checkMatch);
+}
+
+/* ── Profile completeness bar ────────────────────────────── */
+function updateProfileCompleteness() {
+  const account = getAccount ? getAccount() : null;
+  const fields = ['fullName', 'email', 'phone', 'city', 'bio'];
+  const filled = fields.filter(f => account && account[f] && account[f].trim()).length;
+  const avatar = document.querySelector('.settings-avatar-preview img');
+  const total  = fields.length + 1; // +1 for photo
+  const score  = Math.round(((filled + (avatar ? 1 : 0)) / total) * 100);
+  const pct = document.getElementById('profile-complete-pct');
+  const bar = document.getElementById('profile-complete-bar');
+  const fill = document.getElementById('profile-complete-fill');
+  if (pct) pct.textContent = score + '%';
+  if (bar) bar.setAttribute('aria-valuenow', score);
+  if (fill) fill.style.width = score + '%';
+}
+
+/* ── Settings toggles (notifications, 2FA) ──────────────── */
+function initSettingToggles() {
+  const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
+  const prefs = JSON.parse(localStorage.getItem('servio_notif_prefs') || '{}');
+
+  document.querySelectorAll('.stab-toggle[data-pref]').forEach(btn => {
+    const key = btn.dataset.pref;
+    // Restore saved state (if we have it, otherwise keep HTML default)
+    if (key in prefs) {
+      const on = prefs[key];
+      btn.setAttribute('aria-checked', on ? 'true' : 'false');
+      btn.classList.toggle('stab-toggle--on', on);
+    }
+    btn.addEventListener('click', () => {
+      const on = btn.getAttribute('aria-checked') !== 'true';
+      btn.setAttribute('aria-checked', on ? 'true' : 'false');
+      btn.classList.toggle('stab-toggle--on', on);
+      prefs[key] = on;
+      localStorage.setItem('servio_notif_prefs', JSON.stringify(prefs));
+      showToast(_t('toast_notif_saved'), 'success');
+    });
+  });
+}
+
+/* ── Language cards ─────────────────────────────────────── */
+function initLanguageCards() {
+  const cards = document.getElementById('lang-cards');
+  if (!cards) return;
+
+  function syncCards() {
+    const current = localStorage.getItem('servio_lang') || 'en';
+    cards.querySelectorAll('.lang-card').forEach(c => {
+      const active = c.dataset.lang === current;
+      c.setAttribute('aria-checked', active ? 'true' : 'false');
+    });
+  }
+  syncCards();
+
+  cards.addEventListener('click', (e) => {
+    const card = e.target.closest('.lang-card');
+    if (!card) return;
+    const lang = card.dataset.lang;
+    // Trigger the existing lang.js switch
+    const switcher = document.querySelector('[data-lang-switcher], [data-lang-switch]');
+    if (switcher) {
+      switcher.value = lang;
+      switcher.dispatchEvent(new Event('change'));
+    } else if (typeof window.setLang === 'function') {
+      window.setLang(lang);
+    } else {
+      localStorage.setItem('servio_lang', lang);
+      location.reload();
+    }
+    syncCards();
+  });
+
+  document.addEventListener('langchange', syncCards);
+}
+
+/* ── Theme cards ─────────────────────────────────────────── */
+function initThemeCards() {
+  const cards = document.getElementById('theme-cards');
+  if (!cards) return;
+
+  function syncCards() {
+    const current = localStorage.getItem('servio_theme') || 'system';
+    cards.querySelectorAll('.theme-card').forEach(c => {
+      const active = c.dataset.themeChoice === current;
+      c.setAttribute('aria-checked', active ? 'true' : 'false');
+    });
+  }
+  syncCards();
+
+  cards.addEventListener('click', (e) => {
+    const card = e.target.closest('.theme-card');
+    if (!card) return;
+    const choice = card.dataset.themeChoice;
+    localStorage.setItem('servio_theme', choice);
+
+    let apply = choice;
+    if (choice === 'system') {
+      apply = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    document.documentElement.setAttribute('data-theme', apply);
+    // Also try the existing dashboard toggle if present
+    const toggle = document.querySelector('[data-theme-toggle]');
+    if (toggle) toggle.checked = apply === 'dark';
+    syncCards();
+  });
+}
+
+/* ── Addresses tab ──────────────────────────────────────── */
+function initAddressTab() {
+  const formWrap   = document.getElementById('addr-form-wrap');
+  const btnAdd     = document.getElementById('btn-addr-add');
+  const btnCancel  = document.getElementById('btn-addr-cancel');
+  const btnSave    = document.getElementById('btn-addr-save');
+  const formTitle  = document.getElementById('addr-form-title');
+  if (!formWrap) return;
+
+  const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
+  let currentAddrTarget = null;
+
+  function openForm(target) {
+    currentAddrTarget = target;
+    formTitle.textContent = _t('cust_addr_edit_title');
+    // Pre-fill if stored
+    const saved = JSON.parse(localStorage.getItem('servio_addresses') || '{}');
+    const data = saved[target] || {};
+    document.getElementById('addr-input-street').value   = data.street   || '';
+    document.getElementById('addr-input-district').value = data.district || '';
+    document.getElementById('addr-input-city').value     = data.city     || '';
+    formWrap.removeAttribute('hidden');
+    btnAdd.setAttribute('hidden', '');
+    document.getElementById('addr-input-street').focus();
+  }
+
+  function closeForm() {
+    formWrap.setAttribute('hidden', '');
+    btnAdd.removeAttribute('hidden');
+    currentAddrTarget = null;
+  }
+
+  // Edit buttons on each card
+  document.querySelectorAll('.btn-addr-edit').forEach(btn => {
+    btn.addEventListener('click', () => openForm(btn.dataset.addrTarget));
+  });
+
+  btnAdd.addEventListener('click', () => openForm('other-' + Date.now()));
+  btnCancel.addEventListener('click', closeForm);
+
+  btnSave.addEventListener('click', () => {
+    if (!currentAddrTarget) return;
+    const street   = document.getElementById('addr-input-street').value.trim();
+    const district = document.getElementById('addr-input-district').value.trim();
+    const city     = document.getElementById('addr-input-city').value.trim();
+    if (!street) { document.getElementById('addr-input-street').focus(); return; }
+
+    const saved = JSON.parse(localStorage.getItem('servio_addresses') || '{}');
+    saved[currentAddrTarget] = { street, district, city };
+    localStorage.setItem('servio_addresses', JSON.stringify(saved));
+
+    const full = [street, district, city].filter(Boolean).join(', ');
+    const valueEl = document.getElementById('addr-' + currentAddrTarget + '-value');
+    if (valueEl) valueEl.textContent = full;
+
+    closeForm();
+    showToast(_t('toast_addr_saved'), 'success');
+  });
+
+  // Restore saved addresses on load
+  const saved = JSON.parse(localStorage.getItem('servio_addresses') || '{}');
+  ['home', 'work'].forEach(key => {
+    const data = saved[key];
+    if (!data) return;
+    const el = document.getElementById('addr-' + key + '-value');
+    if (el) el.textContent = [data.street, data.district, data.city].filter(Boolean).join(', ');
+  });
+}
+
+/* ── Account tab (export / deactivate / delete) ─────────── */
+function initAccountTab() {
+  const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
+
+  /* ── Export data ── */
+  document.getElementById('btn-export-data')?.addEventListener('click', () => {
+    showToast(_t('toast_export_demo'), 'info');
+  });
+
+  /* ── Deactivate modal ── */
+  const modalDeactivate  = document.getElementById('modal-deactivate');
+  const checkDeactivate  = document.getElementById('deactivate-confirm-check');
+  const btnDeactivateOk  = document.getElementById('btn-deactivate-confirm');
+
+  function openDeactivateModal() {
+    if (!modalDeactivate) return;
+    checkDeactivate.checked = false;
+    btnDeactivateOk.disabled = true;
+    modalDeactivate.removeAttribute('hidden');
+    document.body.style.overflow = 'hidden';
+    checkDeactivate.focus();
+  }
+  function closeDeactivateModal() {
+    modalDeactivate?.setAttribute('hidden', '');
+    document.body.style.overflow = '';
+  }
+
+  document.getElementById('btn-deactivate-account')?.addEventListener('click', openDeactivateModal);
+  document.getElementById('btn-close-deactivate')?.addEventListener('click', closeDeactivateModal);
+  document.getElementById('btn-deactivate-cancel')?.addEventListener('click', closeDeactivateModal);
+
+  checkDeactivate?.addEventListener('change', () => {
+    btnDeactivateOk.disabled = !checkDeactivate.checked;
+  });
+
+  btnDeactivateOk?.addEventListener('click', () => {
+    closeDeactivateModal();
+    showToast(_t('toast_deactivate_demo'), 'info');
+  });
+
+  /* ── Delete modal ── */
+  const modalDelete   = document.getElementById('modal-delete');
+  const inputDelete   = document.getElementById('delete-confirm-input');
+  const btnDeleteOk   = document.getElementById('btn-delete-confirm');
+  const CONFIRM_WORD  = 'DELETE';
+
+  function openDeleteModal() {
+    if (!modalDelete) return;
+    inputDelete.value = '';
+    inputDelete.classList.remove('is-valid');
+    btnDeleteOk.disabled = true;
+    modalDelete.removeAttribute('hidden');
+    document.body.style.overflow = 'hidden';
+    inputDelete.focus();
+  }
+  function closeDeleteModal() {
+    modalDelete?.setAttribute('hidden', '');
+    document.body.style.overflow = '';
+  }
+
+  // Override the existing btn-delete-account click (initDeleteAccount set a toast, we replace it)
+  const btnDeleteAcct = document.getElementById('btn-delete-account');
+  if (btnDeleteAcct) {
+    // Clone to remove the old listener added by initDeleteAccount
+    const fresh = btnDeleteAcct.cloneNode(true);
+    btnDeleteAcct.parentNode.replaceChild(fresh, btnDeleteAcct);
+    fresh.addEventListener('click', openDeleteModal);
+  }
+
+  document.getElementById('btn-close-delete')?.addEventListener('click', closeDeleteModal);
+  document.getElementById('btn-delete-cancel')?.addEventListener('click', closeDeleteModal);
+
+  inputDelete?.addEventListener('input', () => {
+    const match = inputDelete.value === CONFIRM_WORD;
+    inputDelete.classList.toggle('is-valid', match);
+    btnDeleteOk.disabled = !match;
+  });
+
+  btnDeleteOk?.addEventListener('click', () => {
+    closeDeleteModal();
+    showToast(_t('toast_delete_demo'), 'info');
+  });
+
+  /* ── Close on backdrop click ── */
+  [modalDeactivate, modalDelete].forEach(modal => {
+    modal?.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal === modalDeactivate ? closeDeactivateModal() : closeDeleteModal();
+      }
+    });
+  });
+
+  /* ── Close on Escape ── */
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (modalDeactivate && !modalDeactivate.hidden) closeDeactivateModal();
+    if (modalDelete     && !modalDelete.hidden)     closeDeleteModal();
+  });
+}
+
+/* ── Date/Time Translation ────────────────────────────── */
+function translateDateTime(str) {
+  if (!str) return '';
+  const lang = localStorage.getItem('servio_lang') || 'en';
+  if (lang !== 'ar') return str;
+
+  const monthsMap = {
+    'Jan': 'يناير', 'Feb': 'فبراير', 'Mar': 'مارس', 'Apr': 'أبريل',
+    'May': 'مايو', 'Jun': 'يونيو', 'Jul': 'يوليو', 'Aug': 'أغسطس',
+    'Sep': 'سبتمبر', 'Oct': 'أكتوبر', 'Nov': 'نوفمبر', 'Dec': 'ديسمبر',
+    'January': 'يناير', 'February': 'فبراير', 'March': 'مارس', 'April': 'أبريل',
+    'June': 'يونيو', 'July': 'يوليو', 'August': 'أغسطس',
+    'September': 'سبتمبر', 'October': 'أكتوبر', 'November': 'نوفمبر', 'December': 'ديسمبر',
+    'Sun': 'الأحد', 'Mon': 'الاثنين', 'Tue': 'الثلاثاء', 'Wed': 'الأربعاء', 'Thu': 'الخميس', 'Fri': 'الجمعة', 'Sat': 'السبت'
+  };
+
+  const ampmMap = {
+    'AM': 'صباحاً',
+    'PM': 'مساءً'
+  };
+
+  let res = str;
+  Object.keys(monthsMap).forEach(k => { res = res.replace(new RegExp('\\b' + k + '\\b', 'g'), monthsMap[k]); });
+  Object.keys(ampmMap).forEach(k => { res = res.replace(new RegExp('\\b' + k + '\\b', 'g'), ampmMap[k]); });
+  return res;
+}
+
+/* ── Live language switch ────────────────────────────────── */
 function refreshDynamicText() {
   updateWelcomeText();
   const welcomeEl = document.querySelector('[data-dash-welcome]');
   if (welcomeEl) {
     welcomeEl.textContent = typeof window.t === 'function' ? window.t('cust_welcome_sub_text') : 'Your overview';
   }
+
+  // Translate hours in schedule cards
+  document.querySelectorAll('.dash-next-appt__hour, .dash-schedule-item__hour').forEach(el => {
+    // Store original if not stored
+    if (!el.dataset.origText) el.dataset.origText = el.textContent;
+    el.textContent = translateDateTime(el.dataset.origText);
+  });
+
+  // Translate Job counts in Favourites
+  document.querySelectorAll('.fav-card-v2__jobs-count').forEach(el => {
+    if (!el.dataset.origText) el.dataset.origText = el.textContent;
+    const countMatch = el.dataset.origText.match(/\d+/);
+    if (countMatch && typeof window.t === 'function') {
+      el.textContent = window.t('cust_fav_jobs_n', { n: countMatch[0] });
+    }
+  });
 }
 
 /* On every language switch (fired by lang.js after it calls applyLanguage) */
 document.addEventListener('langchange', refreshDynamicText);
 
-/* On initial load: lang.js fires langchange on DOMContentLoaded, which runs
-   AFTER this module (modules run before DCL per HTML spec). The langchange
-   listener above handles that case. But if lang.js already ran before this
-   module registered the listener, fall back to running once on DOMContentLoaded. */
+/* On initial load: lang.js fires langchange on DOMContentLoaded */
 document.addEventListener('DOMContentLoaded', refreshDynamicText, { once: true });
 
 /* ═══════════════════════════════════════════════

@@ -244,8 +244,8 @@ function initAdminDashboard() {
         </div>
       </div>
       <div class="pending-card__docs">
-        <div class="doc-item doc-item--ok" data-i18n="doc_national_id">✓ National ID</div>
-        <div class="doc-item doc-item--ok">✓ Selfie</div>
+        <div class="doc-item doc-item--ok" data-i18n="doc_national_id">National ID</div>
+        <div class="doc-item doc-item--ok" data-i18n="doc_selfie">Selfie</div>
       </div>
       <div class="pending-card__actions">
         <button class="btn btn--primary btn--sm" data-action="approve" data-i18n="admin_action_approve">Approve</button>
@@ -699,6 +699,62 @@ function initAdminDashboard() {
   document.getElementById('exportReportBtn')?.addEventListener('click', () => {
     showToast(typeof window.t === 'function' ? window.t('toast_report_exported') : 'Report exported successfully', 'success');
   });
+
+  // ── Analytics Filters ────────────────────────────────────
+  const btnApplyAnalyticFilters = document.getElementById('applyAnalyticsFilters');
+  const btnResetAnalyticFilters = document.getElementById('resetAnalyticsFilters');
+  
+  function applyAnalyticsChartChanges(srvVal) {
+      // Update horizontal bar chart visibility (service demand)
+      const chartItems = document.querySelectorAll('#analyticsServicesChart .analytics-hbar-item');
+      chartItems.forEach(item => {
+        const itemSvc = item.dataset.service || '';
+        if (srvVal === '' || itemSvc === srvVal) {
+          item.style.display = 'flex';
+          // Simulate data shifting
+          const randomPct = Math.floor(Math.random() * 60) + 30; // 30 to 90
+          const fill = item.querySelector('.analytics-hbar-fill');
+          const pct = item.querySelector('.analytics-hbar-pct');
+          if (fill) fill.style.setProperty('--bar-width', randomPct + '%');
+          if (pct) pct.textContent = randomPct + '%';
+        } else {
+          item.style.display = 'none';
+        }
+      });
+
+      // Also randomize vertical bar chart to simulate data update
+      const randomBars = document.querySelectorAll('.analytics-bar');
+      randomBars.forEach(bar => {
+         const newH = Math.floor(Math.random() * 70) + 30; 
+         bar.style.setProperty('--bar-height', newH + '%');
+         bar.textContent = Math.floor(newH / 1.5);
+      });
+  }
+
+  if (btnApplyAnalyticFilters) {
+    btnApplyAnalyticFilters.addEventListener('click', () => {
+      const srvFilter = document.getElementById('analyticsServiceFilter');
+      const srvVal = srvFilter ? srvFilter.value : '';
+      
+      applyAnalyticsChartChanges(srvVal);
+      showToast(window.__lang === 'ar' ? 'تم تطبيق الفلاتر والتحليلات' : 'Analytics filters applied', 'success');
+    });
+  }
+
+  if (btnResetAnalyticFilters) {
+    btnResetAnalyticFilters.addEventListener('click', () => {
+       const filters = ['analyticsDateFilter', 'analyticsServiceFilter', 'analyticsRegionFilter'];
+       filters.forEach(id => {
+         const el = document.getElementById(id);
+         if (el) el.value = ''; 
+       });
+       const dFilter = document.getElementById('analyticsDateFilter');
+       if (dFilter) dFilter.value = '30'; // Default is usually Last 30 Days
+
+       applyAnalyticsChartChanges('');
+       showToast(window.__lang === 'ar' ? 'تم إعادة ضبط الفلاتر' : 'Filters reset successfully', 'info');
+    });
+  }
 
   // ── Overview date — set on init and on language switch ──
   _updateOverviewDate();

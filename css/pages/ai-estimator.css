@@ -254,7 +254,7 @@
   height: 2px;
   width: 64px;
   background: var(--color-border);
-  margin-bottom: 1.4rem;
+  margin: 0 10px 1.4rem;
   flex-shrink: 0;
   transition: background 0.3s ease;
 }

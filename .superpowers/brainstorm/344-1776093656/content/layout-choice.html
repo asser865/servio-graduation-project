@@ -1,0 +1,210 @@
+<style>
+  .layout-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 20px; }
+
+  /* ── Shared mock shell ── */
+  .mock-shell { background: #0f172a; border-radius: 10px; overflow: hidden; border: 1px solid #1e293b; font-family: system-ui, sans-serif; font-size: 11px; }
+  .mock-topbar { background: #1e293b; padding: 8px 14px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #334155; }
+  .mock-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .mock-title { color: #94a3b8; font-size: 10px; font-weight: 600; letter-spacing:.04em; margin-left: 4px; }
+
+  /* ── Layout A: Single scroll ── */
+  .layout-a-body { padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .la-section { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 12px; }
+  .la-heading { font-size: 11px; font-weight: 700; color: #e2e8f0; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+  .la-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .la-field { background: #0f172a; border: 1px solid #334155; border-radius: 5px; height: 26px; }
+  .la-label { font-size: 9px; color: #475569; margin-bottom: 3px; }
+  .la-row { display: flex; align-items: center; justify-content: space-between; }
+  .la-toggle { width: 28px; height: 16px; background: #6366f1; border-radius: 20px; position: relative; }
+  .la-toggle::after { content:''; position: absolute; right: 3px; top: 3px; width: 10px; height: 10px; border-radius: 50%; background: #fff; }
+  .la-toggle-off { background: #334155; }
+  .la-toggle-off::after { left: 3px; right: auto; }
+  .la-badge { font-size: 9px; padding: 2px 6px; border-radius: 10px; background: rgba(99,102,241,.15); color: #a5b4fc; }
+  .la-danger { border-color: rgba(239,68,68,.3) !important; }
+
+  /* ── Layout B: Sidebar nav ── */
+  .layout-b-body { display: flex; min-height: 280px; }
+  .lb-sidebar { width: 120px; background: #1e293b; border-right: 1px solid #334155; padding: 10px 0; flex-shrink: 0; }
+  .lb-nav-item { padding: 7px 12px; font-size: 10px; color: #64748b; display: flex; align-items: center; gap: 7px; cursor: pointer; transition: all .15s; }
+  .lb-nav-item.active { background: rgba(99,102,241,.12); color: #a5b4fc; border-right: 2px solid #6366f1; }
+  .lb-nav-icon { font-size: 12px; }
+  .lb-content { flex: 1; padding: 14px; overflow: hidden; }
+  .lb-page-title { font-size: 13px; font-weight: 700; color: #e2e8f0; margin-bottom: 2px; }
+  .lb-page-sub { font-size: 10px; color: #64748b; margin-bottom: 14px; }
+  .lb-avatar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .lb-avatar { width: 44px; height: 44px; border-radius: 50%; background: #6366f1; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 16px; }
+  .lb-completion { flex: 1; }
+  .lb-completion-label { font-size: 9px; color: #64748b; margin-bottom: 4px; display: flex; justify-content: space-between; }
+  .lb-bar { height: 4px; background: #334155; border-radius: 10px; }
+  .lb-bar-fill { height: 100%; width: 65%; background: linear-gradient(90deg, #6366f1, #8b5cf6); border-radius: 10px; }
+  .lb-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .lb-field-label { font-size: 9px; color: #475569; margin-bottom: 3px; }
+  .lb-input { background: #0f172a; border: 1px solid #334155; border-radius: 5px; height: 26px; width: 100%; }
+  .lb-save-row { margin-top: 10px; display: flex; justify-content: flex-end; }
+  .lb-save-btn { background: #6366f1; color: #fff; border: none; padding: 6px 14px; border-radius: 6px; font-size: 10px; font-weight: 600; }
+
+  /* pros/cons */
+  .pc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+  .pc-box { padding: 10px 12px; border-radius: 8px; font-size: 11px; }
+  .pc-pro { background: rgba(34,197,94,.07); border: 1px solid rgba(34,197,94,.2); }
+  .pc-con { background: rgba(239,68,68,.07); border: 1px solid rgba(239,68,68,.15); }
+  .pc-title { font-size: 10px; font-weight: 700; margin-bottom: 6px; }
+  .pc-pro .pc-title { color: #4ade80; }
+  .pc-con .pc-title { color: #f87171; }
+  .pc-list { list-style: none; padding: 0; margin: 0; }
+  .pc-list li { color: #94a3b8; padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,.04); font-size: 10px; }
+  .pc-list li:last-child { border-bottom: none; }
+  .pc-list li::before { content: ''; margin-right: 6px; }
+  .pc-pro .pc-list li::before { content: '✓'; color: #4ade80; }
+  .pc-con .pc-list li::before { content: '✗'; color: #f87171; }
+
+  .rec-badge { display: inline-flex; align-items: center; gap: 5px; background: rgba(99,102,241,.15); border: 1px solid rgba(99,102,241,.3); color: #a5b4fc; padding: 3px 10px; border-radius: 20px; font-size: 10px; font-weight: 700; margin-top: 6px; }
+</style>
+
+<h2>Settings Layout — Which Structure?</h2>
+<p class="subtitle">Two fundamentally different approaches. Click to select your preferred direction.</p>
+
+<div class="layout-cards">
+
+  <!-- Option A -->
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Single-Page Scroll</h3>
+      <p>All settings stacked vertically in one scrollable page — Profile → Security → Notifications → Preferences → Danger Zone. Like Airbnb, Uber.</p>
+
+      <div class="mock-shell" style="margin-top:12px;">
+        <div class="mock-topbar">
+          <div class="mock-dot" style="background:#ef4444"></div>
+          <div class="mock-dot" style="background:#f59e0b"></div>
+          <div class="mock-dot" style="background:#22c55e"></div>
+          <span class="mock-title">Settings</span>
+        </div>
+        <div class="layout-a-body">
+          <div class="la-section">
+            <div class="la-heading">👤 Profile Information</div>
+            <div class="la-fields">
+              <div><div class="la-label">Full Name</div><div class="la-field"></div></div>
+              <div><div class="la-label">Email</div><div class="la-field"></div></div>
+              <div><div class="la-label">Phone</div><div class="la-field"></div></div>
+              <div><div class="la-label">Address</div><div class="la-field"></div></div>
+            </div>
+          </div>
+          <div class="la-section">
+            <div class="la-heading">🔒 Security</div>
+            <div class="la-fields">
+              <div><div class="la-label">Current Password</div><div class="la-field"></div></div>
+              <div><div class="la-label">New Password</div><div class="la-field"></div></div>
+            </div>
+          </div>
+          <div class="la-section">
+            <div class="la-heading">🔔 Notifications</div>
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <div class="la-row"><span style="color:#94a3b8">Booking Confirmed</span><div class="la-toggle"></div></div>
+              <div class="la-row"><span style="color:#94a3b8">Technician On the Way</span><div class="la-toggle"></div></div>
+              <div class="la-row"><span style="color:#94a3b8">Promotional Emails</span><div class="la-toggle la-toggle-off"></div></div>
+            </div>
+          </div>
+          <div class="la-section">
+            <div class="la-heading">🌐 Language & Appearance</div>
+            <div class="la-row"><span style="color:#94a3b8">Language</span><span class="la-badge">العربية</span></div>
+          </div>
+          <div class="la-section la-danger">
+            <div style="color:#ef4444;font-weight:700;margin-bottom:4px;">⚠ Danger Zone</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pc-grid">
+        <div class="pc-box pc-pro">
+          <div class="pc-title">Pros</div>
+          <ul class="pc-list">
+            <li>Nothing to learn — just scroll</li>
+            <li>Matches current structure</li>
+            <li>Mobile-friendly naturally</li>
+            <li>Less navigation overhead</li>
+          </ul>
+        </div>
+        <div class="pc-box pc-con">
+          <div class="pc-title">Cons</div>
+          <ul class="pc-list">
+            <li>Gets long with 6+ sections</li>
+            <li>Hard to jump to a section</li>
+            <li>No clear section separation</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Option B -->
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Sidebar Navigation</h3>
+      <p>Left sidebar lists all sections. Clicking a section shows only that content on the right. Like GitHub, Stripe, Linear, Notion settings.</p>
+
+      <div class="mock-shell" style="margin-top:12px;">
+        <div class="mock-topbar">
+          <div class="mock-dot" style="background:#ef4444"></div>
+          <div class="mock-dot" style="background:#f59e0b"></div>
+          <div class="mock-dot" style="background:#22c55e"></div>
+          <span class="mock-title">Settings</span>
+        </div>
+        <div class="layout-b-body">
+          <div class="lb-sidebar">
+            <div class="lb-nav-item active"><span class="lb-nav-icon">👤</span> Profile</div>
+            <div class="lb-nav-item"><span class="lb-nav-icon">🔒</span> Security</div>
+            <div class="lb-nav-item"><span class="lb-nav-icon">🔔</span> Notifs</div>
+            <div class="lb-nav-item"><span class="lb-nav-icon">🌐</span> Language</div>
+            <div class="lb-nav-item"><span class="lb-nav-icon">🎨</span> Appear.</div>
+            <div class="lb-nav-item"><span class="lb-nav-icon">📍</span> Addresses</div>
+            <div class="lb-nav-item"><span class="lb-nav-icon">⚠</span> Danger</div>
+          </div>
+          <div class="lb-content">
+            <div class="lb-page-title">Profile Information</div>
+            <div class="lb-page-sub">Your name, email and contact details.</div>
+            <div class="lb-avatar-row">
+              <div class="lb-avatar">A</div>
+              <div class="lb-completion">
+                <div class="lb-completion-label"><span>Profile complete</span><span style="color:#a5b4fc">65%</span></div>
+                <div class="lb-bar"><div class="lb-bar-fill"></div></div>
+              </div>
+            </div>
+            <div class="lb-fields">
+              <div><div class="lb-field-label">Full Name</div><div class="lb-input"></div></div>
+              <div><div class="lb-field-label">Email</div><div class="lb-input"></div></div>
+              <div><div class="lb-field-label">Phone</div><div class="lb-input"></div></div>
+              <div><div class="lb-field-label">Address</div><div class="lb-input"></div></div>
+            </div>
+            <div class="lb-save-row"><button class="lb-save-btn">Save Changes</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rec-badge">⭐ Recommended for 6+ sections</div>
+
+      <div class="pc-grid">
+        <div class="pc-box pc-pro">
+          <div class="pc-title">Pros</div>
+          <ul class="pc-list">
+            <li>Scales to any number of sections</li>
+            <li>Focused — one task at a time</li>
+            <li>Instantly navigable</li>
+            <li>Industry standard (GitHub, Stripe)</li>
+            <li>Room for profile completeness bar</li>
+          </ul>
+        </div>
+        <div class="pc-box pc-con">
+          <div class="pc-title">Cons</div>
+          <ul class="pc-list">
+            <li>More JS to manage active state</li>
+            <li>Sidebar needs collapsing on mobile</li>
+            <li>Bigger structural change to HTML</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>

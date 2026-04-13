@@ -1,0 +1,304 @@
+<style>
+  .options-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; margin-top: 20px; }
+
+  .mock-shell { background: #0f172a; border-radius: 10px; overflow: hidden; border: 1px solid #1e293b; font-family: system-ui, sans-serif; font-size: 11px; }
+  .mock-topbar { background: #1e293b; padding: 7px 12px; display: flex; align-items: center; gap: 6px; border-bottom: 1px solid #334155; }
+  .mock-dot { width: 7px; height: 7px; border-radius: 50%; }
+  .mock-label { color: #64748b; font-size: 9px; font-weight: 600; letter-spacing:.04em; margin-left: 4px; }
+
+  /* ── Option A: Horizontal Tabs ── */
+  .htabs-bar { display: flex; gap: 0; background: #1e293b; border-bottom: 1px solid #334155; overflow-x: auto; }
+  .htab { padding: 8px 11px; font-size: 9.5px; color: #64748b; white-space: nowrap; cursor: pointer; border-bottom: 2px solid transparent; display: flex; align-items: center; gap: 5px; }
+  .htab.active { color: #a5b4fc; border-bottom-color: #6366f1; }
+  .htab-content { padding: 14px; }
+  .htab-title { font-size: 13px; font-weight: 700; color: #e2e8f0; margin-bottom: 2px; }
+  .htab-sub { font-size: 10px; color: #64748b; margin-bottom: 12px; }
+  .htab-avatar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .htab-avatar { width: 40px; height: 40px; border-radius: 50%; background: #6366f1; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 15px; flex-shrink: 0; }
+  .htab-completion { flex: 1; }
+  .htab-completion-label { font-size: 9px; color: #64748b; margin-bottom: 3px; display: flex; justify-content: space-between; }
+  .htab-bar { height: 3px; background: #334155; border-radius: 10px; }
+  .htab-bar-fill { height: 100%; width: 65%; background: linear-gradient(90deg,#6366f1,#8b5cf6); border-radius: 10px; }
+  .htab-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+  .htab-label { font-size: 9px; color: #475569; margin-bottom: 3px; }
+  .htab-input { background: #0f172a; border: 1px solid #334155; border-radius: 5px; height: 24px; width: 100%; box-sizing: border-box; }
+  .htab-save { background: #6366f1; color: #fff; border: none; padding: 5px 12px; border-radius: 5px; font-size: 10px; font-weight: 600; float: right; }
+
+  /* ── Option B: Sticky Jump Links ── */
+  .sjl-jumps { display: flex; gap: 6px; padding: 8px 12px; background: #1e293b; border-bottom: 1px solid #334155; overflow-x: auto; }
+  .sjl-pill { padding: 3px 9px; background: #0f172a; border: 1px solid #334155; border-radius: 20px; font-size: 9px; color: #64748b; white-space: nowrap; cursor: pointer; }
+  .sjl-pill.active { background: rgba(99,102,241,.15); border-color: #6366f1; color: #a5b4fc; }
+  .sjl-body { padding: 12px; max-height: 220px; overflow-y: auto; }
+  .sjl-section { margin-bottom: 12px; }
+  .sjl-section-title { font-size: 10px; font-weight: 700; color: #e2e8f0; margin-bottom: 6px; display: flex; align-items: center; gap: 5px; padding-bottom: 5px; border-bottom: 1px solid #1e293b; }
+  .sjl-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+  .sjl-label { font-size: 9px; color: #475569; margin-bottom: 2px; }
+  .sjl-input { background: #0f172a; border: 1px solid #334155; border-radius: 4px; height: 22px; width: 100%; box-sizing: border-box; }
+  .sjl-toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid #1a2230; }
+  .sjl-toggle { width: 24px; height: 14px; background: #6366f1; border-radius: 20px; position: relative; flex-shrink: 0; }
+  .sjl-toggle::after { content:''; position: absolute; right: 2px; top: 2px; width: 10px; height: 10px; border-radius: 50%; background: #fff; }
+  .sjl-save-mini { background: #6366f1; color: #fff; border: none; padding: 4px 10px; border-radius: 5px; font-size: 9px; font-weight: 600; margin-top: 8px; }
+
+  /* ── Option C: Accordion ── */
+  .acc-body { padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+  .acc-item { background: #1e293b; border: 1px solid #334155; border-radius: 8px; overflow: hidden; }
+  .acc-header { display: flex; align-items: center; justify-content: space-between; padding: 9px 12px; cursor: pointer; }
+  .acc-header-left { display: flex; align-items: center; gap: 7px; font-size: 10px; font-weight: 700; color: #e2e8f0; }
+  .acc-chevron { color: #64748b; font-size: 10px; transition: transform .2s; }
+  .acc-open .acc-chevron { transform: rotate(180deg); color: #a5b4fc; }
+  .acc-open .acc-header { border-bottom: 1px solid #334155; }
+  .acc-open .acc-header-left { color: #a5b4fc; }
+  .acc-content { padding: 10px 12px; display: none; }
+  .acc-open .acc-content { display: block; }
+  .acc-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+  .acc-label { font-size: 9px; color: #475569; margin-bottom: 2px; }
+  .acc-input { background: #0f172a; border: 1px solid #334155; border-radius: 4px; height: 22px; width: 100%; box-sizing: border-box; }
+  .acc-save { background: #6366f1; color: #fff; border: none; padding: 4px 10px; border-radius: 5px; font-size: 9px; font-weight: 600; margin-top: 8px; }
+  .acc-toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; }
+  .acc-toggle { width: 24px; height: 14px; background: #6366f1; border-radius: 20px; position: relative; flex-shrink: 0; }
+  .acc-toggle::after { content:''; position:absolute; right:2px; top:2px; width:10px; height:10px; border-radius:50%; background:#fff; }
+  .acc-badge { font-size: 8px; background: rgba(99,102,241,.15); color: #a5b4fc; padding: 2px 6px; border-radius: 10px; }
+
+  /* pros/cons */
+  .pc { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
+  .pc-box { padding: 7px 9px; border-radius: 7px; font-size: 10px; }
+  .pc-pro { background: rgba(34,197,94,.07); border: 1px solid rgba(34,197,94,.18); }
+  .pc-con { background: rgba(239,68,68,.07); border: 1px solid rgba(239,68,68,.12); }
+  .pc-title { font-size: 9px; font-weight: 700; margin-bottom: 5px; }
+  .pc-pro .pc-title { color: #4ade80; }
+  .pc-con .pc-title { color: #f87171; }
+  .pc-ul { list-style: none; padding: 0; margin: 0; }
+  .pc-ul li { color: #94a3b8; padding: 2px 0; font-size: 9.5px; }
+  .pc-pro .pc-ul li::before { content: '✓ '; color: #4ade80; }
+  .pc-con .pc-ul li::before { content: '✗ '; color: #f87171; }
+
+  .rec { display: inline-flex; align-items: center; gap: 4px; background: rgba(99,102,241,.15); border: 1px solid rgba(99,102,241,.3); color: #a5b4fc; padding: 3px 9px; border-radius: 20px; font-size: 9px; font-weight: 700; margin-top: 6px; }
+</style>
+
+<h2>Three Better Approaches</h2>
+<p class="subtitle">All avoid sidebar-in-sidebar and long scroll. Click the one that feels right.</p>
+
+<div class="options-grid">
+
+  <!-- A: Horizontal Tabs -->
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Horizontal Tabs</h3>
+      <p>Tabs across the top of the settings panel. One section visible at a time. No scroll at all.</p>
+
+      <div class="mock-shell" style="margin-top:10px;">
+        <div class="mock-topbar">
+          <div class="mock-dot" style="background:#ef4444"></div>
+          <div class="mock-dot" style="background:#f59e0b"></div>
+          <div class="mock-dot" style="background:#22c55e"></div>
+          <span class="mock-label">Settings Panel</span>
+        </div>
+        <div class="htabs-bar">
+          <div class="htab active">👤 Profile</div>
+          <div class="htab">🔒 Security</div>
+          <div class="htab">🔔 Notifs</div>
+          <div class="htab">🌐 Language</div>
+          <div class="htab">📍 Addresses</div>
+          <div class="htab">⚠ Danger</div>
+        </div>
+        <div class="htab-content">
+          <div class="htab-title">Profile Information</div>
+          <div class="htab-sub">Your name, email and contact details.</div>
+          <div class="htab-avatar-row">
+            <div class="htab-avatar">A</div>
+            <div class="htab-completion">
+              <div class="htab-completion-label"><span>Profile complete</span><span style="color:#a5b4fc">65%</span></div>
+              <div class="htab-bar"><div class="htab-bar-fill"></div></div>
+            </div>
+          </div>
+          <div class="htab-fields">
+            <div><div class="htab-label">Full Name</div><div class="htab-input"></div></div>
+            <div><div class="htab-label">Email</div><div class="htab-input"></div></div>
+            <div><div class="htab-label">Phone</div><div class="htab-input"></div></div>
+            <div><div class="htab-label">Address</div><div class="htab-input"></div></div>
+          </div>
+          <button class="htab-save">Save Changes</button>
+        </div>
+      </div>
+
+      <span class="rec">⭐ Recommended</span>
+
+      <div class="pc">
+        <div class="pc-box pc-pro">
+          <div class="pc-title">Pros</div>
+          <ul class="pc-ul">
+            <li>No scroll at all</li>
+            <li>No nested sidebar</li>
+            <li>Focused & clean</li>
+            <li>Easy on mobile (scroll tabs)</li>
+            <li>Minimal JS change</li>
+          </ul>
+        </div>
+        <div class="pc-box pc-con">
+          <div class="pc-title">Cons</div>
+          <ul class="pc-ul">
+            <li>Tab bar gets tight at 7+ items</li>
+            <li>Labels need to stay short</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- B: Sticky Jump Links -->
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Sticky Jump Links</h3>
+      <p>One scroll page but with sticky pill anchors at the top. Click a pill to jump straight to that section.</p>
+
+      <div class="mock-shell" style="margin-top:10px;">
+        <div class="mock-topbar">
+          <div class="mock-dot" style="background:#ef4444"></div>
+          <div class="mock-dot" style="background:#f59e0b"></div>
+          <div class="mock-dot" style="background:#22c55e"></div>
+          <span class="mock-label">Settings Panel</span>
+        </div>
+        <div class="sjl-jumps">
+          <div class="sjl-pill active">👤 Profile</div>
+          <div class="sjl-pill">🔒 Security</div>
+          <div class="sjl-pill">🔔 Notifs</div>
+          <div class="sjl-pill">🌐 Language</div>
+          <div class="sjl-pill">📍 Addresses</div>
+          <div class="sjl-pill">⚠</div>
+        </div>
+        <div class="sjl-body">
+          <div class="sjl-section">
+            <div class="sjl-section-title">👤 Profile Information</div>
+            <div class="sjl-fields">
+              <div><div class="sjl-label">Full Name</div><div class="sjl-input"></div></div>
+              <div><div class="sjl-label">Email</div><div class="sjl-input"></div></div>
+            </div>
+            <button class="sjl-save-mini">Save</button>
+          </div>
+          <div class="sjl-section">
+            <div class="sjl-section-title">🔔 Notifications</div>
+            <div class="sjl-toggle-row"><span style="color:#94a3b8;font-size:10px">Booking confirmed</span><div class="sjl-toggle"></div></div>
+            <div class="sjl-toggle-row"><span style="color:#94a3b8;font-size:10px">Technician on way</span><div class="sjl-toggle"></div></div>
+          </div>
+          <div class="sjl-section">
+            <div class="sjl-section-title">🌐 Language & Appearance</div>
+            <div class="sjl-toggle-row"><span style="color:#94a3b8;font-size:10px">Language: العربية</span><span style="color:#64748b;font-size:9px">change →</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pc">
+        <div class="pc-box pc-pro">
+          <div class="pc-title">Pros</div>
+          <ul class="pc-ul">
+            <li>Everything visible at once</li>
+            <li>Jump links solve long scroll</li>
+            <li>Closest to current structure</li>
+            <li>Least HTML restructuring</li>
+          </ul>
+        </div>
+        <div class="pc-box pc-con">
+          <div class="pc-title">Cons</div>
+          <ul class="pc-ul">
+            <li>Still long on mobile</li>
+            <li>Sticky logic needs JS</li>
+            <li>Less focused per task</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- C: Accordion -->
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Accordion Sections</h3>
+      <p>All sections collapsed by default. Click a section header to expand it. Only one open at a time.</p>
+
+      <div class="mock-shell" style="margin-top:10px;">
+        <div class="mock-topbar">
+          <div class="mock-dot" style="background:#ef4444"></div>
+          <div class="mock-dot" style="background:#f59e0b"></div>
+          <div class="mock-dot" style="background:#22c55e"></div>
+          <span class="mock-label">Settings Panel</span>
+        </div>
+        <div class="acc-body">
+          <div class="acc-item acc-open">
+            <div class="acc-header">
+              <div class="acc-header-left">👤 Profile Information</div>
+              <span class="acc-chevron">▲</span>
+            </div>
+            <div class="acc-content">
+              <div class="acc-fields">
+                <div><div class="acc-label">Full Name</div><div class="acc-input"></div></div>
+                <div><div class="acc-label">Email</div><div class="acc-input"></div></div>
+                <div><div class="acc-label">Phone</div><div class="acc-input"></div></div>
+                <div><div class="acc-label">Address</div><div class="acc-input"></div></div>
+              </div>
+              <button class="acc-save">Save Changes</button>
+            </div>
+          </div>
+          <div class="acc-item">
+            <div class="acc-header">
+              <div class="acc-header-left">🔒 Security <span class="acc-badge">2 items</span></div>
+              <span class="acc-chevron">▼</span>
+            </div>
+            <div class="acc-content"></div>
+          </div>
+          <div class="acc-item">
+            <div class="acc-header">
+              <div class="acc-header-left">🔔 Notifications <span class="acc-badge">3 on</span></div>
+              <span class="acc-chevron">▼</span>
+            </div>
+            <div class="acc-content"></div>
+          </div>
+          <div class="acc-item">
+            <div class="acc-header">
+              <div class="acc-header-left">🌐 Language & Region</div>
+              <span class="acc-chevron">▼</span>
+            </div>
+            <div class="acc-content"></div>
+          </div>
+          <div class="acc-item">
+            <div class="acc-header">
+              <div class="acc-header-left">📍 Saved Addresses</div>
+              <span class="acc-chevron">▼</span>
+            </div>
+            <div class="acc-content"></div>
+          </div>
+          <div class="acc-item" style="border-color:rgba(239,68,68,.3)">
+            <div class="acc-header">
+              <div class="acc-header-left" style="color:#f87171">⚠ Danger Zone</div>
+              <span class="acc-chevron">▼</span>
+            </div>
+            <div class="acc-content"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pc">
+        <div class="pc-box pc-pro">
+          <div class="pc-title">Pros</div>
+          <ul class="pc-ul">
+            <li>Short by default</li>
+            <li>No nested navigation</li>
+            <li>Summary badges when collapsed</li>
+            <li>Familiar pattern</li>
+          </ul>
+        </div>
+        <div class="pc-box pc-con">
+          <div class="pc-title">Cons</div>
+          <ul class="pc-ul">
+            <li>Extra click to open each section</li>
+            <li>Feels less premium than tabs</li>
+            <li>Long when all open</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>

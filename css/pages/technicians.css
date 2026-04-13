@@ -193,6 +193,10 @@
     }
 
     .tech-card__action {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      white-space: nowrap;
       opacity: 0;
       transform: translateX(-5px);
       transition: all 0.3s ease;
@@ -204,6 +208,7 @@
       background: linear-gradient(135deg, var(--color-primary), var(--color-primary-container));
       padding: 0.5rem 1rem;
       border-radius: 4px;
+      min-width: max-content;
     }
 
     .tech-card:hover .tech-card__action {

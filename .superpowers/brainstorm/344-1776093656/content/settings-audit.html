@@ -1,0 +1,243 @@
+<style>
+  .audit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 20px; }
+  .audit-panel { background: #0f172a; border: 1px solid #1e293b; border-radius: 12px; overflow: hidden; }
+  .audit-panel--current { border-color: #334155; }
+  .audit-panel--missing { border-color: #7c3aed44; }
+  .audit-header { padding: 10px 16px; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+  .audit-header--current { background: #1e293b; color: #94a3b8; }
+  .audit-header--missing { background: #1e1035; color: #a78bfa; }
+  .audit-header--issue { background: #1c1108; color: #f59e0b; }
+  .audit-body { padding: 16px; }
+
+  .sim-settings { font-family: system-ui, sans-serif; }
+  .sim-section { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 16px; margin-bottom: 12px; }
+  .sim-section-title { font-size: 12px; font-weight: 700; color: #e2e8f0; display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  .sim-section-sub { font-size: 11px; color: #64748b; margin-bottom: 12px; }
+  .sim-avatar-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .sim-avatar { width: 52px; height: 52px; border-radius: 50%; background: #6366f1; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; color: #fff; flex-shrink: 0; }
+  .sim-change-btn { border: 1px solid #334155; background: transparent; color: #94a3b8; padding: 6px 12px; border-radius: 6px; font-size: 11px; cursor: pointer; }
+  .sim-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .sim-field label { font-size: 10px; color: #94a3b8; margin-bottom: 4px; display: block; }
+  .sim-input { width: 100%; background: #0f172a; border: 1px solid #334155; color: #e2e8f0; padding: 7px 10px; border-radius: 6px; font-size: 11px; box-sizing: border-box; }
+  .sim-hint { font-size: 9px; color: #475569; margin-top: 3px; }
+  .sim-save-row { margin-top: 10px; }
+  .sim-save-btn { background: #6366f1; color: #fff; border: none; padding: 8px 18px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .sim-pw-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .sim-pw-req { font-size: 9px; color: #64748b; background: #1a2740; border-radius: 6px; padding: 8px; margin-top: 8px; line-height: 1.6; }
+  .sim-danger { border-color: rgba(239,68,68,.3) !important; }
+  .sim-danger-title { color: #ef4444; font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+  .sim-danger-desc { font-size: 10px; color: #94a3b8; margin-bottom: 10px; }
+  .sim-delete-btn { background: transparent; border: 1px solid #ef4444; color: #ef4444; padding: 7px 14px; border-radius: 6px; font-size: 11px; cursor: pointer; }
+
+  /* Issue annotations */
+  .issue-list { list-style: none; padding: 0; margin: 0; }
+  .issue-list li { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px solid #1e293b; font-size: 12px; color: #cbd5e1; }
+  .issue-list li:last-child { border-bottom: none; }
+  .issue-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+  .dot-red { background: #ef4444; }
+  .dot-yellow { background: #f59e0b; }
+  .dot-blue { background: #3b82f6; }
+  .issue-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; display: block; margin-bottom: 2px; }
+  .label-red { color: #f87171; }
+  .label-yellow { color: #fbbf24; }
+  .label-blue { color: #60a5fa; }
+
+  .missing-list { list-style: none; padding: 0; margin: 0; }
+  .missing-list li { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px solid #1e293b; font-size: 12px; color: #cbd5e1; }
+  .missing-list li:last-child { border-bottom: none; }
+  .missing-icon { font-size: 14px; flex-shrink: 0; line-height: 1.4; }
+  .missing-text strong { display: block; font-size: 12px; color: #e2e8f0; margin-bottom: 2px; }
+  .missing-text span { font-size: 11px; color: #64748b; }
+
+  .badge { display: inline-block; padding: 2px 7px; border-radius: 20px; font-size: 10px; font-weight: 700; }
+  .badge-critical { background: rgba(239,68,68,.15); color: #f87171; }
+  .badge-ux { background: rgba(245,158,11,.15); color: #fbbf24; }
+  .badge-polish { background: rgba(99,102,241,.15); color: #a5b4fc; }
+</style>
+
+<h2>Settings Tab — Current State Audit</h2>
+<p class="subtitle">What exists now vs. what a professional settings page needs</p>
+
+<div class="audit-grid">
+
+  <!-- LEFT: Current simulation -->
+  <div>
+    <div class="audit-panel audit-panel--current">
+      <div class="audit-header audit-header--current">
+        <span>📋</span> Current Settings Tab (as-is)
+      </div>
+      <div class="audit-body">
+        <div class="sim-settings">
+
+          <div class="sim-section">
+            <div class="sim-section-title">👤 Profile Information</div>
+            <div class="sim-section-sub">Your name, email and contact details shown to technicians.</div>
+            <div class="sim-avatar-row">
+              <div class="sim-avatar">A</div>
+              <button class="sim-change-btn">📷 Change Photo</button>
+            </div>
+            <div class="sim-form-row">
+              <div class="sim-field">
+                <label>Full Name *</label>
+                <input class="sim-input" placeholder="Your full name" />
+                <div class="sim-hint">This name appears on your bookings and receipts.</div>
+              </div>
+              <div class="sim-field">
+                <label>Email *</label>
+                <input class="sim-input" placeholder="your@email.com" />
+                <div class="sim-hint">Used for booking confirmations.</div>
+              </div>
+            </div>
+            <div class="sim-form-row">
+              <div class="sim-field">
+                <label>Phone *</label>
+                <input class="sim-input" placeholder="+20 100 000 0000" />
+                <div class="sim-hint">Technicians may contact you here.</div>
+              </div>
+              <div class="sim-field">
+                <label>Address</label>
+                <input class="sim-input" placeholder="Your address" />
+                <div class="sim-hint">Default location for service requests.</div>
+              </div>
+            </div>
+            <div class="sim-save-row">
+              <button class="sim-save-btn">Save Changes</button>
+            </div>
+          </div>
+
+          <div class="sim-section">
+            <div class="sim-section-title">🔒 Security</div>
+            <div class="sim-section-sub">Change your password to keep your account secure.</div>
+            <div class="sim-pw-row">
+              <div class="sim-field">
+                <label>New Password</label>
+                <input class="sim-input" placeholder="New password" type="password" />
+              </div>
+              <div class="sim-field">
+                <label>Confirm Password</label>
+                <input class="sim-input" placeholder="Confirm new password" type="password" />
+              </div>
+            </div>
+            <div class="sim-pw-req">Password must be at least 8 characters, include one uppercase letter, one number, and one special character.</div>
+          </div>
+
+          <div class="sim-section sim-danger">
+            <div class="sim-danger-title">Danger Zone</div>
+            <div class="sim-danger-desc">Once you delete your account, there is no going back. Please be certain.</div>
+            <button class="sim-delete-btn">Delete Account</button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Issues + Missing -->
+  <div style="display: flex; flex-direction: column; gap: 16px;">
+
+    <div class="audit-panel">
+      <div class="audit-header audit-header--issue">
+        <span>⚠️</span> Issues Found (7 problems)
+      </div>
+      <div class="audit-body">
+        <ul class="issue-list">
+          <li>
+            <div class="issue-dot dot-red"></div>
+            <div>
+              <span class="issue-label label-red"><span class="badge badge-critical">Critical</span></span>
+              <strong>No "Current Password" field</strong> — Security section lets users set a new password without verifying who they are. JS checks for it but it's not in the HTML.
+            </div>
+          </li>
+          <li>
+            <div class="issue-dot dot-red"></div>
+            <div>
+              <span class="issue-label label-red"><span class="badge badge-critical">Critical</span></span>
+              <strong>Password section has no Save button</strong> — Profile and password share one form submit, but only "Save Changes" in the profile section triggers it. Password changes are ambiguous.
+            </div>
+          </li>
+          <li>
+            <div class="issue-dot dot-yellow"></div>
+            <div>
+              <span class="issue-label label-yellow"><span class="badge badge-ux">UX</span></span>
+              <strong>Password requirements are wall-of-text</strong> — A single paragraph with multiple rules. Users won't read it. Live inline checklist is the industry standard.
+            </div>
+          </li>
+          <li>
+            <div class="issue-dot dot-yellow"></div>
+            <div>
+              <span class="issue-label label-yellow"><span class="badge badge-ux">UX</span></span>
+              <strong>No password strength meter</strong> — No visual feedback as the user types. Users can't tell if their password is strong enough before they submit.
+            </div>
+          </li>
+          <li>
+            <div class="issue-dot dot-yellow"></div>
+            <div>
+              <span class="issue-label label-yellow"><span class="badge badge-ux">UX</span></span>
+              <strong>Avatar upload has no preview</strong> — Clicking "Change Photo" opens file picker with no crop/resize UI, no size guidance, and no preview of the result.
+            </div>
+          </li>
+          <li>
+            <div class="issue-dot dot-blue"></div>
+            <div>
+              <span class="issue-label label-blue"><span class="badge badge-polish">Polish</span></span>
+              <strong>Section headings too small (0.9rem)</strong> — Section titles blend into body text. They need clearer visual hierarchy to separate profile vs. security.
+            </div>
+          </li>
+          <li>
+            <div class="issue-dot dot-blue"></div>
+            <div>
+              <span class="issue-label label-blue"><span class="badge badge-polish">Polish</span></span>
+              <strong>Danger Zone lacks visual weight</strong> — Only separated by margin-top. No strong visual cue (border, background, or icon) that this is irreversible.
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="audit-panel audit-panel--missing">
+      <div class="audit-header audit-header--missing">
+        <span>✦</span> Missing Sections (professional standard)
+      </div>
+      <div class="audit-body">
+        <ul class="missing-list">
+          <li>
+            <div class="missing-icon">🔔</div>
+            <div class="missing-text">
+              <strong>Notification Preferences</strong>
+              <span>Toggles for email / SMS / push alerts per event type (booking confirmed, technician on the way, etc.)</span>
+            </div>
+          </li>
+          <li>
+            <div class="missing-icon">🌐</div>
+            <div class="missing-text">
+              <strong>Language & Region</strong>
+              <span>The project has full i18n (AR/EN RTL/LTR) — but there's no UI to let users switch language from settings.</span>
+            </div>
+          </li>
+          <li>
+            <div class="missing-icon">🎨</div>
+            <div class="missing-text">
+              <strong>Appearance</strong>
+              <span>Light / Dark / System theme preference — a setting users expect in any modern dashboard.</span>
+            </div>
+          </li>
+          <li>
+            <div class="missing-icon">📍</div>
+            <div class="missing-text">
+              <strong>Saved Addresses</strong>
+              <span>Single address field won't cut it. Users want Home / Work / Other address slots for quick booking.</span>
+            </div>
+          </li>
+          <li>
+            <div class="missing-icon">🕐</div>
+            <div class="missing-text">
+              <strong>Login Activity / Last Seen</strong>
+              <span>Show last sign-in date + device. Builds trust and gives users a security heads-up.</span>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</div>

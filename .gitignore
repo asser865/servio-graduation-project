@@ -10,6 +10,7 @@ node_modules/
 .settings/
 *.sublime-project
 *.sublime-workspace
+.superpowers/
 
 # OS files
 Thumbs.db
