@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Booking Details | SERVIO</title>
+  <meta name="description" content="Track and manage your active booking on SERVIO." />
+  <script src="../js/theme-init.js"></script>
+  <script src="../js/lang-init.js"></script>
+  <link rel="stylesheet" href="../css/main.css" />
+  <link rel="stylesheet" href="../css/pages/booking-details.css" />
+</head>
+<body>
+  <div class="scroll-progress" data-scroll-progress aria-hidden="true"></div>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <!-- ══════════════════════════ HEADER ══════════════════════════ -->
+  <header class="site-header" data-site-header>
+    <div class="container header__inner">
+      <a class="brand" href="./index.html" aria-label="SERVIO Home">
+        <img class="brand__mark" src="../assets/images/logo.svg" alt="SERVIO" width="38" height="38" />
+        <span class="brand__name">SERVIO</span>
+      </a>
+
+      <div class="header__center">
+        <nav class="primary-nav" aria-label="Primary">
+          <div class="nav-shell" id="primary-nav">
+            <ul class="primary-nav__list" role="list">
+              <li><a class="nav-link" href="./index.html" data-i18n="nav_home">Home</a></li>
+              <li><a class="nav-link" href="./services-marketplace.html" data-i18n="nav_services">Services</a></li>
+              <li><a class="nav-link" href="./smart-match.html" data-i18n="nav_smart_match">Smart Match</a></li>
+              <li><a class="nav-link" href="./ai-estimator.html" data-i18n="nav_ai_estimator">AI Estimator</a></li>
+              <li><a class="nav-link" href="./about.html" data-i18n="nav_about">About</a></li>
+              <li><a class="nav-link" href="./contact.html" data-i18n="nav_contact">Contact</a></li>
+            </ul>
+          </div>
+        </nav>
+      </div>
+
+      <div class="header__right">
+        <div class="lang" data-lang>
+          <button class="lang-switch" type="button" aria-haspopup="listbox" aria-expanded="false">
+            <svg class="lang-switch__globe" viewBox="0 0 24 24" aria-hidden="true" width="16" height="16">
+              <path fill="currentColor" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm7.93 9h-3.11a15.6 15.6 0 0 0-1.3-5.06A8.03 8.03 0 0 1 19.93 11ZM12 4c.78.95 1.9 3.1 2.56 7H9.44C10.1 7.1 11.22 4.95 12 4ZM4.07 13h3.11a15.6 15.6 0 0 0 1.3 5.06A8.03 8.03 0 0 1 4.07 13ZM7.18 11H4.07a8.03 8.03 0 0 1 4.41-5.06A15.6 15.6 0 0 0 7.18 11Zm2.26 2h5.12c-.66 3.9-1.78 6.05-2.56 7-.78-.95-1.9-3.1-2.56-7Zm6.08 5.06A15.6 15.6 0 0 0 16.82 13h3.11a8.03 8.03 0 0 1-4.41 5.06Z" />
+            </svg>
+            <span class="lang__current">EN</span>
+            <span class="lang__caret" aria-hidden="true">▾</span>
+          </button>
+          <ul class="lang__menu" role="listbox" aria-label="Select language">
+            <li role="option" aria-selected="true">EN</li>
+            <li role="option" aria-selected="false">AR</li>
+          </ul>
+        </div>
+        <button class="btn btn--sm btn--header-theme" type="button" data-theme-button aria-label="Toggle dark mode">
+        <span class="theme-button__icon theme-button__icon--moon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            </svg>
+          </span>
+          <span class="theme-button__icon theme-button__icon--sun" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="4.25"></circle>
+              <path d="M12 2.5v2.5M12 19v2.5M4.93 4.93l1.77 1.77M17.3 17.3l1.77 1.77M2.5 12H5M19 12h2.5M4.93 19.07l1.77-1.77M17.3 6.7l1.77-1.77"></path>
+            </svg>
+          </span>
+        </button>
+
+        <div class="header__auth-slot" data-auth-slot>
+          <a class="btn btn--sm btn--header-login" href="./login.html" data-i18n="nav_login">Login</a>
+          <a class="btn btn--sm btn--header-signup" href="./signup.html" data-i18n="nav_signup">Sign Up</a>
+        </div>
+
+        <button class="hamburger" type="button" aria-label="Toggle menu" aria-expanded="false"
+          aria-controls="primary-nav" data-nav-toggle>
+          <span class="hamburger__lines" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+          </span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ══════════════════════════ MAIN ══════════════════════════ -->
+  <main id="main" class="bk-page">
+
+    <!-- ── EMPTY STATE (shown when no booking in localStorage) ── -->
+    <div class="bk-empty" id="bkEmptyState" style="display:none">
+      <div class="bk-empty__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2"/>
+          <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+          <line x1="3" y1="10" x2="21" y2="10"/>
+          <path d="M9 16l2 2 4-4"/>
+        </svg>
+      </div>
+      <h1 class="bk-empty__title" data-i18n="bkd_empty_title">No Active Booking Found</h1>
+      <p class="bk-empty__sub" data-i18n="bkd_empty_sub">It looks like there's no booking to display right now.</p>
+      <a class="btn btn--primary" href="./customer-dashboard.html" data-i18n="bkd_empty_back">Back to Dashboard</a>
+    </div>
+
+    <!-- ── BOOKING CONTENT ── -->
+    <div id="bkContent" hidden>
+
+      <!-- HERO HEADER CARD -->
+      <section class="bk-hero" aria-label="Booking overview">
+        <div class="bk-hero__dots" aria-hidden="true"></div>
+        <div class="container">
+          <!-- Breadcrumb -->
+          <nav class="bk-breadcrumb" aria-label="Breadcrumb">
+            <a href="./customer-dashboard.html" data-i18n="bkd_breadcrumb_dashboard">Dashboard</a>
+            <span class="bk-breadcrumb__sep" aria-hidden="true">›</span>
+            <a href="./customer-dashboard.html" data-i18n="bkd_breadcrumb_bookings">My Bookings</a>
+            <span class="bk-breadcrumb__sep" aria-hidden="true">›</span>
+            <span class="bk-breadcrumb__current" aria-current="page" data-i18n="bkd_breadcrumb_details">Booking Details</span>
+          </nav>
+
+          <!-- Header card -->
+          <div class="bk-header-card">
+            <div class="bk-header-card__meta">
+              <div class="bk-header-card__id"><span data-i18n="bk_booking_hash">Booking #</span><span id="bkId">S-2848</span></div>
+              <div class="bk-header-card__service" id="bkService">HVAC Maintenance</div>
+              <div class="bk-header-card__datetime">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+                <span id="bkDate">Thu, 27 Mar 2026</span>
+                <span aria-hidden="true">·</span>
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                </svg>
+                <span id="bkTime">2:00 PM</span>
+              </div>
+            </div>
+
+            <!-- Status Badge -->
+            <div class="bk-status-badge bk-status-badge--in-progress" id="bkStatusBadge" role="status" aria-label="Booking status">
+              <span class="bk-status-badge__pulse" aria-hidden="true"></span>
+              <span id="bkStatusText" data-i18n="status_in_progress">In Progress</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- CANCELLED BANNER (shown only if status = Cancelled) -->
+      <div class="container" id="bkCancelledBannerWrap" hidden>
+        <div class="bk-cancelled-banner" role="alert">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+          </svg>
+          <span data-i18n="bkd_cancelled">This booking has been cancelled.</span>
+        </div>
+      </div>
+
+      <!-- BODY GRID -->
+      <div class="container bk-grid">
+
+        <!-- ═══════════ LEFT COLUMN ═══════════ -->
+        <div class="bk-main">
+
+          <!-- Status Timeline -->
+          <div class="bk-card" data-reveal>
+            <h2 class="bk-card__title" data-i18n="bkd_status_title">Booking Status</h2>
+            <ol class="bk-timeline" id="bkTimeline" aria-label="Booking progress">
+              <!-- Populated by JS -->
+            </ol>
+          </div>
+
+          <!-- Technician Card -->
+          <div class="bk-card" data-reveal>
+            <h2 class="bk-card__title" data-i18n="bkd_tech_title">Your Technician</h2>
+            <div class="bk-tech">
+              <div class="bk-tech__avatar" id="bkTechInitials" aria-hidden="true">HA</div>
+              <div class="bk-tech__info">
+                <div class="bk-tech__name" id="bkTechName">Hassan Ali</div>
+                <div class="bk-tech__specialty" id="bkTechSpecialty" data-i18n="tech_role_hvac">HVAC Specialist</div>
+                <div class="bk-tech__rating" aria-label="Rating">
+                  <span class="bk-tech__stars" aria-hidden="true">★★★★★</span>
+                  <div class="bk-tech__rating-summary">
+                    <span class="bk-tech__rating-val" id="bkTechRating">4.9</span>
+                    <span class="bk-tech__rating-max" data-i18n="bkd_out_of_5">out of 5</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="bk-tech__actions">
+              <a href="./messages.html" class="btn btn--outline bk-tech__btn" id="bkMsgLink">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+                <span data-i18n="bkd_msg_tech">Message Technician</span>
+              </a>
+              <a href="tel:+201000000000" class="btn btn--outline bk-tech__btn" id="bkCallLink">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.62 3.38 2 2 0 0 1 3.6 1.21h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.91a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 16z"/>
+                </svg>
+                <span data-i18n="bkd_call">Call</span>
+              </a>
+            </div>
+          </div>
+
+          <!-- Job Details -->
+          <div class="bk-card" data-reveal>
+            <h2 class="bk-card__title" data-i18n="bkd_job_title">Job Details</h2>
+            <dl class="bk-details">
+              <div class="bk-details__row">
+                <dt data-i18n="bkd_dt_service">Service</dt>
+                <dd id="bkCategory">HVAC Maintenance</dd>
+              </div>
+              <div class="bk-details__row">
+                <dt data-i18n="bkd_dt_location">Location</dt>
+                <dd id="bkLocation">12 Nile View St, Maadi, Cairo</dd>
+              </div>
+              <div class="bk-details__row">
+                <dt data-i18n="bkd_dt_scheduled">Scheduled</dt>
+                <dd id="bkScheduledDate">Thu, 27 Mar 2026</dd>
+              </div>
+              <div class="bk-details__row">
+                <dt data-i18n="bkd_dt_timeslot">Time Slot</dt>
+                <dd id="bkScheduledTime">2:00 PM – 4:00 PM</dd>
+              </div>
+              <div class="bk-details__row">
+                <dt data-i18n="bkd_dt_duration">Duration</dt>
+                <dd id="bkDuration">~2 hours</dd>
+              </div>
+              <div class="bk-details__row">
+                <dt data-i18n="bkd_dt_payment">Payment</dt>
+                <dd id="bkPaymentMethodDetail">Online Card</dd>
+              </div>
+            </dl>
+          </div>
+
+        </div><!-- /bk-main -->
+
+        <!-- ═══════════ RIGHT COLUMN (ASIDE) ═══════════ -->
+        <div class="bk-aside">
+
+          <!-- PIN Card -->
+          <div class="bk-pin-card" data-reveal>
+            <div class="bk-pin-card__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+            </div>
+            <div class="bk-pin-card__label" id="bkPinLabel" data-i18n="bkd_pin_label">Your Arrival PIN</div>
+            <div class="bk-pin-card__digits" id="bkPin" data-i18n-aria-label="bk_arrival_pin_label">7 4 2 9</div>
+            <p class="bk-pin-card__help" data-i18n="bkd_pin_help">Give this to your technician when they arrive</p>
+          </div>
+
+          <!-- Payment Summary -->
+          <div class="bk-card" data-reveal>
+            <h2 class="bk-card__title" data-i18n="bkd_payment_title">Payment Summary</h2>
+            <dl class="bk-details">
+              <div class="bk-details__row">
+                <dt data-i18n="bkd_dt_method">Method</dt>
+                <dd id="bkPaySummaryMethod">Online Card</dd>
+              </div>
+              <div class="bk-details__row">
+                <dt data-i18n="bkd_dt_amount">Amount</dt>
+                <dd id="bkPayAmount"><strong>EGP 450</strong></dd>
+              </div>
+              <div class="bk-details__row">
+                <dt data-i18n="bkd_dt_status">Status</dt>
+                <dd>
+                  <span class="bk-pay-status" id="bkPayStatus" data-i18n="bk_deposit_paid">Deposit Paid</span>
+                </dd>
+              </div>
+            </dl>
+          </div>
+
+          <!-- Booking Actions -->
+          <div class="bk-card" data-reveal>
+            <h2 class="bk-card__title" data-i18n="bkd_actions_title">Booking Actions</h2>
+            <div class="bk-actions">
+              <button type="button" class="btn btn--outline-danger bk-action-btn" id="bkCancelBtn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+                </svg>
+                <span data-i18n="bkd_cancel">Cancel Booking</span>
+              </button>
+              <button type="button" class="btn btn--outline bk-action-btn" id="bkRescheduleBtn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+                <span data-i18n="bkd_reschedule">Reschedule</span>
+              </button>
+              <button type="button" class="btn btn--outline bk-action-btn" id="bkReceiptBtn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                <span data-i18n="bkd_download_receipt">Download Receipt</span>
+              </button>
+            </div>
+          </div>
+
+        </div><!-- /bk-aside -->
+
+      </div><!-- /bk-grid -->
+    </div><!-- /bkContent -->
+
+  </main>
+
+  <!-- ══════════════════════════ MOBILE STICKY BAR ══════════════════════════ -->
+  <div class="bk-mobile-bar" id="bkMobileBar" role="complementary" aria-label="Quick contact">
+    <div class="bk-mobile-bar__info">
+      <div class="bk-mobile-bar__avatar" id="bkBarInitials" aria-hidden="true">HA</div>
+      <span class="bk-mobile-bar__name" id="bkBarName">Hassan Ali</span>
+    </div>
+    <a href="./messages.html" class="btn btn--primary bk-mobile-bar__msg" id="bkBarMsgLink">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+      <span data-i18n="bkd_mobile_msg">Message</span>
+    </a>
+  </div>
+
+  <!-- ══════════════════════════ CANCEL DIALOG ══════════════════════════ -->
+  <div class="bk-dialog-overlay" id="bkCancelDialog" role="dialog" aria-modal="true" aria-labelledby="bkDialogTitle" hidden>
+    <div class="bk-dialog">
+      <div class="bk-dialog__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+          <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+      </div>
+      <h2 class="bk-dialog__title" id="bkDialogTitle" data-i18n="bkd_dialog_cancel_title">Cancel Booking?</h2>
+      <p class="bk-dialog__body" id="bkDialogBody"><span data-i18n="bk_cancel_confirm_prefix">Are you sure you want to cancel booking</span> <strong id="bkDialogId">S-2848</strong><span data-i18n="bk_cancel_confirm_suffix">? This action cannot be undone.</span></p>
+      <div class="bk-dialog__actions">
+        <button type="button" class="btn--ghost" id="bkDialogKeep" data-i18n="bkd_dialog_keep">Keep Booking</button>
+        <button type="button" class="btn--danger" id="bkDialogConfirm" data-i18n="bkd_dialog_yes_cancel">Yes, Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════ RESCHEDULE DIALOG ══════════════════════════ -->
+  <div class="bk-dialog-overlay" id="bkRescheduleDialog" role="dialog" aria-modal="true" aria-labelledby="bkRsDialogTitle" hidden>
+    <div class="bk-dialog">
+      <div class="bk-dialog__icon bk-dialog__icon--info" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+          <line x1="3" y1="10" x2="21" y2="10"/>
+        </svg>
+      </div>
+      <h2 class="bk-dialog__title" id="bkRsDialogTitle" data-i18n="bkd_dialog_rs_title">Reschedule Booking</h2>
+      <p class="bk-dialog__body" data-i18n="bkd_dialog_rs_body">Select a new date and time that works best for you.</p>
+
+      <div class="bk-form-group">
+        <label class="bk-label" for="newBookingDate" data-i18n="bkd_new_date">New Date</label>
+        <input type="date" id="newBookingDate" class="bk-input" />
+      </div>
+
+      <div class="bk-form-group">
+        <label class="bk-label" for="newBookingSlot" data-i18n="bkd_new_slot">New Time Slot</label>
+        <div class="bk-select-wrap">
+          <select id="newBookingSlot" class="bk-input bk-select">
+            <option value="8:00 AM – 10:00 AM">8:00 AM – 10:00 AM</option>
+            <option value="10:00 AM – 12:00 PM">10:00 AM – 12:00 PM</option>
+            <option value="12:00 PM – 2:00 PM">12:00 PM – 2:00 PM</option>
+            <option value="2:00 PM – 4:00 PM" selected>2:00 PM – 4:00 PM</option>
+            <option value="4:00 PM – 6:00 PM">4:00 PM – 6:00 PM</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="bk-dialog__actions">
+        <button type="button" class="btn--ghost" id="bkRsDialogCancel" data-i18n="bkd_keep_existing">Keep Existing</button>
+        <button type="button" class="btn btn--primary" id="bkRsDialogConfirm" style="padding: 0.65rem 1.5rem" data-i18n="bkd_confirm_slot">Confirm New Slot</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════ TOAST CONTAINER ══════════════════════════ -->
+  <div class="bk-toast-wrap" id="bkToastWrap" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- ══════════════════════════ FOOTER ══════════════════════════ -->
+  <footer class="site-footer">
+    <div class="container footer__grid">
+      <div class="footer__brand-col">
+        <h2 class="footer__brand-text" data-i18n="footer_stay_connected">Stay Connected</h2>
+        <p class="footer__desc" data-i18n="footer_newsletter_desc">Join our newsletter for the latest updates and exclusive offers.</p>
+        <form class="footer__newsletter">
+          <input type="email" placeholder="Enter your email" data-i18n-placeholder="footer_email_ph" class="footer__input" required>
+          <button type="submit" class="footer__submit-btn" aria-label="Subscribe">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+          </button>
+        </form>
+      </div>
+      <div class="footer__nav-col">
+        <h3 class="footer__title" data-i18n="footer_quick_links">Quick Links</h3>
+        <ul class="footer__links" role="list">
+          <li><a class="footer__link" href="./index.html" data-i18n="nav_home">Home</a></li>
+          <li><a class="footer__link" href="./about.html" data-i18n="footer_about">About Us</a></li>
+          <li><a class="footer__link" href="./services-marketplace.html" data-i18n="nav_services">Services</a></li>
+          <li><a class="footer__link" href="#" data-i18n="footer_products">Products</a></li>
+          <li><a class="footer__link" href="./contact.html" data-i18n="nav_contact">Contact</a></li>
+        </ul>
+      </div>
+      <div class="footer__nav-col">
+        <h3 class="footer__title" data-i18n="footer_contact_us">Contact Us</h3>
+        <address class="footer__address">
+          <p data-i18n="footer_city">Cairo, Egypt</p>
+
+          <p data-i18n="footer_phone">Phone: +20 100 000 0000</p>
+          <p data-i18n-html="footer_email">Email: hello@servio.eg</p>
+        </address>
+      </div>
+      <div class="footer__nav-col">
+        <h3 class="footer__title" data-i18n="footer_follow_us">Follow Us</h3>
+        <div class="footer__socials">
+          <a href="#" class="social-link" aria-label="Facebook">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg>
+          </a>
+          <a href="#" class="social-link" aria-label="Twitter">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"></path></svg>
+          </a>
+          <a href="#" class="social-link" aria-label="Instagram">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+          </a>
+          <a href="#" class="social-link" aria-label="LinkedIn">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path><rect x="2" y="9" width="4" height="12"></rect><circle cx="4" cy="4" r="2"></circle></svg>
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="container footer__bottom-wrapper">
+      <div class="footer__bottom">
+        <p class="footer__fineprint" data-i18n="footer_rights">© <span id="year">2026</span> SERVIO. All rights reserved.</p>
+        <div class="footer__bottom-links">
+          <a href="#" class="footer__small-link" data-i18n="footer_privacy">Privacy Policy</a>
+          <a href="#" class="footer__small-link" data-i18n="footer_terms">Terms of Service</a>
+          <a href="#" class="footer__small-link" data-i18n="footer_cookies">Cookie Settings</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ══════════════════════════ SCRIPTS ══════════════════════════ -->
+  <script src="../js/lang.js"></script>
+  <script type="module" src="../js/main.js"></script>
+  <script type="module" src="../js/html/booking-details.js"></script>
+</body>
+</html>
+
+<!-- . -->
