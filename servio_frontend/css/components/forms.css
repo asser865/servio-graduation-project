@@ -1,0 +1,50 @@
+.form {
+  display: grid;
+  gap: 12px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+.label {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.input {
+  width: 100%;
+  padding: 12px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary) 18%, transparent);
+}
+
+textarea.input {
+  min-height: 120px;
+  resize: vertical;
+}
+
+@media (max-width: 480px) {
+  .form {
+    gap: 10px;
+  }
+
+  .field {
+    gap: 5px;
+  }
+
+  .input {
+    padding: 11px 12px;
+    font-size: 16px;
+  }
+}
+
+/* . */

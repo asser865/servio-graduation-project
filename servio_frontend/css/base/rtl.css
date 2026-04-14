@@ -1,0 +1,1331 @@
+/* ═══════════════════════════════════════════════════════════════
+   SERVIO — Arabic / RTL overrides
+   Applied when <html class="lang-ar" dir="rtl"> is set by lang.js
+═══════════════════════════════════════════════════════════════ */
+
+/* ── Arabic Web Font (Cairo) ─────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap');
+
+/* ── Root font switch ──────────────────────────────────────────── */
+:root:lang(ar),
+.lang-ar {
+  font-family: 'Cairo', 'Tajawal', 'Arial', sans-serif;
+}
+
+/* ── Global direction ─────────────────────────────────────────── */
+[dir="rtl"] body {
+  text-align: right;
+}
+
+/* ── Header / Nav ─────────────────────────────────────────────── */
+/* .header__inner is display:grid — direction:rtl (inherited from html[dir="rtl"])
+   automatically reverses the 3-column visual order:
+     col-1 (1fr, RIGHT) = brand/logo
+     col-2 (auto, CENTER) = nav
+     col-3 (1fr, LEFT)  = controls
+   No flex-direction override needed. */
+
+/* Nav list: direction:rtl inherited → items flow right-to-left naturally.
+   DO NOT add flex-direction:row-reverse — it would cancel the RTL effect. */
+
+/* Controls (.header__right): keep items in their original visual order
+   (lang, theme, buttons) but let the grid column move them to the left. */
+[dir="rtl"] .header__right {
+  direction: rtl;
+  min-width: max-content;
+  gap: 12px;
+}
+
+/* Fix overlapping and sizing for Arabic links */
+[dir="rtl"] .nav-link {
+  font-size: 0.85rem;
+  padding: 6px 12px;
+}
+
+[dir="rtl"] .header__inner {
+  gap: 12px;
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+[dir="rtl"] .brand {
+  min-width: max-content;
+}
+
+/* Adjust auth buttons for Arabic text length */
+[dir="rtl"] .header__right .btn--sm {
+  font-size: 0.8rem;
+  padding: 0.5em 1rem;
+  white-space: nowrap;
+}
+
+[dir="rtl"] .lang__menu {
+  right: auto;
+  left: 0;
+}
+
+/* ── Home: category service cards — hover arrow (logical inline-end + mirror) ─ */
+[dir="rtl"] .category-card__arrow {
+  transform: translateX(10px) scaleX(-1);
+}
+
+[dir="rtl"] .category-card:hover .category-card__arrow {
+  transform: translateX(0) scaleX(-1);
+}
+
+/* ── Hero (home page) — RTL layout ───────────────────────────── */
+/* Flip overlay gradient so the dark side covers the right (content) side */
+[dir="rtl"] .home-hero__bg-overlay {
+  background: linear-gradient(to left,
+      rgba(15, 10, 5, 0.82) 0%,
+      rgba(15, 10, 5, 0.6) 40%,
+      rgba(15, 10, 5, 0.25) 70%,
+      rgba(15, 10, 5, 0.15) 100%);
+}
+
+/* Pin the editorial block to the RIGHT side and align items to the right edge */
+[dir="rtl"] .hero-editorial {
+  margin-left: auto;
+  margin-right: 0;
+  align-items: flex-start;
+  padding: 140px 0 80px 0; /* Match home.css for floating header room */
+  transform: none;
+}
+
+[dir="rtl"] .hero-editorial__content {
+  align-items: flex-start;
+  text-align: right;
+}
+
+/* Scale down the large display title slightly for Arabic to prevent overflow */
+[dir="rtl"] .hero-editorial__title {
+  font-size: clamp(2.35rem, 4.15vw, 4.45rem);
+  line-height: 0.95;
+  letter-spacing: 0;
+  margin-bottom: 8px;
+  max-width: 100%;
+}
+
+[dir="rtl"] .hero-editorial__title .hero-editorial__dynamic {
+  margin: 0.12em 0;
+  font-style: normal;
+  font-weight: 650;
+}
+
+[dir="rtl"] .hero-editorial__lead {
+  line-height: 1.5;
+  max-width: 620px;
+  margin-bottom: 18px;
+}
+
+[dir="rtl"] .hero-editorial__kicker {
+  letter-spacing: 0;
+  margin-bottom: 10px;
+}
+
+[dir="rtl"] .active-badge {
+  margin-bottom: 12px;
+}
+
+/* Move the decorative kicker line to the correct (after-text) side in RTL */
+[dir="rtl"] .hero-editorial__kicker::before {
+  display: none;
+}
+[dir="rtl"] .hero-editorial__kicker::after {
+  content: "";
+  display: inline-block;
+  width: 32px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+/* Join CTA: flip arrow for RTL */
+[dir="rtl"] .hero-technician-link__arrow {
+  transform: scaleX(-1);
+}
+
+[dir="rtl"] .hero-technician-link:hover .hero-technician-link__arrow {
+  transform: scaleX(-1) translateX(-3px);
+}
+
+/* Find Pro: arrow points back toward text in RTL */
+[dir="rtl"] .hero-search__btn-arrow {
+  transform: scaleX(-1);
+}
+
+/* Hero search: icon at end of field, button at start (RTL) */
+[dir="rtl"] .hero-search {
+  flex-direction: row-reverse;
+  padding: 5px 18px 5px 6px;
+}
+
+[dir="rtl"] .hero-search__input {
+  padding: 12px 10px 12px 14px;
+  text-align: right;
+}
+
+[dir="rtl"] .hero-search__btn {
+  padding: 12px 22px 12px 24px;
+}
+
+/* ── Cards and grids ──────────────────────────────────────────── */
+[dir="rtl"] .about-story__chapter,
+[dir="rtl"] .jt-step {
+  text-align: right;
+}
+
+[dir="rtl"] .about-stat__bar {
+  margin-right: 0;
+  margin-left: auto;
+}
+
+/* ── Footer ───────────────────────────────────────────────────── */
+[dir="rtl"] .footer__grid {
+  direction: rtl;
+}
+
+[dir="rtl"] .footer__bottom {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .footer__bottom-links {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .footer__newsletter {
+  flex-direction: row-reverse;
+}
+
+/* ── Forms ────────────────────────────────────────────────────── */
+[dir="rtl"] .field,
+[dir="rtl"] .label {
+  text-align: right;
+}
+
+[dir="rtl"] .input {
+  text-align: right;
+}
+
+[dir="rtl"] .input-icon-wrap .input-icon {
+  right: 0.875rem;
+  left: auto;
+}
+
+[dir="rtl"] .input--icon {
+  padding-right: 2.75rem;
+  padding-left: 1rem;
+}
+
+[dir="rtl"] .password-toggle {
+  left: 0.75rem;
+  right: auto;
+}
+
+[dir="rtl"] .input--icon-password {
+  padding-right: 2.75rem;
+  padding-left: 2.5rem;
+}
+
+/* ── Auth showcase ────────────────────────────────────────────── */
+[dir="rtl"] .auth-showcase__stats {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .auth-feature {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+
+[dir="rtl"] .login-options {
+  flex-direction: row-reverse;
+}
+
+/* ── Chat widget ──────────────────────────────────────────────── */
+[dir="rtl"] .chat-widget__header {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .chat-widget__brand {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .chat-widget__bubble {
+  text-align: right;
+}
+
+[dir="rtl"] .chat-widget__form {
+  flex-direction: row-reverse;
+}
+
+/* ── Breadcrumbs ──────────────────────────────────────────────── */
+[dir="rtl"] .breadcrumb {
+  flex-direction: row-reverse;
+}
+
+/* ── Contact sidebar ──────────────────────────────────────────── */
+[dir="rtl"] .contact-sidebar__list li {
+  flex-direction: row; /* Let native RTL handle the ordering (Icon on right) */
+}
+
+[dir="rtl"] .contact-sidebar__list li div {
+  text-align: right;
+}
+
+[dir="rtl"] .contact-sidebar__hours-row {
+  flex-direction: row;
+}
+
+[dir="rtl"] .contact-sidebar__promise {
+  flex-direction: row;
+  text-align: right;
+}
+
+/* ── FAQ ──────────────────────────────────────────────────────── */
+[dir="rtl"] .contact-faq__question {
+  flex-direction: row-reverse;
+}
+
+/* ── Elite cards / tech cards ─────────────────────────────────── */
+[dir="rtl"] .elite-card__badges,
+[dir="rtl"] .elite-card__tags,
+[dir="rtl"] .elite-card__stats,
+[dir="rtl"] .elite-card__location {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .elite-card__info {
+  text-align: right;
+}
+
+/* ── Dashboard sidebar ────────────────────────────────────────── */
+[dir="rtl"] .dashboard-sidebar {
+  left: auto;
+  right: 0;
+}
+
+[dir="rtl"] .dashboard-content {
+  margin-left: 0;
+  margin-right: var(--sidebar-width, 260px);
+}
+
+/* ── Back-to-top button ───────────────────────────────────────── */
+/* Button uses left:50% + translateX(-50%) centering — works identically in RTL.
+   No override needed; overriding left without also correcting the transform breaks centering. */
+
+/* ── Trust badges / pills ─────────────────────────────────────── */
+[dir="rtl"] .booking-hero__trust,
+[dir="rtl"] .auth-showcase__trust,
+[dir="rtl"] .jt-hero__trust {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .trust-badge,
+[dir="rtl"] .trust-pill,
+[dir="rtl"] .jt-trust-pill {
+  flex-direction: row-reverse;
+}
+
+/* ── Steps / how it works ─────────────────────────────────────── */
+[dir="rtl"] .jt-steps__flow {
+  flex-direction: row-reverse;
+}
+
+/* ── Hero editorial ───────────────────────────────────────────── */
+[dir="rtl"] .home-hero__bg-overlay {
+  background: linear-gradient(to left,
+      rgba(15, 10, 5, 0.82) 0%,
+      rgba(15, 10, 5, 0.6) 40%,
+      rgba(15, 10, 5, 0.25) 70%,
+      rgba(15, 10, 5, 0.15) 100%);
+}
+
+[dir="rtl"] .hero-editorial__content {
+  text-align: right;
+  align-items: flex-start;
+}
+
+@media (max-width: 1024px) {
+  [dir="rtl"] .hero-editorial__content {
+    text-align: right;
+    align-items: flex-start;
+  }
+
+  [dir="rtl"] .hero-actions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 768px) {
+  [dir="rtl"] .home-hero {
+    align-items: flex-start;
+  }
+
+  [dir="rtl"] .hero-editorial {
+    max-width: 100%;
+    width: 100%;
+    padding: 76px 0 20px;
+    transform: none;
+  }
+
+  [dir="rtl"] .hero-editorial__content {
+    width: 100%;
+    gap: 0;
+  }
+
+  [dir="rtl"] .active-badge {
+    padding: 7px 12px;
+    font-size: 0.74rem;
+    margin-bottom: 12px;
+  }
+
+  [dir="rtl"] .hero-editorial__kicker {
+    font-size: 0.72rem;
+    margin-bottom: 12px;
+  }
+
+  [dir="rtl"] .hero-editorial__title {
+    font-size: clamp(2.15rem, 10.8vw, 3.5rem);
+    line-height: 0.86;
+    max-width: 100%;
+    margin-bottom: 8px;
+  }
+
+  [dir="rtl"] .hero-editorial__lead {
+    max-width: 100%;
+    font-size: 0.98rem;
+    line-height: 1.38;
+    margin-bottom: 16px;
+  }
+
+  [dir="rtl"] .hero-search {
+    max-width: 100%;
+    padding: 5px 14px 5px 6px;
+  }
+
+  [dir="rtl"] .hero-search__input {
+    min-width: 0;
+    font-size: 0.94rem;
+    padding: 10px 8px 10px 10px;
+  }
+
+  [dir="rtl"] .hero-search__btn {
+    padding: 11px 16px 11px 14px;
+    font-size: 0.88rem;
+  }
+
+  [dir="rtl"] .hero-technician-link {
+    font-size: 0.84rem;
+    padding: 10px 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  [dir="rtl"] .hero-editorial {
+    padding: 72px 0 16px;
+  }
+
+  [dir="rtl"] .hero-editorial__title {
+    font-size: clamp(1.95rem, 11.2vw, 2.9rem);
+    line-height: 0.84;
+    margin-bottom: 6px;
+  }
+
+  [dir="rtl"] .hero-editorial__lead {
+    font-size: 0.92rem;
+    line-height: 1.36;
+    margin-bottom: 14px;
+  }
+
+  [dir="rtl"] .hero-search__btn {
+    padding: 11px 14px;
+    font-size: 0.84rem;
+  }
+
+  [dir="rtl"] .hero-search__input {
+    font-size: 0.88rem;
+  }
+}
+
+[dir="rtl"] .active-badge {
+  flex-direction: row-reverse;
+}
+
+/* ── Filter bar ───────────────────────────────────────────────── */
+[dir="rtl"] .filter-bar__top {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .filter-pills {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .results-header {
+  flex-direction: row-reverse;
+}
+
+/* ── AI composer ──────────────────────────────────────────────── */
+[dir="rtl"] .ai-composer__footer {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .ai-composer__meta {
+  flex-direction: row-reverse;
+}
+
+/* ── Wizard stepper ───────────────────────────────────────────── */
+[dir="rtl"] .wizard-stepper {
+  flex-direction: row-reverse;
+}
+
+/* ── Demo accounts ────────────────────────────────────────────── */
+[dir="rtl"] .demo-account {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+
+/* ── About feature cards ──────────────────────────────────────── */
+[dir="rtl"] .about-features {
+  direction: rtl;
+}
+
+/* ── Messages ─────────────────────────────────────────────────── */
+[dir="rtl"] .messages-layout {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .message-item {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+
+/* ── Arabic typography ────────────────────────────────────────── */
+.lang-ar body,
+.lang-ar p,
+.lang-ar h1,
+.lang-ar h2,
+.lang-ar h3,
+.lang-ar h4,
+.lang-ar h5,
+.lang-ar h6,
+.lang-ar span,
+.lang-ar label,
+.lang-ar button,
+.lang-ar a,
+.lang-ar li,
+.lang-ar td,
+.lang-ar th {
+  font-family: 'Cairo', 'Tajawal', 'Arial', sans-serif;
+  line-height: 1.15;
+}
+
+/* ── Directional icon flipping ────────────────────────────────── */
+[dir="rtl"] .icon-arrow-right,
+[dir="rtl"] .icon-chevron-right,
+[dir="rtl"] .icon-caret-right,
+[dir="rtl"] [class*="arrow-right"],
+[dir="rtl"] [class*="chevron-right"] {
+  transform: scaleX(-1);
+}
+
+[dir="rtl"] .back-arrow,
+[dir="rtl"] .prev-btn svg,
+[dir="rtl"] .nav-prev svg,
+[dir="rtl"] .elite-carousel__btn svg,
+[dir="rtl"] .editorial-header__link svg {
+  transform: scaleX(-1);
+}
+
+/* ── Admin dashboard sidebar — logic moved to local admin-dashboard.css for 
+      better flex integration ───────────────── */
+
+/* ── Technician dashboard sidebar ─────────────────────────────── */
+[dir="rtl"] .tech-sidebar,
+[dir="rtl"] .sidebar {
+  left: auto;
+  right: 0;
+  border-left: none;
+  border-right: 1px solid var(--border, #e2e8f0);
+}
+
+[dir="rtl"] .tech-content,
+[dir="rtl"] .main-content {
+  margin-left: 0;
+  margin-right: var(--sidebar-width, 260px);
+}
+
+[dir="rtl"] .sidebar__nav-item,
+[dir="rtl"] .nav-item {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .sidebar__nav-icon,
+[dir="rtl"] .nav-icon {
+  margin-right: 0;
+  margin-left: 0.75rem;
+}
+
+/* ── Customer dashboard ────────────────────────────────────────── */
+[dir="rtl"] .customer-sidebar {
+  left: auto;
+  right: 0;
+}
+
+[dir="rtl"] .customer-content {
+  margin-left: 0;
+  margin-right: var(--sidebar-width, 260px);
+}
+
+/* ── Topbar ────────────────────────────────────────────────────── */
+[dir="rtl"] .topbar,
+[dir="rtl"] .dashboard-topbar {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .topbar__actions,
+[dir="rtl"] .header-actions {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .topbar__title {
+  text-align: right;
+}
+
+/* ── Stat cards ────────────────────────────────────────────────── */
+[dir="rtl"] .stat-card {
+  text-align: right;
+}
+
+[dir="rtl"] .stat-card__header {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .stat-card__icon {
+  margin-right: 0;
+  margin-left: auto;
+}
+
+[dir="rtl"] .stat-card__trend {
+  flex-direction: row-reverse;
+}
+
+/* ── Overview grid ─────────────────────────────────────────────── */
+[dir="rtl"] .overview-section__header,
+[dir="rtl"] .section-header {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .quick-actions {
+  text-align: right;
+}
+
+[dir="rtl"] .quick-action-item {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+
+[dir="rtl"] .quick-action-item__icon {
+  margin-right: 0;
+  margin-left: 0.75rem;
+}
+
+/* ── Job queue / job cards ─────────────────────────────────────── */
+[dir="rtl"] .job-card {
+  text-align: right;
+}
+
+[dir="rtl"] .job-card__header {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .job-card__meta {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .job-card__meta-item {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .job-card__meta-icon {
+  margin-right: 0;
+  margin-left: 0.375rem;
+}
+
+[dir="rtl"] .job-card__actions {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .job-status-badge {
+  flex-direction: row-reverse;
+}
+
+/* ── Job board / proposals ─────────────────────────────────────── */
+[dir="rtl"] .proposals-section__header,
+[dir="rtl"] .job-board-header {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .proposal-card {
+  text-align: right;
+}
+
+[dir="rtl"] .proposal-card__header {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .proposal-card__actions {
+  flex-direction: row-reverse;
+}
+
+/* ── Earnings rows ─────────────────────────────────────────────── */
+[dir="rtl"] .earnings-row,
+[dir="rtl"] .earnings-item {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .earnings-stat {
+  text-align: right;
+}
+
+[dir="rtl"] .recent-jobs-table th,
+[dir="rtl"] .recent-jobs-table td {
+  text-align: right;
+}
+
+/* ── Availability panel ────────────────────────────────────────── */
+[dir="rtl"] .availability-row,
+[dir="rtl"] .schedule-row {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .day-label {
+  text-align: right;
+}
+
+[dir="rtl"] .availability-section {
+  text-align: right;
+}
+
+/* ── Settings forms ────────────────────────────────────────────── */
+[dir="rtl"] .settings-section {
+  text-align: right;
+}
+
+[dir="rtl"] .settings-section__header {
+  flex-direction: row-reverse;
+}
+
+/* form-row is display:grid — direction:rtl makes columns flow R→L automatically.
+   (flex-direction has no effect on grid; kept for legacy safety.) */
+[dir="rtl"] .form-row {
+  direction: rtl;
+}
+
+[dir="rtl"] .form-group {
+  text-align: right;
+}
+
+/* form-field / form-label / form-input ─────────────────────────── */
+[dir="rtl"] .form-field {
+  text-align: right;
+}
+
+/* Arabic labels: drop English-only uppercase + letter-spacing that
+   fragments Arabic connected letters; add breathing room */
+[dir="rtl"] .form-label {
+  text-transform: none;
+  letter-spacing: 0;
+  line-height: 1.5;
+}
+
+/* Inputs: align text to the right and set direction so the cursor
+   starts at the right edge */
+[dir="rtl"] .form-input {
+  text-align: right;
+  direction: rtl;
+}
+
+[dir="rtl"] .form-actions {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .danger-zone {
+  text-align: right;
+}
+
+/* ── Settings section heading / description spacing ─────────────── */
+[dir="rtl"] .settings-section__heading {
+  gap: 10px;
+  line-height: 1.5;
+}
+
+[dir="rtl"] .settings-section__desc {
+  line-height: 1.7;
+  margin-bottom: 20px;
+}
+
+/* ── Toggle label & sub-text line-height ─────────────────────────── */
+[dir="rtl"] .settings-toggle-label {
+  line-height: 1.6;
+}
+
+[dir="rtl"] .settings-toggle-sub {
+  line-height: 1.6;
+}
+
+/* ── Toggle thumb — RTL direction fix ───────────────────────────── */
+/* In RTL the flex track's main axis runs R→L, so the thumb starts
+   on the RIGHT (off state) and must slide LEFT for the on state.   */
+[dir="rtl"] .stab-toggle--on .stab-toggle__thumb,
+[dir="rtl"] .stab-toggle[aria-checked="true"] .stab-toggle__thumb {
+  transform: translateX(-18px);
+}
+
+/* ── Notification group labels ───────────────────────────────────── */
+/* letter-spacing + uppercase are English-only concepts that break
+   Arabic connected script                                           */
+[dir="rtl"] .stab-notif-group-label {
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+/* ── Tables ────────────────────────────────────────────────────── */
+[dir="rtl"] table {
+  direction: rtl;
+}
+
+[dir="rtl"] th,
+[dir="rtl"] td {
+  text-align: right;
+}
+
+[dir="rtl"] .table-actions {
+  flex-direction: row-reverse;
+}
+
+/* ── Admin panels ──────────────────────────────────────────────── */
+[dir="rtl"] .admin-panel__header {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .admin-panel__search {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .admin-filter-bar {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .dispute-card {
+  text-align: right;
+}
+
+[dir="rtl"] .dispute-card::before {
+  left: auto;
+  right: 0;
+}
+
+[dir="rtl"] .dispute-card__top {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .dispute-card__id-group {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .dispute-reason-text {
+  border-left: none;
+  border-right: 2px solid var(--color-border);
+  padding-left: 0;
+  padding-right: 0.75rem;
+}
+
+[dir="rtl"] .dispute-card__footer {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .dispute-actions {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .dispute-btn svg,
+[dir="rtl"] .bk-export-btn svg {
+  margin-right: 0;
+  margin-left: 8px;
+}
+
+[dir="rtl"] .admin-kpi-card__main {
+  text-align: right;
+}
+
+[dir="rtl"] .dispute-id-badge {
+  text-align: right;
+}
+
+/* ── Customer Schedule Card RTL ────────────────────────────── */
+[dir="rtl"] .dash-next-appt__time {
+  align-items: flex-start;
+}
+
+[dir="rtl"] .dash-next-appt__hour {
+  text-align: left;
+}
+
+[dir="rtl"] .dash-schedule-item__hour {
+  text-align: right;
+}
+
+[dir="rtl"] .dash-next-appt__track-label {
+  text-align: right;
+}
+
+[dir="rtl"] .dash-schedule-item__status {
+  margin-right: auto;
+  margin-left: 0;
+}
+
+/* ── Customer Stat Card RTL ────────────────────────────────── */
+[dir="rtl"] .dash-stat-card {
+  text-align: right;
+}
+
+[dir="rtl"] .dash-stat-card__top {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .dash-stat-card__value {
+  text-align: right;
+}
+
+[dir="rtl"] .dash-stat-card__context {
+  text-align: right;
+  direction: rtl;
+}
+
+[dir="rtl"] .settlement-row {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .analytics-section {
+  text-align: right;
+}
+
+/* ── Modals / drawers ──────────────────────────────────────────── */
+[dir="rtl"] .modal__header {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .modal__footer {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .modal__close {
+  margin-right: auto;
+  margin-left: 0;
+}
+
+[dir="rtl"] .drawer {
+  right: auto;
+  left: 0;
+}
+
+[dir="rtl"] .drawer__header {
+  flex-direction: row-reverse;
+}
+
+/* ── Toast notifications ───────────────────────────────────────── */
+[dir="rtl"] .toast-container {
+  right: auto;
+  left: 1.5rem;
+}
+
+[dir="rtl"] .toast {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+
+[dir="rtl"] .toast__icon {
+  margin-right: 0;
+  margin-left: 0.75rem;
+}
+
+/* ── Technician profile / reviews ─────────────────────────────── */
+[dir="rtl"] .tech-profile__header {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .tech-profile__info {
+  text-align: right;
+}
+
+[dir="rtl"] .review-card {
+  text-align: right;
+}
+
+[dir="rtl"] .review-card__header {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .review-card__rating {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .star-rating {
+  flex-direction: row-reverse;
+}
+
+/* ── Verification docs ─────────────────────────────────────────── */
+[dir="rtl"] .verification-item {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+
+[dir="rtl"] .verification-icon {
+  margin-right: 0;
+  margin-left: 0.75rem;
+}
+
+/* ── Services marketplace ──────────────────────────────────────── */
+[dir="rtl"] .service-card {
+  text-align: right;
+}
+
+[dir="rtl"] .service-card__header {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .service-card__meta {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .service-card__tags {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .category-chip {
+  flex-direction: row-reverse;
+}
+
+/* ── Booking flow ──────────────────────────────────────────────── */
+[dir="rtl"] .booking-form {
+  text-align: right;
+}
+
+[dir="rtl"] .booking-summary {
+  text-align: right;
+}
+
+[dir="rtl"] .booking-summary__row {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .time-slots {
+  direction: rtl;
+}
+
+[dir="rtl"] .booking-confirmation__header {
+  flex-direction: row-reverse;
+}
+
+/* ── AI estimator ──────────────────────────────────────────────── */
+[dir="rtl"] .estimator-form {
+  text-align: right;
+}
+
+[dir="rtl"] .estimate-result {
+  text-align: right;
+}
+
+[dir="rtl"] .estimate-breakdown {
+  direction: rtl;
+}
+
+/* ── Smart match ───────────────────────────────────────────────── */
+[dir="rtl"] .smart-match__header {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .match-card {
+  text-align: right;
+}
+
+[dir="rtl"] .match-card__stats {
+  flex-direction: row-reverse;
+}
+
+/* ── Join as technician ────────────────────────────────────────── */
+[dir="rtl"] .jt-form {
+  text-align: right;
+}
+
+[dir="rtl"] .jt-form .form-group {
+  text-align: right;
+}
+
+/* ── Pagination ────────────────────────────────────────────────── */
+[dir="rtl"] .pagination {
+  flex-direction: row-reverse;
+}
+
+/* ── Notification dropdown ─────────────────────────────────────── */
+[dir="rtl"] .notif-dropdown {
+  right: auto;
+  left: 0;
+}
+
+[dir="rtl"] .notif-item {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+
+[dir="rtl"] .notif-item__icon {
+  margin-right: 0;
+  margin-left: 0.75rem;
+}
+
+/* ── Profile dropdown ──────────────────────────────────────────── */
+[dir="rtl"] .profile-dropdown {
+  right: auto;
+  left: 0;
+}
+
+[dir="rtl"] .profile-menu__item {
+  flex-direction: row-reverse;
+}
+
+/* ── Chat messages ─────────────────────────────────────────────── */
+[dir="rtl"] .chat-message--outgoing {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .chat-message--incoming {
+  flex-direction: row;
+}
+
+[dir="rtl"] .home-section-indicator {
+  left: auto;
+  right: 28px;
+}
+
+[dir="rtl"] .home-section-indicator::before {
+  left: auto;
+  right: calc((var(--home-indicator-track) - 1px) / 2);
+}
+
+[dir="rtl"] .home-section-indicator__label {
+  transform: translateX(10px);
+}
+
+[dir="rtl"] .home-section-indicator__item:hover .home-section-indicator__label,
+[dir="rtl"] .home-section-indicator__item:focus-visible .home-section-indicator__label {
+  transform: translateX(0);
+}
+
+[dir="rtl"] .chat-input-area {
+  flex-direction: row-reverse;
+}
+
+/* ── Tabs ──────────────────────────────────────────────────────── */
+[dir="rtl"] .tabs,
+[dir="rtl"] .tab-list {
+  flex-direction: row-reverse;
+}
+
+/* ── Skeleton loaders ──────────────────────────────────────────── */
+[dir="rtl"] .skeleton-line {
+  margin-right: 0;
+  margin-left: auto;
+}
+
+/* ── Mobile sidebar toggle ─────────────────────────────────────── */
+@media (max-width: 768px) {
+  [dir="rtl"] .dashboard-sidebar,
+  [dir="rtl"] .admin-sidebar,
+  [dir="rtl"] .tech-sidebar,
+  [dir="rtl"] .sidebar {
+    right: -100%;
+    left: auto;
+    transform: translateX(100%);
+  }
+
+  [dir="rtl"] .dashboard-sidebar.is-open,
+  [dir="rtl"] .admin-sidebar.is-open,
+  [dir="rtl"] .tech-sidebar.is-open,
+  [dir="rtl"] .sidebar.is-open {
+    right: 0;
+    transform: translateX(0);
+  }
+
+  [dir="rtl"] .dashboard-content,
+  [dir="rtl"] .admin-content,
+  [dir="rtl"] .tech-content,
+  [dir="rtl"] .main-content {
+    margin-right: 0;
+  }
+}
+
+/* ── Dashboard Content Spacing ─────────────────────────────────── */
+[dir="rtl"] .dash-panel__title {
+  letter-spacing: 0;
+  margin-bottom: 12px;
+  line-height: 1.3;
+}
+
+[dir="rtl"] .dash-panel__subtitle {
+  line-height: 1.6;
+}
+
+[dir="rtl"] .dash-section-title {
+  letter-spacing: 0;
+  margin-bottom: 18px;
+}
+
+/* ── Invoice Panel RTL ────────────────────────────────────────── */
+[dir="rtl"] .invoice-table__row span:last-child {
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: left;
+}
+
+[dir="rtl"] .booking-card__invoice-footer {
+  text-align: right;
+}
+
+/* ── Dashboard Content Spacing ────────────────────────────────── */
+[dir="rtl"] .dash-panel__title {
+  letter-spacing: 0;
+  margin-bottom: 12px;
+  line-height: 1.3;
+}
+
+[dir="rtl"] .dash-panel__subtitle {
+  line-height: 1.6;
+}
+
+[dir="rtl"] .dash-section-title {
+  letter-spacing: 0;
+  margin-bottom: 18px;
+}
+
+/* ── Technician Dashboard: Notification Panel RTL ──────────────── */
+[dir="rtl"] .dash-topbar__badge {
+  right: auto;
+  left: 4px;
+}
+
+[dir="rtl"] .notif-panel {
+  text-align: right;
+  direction: rtl;
+}
+
+[dir="rtl"] .notif-item {
+  flex-direction: row !important;
+  direction: rtl !important;
+  text-align: right !important;
+}
+
+[dir="rtl"] .notif-panel__mark-all {
+  margin-left: 0;
+  margin-right: auto;
+}
+
+@media (max-width: 480px) {
+  [dir="rtl"] .notif-panel {
+    right: auto;
+    left: -8px;
+  }
+}
+
+/* ── Technician Dashboard: Settings & Toggles RTL ────────────── */
+[dir="rtl"] .settings-toggle-row {
+  display: flex !important;
+  flex-direction: row !important; /* Row in RTL means Text(Right) -> Toggle(Left) */
+  justify-content: space-between !important;
+  text-align: right;
+}
+
+[dir="rtl"] .settings-toggle-info {
+  text-align: right;
+  flex: 1; 
+  order: 1; /* First in source, first in row (Right) */
+}
+
+[dir="rtl"] .stab-toggle {
+  order: 2; /* Second in source, second in row (Left) */
+}
+
+
+[dir="rtl"] .stab-bar {
+  /* Natural RTL flow for tabs — direction:rtl inherited from html */
+}
+
+/* ── Form hints, errors, and helper text ─────────────────── */
+[dir="rtl"] .form-hint,
+[dir="rtl"] .field-error,
+[dir="rtl"] .pw-match-hint {
+  text-align: right;
+}
+
+/* ── Stab-btn tab labels: zero letter-spacing for Arabic ─── */
+[dir="rtl"] .stab-btn {
+  letter-spacing: 0;
+}
+
+/* ── Admin Dashboard RTL ───────────────────────────────────── */
+[dir="rtl"] .admin-nav__btn {
+  flex-direction: row !important;
+  direction: rtl !important;
+  text-align: right !important;
+  border-left: none !important;
+  border-right: 3px solid transparent;
+}
+
+[dir="rtl"] .admin-nav__btn.is-active {
+  border-right-color: var(--color-accent) !important;
+  border-left-color: transparent !important;
+}
+
+[dir="rtl"] .admin-toolbar__search-wrap svg {
+  left: auto !important;
+  right: 14px !important;
+}
+
+[dir="rtl"] .admin-search {
+  padding: 10px 42px 10px 14px !important;
+}
+
+[dir="rtl"] .admin-stat-card::before {
+  left: auto !important;
+  right: 0 !important;
+}
+
+[dir="rtl"] .activity-feed {
+  padding-left: 0 !important;
+  padding-right: 8px !important;
+}
+
+[dir="rtl"] .activity-feed::after {
+  left: auto !important;
+  right: 12px !important;
+}
+
+[dir="rtl"] .activity-item {
+  direction: rtl;
+}
+
+[dir="rtl"] .admin-sidebar__avatar {
+  margin: 0 auto 0.75rem;
+}
+
+[dir="rtl"] .admin-sidebar__profile {
+  text-align: center;
+}
+
+[dir="rtl"] .admin-nav__btn--logout svg {
+  transform: rotate(180deg);
+}
+
+
+/* . */
+

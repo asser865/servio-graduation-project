@@ -1,0 +1,97 @@
+@import "./base/reset.css";
+@import "./base/variables.css";
+@import "./base/typography.css";
+@import "./base/utilities.css";
+
+@import "./layout/header.css";
+@import "./layout/footer.css";
+
+@import "./components/buttons.css";
+@import "./components/cards.css";
+@import "./components/forms.css";
+@import "./components/filter-bar.css";
+@import "./components/chat-widget.css";
+@import "./components/splash-loader.css";
+@import "./components/auth-header.css";
+@import "./components/toast.css";
+@import "./components/back-to-top.css";
+
+@import "./pages/home.css";
+@import "./pages/about.css";
+@import "./pages/contact.css";
+@import "./pages/auth.css";
+@import "./pages/services.css";
+@import "./pages/technicians.css";
+@import "./pages/ai-match.css";
+@import "./pages/ai-estimator.css";
+@import "./pages/profile.css";
+@import "./pages/booking.css";
+@import "./pages/service-details.css";
+@import "./pages/dashboard-layout.css";
+@import "./pages/booking-details.css";
+@import "./pages/join-technician.css";
+@import "./pages/admin-dashboard.css";
+@import "./pages/customer-dashboard.css";
+@import "./pages/technician-dashboard.css";
+@import "./pages/booking-history.css";
+@import "./pages/messages.css";
+@import "./pages/404.css";
+@import "./pages/booking-confirmation.css";
+
+@import "./base/dark-mode.css";
+@import "./base/rtl.css";
+@import "./base/fonts.css";
+
+/* Global utilities */
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  z-index: 999;
+  padding: 10px 12px;
+  border-radius: 999px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+  translate: 0 -140%;
+  transition: translate 160ms ease;
+}
+
+.skip-link:focus {
+  translate: 0 0;
+}
+
+/* Site chrome: Pinned to the viewport with a floating effect. */
+.site-header[data-site-header],
+header.site-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  pointer-events: none; /* Allow clicks through to the background */
+  z-index: 100;
+}
+
+/* Re-enable clicks for the actual pill content */
+.header__inner {
+  pointer-events: auto;
+}
+
+header.dash-topbar {
+  position: relative;
+  top: auto;
+  bottom: auto;
+}
+
+/* Ensure ALL pages have a gap below the fixed header */
+main#main {
+  padding-top: 5rem; /* 80px — clears the ~74px floating pill header */
+}
+
+/* Technician Dashboard: topbar is relative, so no padding needed at the top of #main */
+[data-page="technician-dashboard"] main#main {
+  padding-top: 0;
+}
+
+
+/* . */
