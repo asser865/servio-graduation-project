@@ -1,0 +1,669 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Book Service – Omar Tarek | SERVIO</title>
+  <meta name="description" content="Book a professional home service with Omar Tarek through SERVIO." />
+  <script src="../js/theme-init.js"></script>
+  <script src="../js/lang-init.js"></script>
+  <link rel="stylesheet" href="../css/main.css" />
+</head>
+<body>
+  <div class="scroll-progress" data-scroll-progress aria-hidden="true"></div>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <!-- ══════════════════════════ HEADER ══════════════════════════ -->
+  <header class="site-header" data-site-header>
+    <div class="container header__inner">
+      <a class="brand" href="./index.html" aria-label="SERVIO Home">
+        <img class="brand__mark" src="../assets/images/logo.svg" alt="SERVIO" width="38" height="38" />
+        <span class="brand__name">SERVIO</span>
+      </a>
+
+      <div class="header__center">
+        <nav class="primary-nav" aria-label="Primary">
+          <div class="nav-shell" id="primary-nav">
+            <ul class="primary-nav__list" role="list">
+              <li><a class="nav-link" href="./index.html" data-i18n="nav_home">Home</a></li>
+              <li><a class="nav-link" href="./services-marketplace.html" data-i18n="nav_services">Services</a></li>
+              <li><a class="nav-link" href="./smart-match.html" data-i18n="nav_smart_match">Smart Match</a></li>
+              <li><a class="nav-link" href="./ai-estimator.html" data-i18n="nav_ai_estimator">AI Estimator</a></li>
+              <li><a class="nav-link" href="./about.html" data-i18n="nav_about">About</a></li>
+              <li><a class="nav-link" href="./contact.html" data-i18n="nav_contact">Contact</a></li>
+            </ul>
+          </div>
+        </nav>
+      </div>
+
+      <div class="header__right">
+        <div class="lang" data-lang>
+          <button class="lang-switch" type="button" aria-haspopup="listbox" aria-expanded="false">
+            <svg class="lang-switch__globe" viewBox="0 0 24 24" aria-hidden="true" width="16" height="16">
+              <path fill="currentColor" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm7.93 9h-3.11a15.6 15.6 0 0 0-1.3-5.06A8.03 8.03 0 0 1 19.93 11ZM12 4c.78.95 1.9 3.1 2.56 7H9.44C10.1 7.1 11.22 4.95 12 4ZM4.07 13h3.11a15.6 15.6 0 0 0 1.3 5.06A8.03 8.03 0 0 1 4.07 13ZM7.18 11H4.07a8.03 8.03 0 0 1 4.41-5.06A15.6 15.6 0 0 0 7.18 11Zm2.26 2h5.12c-.66 3.9-1.78 6.05-2.56 7-.78-.95-1.9-3.1-2.56-7Zm6.08 5.06A15.6 15.6 0 0 0 16.82 13h3.11a8.03 8.03 0 0 1-4.41 5.06Z" />
+            </svg>
+            <span class="lang__current">EN</span>
+            <span class="lang__caret" aria-hidden="true">▾</span>
+          </button>
+          <ul class="lang__menu" role="listbox" aria-label="Select language">
+            <li role="option" aria-selected="true">EN</li>
+            <li role="option" aria-selected="false">AR</li>
+          </ul>
+        </div>
+        <button class="btn btn--sm btn--header-theme" type="button" data-theme-button aria-label="Toggle dark mode">
+        <span class="theme-button__icon theme-button__icon--moon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            </svg>
+          </span>
+          <span class="theme-button__icon theme-button__icon--sun" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="4.25"></circle>
+              <path d="M12 2.5v2.5M12 19v2.5M4.93 4.93l1.77 1.77M17.3 17.3l1.77 1.77M2.5 12H5M19 12h2.5M4.93 19.07l1.77-1.77M17.3 6.7l1.77-1.77"></path>
+            </svg>
+          </span>
+        </button>
+        <a class="btn btn--sm btn--header-login" href="./login.html" data-i18n="nav_login">Login</a>
+        <a class="btn btn--sm btn--header-signup" href="./signup.html" data-i18n="nav_signup">Sign Up</a>
+
+        <button class="hamburger" type="button" aria-label="Toggle menu" aria-expanded="false"
+          aria-controls="primary-nav" data-nav-toggle>
+          <span class="hamburger__lines" aria-hidden="true">
+            <span></span><span></span><span></span>
+          </span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ══════════════════════════ MAIN ══════════════════════════ -->
+  <main id="main" class="booking-page">
+
+    <!-- PAGE HERO ─ Enhanced Trust & Authority -->
+    <div class="booking-hero">
+      <!-- Decorative background layers -->
+      <div class="booking-hero__bg" aria-hidden="true">
+        <div class="booking-hero__bg-glow booking-hero__bg-glow--1"></div>
+        <div class="booking-hero__bg-glow booking-hero__bg-glow--2"></div>
+        <svg class="booking-hero__bg-dots" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="hero-dots" x="0" y="0" width="24" height="24" patternUnits="userSpaceOnUse">
+              <circle cx="1.5" cy="1.5" r="1.5" fill="currentColor" opacity="0.12"/>
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#hero-dots)" />
+        </svg>
+      </div>
+
+      <div class="container">
+        <!-- Breadcrumb -->
+        <nav class="breadcrumb booking-hero__breadcrumb" aria-label="Breadcrumb">
+          <a href="./index.html" data-i18n="nav_home">Home</a>
+          <span class="breadcrumb__sep" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </span>
+          <a href="./services-marketplace.html" data-i18n="nav_services">Services</a>
+          <span class="breadcrumb__sep" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </span>
+          <a href="./technician-profile.html" data-i18n="booking_breadcrumb_tech">Omar Tarek</a>
+          <span class="breadcrumb__sep" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </span>
+          <span aria-current="page" data-i18n="booking_breadcrumb_page">Book Service</span>
+
+        </nav>
+
+        <!-- Hero split layout -->
+        <div class="booking-hero__inner">
+
+          <!-- LEFT: headline + sub + trust badges -->
+          <div class="booking-hero__content">
+            <div class="booking-hero__eyebrow">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              <span data-i18n="booking_eyebrow">Booking Request</span>
+            </div>
+
+            <h1 class="booking-hero__title" data-i18n="booking_title">Book Your Service</h1>
+            <p class="booking-hero__sub" data-i18n="booking_sub">Confirm the details and schedule a visit —<br>takes under 2 minutes.</p>
+
+            <!-- Trust signal badges -->
+            <div class="booking-hero__trust" role="list" aria-label="Trust signals">
+              <div class="trust-pill" role="listitem">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+                <span data-i18n="booking_trust_verified">Verified Pro</span>
+              </div>
+              <div class="trust-pill trust-pill--secure" role="listitem">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <span data-i18n="booking_trust_secure">Secure Booking</span>
+              </div>
+              <div class="trust-pill trust-pill--star" role="listitem">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                <span data-i18n="booking_trust_star">5-Star Rated</span>
+              </div>
+              <div class="trust-pill trust-pill--insured" role="listitem">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="9 12 11 14 15 10"/></svg>
+                <span data-i18n="booking_trust_insured">Insured &amp; Licensed</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- RIGHT: Technician context card -->
+          <div class="booking-hero__card-wrap">
+            <article class="tech-hero-card" aria-label="Technician: Omar Tarek">
+              <div class="tech-hero-card__header">
+                <div class="tech-hero-card__avatar" aria-hidden="true" data-i18n="booking_card_avatar_init">OT</div>
+                <div class="tech-hero-card__info">
+                  <h2 class="tech-hero-card__name" data-i18n="booking_card_tech_name">Omar Tarek</h2>
+                  <p class="tech-hero-card__service" data-i18n="booking_card_tech_service">Plumbing &amp; Pipe Repair</p>
+                </div>
+
+                <div class="tech-hero-card__verified-badge" title="Verified Professional">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                </div>
+              </div>
+
+              <div class="tech-hero-card__rating" aria-label="Rating: 4.9 out of 5, 127 reviews">
+                <span class="hero-stars" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                </span>
+                <strong class="hero-rating-num">4.9</strong>
+                <span class="hero-rating-count" data-i18n="booking_card_reviews_count">(127 reviews)</span>
+
+              </div>
+
+              <div class="tech-hero-card__meta">
+                <span class="hero-meta-pill">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  <span data-i18n="booking_respond_1hr">Responds within 1 hour</span>
+                </span>
+                <span class="hero-meta-pill hero-meta-pill--available">
+                  <span class="avail-dot" aria-hidden="true"></span>
+                  <span data-i18n="booking_avail_today">Available Today</span>
+                </span>
+              </div>
+
+              <div class="tech-hero-card__divider"></div>
+
+              <div class="tech-hero-card__stats">
+                <div class="hero-stat">
+                  <strong>8+</strong>
+                  <span data-i18n="booking_stat_years">Years Exp.</span>
+                </div>
+                <div class="hero-stat-sep" aria-hidden="true"></div>
+                <div class="hero-stat">
+                  <strong>430+</strong>
+                  <span data-i18n="booking_stat_jobs_done">Jobs Done</span>
+                </div>
+                <div class="hero-stat-sep" aria-hidden="true"></div>
+                <div class="hero-stat">
+                  <strong>98%</strong>
+                  <span data-i18n="booking_stat_ontime">On Time</span>
+                </div>
+              </div>
+            </article>
+          </div>
+
+        </div><!-- /.booking-hero__inner -->
+      </div><!-- /.container -->
+    </div><!-- /.booking-hero -->
+
+    <!-- TWO-COLUMN LAYOUT -->
+    <div class="container booking-layout">
+
+      <!-- ──────── LEFT: STEPPER + FORM ──────── -->
+      <div class="booking-main">
+
+        <!-- PROGRESS STEPPER -->
+        <div class="booking-stepper" id="bookingStepper" aria-label="Booking steps">
+          <div class="step-item is-active" data-step="1">
+            <div class="step-num" aria-hidden="true">1</div>
+            <div class="step-label">
+              <span class="step-label__title" data-i18n="booking_step1_label">Service Details</span>
+              <span class="step-label__sub" data-i18n="booking_step1_sub_label">Date, time & location</span>
+            </div>
+          </div>
+          <div class="step-item" data-step="2">
+            <div class="step-num" aria-hidden="true">2</div>
+            <div class="step-label">
+              <span class="step-label__title" data-i18n="booking_step2_label">Payment</span>
+              <span class="step-label__sub" data-i18n="booking_step2_sub_label">Choose method</span>
+            </div>
+          </div>
+          <div class="step-item" data-step="3">
+            <div class="step-num" aria-hidden="true">3</div>
+            <div class="step-label">
+              <span class="step-label__title" data-i18n="booking_step3_label">Review & Confirm</span>
+              <span class="step-label__sub" data-i18n="booking_step3_sub_label">Finalize booking</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- FORM CARD -->
+        <div class="booking-form-card">
+
+          <!-- ═══════════ STEP 1: SERVICE DETAILS ═══════════ -->
+          <div class="step-panel is-active" id="step-1" role="tabpanel" aria-labelledby="step-label-1">
+            <h2 class="step-panel__heading" data-i18n="booking_step1_heading">Service Details</h2>
+            <p class="step-panel__sub" data-i18n="booking_step1_desc">Tell us what you need and when you're available.</p>
+
+            <!-- Technician strip -->
+            <div class="service-strip" data-reveal data-reveal-delay="50">
+              <img class="service-strip__avatar"
+                src="https://images.unsplash.com/photo-1540569014015-19a7be504e3a?q=80&w=256&auto=format&fit=crop"
+                alt="Omar Tarek" />
+              <div class="service-strip__info">
+                <div class="service-strip__name">Omar Tarek</div>
+                <div class="service-strip__type">Master Plumber · Nasr City</div>
+                <div class="service-strip__verified">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><polyline points="9 12 11 14 15 10" />
+                  </svg>
+                  <span data-i18n="booking_strip_verified">Identity &amp; License Verified</span>
+                </div>
+              </div>
+              <div class="service-strip__rate">45 EGP / hr</div>
+            </div>
+
+            <form id="formStep1" novalidate>
+
+              <!-- Service type -->
+              <div class="form-row form-row--full" data-reveal data-reveal-delay="80">
+                <div class="field">
+                  <label for="serviceType"><span data-i18n="booking_service_type">Service Type</span> <span class="required">*</span></label>
+                  <select id="serviceType" name="serviceType" required>
+                    <option value="" disabled selected data-i18n="booking_svc_select_ph">Select a service…</option>
+                    <option value="pipe-repair" data-i18n="booking_svc_pipe_repair">Pipe Repair &amp; Leak Fix</option>
+                    <option value="drain-cleaning" data-i18n="booking_svc_drain">Drain Cleaning</option>
+                    <option value="fixture-install" data-i18n="booking_svc_fixture">Fixture Installation</option>
+                    <option value="water-heater" data-i18n="booking_svc_water_heater">Water Heater Service</option>
+                    <option value="full-inspection" data-i18n="booking_svc_inspection">Full Plumbing Inspection</option>
+                    <option value="emergency" data-i18n="booking_svc_emergency">Emergency Callout</option>
+                    <option value="other" data-i18n="booking_svc_other">Other</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Other problem description (shown only when "Other" is selected) -->
+              <div class="form-row form-row--full" id="otherProblemRow" style="display:none;" data-reveal data-reveal-delay="90">
+                <div class="field">
+                  <label for="otherProblem"><span data-i18n="booking_other_label">Describe your problem</span> <span class="required">*</span></label>
+                  <textarea id="otherProblem" name="otherProblem" rows="4" placeholder="Please describe the issue you're experiencing…" data-i18n-placeholder="booking_other_ph" style="resize:vertical;"></textarea>
+                </div>
+              </div>
+
+              <!-- Date + Address -->
+              <div class="form-row" data-reveal data-reveal-delay="120">
+                <div class="field">
+                  <label for="bookDate"><span data-i18n="booking_pref_date">Preferred Date</span> <span class="required">*</span></label>
+                  <input type="date" id="bookDate" name="bookDate" required />
+                </div>
+                <div class="field">
+                  <label for="bookAddress"><span data-i18n="booking_address_label">Address</span> <span class="required">*</span></label>
+                  <input type="text" id="bookAddress" name="bookAddress" placeholder="Street, district, city…" required data-i18n-placeholder="booking_address_ph" />
+                </div>
+              </div>
+
+              <!-- Time Slots -->
+              <div class="timeslot-section" data-reveal data-reveal-delay="160">
+                <div class="timeslot-section__label">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+                  </svg>
+                  <span data-i18n="booking_morning_slots">Morning Slots (8 AM – 12 PM)</span>
+                </div>
+                <div class="timeslot-grid" role="group" aria-label="Morning time slots">
+                  <button type="button" class="timeslot-pill" data-time="08:00">8:00 AM</button>
+                  <button type="button" class="timeslot-pill" data-time="09:00">9:00 AM</button>
+                  <button type="button" class="timeslot-pill" data-time="10:00">10:00 AM</button>
+                  <button type="button" class="timeslot-pill is-unavailable" data-time="11:00" disabled aria-disabled="true">11:00 AM</button>
+                </div>
+              </div>
+
+              <div class="timeslot-section" data-reveal data-reveal-delay="200">
+                <div class="timeslot-section__label">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+                  </svg>
+                  <span data-i18n="booking_afternoon_slots">Afternoon Slots (12 PM – 6 PM)</span>
+                </div>
+                <div class="timeslot-grid" role="group" aria-label="Afternoon time slots">
+                  <button type="button" class="timeslot-pill" data-time="12:00">12:00 PM</button>
+                  <button type="button" class="timeslot-pill" data-time="14:00">2:00 PM</button>
+                  <button type="button" class="timeslot-pill" data-time="16:00">4:00 PM</button>
+                  <button type="button" class="timeslot-pill is-unavailable" data-time="18:00" disabled aria-disabled="true">6:00 PM</button>
+                </div>
+              </div>
+
+              <!-- Notes -->
+              <div class="form-row form-row--full" data-reveal data-reveal-delay="240">
+                <div class="field">
+                  <label for="bookNotes" data-i18n="booking_notes_label">Additional Notes</label>
+                  <textarea id="bookNotes" name="bookNotes" placeholder="Describe the issue in detail, mention any prior repairs, or add access instructions…" data-i18n-placeholder="booking_notes_ph"></textarea>
+                </div>
+              </div>
+
+              <!-- Nav -->
+              <div class="step-nav step-nav--end">
+                <button type="button" class="btn btn--sm" id="step1Next">
+                  <span data-i18n="booking_continue_payment">Continue to Payment</span>
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </button>
+              </div>
+
+            </form>
+          </div>
+
+          <!-- ═══════════ STEP 2: PAYMENT ═══════════ -->
+          <div class="step-panel" id="step-2" role="tabpanel" aria-labelledby="step-label-2">
+            <h2 class="step-panel__heading" data-i18n="booking_step2_heading">Payment Method</h2>
+            <p class="step-panel__sub" data-i18n="booking_step2_desc">Choose how you'd like to pay. All options are available at checkout.</p>
+
+            <div class="payment-grid" id="paymentGrid">
+              <!-- Option 1: Online Payment (default) -->
+              <label class="payment-option is-selected" data-payment="online">
+                <input type="radio" name="payment" value="online" checked />
+                <div class="payment-option__icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                </div>
+                <div class="payment-option__info">
+                  <strong data-i18n="booking_online_payment">Online Payment</strong>
+                  <p data-i18n="booking_online_desc">Your payment is held securely and released when the job is complete</p>
+                </div>
+                <span class="payment-badge payment-badge--protected">🔒 <span data-i18n="booking_protected">Protected</span></span>
+              </label>
+
+              <!-- Option 2: Cash -->
+              <label class="payment-option" data-payment="cash">
+                <input type="radio" name="payment" value="cash" />
+                <div class="payment-option__icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>
+                </div>
+                <div class="payment-option__info">
+                  <strong data-i18n="booking_cash">Cash</strong>
+                  <p data-i18n="booking_cash_desc">Pay the technician directly when the job is done</p>
+                </div>
+              </label>
+            </div>
+
+            <!-- Card details (shown when card selected) -->
+            <div class="card-fields is-hidden" id="cardFields">
+              <div class="form-row form-row--full">
+                <div class="field">
+                  <label for="cardName" data-i18n="booking_card_name">Cardholder Name</label>
+                  <input type="text" id="cardName" name="cardName" placeholder="As it appears on card" autocomplete="cc-name" data-i18n-placeholder="booking_card_name_ph" />
+                </div>
+              </div>
+              <div class="form-row form-row--full">
+                <div class="field">
+                  <label for="cardNumber" data-i18n="booking_card_number">Card Number</label>
+                  <input type="text" id="cardNumber" name="cardNumber" placeholder="1234 5678 9012 3456" maxlength="19" autocomplete="cc-number" inputmode="numeric" />
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="field">
+                  <label for="cardExpiry" data-i18n="booking_card_expiry">Expiry</label>
+                  <input type="text" id="cardExpiry" name="cardExpiry" placeholder="MM / YY" maxlength="7" autocomplete="cc-exp" inputmode="numeric" />
+                </div>
+                <div class="field">
+                  <label for="cardCvc" data-i18n="booking_card_cvv">CVV</label>
+                  <input type="text" id="cardCvc" name="cardCvc" placeholder="123" maxlength="4" autocomplete="cc-csc" inputmode="numeric" />
+                </div>
+              </div>
+              <div class="security-note">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
+                <span data-i18n="booking_card_security">Your card details are encrypted and never stored on our servers.</span>
+              </div>
+            </div>
+
+            <div class="step-nav">
+              <button type="button" class="btn btn--sm" id="step2Back">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                <span data-i18n="booking_back">Back</span>
+              </button>
+              <button type="button" class="btn btn--sm" id="step2Next">
+                <span data-i18n="booking_review_booking">Review Booking</span>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- ═══════════ STEP 3: REVIEW & CONFIRM ═══════════ -->
+          <div class="step-panel" id="step-3" role="tabpanel" aria-labelledby="step-label-3">
+            <h2 class="step-panel__heading" data-i18n="booking_step3_heading">Review &amp; Confirm</h2>
+            <p class="step-panel__sub" data-i18n="booking_step3_desc">Double-check everything before confirming your booking.</p>
+
+            <!-- Service block -->
+            <div class="review-block">
+              <div class="review-block__header">
+                <span class="review-block__title">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
+                  <span data-i18n="booking_review_service_block">Service Details</span>
+                </span>
+                <button type="button" class="btn btn--sm review-block__edit" data-goto="1" data-i18n="booking_review_edit">Edit</button>
+              </div>
+              <div class="review-block__body">
+                <div class="review-row">
+                  <span class="review-row__label" data-i18n="booking_review_tech">Technician</span>
+                  <span class="review-row__value">Omar Tarek</span>
+                </div>
+                <div class="review-row">
+                  <span class="review-row__label" data-i18n="booking_review_service_label">Service</span>
+                  <span class="review-row__value" id="reviewService">—</span>
+                </div>
+                <div class="review-row">
+                  <span class="review-row__label" data-i18n="booking_review_date">Date</span>
+                  <span class="review-row__value" id="reviewDate">—</span>
+                </div>
+                <div class="review-row">
+                  <span class="review-row__label" data-i18n="booking_review_time">Time</span>
+                  <span class="review-row__value" id="reviewTime">—</span>
+                </div>
+                <div class="review-row">
+                  <span class="review-row__label" data-i18n="booking_review_address_label">Address</span>
+                  <span class="review-row__value" id="reviewAddress">—</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Payment block -->
+            <div class="review-block">
+              <div class="review-block__header">
+                <span class="review-block__title">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2" /><line x1="2" y1="10" x2="22" y2="10" /></svg>
+                  <span data-i18n="booking_review_payment_block">Payment</span>
+                </span>
+                <button type="button" class="btn btn--sm review-block__edit" data-goto="2" data-i18n="booking_review_edit">Edit</button>
+              </div>
+              <div class="review-block__body">
+                <div class="review-row">
+                  <span class="review-row__label" data-i18n="booking_review_method">Method</span>
+                  <span class="review-row__value" id="reviewPayment">Cash on arrival</span>
+                </div>
+                <div class="review-row">
+                  <span class="review-row__label" data-i18n="booking_review_base_rate">Base Rate</span>
+                  <span class="review-row__value">45.00 EGP / hr</span>
+                </div>
+                <div class="review-row">
+                  <span class="review-row__label" data-i18n="booking_review_fee">Platform Fee (5%)</span>
+                  <span class="review-row__value">2.25 EGP</span>
+                </div>
+                <div class="review-row" style="padding-top:0.5rem;border-top:1px solid var(--color-border);margin-top:0.25rem">
+                  <span class="review-row__label" style="font-weight:700;color:var(--color-text)" data-i18n="booking_review_total">Estimated Total</span>
+                  <span class="review-row__value" style="font-family:var(--font-heading);font-size:1.05rem;color:var(--color-accent)">47.25 EGP+</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Terms -->
+            <label class="terms-check">
+              <input type="checkbox" id="termsCheck" required />
+              <span>
+                <span data-i18n="booking_terms_prefix">I agree to SERVIO's </span><a href="#" data-i18n="booking_terms_tos">Terms of Service</a><span data-i18n="booking_terms_and"> and </span>
+                <a href="#" data-i18n="booking_terms_cancel">Cancellation Policy</a><span data-i18n="booking_terms_suffix">. I understand the final cost may vary based on actual hours worked.</span>
+              </span>
+            </label>
+
+            <div class="step-nav">
+              <button type="button" class="btn btn--sm" id="step3Back">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                <span data-i18n="booking_back">Back</span>
+              </button>
+              <a href="./booking-confirmation.html" class="btn btn--sm" id="confirmBtn">
+                <span data-i18n="booking_confirm">Confirm Booking</span>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+              </a>
+            </div>
+
+          </div>
+          <!-- end step-3 -->
+
+        </div>
+        <!-- end .booking-form-card -->
+      </div>
+      <!-- end .booking-main -->
+
+      <!-- ──────── RIGHT: ORDER SUMMARY SIDEBAR ──────── -->
+      <aside class="booking-sidebar" aria-label="Booking summary">
+        <div class="summary-card" data-reveal>
+          <div class="summary-card__header">
+            <h3 data-i18n="booking_summary_title">Order Summary</h3>
+            <p data-i18n="booking_summary_sub">SERVIO verified professional</p>
+          </div>
+
+          <!-- Technician -->
+          <div class="summary-card__tech">
+            <img class="summary-tech__avatar"
+              src="https://images.unsplash.com/photo-1540569014015-19a7be504e3a?q=80&w=128&auto=format&fit=crop"
+              alt="Omar Tarek" />
+            <div>
+              <div class="summary-tech__name">Omar Tarek</div>
+              <div class="summary-tech__role">Master Plumber · 12 yrs exp.</div>
+              <div class="summary-tech__rating">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                4.9 · 342 reviews
+              </div>
+            </div>
+          </div>
+
+          <!-- Pricing -->
+          <div class="summary-card__pricing">
+            <div class="price-row">
+              <span class="price-row__label" data-i18n="booking_base_rate_label">Base rate (1 hr min.)</span>
+              <span class="price-row__value">45.00 EGP</span>
+            </div>
+            <div class="price-row">
+              <span class="price-row__label" data-i18n="booking_fee_label">Platform fee (5%)</span>
+              <span class="price-row__value">2.25 EGP</span>
+            </div>
+            <div class="price-row">
+              <span class="price-row__label" data-i18n="booking_materials">Parts &amp; materials</span>
+              <span class="price-row__value" data-i18n="booking_as_quoted">As quoted</span>
+            </div>
+            <div class="price-row price-row--total">
+              <span class="price-row__label" data-i18n="booking_est_total">Estimated Total</span>
+              <span class="price-row__value">47.25 EGP+</span>
+            </div>
+          </div>
+
+          <!-- Trust signals -->
+          <div class="summary-card__trust">
+            <div class="trust-item">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span data-i18n="booking_free_cancel">Free cancellation up to 2 hours before</span>
+            </div>
+            <div class="trust-item">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span data-i18n="booking_guarantee">SERVIO Service Guarantee</span>
+            </div>
+            <div class="trust-item">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span data-i18n="booking_id_verified">Identity &amp; license verified</span>
+            </div>
+            <div class="trust-item">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span data-i18n="booking_no_hidden">No hidden fees — pay only what's agreed</span>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+    </div>
+    <!-- end .booking-layout -->
+  </main>
+
+  <!-- ══════════════════════════ FOOTER ══════════════════════════ -->
+  <footer class="site-footer">
+    <div class="container footer__grid">
+      <div class="footer__brand-col">
+        <h2 class="footer__brand-text" data-i18n="footer_stay_connected">Stay Connected</h2>
+        <p class="footer__desc" data-i18n="footer_newsletter_desc">Join our newsletter for the latest updates and exclusive offers.</p>
+        <form class="footer__newsletter">
+          <input type="email" placeholder="Enter your email" data-i18n-placeholder="footer_email_ph" class="footer__input" required>
+          <button type="submit" class="footer__submit-btn" aria-label="Subscribe">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+          </button>
+        </form>
+      </div>
+      <div class="footer__nav-col">
+        <h3 class="footer__title" data-i18n="footer_quick_links">Quick Links</h3>
+        <ul class="footer__links" role="list">
+          <li><a class="footer__link" href="./index.html" data-i18n="nav_home">Home</a></li>
+          <li><a class="footer__link" href="./about.html" data-i18n="footer_about">About Us</a></li>
+          <li><a class="footer__link" href="./services-marketplace.html" data-i18n="nav_services">Services</a></li>
+          <li><a class="footer__link" href="#" data-i18n="footer_products">Products</a></li>
+          <li><a class="footer__link" href="./contact.html" data-i18n="nav_contact">Contact</a></li>
+        </ul>
+      </div>
+      <div class="footer__nav-col">
+        <h3 class="footer__title" data-i18n="footer_contact_us">Contact Us</h3>
+        <address class="footer__address">
+          <p data-i18n="footer_city">Cairo, Egypt</p>
+
+          <p data-i18n="footer_phone">Phone: +20 100 000 0000</p>
+          <p data-i18n-html="footer_email">Email: hello@servio.eg</p>
+        </address>
+      </div>
+      <div class="footer__nav-col">
+        <h3 class="footer__title" data-i18n="footer_follow_us">Follow Us</h3>
+        <div class="footer__socials">
+          <a href="#" class="social-link" aria-label="Facebook">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg>
+          </a>
+          <a href="#" class="social-link" aria-label="Twitter">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"></path></svg>
+          </a>
+          <a href="#" class="social-link" aria-label="Instagram">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+          </a>
+          <a href="#" class="social-link" aria-label="LinkedIn">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path><rect x="2" y="9" width="4" height="12"></rect><circle cx="4" cy="4" r="2"></circle></svg>
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="container footer__bottom-wrapper">
+      <div class="footer__bottom">
+        <p class="footer__fineprint" data-i18n="footer_rights">© <span id="year">2026</span> SERVIO. All rights reserved.</p>
+        <div class="footer__bottom-links">
+          <a href="#" class="footer__small-link" data-i18n="footer_privacy">Privacy Policy</a>
+          <a href="#" class="footer__small-link" data-i18n="footer_terms">Terms of Service</a>
+          <a href="#" class="footer__small-link" data-i18n="footer_cookies">Cookie Settings</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="../js/lang.js"></script>
+  <script type="module" src="../js/main.js"></script>
+  <script type="module" src="../js/html/booking.js"></script>
+</body>
+</html>
+
+<!-- . -->

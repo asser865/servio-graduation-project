@@ -1,0 +1,2390 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SERVIO | My Dashboard</title>
+  <meta name="description" content="Manage your bookings, favourites, and profile." />
+  <script src="../js/theme-init.js"></script>
+  <script src="../js/lang-init.js"></script>
+    <link rel="stylesheet" href="../css/main.css" />
+  <link rel="stylesheet" href="../css/pages/customer-dashboard.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="site-header" data-site-header>
+    <div class="container header__inner">
+      <a class="brand" href="./index.html" aria-label="SERVIO Home">
+        <img class="brand__mark" src="../assets/images/logo.svg" alt="SERVIO" width="38" height="38" />
+        <span class="brand__name">SERVIO</span>
+      </a>
+
+      <div class="header__center">
+        <nav class="primary-nav" aria-label="Primary">
+          <div class="nav-shell" id="primary-nav">
+            <ul class="primary-nav__list" role="list">
+              <li><a class="nav-link" href="./index.html" data-i18n="nav_home">Home</a></li>
+              <li><a class="nav-link" href="./services-marketplace.html" data-i18n="nav_services">Services</a></li>
+              <li><a class="nav-link" href="./smart-match.html" data-i18n="nav_smart_match">Smart Match</a></li>
+              <li><a class="nav-link" href="./ai-estimator.html" data-i18n="nav_ai_estimator">AI Estimator</a></li>
+              <li><a class="nav-link" href="./about.html" data-i18n="nav_about">About</a></li>
+              <li><a class="nav-link" href="./contact.html" data-i18n="nav_contact">Contact</a></li>
+            </ul>
+          </div>
+        </nav>
+      </div>
+
+      <div class="header__right">
+        <div class="lang" data-lang>
+          <button class="lang-switch" type="button" aria-haspopup="listbox" aria-expanded="false">
+            <svg class="lang-switch__globe" viewBox="0 0 24 24" aria-hidden="true" width="16" height="16">
+              <path fill="currentColor"
+                d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm7.93 9h-3.11a15.6 15.6 0 0 0-1.3-5.06A8.03 8.03 0 0 1 19.93 11ZM12 4c.78.95 1.9 3.1 2.56 7H9.44C10.1 7.1 11.22 4.95 12 4ZM4.07 13h3.11a15.6 15.6 0 0 0 1.3 5.06A8.03 8.03 0 0 1 4.07 13ZM7.18 11H4.07a8.03 8.03 0 0 1 4.41-5.06A15.6 15.6 0 0 0 7.18 11Zm2.26 2h5.12c-.66 3.9-1.78 6.05-2.56 7-.78-.95-1.9-3.1-2.56-7Zm6.08 5.06A15.6 15.6 0 0 0 16.82 13h3.11a8.03 8.03 0 0 1-4.41 5.06Z" />
+            </svg>
+            <span class="lang__current">EN</span>
+            <span class="lang__caret" aria-hidden="true">▾</span>
+          </button>
+          <ul class="lang__menu" role="listbox" aria-label="Select language">
+            <li role="option" aria-selected="true">EN</li>
+            <li role="option" aria-selected="false">AR</li>
+          </ul>
+        </div>
+        <button class="btn btn--sm btn--header-theme" type="button" data-theme-button aria-label="Toggle dark mode">
+        <span class="theme-button__icon theme-button__icon--moon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            </svg>
+          </span>
+          <span class="theme-button__icon theme-button__icon--sun" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="4.25"></circle>
+              <path d="M12 2.5v2.5M12 19v2.5M4.93 4.93l1.77 1.77M17.3 17.3l1.77 1.77M2.5 12H5M19 12h2.5M4.93 19.07l1.77-1.77M17.3 6.7l1.77-1.77"></path>
+            </svg>
+          </span>
+        </button>
+        <a class="btn btn--sm btn--header-login" href="./login.html" data-i18n="nav_login">Login</a>
+        <a class="btn btn--sm btn--header-signup" href="./signup.html" data-i18n="nav_signup">Sign Up</a>
+
+        <button class="hamburger" type="button" aria-label="Toggle menu" aria-expanded="false"
+          aria-controls="primary-nav" data-nav-toggle>
+          <span class="hamburger__lines" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+          </span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+<main id="main">
+<div class="dashboard dashboard--customer">
+<aside class="dash-sidebar" aria-label="Dashboard navigation" data-sidebar>
+<div class="dash-sidebar__nav-scroll dash-sidebar__nav-scroll--customer">
+<ul class="dash-nav" role="tablist" aria-label="Dashboard sections">
+<li role="none">
+<button class="dash-nav__btn is-active" role="tab" aria-selected="true"
+              aria-controls="panel-overview" id="tab-overview" data-tab="overview" title="Overview">
+        <span class="dash-nav__icon-slot" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+        </svg>
+        </span>
+        <span class="dash-nav__label" data-i18n="cust_nav_overview">Overview</span>
+      </button>
+    </li>
+    <li role="none">
+      <button class="dash-nav__btn" role="tab" aria-selected="false"
+              aria-controls="panel-bookings" id="tab-bookings" data-tab="bookings" title="Bookings">
+        <span class="dash-nav__icon-slot" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+        </svg>
+        </span>
+        <span class="dash-nav__label" data-i18n="cust_nav_bookings">Bookings</span>
+      </button>
+    </li>
+    <li role="none">
+      <button class="dash-nav__btn" role="tab" aria-selected="false"
+              aria-controls="panel-history" id="tab-history" data-tab="history" title="History">
+        <span class="dash-nav__icon-slot" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+        </svg>
+        </span>
+        <span class="dash-nav__label" data-i18n="cust_nav_history">History</span>
+      </button>
+    </li>
+    <li role="none">
+      <button class="dash-nav__btn" role="tab" aria-selected="false"
+              aria-controls="panel-favourites" id="tab-favourites" data-tab="favourites" title="Favourites">
+        <span class="dash-nav__icon-slot" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+        </svg>
+        </span>
+        <span class="dash-nav__label" data-i18n="cust_nav_favourites">Favourites</span>
+      </button>
+    </li>
+  </ul>
+
+  <ul class="dash-nav" role="tablist" aria-label="Account sections">
+    <li role="none">
+      <button class="dash-nav__btn" role="tab" aria-selected="false"
+              aria-controls="panel-notifications" id="tab-notifications" data-tab="notifications" title="Notifications">
+        <span class="dash-nav__icon-slot" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+        </svg>
+        </span>
+        <span class="dash-nav__label" data-i18n="cust_nav_notifications">Notifications</span>
+      </button>
+    </li>
+    <li role="none">
+      <button class="dash-nav__btn" role="tab" aria-selected="false"
+              aria-controls="panel-job-posts" id="tab-job-posts" data-tab="job-posts"
+              title="Job Posts">
+        <span class="dash-nav__icon-slot" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/>
+        </svg>
+        </span>
+        <span class="dash-nav__label" data-i18n="cust_nav_job_posts">Job Posts</span>
+      </button>
+    </li>
+    <li role="none">
+      <button class="dash-nav__btn" role="tab" aria-selected="false"
+              aria-controls="panel-proposals" id="tab-proposals" data-tab="proposals"
+              title="Proposals">
+        <span class="dash-nav__icon-slot" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+        </span>
+        <span class="dash-nav__label" data-i18n="cust_nav_proposals">Proposals</span>
+      </button>
+    </li>
+    <li role="none">
+      <button class="dash-nav__btn" role="tab" aria-selected="false"
+              aria-controls="panel-settings" id="tab-settings" data-tab="settings" title="Settings">
+        <span class="dash-nav__icon-slot" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>
+          <circle cx="8" cy="6" r="2" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="10" cy="18" r="2" fill="currentColor" stroke="none"/>
+        </svg>
+        </span>
+        <span class="dash-nav__label" data-i18n="cust_nav_settings">Settings</span>
+      </button>
+    </li>
+  </ul>
+        </div>
+
+  <div class="dash-sidebar__spacer"></div>
+
+  <!-- User profile row -->
+  <div class="dash-sidebar__user">
+    <div class="dash-sidebar__user-avatar" data-dash-initials>AY</div>
+    <div style="min-width:0;flex:1;">
+      <span class="dash-sidebar__user-name" data-dash-name data-i18n="dash_loading">Loading…</span>
+      <span class="dash-sidebar__user-role" data-i18n="cust_user_role">Customer</span>
+    </div>
+  </div>
+
+  <div class="dash-sidebar__footer">
+    <button type="button" class="dash-sidebar__logout" data-dash-logout aria-label="Log out">
+      <svg class="dash-sidebar__logout-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+        <polyline points="16 17 21 12 16 7" />
+        <line x1="21" y1="12" x2="9" y2="12" />
+      </svg>
+      <span class="dash-sidebar__logout-label" data-i18n="cust_logout">Logout</span>
+    </button>
+  </div>
+
+</aside>
+
+      <!-- Mobile tabs strip (JS populates) -->
+      <div class="dash-mobile-tabs" data-mobile-tabs aria-label="Dashboard tabs" role="tablist"></div>
+
+      <!-- Content panels -->
+      <div class="dash-content">
+
+        <!-- Overview panel -->
+        <section
+          class="dash-panel is-active"
+          id="panel-overview"
+          role="tabpanel"
+          aria-labelledby="tab-overview"
+          data-panel="overview"
+        >
+          <div class="dash-welcome dash-welcome--compact" data-reveal>
+            <div class="dash-welcome__text">
+              <p class="dash-welcome__greeting"><span class="dash-welcome__time-label" data-i18n="cust_good_morning">Good morning</span><span class="dash-welcome__comma">, </span><span data-dash-firstname class="dash-welcome__firstname">there</span></p>
+              <h2 class="dash-welcome__name" data-dash-welcome data-i18n="cust_your_overview">Your overview</h2>
+              <p class="dash-welcome__sub" data-i18n="cust_welcome_sub">Here’s what’s happening with your bookings and saved pros.</p>
+            </div>
+            <a class="btn btn--primary dash-welcome__cta" href="./booking.html">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              <span data-i18n="cust_book_service">Book a Service</span>
+            </a>
+          </div>
+
+          <div class="dash-stat-grid" data-reveal>
+            <!-- Total Bookings -->
+            <div class="dash-stat-card dash-stat-card--hero dash-stat-card--accent">
+              <div class="dash-stat-card__stripe dash-stat-card__stripe--accent"></div>
+              <div class="dash-stat-card__top">
+                <div class="dash-stat-card__icon dash-stat-card__icon--accent">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#9A8C73" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                  </svg>
+                </div>
+                <span class="dash-stat-card__change" data-i18n="cust_stat_vs_last_month">+33% vs last month</span>
+              </div>
+              <div class="dash-stat-card__value dash-stat-card__value--lg" data-stat="total-bookings">—</div>
+              <div class="dash-stat-card__label" data-i18n="cust_stat_total_bookings">Total Bookings</div>
+              <p class="dash-stat-card__context" data-i18n-html="cust_stat_total_bookings_ctx" data-i18n-pct="60">You’re at <strong class="dash-stat-card__pct-val">60%</strong> of your personal goal (5 bookings).</p>
+              <div class="dash-stat-card__bar"><div class="dash-stat-card__bar-fill dash-stat-card__bar-fill--accent" data-stat-goal-bar="total" style="width:60%"></div></div>
+            </div>
+            <!-- Active / in progress breakdown -->
+            <div class="dash-stat-card dash-stat-card--progress">
+              <div class="dash-stat-card__stripe dash-stat-card__stripe--green"></div>
+              <div class="dash-stat-card__top">
+                <div class="dash-stat-card__icon dash-stat-card__icon--green">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#22A05A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                  </svg>
+                </div>
+                <span class="dash-stat-card__change dash-stat-card__change--green" data-i18n="cust_stat_live">● Live</span>
+              </div>
+              <div class="dash-stat-card__value" data-stat="active-bookings">—</div>
+              <div class="dash-stat-card__label" data-i18n="cust_stat_in_progress">In progress now</div>
+              <div class="in-progress-breakdown" aria-label="Booking stages">
+                <div class="in-progress-breakdown__row">
+                  <span class="in-progress-breakdown__name" data-i18n="cust_stat_confirmed">Confirmed &amp; scheduled</span>
+                  <span class="in-progress-breakdown__pct">50%</span>
+                </div>
+                <div class="in-progress-breakdown__track"><span class="in-progress-breakdown__fill in-progress-breakdown__fill--confirmed" style="width:50%"></span></div>
+                <div class="in-progress-breakdown__row">
+                  <span class="in-progress-breakdown__name" data-i18n="cust_stat_awaiting">Awaiting confirmation</span>
+                  <span class="in-progress-breakdown__pct">50%</span>
+                </div>
+                <div class="in-progress-breakdown__track"><span class="in-progress-breakdown__fill in-progress-breakdown__fill--pending" style="width:50%"></span></div>
+              </div>
+            </div>
+            <!-- Saved Technicians -->
+            <div class="dash-stat-card dash-stat-card--hero">
+              <div class="dash-stat-card__stripe dash-stat-card__stripe--purple"></div>
+              <div class="dash-stat-card__top">
+                <div class="dash-stat-card__icon dash-stat-card__icon--purple">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#6E56CF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                  </svg>
+                </div>
+                <span class="dash-stat-card__change dash-stat-card__change--muted" data-i18n="cust_stat_saved_change">+1 saved</span>
+              </div>
+              <div class="dash-stat-card__value dash-stat-card__value--lg" data-stat="saved-technicians">—</div>
+              <div class="dash-stat-card__label" data-i18n="cust_stat_saved">Saved Technicians</div>
+              <p class="dash-stat-card__context" data-i18n="cust_stat_saved_ctx">Build your go-to list for faster re-booking.</p>
+              <div class="dash-stat-card__bar"><div class="dash-stat-card__bar-fill" style="width:40%;background:#6E56CF;"></div></div>
+            </div>
+            <!-- Total Spent -->
+            <div class="dash-stat-card dash-stat-card--hero">
+              <div class="dash-stat-card__stripe dash-stat-card__stripe--blue"></div>
+              <div class="dash-stat-card__top">
+                <div class="dash-stat-card__icon dash-stat-card__icon--blue">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                  </svg>
+                </div>
+                <span class="dash-stat-card__change dash-stat-card__change--blue" data-i18n="cust_stat_this_month">This month</span>
+              </div>
+              <div class="dash-stat-card__value dash-stat-card__value--lg dash-stat-card__value--currency" data-stat="total-spent">— EGP</div>
+              <div class="dash-stat-card__label" data-i18n="cust_stat_total_spent">Total Spent</div>
+              <p class="dash-stat-card__context" data-i18n="cust_stat_total_spent_ctx">Across all completed bookings this period.</p>
+              <div class="dash-stat-card__bar"><div class="dash-stat-card__bar-fill" style="width:55%;background:#2563EB;"></div></div>
+            </div>
+          </div>
+
+          <div class="dash-bottom-grid" data-reveal>
+
+            <!-- Recent Bookings -->
+            <div class="dash-overview-card">
+              <div class="dash-overview-card__header">
+                <h3 class="dash-overview-card__title" data-i18n="cust_recent_bookings">Recent Bookings</h3>
+                <button class="dash-overview-card__link" type="button" data-tab-link="bookings" data-i18n="cust_view_all">View all</button>
+              </div>
+              <ul class="dash-booking-list">
+                <li class="dash-booking-item">
+                  <div class="dash-booking-item__icon">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#9A8C73" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                  </div>
+                  <div class="dash-booking-item__info">
+                    <span class="dash-booking-item__service" data-i18n="cust_service_plumbing_repair">Plumbing Repair</span>
+                    <span class="dash-booking-item__meta" data-i18n="cust_recent_meta_1">Today, 10:00 AM · Mohamed Ali</span>
+                  </div>
+                  <span class="badge badge--confirmed" data-i18n="status_active">Active</span>
+                </li>
+                <li class="dash-booking-item">
+                  <div class="dash-booking-item__icon">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#9A8C73" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                  </div>
+                  <div class="dash-booking-item__info">
+                    <span class="dash-booking-item__service" data-i18n="cust_service_electrical_wiring">Electrical Wiring</span>
+                    <span class="dash-booking-item__meta" data-i18n="cust_recent_meta_2">Tomorrow, 2:00 PM · Khaled Hassan</span>
+                  </div>
+                  <span class="badge badge--pending" data-i18n="status_pending">Pending</span>
+                </li>
+                <li class="dash-booking-item">
+                  <div class="dash-booking-item__icon">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#9A8C73" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                  </div>
+                  <div class="dash-booking-item__info">
+                    <span class="dash-booking-item__service" data-i18n="cust_service_interior_painting">Interior Painting</span>
+                    <span class="dash-booking-item__meta" data-i18n="cust_recent_meta_3">Mar 18 · Ahmed Salah</span>
+                  </div>
+                  <span class="badge badge--secondary" data-i18n="status_completed">Completed</span>
+                </li>
+              </ul>
+            </div>
+
+            <!-- Upcoming Schedule -->
+            <div class="dash-overview-card dash-schedule-card">
+              <div class="dash-overview-card__header">
+                <h3 class="dash-overview-card__title">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:inline;vertical-align:-2px;margin-inline-end:6px;opacity:.7"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  <span data-i18n="cust_schedule_title">Upcoming Schedule</span>
+                </h3>
+                <button class="dash-overview-card__link" type="button" data-tab-link="bookings" data-i18n="cust_view_all">View all</button>
+              </div>
+
+              <!-- Next appointment spotlight -->
+              <div class="dash-next-appt">
+                <div class="dash-next-appt__badge" data-i18n="cust_next_up">NEXT UP</div>
+                <div class="dash-next-appt__body">
+                  <div class="dash-next-appt__service-icon">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#9A8C73" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"/><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"/></svg>
+                  </div>
+                  <div class="dash-next-appt__info">
+                    <span class="dash-next-appt__title" data-i18n="home_cat_plumbing">Plumbing Repair</span>
+                    <span class="dash-next-appt__pro">Mohamed Ali</span>
+                  </div>
+                  <div class="dash-next-appt__time">
+                    <span class="dash-next-appt__countdown" data-i18n="cust_today">Today</span>
+                    <span class="dash-next-appt__hour">10:00 AM</span>
+                  </div>
+                </div>
+                <div class="dash-next-appt__track">
+                  <div class="dash-next-appt__track-fill" style="width:40%"></div>
+                </div>
+                <span class="dash-next-appt__track-label" data-i18n="cust_in_relative">In ~3 hours</span>
+              </div>
+
+              <!-- Upcoming timeline -->
+              <ul class="dash-schedule-list">
+                <li class="dash-schedule-item">
+                  <div class="dash-schedule-item__dot dash-schedule-item__dot--pending"></div>
+                  <div class="dash-schedule-item__date">
+                    <span class="dash-schedule-item__day" data-i18n="cust_tomorrow">Tomorrow</span>
+                    <span class="dash-schedule-item__hour">2:00 PM</span>
+                  </div>
+                  <div class="dash-schedule-item__detail">
+                    <span class="dash-schedule-item__service" data-i18n="home_cat_electrical">Electrical Wiring</span>
+                    <span class="dash-schedule-item__pro">Khaled Hassan</span>
+                  </div>
+                  <span class="dash-schedule-item__status dash-schedule-item__status--pending" data-i18n="status_pending">Pending</span>
+                </li>
+                <li class="dash-schedule-item">
+                  <div class="dash-schedule-item__dot dash-schedule-item__dot--done"></div>
+                  <div class="dash-schedule-item__date">
+                    <span class="dash-schedule-item__day">Mar 18</span>
+                    <span class="dash-schedule-item__hour">9:00 AM</span>
+                  </div>
+                  <div class="dash-schedule-item__detail">
+                    <span class="dash-schedule-item__service" data-i18n="home_cat_painting">Interior Painting</span>
+                    <span class="dash-schedule-item__pro">Ahmed Salah</span>
+                  </div>
+                  <span class="dash-schedule-item__status dash-schedule-item__status--done" data-i18n="status_complete">Done</span>
+                </li>
+              </ul>
+
+              <a class="dash-schedule-cta" href="./booking.html" data-i18n="cust_book_new">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Book a new service
+              </a>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- Bookings panel -->
+        <section class="dash-panel" id="panel-bookings" role="tabpanel" aria-labelledby="tab-bookings" data-panel="bookings" hidden>
+
+  <div class="dash-panel__header">
+    <h1 class="dash-panel__title" data-i18n="cust_my_bookings">My Bookings</h1>
+    <p class="dash-panel__subtitle" data-i18n="cust_bookings_sub">Manage your upcoming and active service requests.</p>
+  </div>
+
+  <div class="booking-filter-bar" data-reveal>
+    <button class="booking-filter-btn is-active" type="button" data-booking-filter="all" data-i18n="cust_filter_all">All</button>
+    <button class="booking-filter-btn" type="button" data-booking-filter="confirmed" data-i18n="cust_filter_active">Active</button>
+    <button class="booking-filter-btn" type="button" data-booking-filter="pending" data-i18n="cust_filter_pending">Pending</button>
+    <button class="booking-filter-btn" type="button" data-booking-filter="completed" data-i18n="cust_filter_completed">Completed</button>
+  </div>
+
+  <p class="dash-section-title" data-reveal data-i18n="cust_active_upcoming">Active &amp; Upcoming</p>
+
+  <div class="booking-group__cards" data-reveal data-booking-group>
+      <!-- Card 1: Confirmed (Plumbing) -->
+      <div class="booking-card" data-booking-card data-booking-status="confirmed" data-booking-date="2024-03-15">
+        <div class="booking-card__inner">
+          <div class="booking-card__body">
+            <div class="booking-card__header">
+              <div class="booking-card__title-grp">
+                <div class="booking-card__service-row">
+                  <div class="booking-card__header-icon">
+                    <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"/>
+                      <path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"/>
+                    </svg>
+                  </div>
+                  <h3 class="booking-card__title" data-i18n="cust_booking_title_pipe_repair">Pipe Repair &amp; Maintenance</h3>
+                </div>
+                <div class="booking-card__provider-wrap">
+                  <img src="https://i.pravatar.cc/150?u=omar" alt="Omar" class="provider-avatar">
+                  <div class="booking-card__provider-info">
+                    <span class="provider-tech-label" data-i18n="cust_technician_label">Technician</span>
+                    <span class="provider-name">Omar Tarek</span>
+                  </div>
+                  <a href="./technician-profile.html" class="provider-view-profile" data-i18n="cust_view_profile">View Profile</a>
+                </div>
+              </div>
+              <span class="booking-card__status-badge" data-i18n="status_confirmed">Confirmed</span>
+            </div>
+
+            <div class="booking-card__grid">
+              <div class="booking-grid-box">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <div>
+                  <span class="booking-grid-box__label" data-i18n="cust_service_date">Service Date</span>
+                  <span class="booking-grid-box__value">March 15, 2024</span>
+                </div>
+              </div>
+              <div class="booking-grid-box">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <div>
+                  <span class="booking-grid-box__label" data-i18n="cust_time_slot">Time Slot</span>
+                  <span class="booking-grid-box__value">10:00 AM - 12:00 PM</span>
+                </div>
+              </div>
+              <div class="booking-grid-box booking-grid-box--full">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                <div>
+                  <span class="booking-grid-box__label" data-i18n="cust_service_address">Service Address</span>
+                  <span class="booking-grid-box__value">123 Nile Street, Maadi, Cairo</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="booking-card__progress-wrap">
+              <div class="tracking-status">
+                <div class="tracking-track">
+                  <div class="tracking-track-fill" style="width: 66%;"></div>
+                </div>
+                <div class="tracking-steps">
+                  <div class="tracking-step is-done">
+                    <div class="step-marker">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                    <span class="step-label" data-i18n="cust_step_booked">Booked</span>
+                    <span class="step-time" data-i18n="timeline_2h_ago">2h ago</span>
+                  </div>
+                  <div class="tracking-step is-done">
+                    <div class="step-marker">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                    <span class="step-label" data-i18n="cust_step_confirmed">Confirmed</span>
+                    <span class="step-time" data-i18n="timeline_1h_ago">1h ago</span>
+                  </div>
+                  <div class="tracking-step is-active">
+                    <div class="step-marker"></div>
+                    <span class="step-label" data-i18n="cust_step_enroute">En Route</span>
+                    <span class="step-time" data-i18n="timeline_now">Now</span>
+                  </div>
+                  <div class="tracking-step">
+                    <div class="step-marker"></div>
+                    <span class="step-label" data-i18n="cust_step_completed">Completed</span>
+                    <span class="step-time"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="booking-card__sidebar">
+            <div class="sidebar-box">
+              <div class="sidebar-box__header">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                <span data-i18n="cust_arrival_pin">Arrival PIN</span>
+              </div>
+              <div class="pin-code">
+                <span class="pin-code__digit">2</span>
+                <span class="pin-code__digit">9</span>
+                <span class="pin-code__digit">1</span>
+                <span class="pin-code__digit">6</span>
+              </div>
+            </div>
+            <div class="sidebar-box sidebar-box--amount">
+              <div class="sidebar-box__header">
+                <span class="le-prefix">LE</span>
+                <span data-i18n="cust_total_amount">Total Amount</span>
+              </div>
+              <div class="price-display">
+                <span class="price-display__value">500.00</span>
+                <span class="price-display__currency">EGP</span>
+              </div>
+            </div>
+            <div class="booking-card__actions">
+              <a href="./booking-details.html" class="btn btn--view-details btn--full" data-i18n="cust_view_details">View Details</a>
+              <button class="btn btn--invoice btn--full" type="button" data-invoice-toggle data-i18n="cust_view_invoice">View Invoice</button>
+              <a href="./messages.html" class="btn btn--chat btn--full" data-i18n="cust_chat_tech">Chat with Technician</a>
+              <button class="btn btn--cancel btn--full" type="button" data-cancel-booking data-i18n="cust_cancel">Cancel</button>
+            </div>
+          </div>
+        </div>
+        <!-- Collapsible Invoice Section -->
+        <div class="booking-card__invoice-panel">
+          <div class="invoice-content">
+            <h4 class="invoice-content__title" data-i18n="cust_invoice_breakdown">Service Invoice Breakdown</h4>
+            <div class="invoice-table">
+              <div class="invoice-table__row"><span data-i18n="cust_invoice_pipe_ins">Pipe Inspection</span><span>250.00 EGP</span></div>
+              <div class="invoice-table__row"><span data-i18n="cust_invoice_leak_rep">Leak Repair</span><span>150.00 EGP</span></div>
+              <div class="invoice-table__row"><span data-i18n="cust_invoice_parts">Parts & Materials</span><span>100.00 EGP</span></div>
+              <div class="invoice-table__row is-total"><span data-i18n="cust_grand_total">Grand Total</span><span>500.00 EGP</span></div>
+            </div>
+            <div class="booking-card__invoice-footer">
+              <p><span data-i18n="cust_payment_method">Payment Method</span>: <strong data-i18n="cust_pay_card_visa">Credit Card (Ending 4242)</strong></p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: In-Progress (Electrical) -->
+      <div class="booking-card" data-booking-card data-booking-status="pending" data-booking-date="2024-03-18">
+        <div class="booking-card__inner">
+          <div class="booking-card__body">
+            <div class="booking-card__header">
+              <div class="booking-card__title-grp">
+                <div class="booking-card__service-row">
+                  <div class="booking-card__header-icon">
+                    <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>
+                    </svg>
+                  </div>
+                  <h3 class="booking-card__title" data-i18n="cust_booking_title_elec_inspection">Electrical Panel Inspection</h3>
+                </div>
+                <div class="booking-card__provider-wrap">
+                  <img src="https://i.pravatar.cc/150?u=khaled" alt="Khaled" class="provider-avatar">
+                  <div class="booking-card__provider-info">
+                    <span class="provider-tech-label" data-i18n="cust_technician_label">Technician</span>
+                    <span class="provider-name">Khaled Samir</span>
+                  </div>
+                  <a href="./technician-profile.html" class="provider-view-profile" data-i18n="cust_view_profile">View Profile</a>
+                </div>
+              </div>
+              <span class="booking-card__status-badge" style="background:rgba(180,160,50,0.1); color:#eab308; border-color:#eab308;" data-i18n="status_in_progress">In Progress</span>
+            </div>
+
+            <div class="booking-card__grid">
+              <div class="booking-grid-box">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <div>
+                  <span class="booking-grid-box__label" data-i18n="cust_service_date">Service Date</span>
+                  <span class="booking-grid-box__value">March 18, 2024</span>
+                </div>
+              </div>
+              <div class="booking-grid-box">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <div>
+                  <span class="booking-grid-box__label" data-i18n="cust_time_slot">Time Slot</span>
+                  <span class="booking-grid-box__value">2:00 PM - 4:00 PM</span>
+                </div>
+              </div>
+              <div class="booking-grid-box booking-grid-box--full">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                <div>
+                  <span class="booking-grid-box__label" data-i18n="cust_service_address">Service Address</span>
+                  <span class="booking-grid-box__value">456 Pyramids View Street, Giza</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="booking-card__progress-wrap">
+              <div class="tracking-status">
+                <div class="tracking-track">
+                  <div class="tracking-track-fill" style="width: 100%;"></div>
+                </div>
+                <div class="tracking-steps">
+                  <div class="tracking-step is-done">
+                    <div class="step-marker">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                    <span class="step-label" data-i18n="cust_step_booked">Booked</span>
+                    <span class="step-time" data-i18n="timeline_4h_ago">4h ago</span>
+                  </div>
+                  <div class="tracking-step is-done">
+                    <div class="step-marker">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                    <span class="step-label" data-i18n="cust_step_confirmed">Confirmed</span>
+                    <span class="step-time" data-i18n="timeline_3h_ago">3h ago</span>
+                  </div>
+                  <div class="tracking-step is-done">
+                    <div class="step-marker">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                    <span class="step-label" data-i18n="cust_step_enroute">En Route</span>
+                    <span class="step-time">1h ago</span>
+                  </div>
+                  <div class="tracking-step is-active">
+                    <div class="step-marker"></div>
+                    <span class="step-label" data-i18n="cust_step_completed">Completed</span>
+                    <span class="step-time">In Progress</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="booking-card__sidebar">
+            <div class="sidebar-box">
+              <div class="sidebar-box__header">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                <span data-i18n="cust_arrival_pin">Arrival PIN</span>
+              </div>
+              <div class="pin-code">
+                <span class="pin-code__digit">7</span>
+                <span class="pin-code__digit">3</span>
+                <span class="pin-code__digit">6</span>
+                <span class="pin-code__digit">4</span>
+              </div>
+            </div>
+            <div class="sidebar-box sidebar-box--amount">
+              <div class="sidebar-box__header">
+                <span class="le-prefix">LE</span>
+                <span data-i18n="cust_total_amount">Total Amount</span>
+              </div>
+              <div class="price-display">
+                <span class="price-display__value">900.00</span>
+                <span class="price-display__currency">EGP</span>
+              </div>
+            </div>
+            <div class="booking-card__actions">
+              <a href="./booking-details.html" class="btn btn--view-details btn--full" data-i18n="cust_view_details">View Details</a>
+              <button class="btn btn--invoice btn--full" type="button" data-invoice-toggle data-i18n="cust_view_invoice">View Invoice</button>
+              <a href="./messages.html" class="btn btn--chat btn--full" data-i18n="cust_chat_tech">Chat with Technician</a>
+              <button class="btn btn--cancel btn--full" type="button" data-cancel-booking data-i18n="cust_cancel">Cancel</button>
+            </div>
+          </div>
+        </div>
+        <!-- Collapsible Invoice Section -->
+        <div class="booking-card__invoice-panel">
+          <div class="invoice-content">
+            <h4 class="invoice-content__title" data-i18n="cust_invoice_breakdown">Service Invoice Breakdown</h4>
+            <div class="invoice-table">
+              <div class="invoice-table__row"><span data-i18n="cust_invoice_panel_ins">Panel Inspection</span><span>400.00 EGP</span></div>
+              <div class="invoice-table__row"><span data-i18n="cust_invoice_wiring">Wiring Optimization</span><span>500.00 EGP</span></div>
+              <div class="invoice-table__row is-total"><span data-i18n="cust_grand_total">Grand Total</span><span>900.00 EGP</span></div>
+            </div>
+            <div class="booking-card__invoice-footer">
+              <p><span data-i18n="cust_payment_method">Payment Method</span>: <strong data-i18n="cust_pay_cash_arrival">Cash on Arrival</strong></p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: Pending/Confirmed (AC Maintenance) -->
+      <div class="booking-card" data-booking-card data-booking-status="confirmed" data-booking-date="2024-03-22">
+        <div class="booking-card__inner">
+          <div class="booking-card__body">
+            <div class="booking-card__header">
+              <div class="booking-card__title-grp">
+                <div class="booking-card__service-row">
+                  <div class="booking-card__header-icon">
+                    <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M2 12h20"/>
+                      <path d="M12 2v20"/>
+                      <path d="m20 16-4-4 4-4"/>
+                      <path d="m4 8 4 4-4 4"/>
+                      <path d="m16 4-4 4-4-4"/>
+                      <path d="m8 20 4-4 4 4"/>
+                    </svg>
+                  </div>
+                  <h3 class="booking-card__title" data-i18n="cust_booking_title_ac_cleaning">Central AC Deep Cleaning</h3>
+                </div>
+                <div class="booking-card__provider-wrap">
+                  <img src="https://i.pravatar.cc/150?u=sara" alt="Sara" class="provider-avatar">
+                  <div class="booking-card__provider-info">
+                    <span class="provider-tech-label" data-i18n="cust_technician_label">Technician</span>
+                    <span class="provider-name">Sara Mahmoud</span>
+                  </div>
+                  <a href="./technician-profile.html" class="provider-view-profile" data-i18n="cust_view_profile">View Profile</a>
+                </div>
+              </div>
+              <span class="booking-card__status-badge" data-i18n="status_confirmed">Confirmed</span>
+            </div>
+
+            <div class="booking-card__grid">
+              <div class="booking-grid-box">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <div>
+                  <span class="booking-grid-box__label" data-i18n="cust_service_date">Service Date</span>
+                  <span class="booking-grid-box__value">March 22, 2024</span>
+                </div>
+              </div>
+              <div class="booking-grid-box">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <div>
+                  <span class="booking-grid-box__label" data-i18n="cust_time_slot">Time Slot</span>
+                  <span class="booking-grid-box__value">11:00 AM - 1:00 PM</span>
+                </div>
+              </div>
+              <div class="booking-grid-box booking-grid-box--full">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                <div>
+                  <span class="booking-grid-box__label" data-i18n="cust_service_address">Service Address</span>
+                  <span class="booking-grid-box__value">789 Heliopolis Heights, Cairo</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="booking-card__progress-wrap">
+              <div class="tracking-status">
+                <div class="tracking-track">
+                  <div class="tracking-track-fill" style="width: 33%;"></div>
+                </div>
+                <div class="tracking-steps">
+                  <div class="tracking-step is-done">
+                    <div class="step-marker">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                    <span class="step-label" data-i18n="cust_step_booked">Booked</span>
+                    <span class="step-time" data-i18n="cust_notif_time_yesterday">Yesterday</span>
+                  </div>
+                  <div class="tracking-step is-active">
+                    <div class="step-marker"></div>
+                    <span class="step-label" data-i18n="cust_step_confirmed">Confirmed</span>
+                    <span class="step-time" data-i18n="timeline_just_now">Just Now</span>
+                  </div>
+                  <div class="tracking-step">
+                    <div class="step-marker"></div>
+                    <span class="step-label" data-i18n="cust_step_enroute">En Route</span>
+                    <span class="step-time"></span>
+                  </div>
+                  <div class="tracking-step">
+                    <div class="step-marker"></div>
+                    <span class="step-label" data-i18n="cust_step_completed">Completed</span>
+                    <span class="step-time"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="booking-card__sidebar">
+            <div class="sidebar-box">
+              <div class="sidebar-box__header">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                <span data-i18n="cust_arrival_pin">Arrival PIN</span>
+              </div>
+              <div class="pin-code">
+                <span class="pin-code__digit">1</span>
+                <span class="pin-code__digit">0</span>
+                <span class="pin-code__digit">4</span>
+                <span class="pin-code__digit">7</span>
+              </div>
+            </div>
+            <div class="sidebar-box sidebar-box--amount">
+              <div class="sidebar-box__header">
+                <span class="le-prefix">LE</span>
+                <span data-i18n="cust_total_amount">Total Amount</span>
+              </div>
+              <div class="price-display">
+                <span class="price-display__value">1,200</span>
+                <span class="price-display__currency">EGP</span>
+              </div>
+            </div>
+            <div class="booking-card__actions">
+              <a href="./booking-details.html" class="btn btn--view-details btn--full" data-i18n="cust_view_details">View Details</a>
+              <button class="btn btn--invoice btn--full" type="button" data-invoice-toggle data-i18n="cust_view_invoice">View Invoice</button>
+              <a href="./messages.html" class="btn btn--chat btn--full" data-i18n="cust_chat_tech">Chat with Technician</a>
+              <button class="btn btn--cancel btn--full" type="button" data-cancel-booking data-i18n="cust_cancel">Cancel</button>
+            </div>
+          </div>
+        </div>
+        <!-- Collapsible Invoice Section -->
+        <div class="booking-card__invoice-panel">
+          <div class="invoice-content">
+            <h4 class="invoice-content__title" data-i18n="cust_invoice_breakdown">Service Invoice Breakdown</h4>
+            <div class="invoice-table">
+              <div class="invoice-table__row"><span data-i18n="cust_invoice_ac_clean">Deep Cleaning Base</span><span>800.00 EGP</span></div>
+              <div class="invoice-table__row"><span data-i18n="cust_invoice_filter">Filter Replacement</span><span>400.00 EGP</span></div>
+              <div class="invoice-table__row is-total"><span data-i18n="cust_grand_total">Grand Total</span><span>1,200.00 EGP</span></div>
+            </div>
+            <div class="booking-card__invoice-footer">
+              <p><span data-i18n="cust_payment_method">Payment Method</span>: <strong data-i18n="cust_pay_wallet">SERVIO Wallet</strong></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+</section>
+
+        <!-- History panel -->
+        <section class="dash-panel" id="panel-history" role="tabpanel" aria-labelledby="tab-history" data-panel="history" hidden>
+  <div class="dash-panel__header">
+    <h1 class="dash-panel__title" data-i18n="cust_service_history">Service History</h1>
+    <p class="dash-panel__subtitle" data-i18n="cust_history_sub">Manage and filter your entire service record with detailed invoices.</p>
+  </div>
+
+  <!-- History Stats -->
+  <div class="history-stats reveal">
+    <div class="history-stat-card">
+      <span class="history-stat-card__value">12</span>
+      <span class="history-stat-card__label" data-i18n="cust_hist_bookings_done">Bookings Completed</span>
+    </div>
+    <div class="history-stat-card">
+      <span class="history-stat-card__value">4,250 EGP</span>
+      <span class="history-stat-card__label" data-i18n="cust_hist_amount_spent">Total Amount Spent</span>
+    </div>
+    <div class="history-stat-card">
+      <span class="history-stat-card__value" data-i18n="cust_hist_top_svc_val">Plumbing</span>
+      <span class="history-stat-card__label" data-i18n="cust_hist_most_used">Most Used Service</span>
+    </div>
+  </div>
+
+  <!-- History Filters -->
+  <div class="history-filters reveal">
+    <select id="histFilterCategory" data-hist-filter="category">
+      <option value="" data-i18n="cust_filter_all_cats">All Categories</option>
+      <option value="Plumbing" data-i18n="cust_cat_plumbing">Plumbing</option>
+      <option value="HVAC" data-i18n="cust_cat_hvac">HVAC</option>
+      <option value="Carpentry" data-i18n="cust_cat_carpentry">Carpentry</option>
+      <option value="Painting" data-i18n="cust_cat_painting">Painting</option>
+      <option value="Cleaning" data-i18n="cust_cat_cleaning">Cleaning</option>
+    </select>
+    <select id="histFilterDate" data-hist-filter="date">
+      <option value="" data-i18n="cust_filter_all_time">All Time</option>
+      <option value="30" data-i18n="cust_filter_30d">Last 30 Days</option>
+      <option value="90" data-i18n="cust_filter_3m">Last 3 Months</option>
+      <option value="365" data-i18n="cust_filter_1y">Last Year</option>
+    </select>
+    <select id="histFilterPayment" data-hist-filter="payment">
+      <option value="" data-i18n="cust_filter_all_payments">All Payments</option>
+      <option value="Credit Card" data-i18n="cust_pay_card">Credit Card</option>
+      <option value="Cash" data-i18n="cust_pay_cash">Cash</option>
+    </select>
+    <select id="histFilterRating" data-hist-filter="rating">
+      <option value="" data-i18n="cust_filter_all_ratings">All Ratings</option>
+      <option value="5" data-i18n="cust_rating_5">5 Stars</option>
+      <option value="4" data-i18n="cust_rating_4">4 Stars & Above</option>
+    </select>
+    <button id="clearHistFilters" class="btn btn--sm btn--outline" data-i18n="cust_clear_filters">Clear</button>
+  </div>
+
+  <div class="history-card-items-list" id="historyListRoot" data-reveal>
+    
+    <!-- Card #S-2847 -->
+    <article class="history-card-v2" data-category="Plumbing" data-payment="Credit Card" data-date="2026-03-15" data-rating="5">
+      <div class="history-v2__main">
+        <div class="history-v2__icon">🔧</div>
+        <div class="history-v2__info">
+          <h4 class="history-v2__title"><span data-i18n="cust_hist_cat_plumb">Plumbing</span> <small class="history-v2__id">#S-2847</small></h4>
+          <p class="history-v2__provider"><span data-i18n="cust_hist_tech_khaled">Khaled Mohamed</span> <span class="dot-sep"></span> <span data-i18n="cust_hist_date_mar15">15 Mar 2026</span></p>
+        </div>
+      </div>
+      <div class="history-v2__meta">
+        <span class="history-v2__payment-badge" data-i18n="cust_pay_card">Credit Card</span>
+        <div class="history-v2__price" data-i18n="cust_hist_price_650">650 EGP</div>
+      </div>
+      <div class="history-v2__actions">
+        <button class="btn btn--sm btn--outline" data-invoice-toggle data-i18n="cust_view_invoice">View Invoice</button>
+        <a href="./booking.html" class="btn btn--sm btn--primary" data-i18n="cust_rebook">Re-book</a>
+      </div>
+
+      <div class="history-v2__expanded">
+        <div class="invoice-grid">
+           <div class="invoice-breakdown">
+              <h5 class="invoice-breakdown__title" data-i18n="cust_cost_breakdown">Cost Breakdown</h5>
+              <div class="invoice-item"><span data-i18n="cust_hist_callout">Standard Call-out</span> <span data-i18n="cust_hist_price_300">300 EGP</span></div>
+              <div class="invoice-item"><span data-i18n="cust_hist_sealant">Pipe Sealant Replacement</span> <span data-i18n="cust_hist_price_250">250 EGP</span></div>
+              <div class="invoice-item"><span data-i18n="cust_hist_vat_14">VAT (14%)</span> <span data-i18n="cust_hist_price_100">100 EGP</span></div>
+              <div class="invoice-item is-total"><span data-i18n="cust_total_paid">Total Paid</span> <span data-i18n="cust_hist_price_650">650 EGP</span></div>
+           </div>
+           <div class="invoice-details">
+              <h5 class="invoice-breakdown__title" data-i18n="cust_trans_verified">Transaction Verified</h5>
+              <div class="payment-method-footer">
+                 <div class="payment-method-box">
+                    <span class="payment-method-box__icon">💳</span>
+                    <div class="payment-method-box__details">
+                       <span data-i18n="cust_hist_paid_visa">Paid with Visa</span>
+                       <small class="card-number">**** 4242</small>
+                    </div>
+                 </div>
+                 <button class="btn-download-receipt">📥 Download PDF</button>
+              </div>
+           </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- Card #S-2779 -->
+    <article class="history-card-v2" data-category="HVAC" data-payment="Credit Card" data-date="2026-03-10" data-rating="5">
+      <div class="history-v2__main">
+        <div class="history-v2__icon">❄️</div>
+        <div class="history-v2__info">
+          <h4 class="history-v2__title"><span data-i18n="cust_hist_cat_hvac">A/C Maintenance</span> <small class="history-v2__id">#S-2779</small></h4>
+          <p class="history-v2__provider"><span data-i18n="cust_hist_tech_hassan">Hassan Ali</span> <span class="dot-sep"></span> <span data-i18n="cust_hist_date_mar10">10 Mar 2026</span></p>
+        </div>
+      </div>
+      <div class="history-v2__meta">
+        <span class="history-v2__payment-badge" data-i18n="cust_pay_card">Credit Card</span>
+        <div class="history-v2__price" data-i18n="cust_hist_price_1100">1,100 EGP</div>
+      </div>
+      <div class="history-v2__actions">
+        <button class="btn btn--sm btn--outline" data-invoice-toggle data-i18n="cust_view_invoice">View Invoice</button>
+        <a href="./booking.html" class="btn btn--sm btn--primary" data-i18n="cust_rebook">Re-book</a>
+      </div>
+
+      <div class="history-v2__expanded">
+        <div class="invoice-grid">
+           <div class="invoice-breakdown">
+              <h5 class="invoice-breakdown__title" data-i18n="cust_cost_breakdown">Cost Breakdown</h5>
+              <div class="invoice-item"><span data-i18n="cust_hist_ac_clean">A/C Unit Cleaning</span> <span data-i18n="cust_hist_price_700">700 EGP</span></div>
+              <div class="invoice-item"><span data-i18n="cust_hist_gas_refill">Gas Refill</span> <span data-i18n="cust_hist_price_400">400 EGP</span></div>
+              <div class="invoice-item is-total"><span data-i18n="cust_total_paid">Total Paid</span> <span data-i18n="cust_hist_price_1100">1,100 EGP</span></div>
+           </div>
+           <div class="invoice-details">
+              <h5 class="invoice-breakdown__title" data-i18n="cust_trans_verified">Transaction Verified</h5>
+              <div class="payment-method-footer">
+                 <div class="payment-method-box">
+                    <span class="payment-method-box__icon">💳</span>
+                    <div class="payment-method-box__details">
+                       <span data-i18n="cust_hist_paid_master">Paid with Mastercard</span>
+                       <small class="card-number">**** 8890</small>
+                    </div>
+                 </div>
+                 <button class="btn-download-receipt">📥 Download PDF</button>
+              </div>
+           </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- Card #S-2831 -->
+    <article class="history-card-v2" data-category="Carpentry" data-payment="Cash" data-date="2026-03-05" data-rating="4">
+      <div class="history-v2__main">
+        <div class="history-v2__icon">🪚</div>
+        <div class="history-v2__info">
+          <h4 class="history-v2__title"><span data-i18n="cust_hist_cat_carp">Carpentry</span> <small class="history-v2__id">#S-2831</small></h4>
+          <p class="history-v2__provider"><span data-i18n="cust_hist_tech_youssef_s">Youssef Samir</span> <span class="dot-sep"></span> <span data-i18n="cust_hist_date_mar05">05 Mar 2026</span></p>
+        </div>
+      </div>
+      <div class="history-v2__meta">
+        <span class="history-v2__payment-badge" data-i18n="cust_pay_cash">Cash</span>
+        <div class="history-v2__price" data-i18n="cust_hist_price_750">750 EGP</div>
+      </div>
+      <div class="history-v2__actions">
+        <button class="btn btn--sm btn--outline" data-invoice-toggle data-i18n="cust_view_invoice">View Invoice</button>
+        <a href="./booking.html" class="btn btn--sm btn--primary" data-i18n="cust_rebook">Re-book</a>
+      </div>
+
+      <div class="history-v2__expanded">
+        <div class="invoice-grid">
+           <div class="invoice-breakdown">
+              <h5 class="invoice-breakdown__title" data-i18n="cust_cost_breakdown">Cost Breakdown</h5>
+              <div class="invoice-item"><span data-i18n="cust_hist_furn_assembly">Furniture Assembly</span> <span data-i18n="cust_hist_price_600">600 EGP</span></div>
+              <div class="invoice-item"><span data-i18n="cust_hist_materials">Materials Fee</span> <span data-i18n="cust_hist_price_150">150 EGP</span></div>
+              <div class="invoice-item is-total"><span data-i18n="cust_total_paid">Total Paid</span> <span data-i18n="cust_hist_price_750">750 EGP</span></div>
+           </div>
+           <div class="invoice-details">
+              <h5 class="invoice-breakdown__title" data-i18n="cust_pay_collected">Payment Collected</h5>
+              <div class="payment-method-footer">
+                 <div class="payment-method-box">
+                    <span>💵</span>
+                    <p><span data-i18n="cust_hist_paid_cash">Paid with Cash</span><br><small data-i18n="cust_hist_direct_tech">Direct to Tech</small></p>
+                 </div>
+                 <button class="btn-download-receipt">📥 Download PDF</button>
+              </div>
+           </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- Card #S-2804 -->
+    <article class="history-card-v2" data-category="Painting" data-payment="Cash" data-date="2026-03-10" data-rating="5">
+      <div class="history-v2__main">
+        <div class="history-v2__icon">🎨</div>
+        <div class="history-v2__info">
+          <h4 class="history-v2__title"><span data-i18n="cust_hist_cat_paint">Interior Painting</span> <small class="history-v2__id">#S-2804</small></h4>
+          <p class="history-v2__provider"><span data-i18n="cust_hist_tech_youssef_a">Youssef Ali</span> <span class="dot-sep"></span> <span data-i18n="cust_hist_date_mar10">10 Mar 2026</span></p>
+        </div>
+      </div>
+      <div class="history-v2__meta">
+        <span class="history-v2__payment-badge" data-i18n="cust_pay_cash">Cash</span>
+        <div class="history-v2__price" data-i18n="cust_hist_price_1800">1,800 EGP</div>
+      </div>
+      <div class="history-v2__actions">
+        <button class="btn btn--sm btn--outline" data-invoice-toggle data-i18n="cust_view_invoice">View Invoice</button>
+        <a href="./booking.html" class="btn btn--sm btn--primary" data-i18n="cust_rebook">Re-book</a>
+      </div>
+
+      <div class="history-v2__expanded">
+        <div class="invoice-grid">
+           <div class="invoice-breakdown">
+              <h5 class="invoice-breakdown__title" data-i18n="cust_cost_breakdown">Cost Breakdown</h5>
+              <div class="invoice-item"><span data-i18n="cust_hist_room_paint">Single Room Paint</span> <span data-i18n="cust_hist_price_1200">1,200 EGP</span></div>
+              <div class="invoice-item"><span data-i18n="cust_hist_materials_colors">Materials & Colors</span> <span data-i18n="cust_hist_price_600">600 EGP</span></div>
+              <div class="invoice-item is-total"><span data-i18n="cust_total_paid">Total Paid</span> <span data-i18n="cust_hist_price_1800">1,800 EGP</span></div>
+           </div>
+           <div class="invoice-details">
+              <h5 class="invoice-breakdown__title" data-i18n="cust_pay_collected">Payment Collected</h5>
+              <div class="payment-method-footer">
+                 <div class="payment-method-box">
+                    <span>💵</span>
+                    <p><span data-i18n="cust_hist_paid_cash_v2">Paid with Cash</span><br><small data-i18n="cust_hist_direct_tech">Direct to Tech</small></p>
+                 </div>
+                 <button class="btn-download-receipt">📥 Download PDF</button>
+              </div>
+           </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- Card #S-2801 -->
+    <article class="history-card-v2" data-category="Cleaning" data-payment="Cash" data-date="2026-03-01" data-rating="5">
+      <div class="history-v2__main">
+        <div class="history-v2__icon">🧹</div>
+        <div class="history-v2__info">
+          <h4 class="history-v2__title"><span data-i18n="cust_hist_cat_clean">Deep Cleaning</span> <small class="history-v2__id">#S-2801</small></h4>
+          <p class="history-v2__provider"><span data-i18n="cust_hist_tech_nour">Nour Cleaning</span> <span class="dot-sep"></span> <span data-i18n="cust_hist_date_mar01">01 Mar 2026</span></p>
+        </div>
+      </div>
+      <div class="history-v2__meta">
+        <span class="history-v2__payment-badge" data-i18n="cust_pay_cash">Cash</span>
+        <div class="history-v2__price" data-i18n="cust_hist_price_450">450 EGP</div>
+      </div>
+      <div class="history-v2__actions">
+        <button class="btn btn--sm btn--outline" data-invoice-toggle data-i18n="cust_view_invoice">View Invoice</button>
+        <a href="./booking.html" class="btn btn--sm btn--primary" data-i18n="cust_rebook">Re-book</a>
+      </div>
+
+      <div class="history-v2__expanded">
+        <div class="invoice-grid">
+           <div class="invoice-breakdown">
+              <h5 class="invoice-breakdown__title" data-i18n="cust_cost_breakdown">Cost Breakdown</h5>
+              <div class="invoice-item"><span data-i18n="cust_hist_deep_clean">Deep House Cleaning</span> <span data-i18n="cust_hist_price_450">450 EGP</span></div>
+              <div class="invoice-item is-total"><span data-i18n="cust_total_paid">Total Paid</span> <span data-i18n="cust_hist_price_450">450 EGP</span></div>
+           </div>
+           <div class="invoice-details">
+              <h5 class="invoice-breakdown__title" data-i18n="cust_pay_collected">Payment Collected</h5>
+              <div class="payment-method-footer">
+                 <div class="payment-method-box">
+                    <span>💵</span>
+                    <p><span data-i18n="cust_hist_paid_cash_v2">Paid with Cash</span><br><small data-i18n="cust_hist_direct_tech">Direct to Tech</small></p>
+                 </div>
+                 <button class="btn-download-receipt">📥 Download PDF</button>
+              </div>
+           </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- Card #S-2785 -->
+    <article class="history-card-v2" data-category="Plumbing" data-payment="Credit Card" data-date="2026-02-12" data-rating="5">
+      <div class="history-v2__main">
+        <div class="history-v2__icon">🔧</div>
+        <div class="history-v2__info">
+          <h4 class="history-v2__title"><span data-i18n="cust_hist_cat_plumb">Plumbing</span> <small class="history-v2__id">#S-2785</small></h4>
+          <p class="history-v2__provider"><span data-i18n="cust_hist_tech_mohamed_a">Mohamed Ali</span> <span class="dot-sep"></span> <span data-i18n="cust_hist_date_feb12">12 Feb 2026</span></p>
+        </div>
+      </div>
+      <div class="history-v2__meta">
+        <span class="history-v2__payment-badge" data-i18n="cust_pay_card">Credit Card</span>
+        <div class="history-v2__price" data-i18n="cust_hist_price_250">250 EGP</div>
+      </div>
+      <div class="history-v2__actions">
+        <button class="btn btn--sm btn--outline" data-invoice-toggle data-i18n="cust_view_invoice">View Invoice</button>
+        <a href="./booking.html" class="btn btn--sm btn--primary" data-i18n="cust_rebook">Re-book</a>
+      </div>
+
+      <div class="history-v2__expanded">
+        <div class="invoice-grid">
+           <div class="invoice-breakdown">
+              <h5 class="invoice-breakdown__title" data-i18n="cust_cost_breakdown">Cost Breakdown</h5>
+              <div class="invoice-item"><span>Emergency Leak Fix</span> <span>250 EGP</span></div>
+              <div class="invoice-item is-total"><span data-i18n="cust_total_paid">Total Paid</span> <span>250 EGP</span></div>
+           </div>
+           <div class="invoice-details">
+              <h5 class="invoice-breakdown__title">Transaction Verified</h5>
+              <div class="payment-method-footer">
+                 <div class="payment-method-box">
+                    <span>💳</span>
+                    <p>Paid with Visa<br><small>**** 1122</small></p>
+                 </div>
+                 <button class="btn-download-receipt">📥 Download PDF</button>
+              </div>
+           </div>
+        </div>
+      </div>
+    </article>
+  </div>
+</section>
+
+        <!-- Favourites panel -->
+        <section class="dash-panel" id="panel-favourites" role="tabpanel" aria-labelledby="tab-favourites" data-panel="favourites" hidden>
+
+  <div class="dash-panel__header">
+    <h1 class="dash-panel__title" data-i18n="cust_nav_favourites">Favourites</h1>
+    <p class="dash-panel__subtitle" data-i18n="cust_fav_sub">Technicians you've saved for quick booking.</p>
+  </div>
+
+  <div class="fav-card-v2" data-reveal>
+    <div class="fav-card-v2__avatar">OT</div>
+    <div class="fav-card-v2__body">
+      <h3 class="fav-card-v2__name">Omar Tarek</h3>
+      <div class="fav-card-v2__meta">
+        <span class="fav-card-v2__rating">★ 4.9</span>
+        <span class="fav-card-v2__specialty" data-i18n="tech_role_master_plumber">Master Plumber</span>
+        <span class="fav-card-v2__jobs-count" style="font-size:0.72rem;color:var(--color-text-light);">47 jobs</span>
+      </div>
+    </div>
+    <div class="fav-card-v2__actions">
+      <a class="btn btn--sm" href="./booking.html" data-i18n="cust_book_now">Book Now</a>
+      <button class="btn btn--sm btn--ghost" type="button" data-i18n="cust_remove">Remove</button>
+    </div>
+  </div>
+
+  <div class="fav-card-v2" data-reveal>
+    <div class="fav-card-v2__avatar">KS</div>
+    <div class="fav-card-v2__body">
+      <h3 class="fav-card-v2__name">Khaled Samir</h3>
+      <div class="fav-card-v2__meta">
+        <span class="fav-card-v2__rating">★ 4.7</span>
+        <span class="fav-card-v2__specialty" data-i18n="tech_role_electrician">Electrician</span>
+        <span class="fav-card-v2__jobs-count" style="font-size:0.72rem;color:var(--color-text-light);">31 jobs</span>
+      </div>
+    </div>
+    <div class="fav-card-v2__actions">
+      <a class="btn btn--sm" href="./booking.html" data-i18n="cust_book_now">Book Now</a>
+      <button class="btn btn--sm btn--ghost" type="button" data-i18n="cust_remove">Remove</button>
+    </div>
+  </div>
+
+  <div class="fav-card-v2" data-reveal>
+    <div class="fav-card-v2__avatar">YA</div>
+    <div class="fav-card-v2__body">
+      <h3 class="fav-card-v2__name">Youssef Ali</h3>
+      <div class="fav-card-v2__meta">
+        <span class="fav-card-v2__rating">★ 4.8</span>
+        <span class="fav-card-v2__specialty" data-i18n="tech_role_painter">Painter</span>
+        <span class="fav-card-v2__jobs-count" style="font-size:0.72rem;color:var(--color-text-light);">22 jobs</span>
+      </div>
+    </div>
+    <div class="fav-card-v2__actions">
+      <a class="btn btn--sm" href="./booking.html" data-i18n="cust_book_now">Book Now</a>
+      <button class="btn btn--sm btn--ghost" type="button" data-i18n="cust_remove">Remove</button>
+    </div>
+  </div>
+
+</section>
+
+        <!-- Notifications panel -->
+        <section class="dash-panel" id="panel-notifications" role="tabpanel" aria-labelledby="tab-notifications" data-panel="notifications" hidden>
+
+  <div class="dash-panel__header">
+    <div class="dash-panel__header-row">
+      <div>
+        <h1 class="dash-panel__title" data-i18n="cust_nav_notifications">Notifications</h1>
+        <p class="dash-panel__subtitle" data-i18n="cust_notif_sub">Updates on your bookings and account.</p>
+      </div>
+      <button class="btn btn--sm btn--outline" id="mark-all-read" type="button" data-i18n="cust_mark_all_read">Mark All Read</button>
+    </div>
+  </div>
+
+  <p class="notif-category-label" data-i18n="cust_nav_bookings">Bookings</p>
+
+  <div class="notif-card-v2 is-unread" data-reveal>
+    <div class="notif-card-v2__icon notif-card-v2__icon--booking">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#22A05A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <div class="notif-card-v2__body">
+      <p class="notif-card-v2__title" data-i18n="cust_notif_title_booking_conf">Booking Confirmed</p>
+      <p class="notif-card-v2__desc" data-i18n="cust_notif_desc_booking_conf">Your Plumbing — Pipe Repair with Omar Tarek on 25 Mar has been confirmed.</p>
+      <div class="notif-card-v2__actions">
+        <button class="btn btn--sm" type="button" data-tab-link="bookings" data-i18n="cust_view_booking">View Booking</button>
+        <button class="btn btn--sm btn--danger-ghost" type="button" data-i18n="cust_dismiss">Dismiss</button>
+      </div>
+      <p class="notif-card-v2__time" data-i18n="cust_notif_time_2h">2 hours ago</p>
+    </div>
+  </div>
+
+  <div class="notif-card-v2" data-reveal>
+    <div class="notif-card-v2__icon notif-card-v2__icon--info">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#6E56CF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    </div>
+    <div class="notif-card-v2__body">
+      <p class="notif-card-v2__title" data-i18n="cust_notif_title_tech_assigned">Technician Assigned</p>
+      <p class="notif-card-v2__desc" data-i18n="cust_notif_desc_tech_assigned">Khaled Samir has been assigned to your Electrical — Wiring Check on 28 Mar.</p>
+      <div class="notif-card-v2__actions">
+        <button class="btn btn--sm" type="button" data-tab-link="bookings" data-i18n="cust_view_booking">View Booking</button>
+        <button class="btn btn--sm btn--danger-ghost" type="button" data-i18n="cust_dismiss">Dismiss</button>
+      </div>
+      <p class="notif-card-v2__time" data-i18n="cust_notif_time_yesterday">Yesterday</p>
+    </div>
+  </div>
+
+  <p class="notif-category-label" style="margin-top:24px;" data-i18n="cust_notif_cat_account">Account</p>
+
+  <div class="notif-card-v2" data-reveal>
+    <div class="notif-card-v2__icon notif-card-v2__icon--system">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#9A8C73" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M5.34 17.66l-1.41 1.41M21 12h-2M5 12H3M18.36 18.36l-1.41-1.41M7.05 7.05L5.64 5.64M12 3V1M12 21v2"/></svg>
+    </div>
+    <div class="notif-card-v2__body">
+      <p class="notif-card-v2__title" data-i18n="cust_notif_title_profile_upd">Profile Updated</p>
+      <p class="notif-card-v2__desc" data-i18n="cust_notif_desc_profile_upd">Your profile information was updated successfully.</p>
+      <p class="notif-card-v2__time" data-i18n="cust_notif_time_3d">3 days ago</p>
+    </div>
+  </div>
+
+</section>
+
+        <!-- Settings panel -->
+        <section class="dash-panel" id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" data-panel="settings" hidden>
+
+  <div class="dash-panel__header">
+    <h1 class="dash-panel__title" data-i18n="cust_nav_settings">Settings</h1>
+    <p class="dash-panel__subtitle" data-i18n="cust_settings_sub">Update your profile and account details.</p>
+  </div>
+
+  <!-- ── Settings horizontal tab bar ── -->
+  <nav class="stab-bar" role="tablist" aria-label="Settings sections" id="settings-tab-bar">
+    <button class="stab-btn stab-btn--active" role="tab" aria-selected="true" aria-controls="stab-profile" data-stab="profile" id="stab-btn-profile">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <span data-i18n="cust_stab_profile">Profile</span>
+    </button>
+    <button class="stab-btn" role="tab" aria-selected="false" aria-controls="stab-security" data-stab="security" id="stab-btn-security">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      <span data-i18n="cust_stab_security">Security</span>
+    </button>
+    <button class="stab-btn" role="tab" aria-selected="false" aria-controls="stab-notifications" data-stab="notifications" id="stab-btn-notifications">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span data-i18n="cust_stab_notifications">Notifications</span>
+    </button>
+    <button class="stab-btn" role="tab" aria-selected="false" aria-controls="stab-language" data-stab="language" id="stab-btn-language">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+      <span data-i18n="cust_stab_language">Language</span>
+    </button>
+    <button class="stab-btn" role="tab" aria-selected="false" aria-controls="stab-appearance" data-stab="appearance" id="stab-btn-appearance">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      <span data-i18n="cust_stab_appearance">Appearance</span>
+    </button>
+    <button class="stab-btn" role="tab" aria-selected="false" aria-controls="stab-addresses" data-stab="addresses" id="stab-btn-addresses">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+      <span data-i18n="cust_stab_addresses">Addresses</span>
+    </button>
+    <button class="stab-btn" role="tab" aria-selected="false" aria-controls="stab-account" data-stab="account" id="stab-btn-account">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <span data-i18n="cust_stab_account">Account</span>
+    </button>
+  </nav>
+
+  <!-- ══════════════════════════════════════════
+       TAB 1 — PROFILE
+  ══════════════════════════════════════════ -->
+  <div class="stab-pane stab-pane--active" id="stab-profile" role="tabpanel" aria-labelledby="stab-btn-profile">
+
+    <!-- Profile completeness -->
+    <div class="settings-section">
+      <div class="profile-complete-row">
+        <div class="profile-complete-info">
+          <span class="settings-section__heading" data-i18n="cust_profile_complete_title">Profile Completeness</span>
+          <span class="profile-complete-pct" id="profile-complete-pct">0%</span>
+        </div>
+        <div class="profile-complete-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="profile-complete-bar">
+          <div class="profile-complete-fill" id="profile-complete-fill"></div>
+        </div>
+        <p class="settings-section__desc" data-i18n="cust_profile_complete_desc">Complete your profile so technicians can reach you and trust your requests.</p>
+      </div>
+    </div>
+
+    <!-- Avatar + basic info -->
+    <div class="settings-section">
+      <h2 class="settings-section__heading">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span data-i18n="cust_settings_profile">Profile Information</span>
+      </h2>
+      <p class="settings-section__desc" data-i18n="cust_settings_profile_desc">Your name, email and contact details shown to technicians.</p>
+
+      <div class="settings-avatar-wrap">
+        <div class="settings-avatar-preview" data-avatar-preview>
+          <span data-dash-initials>?</span>
+        </div>
+        <div class="settings-avatar-actions">
+          <button type="button" class="btn-change-photo" id="btn-change-photo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            <span data-i18n="cust_change_photo">Change Photo</span>
+          </button>
+          <p class="settings-avatar-hint" data-i18n="cust_photo_hint">JPG or PNG, max 2 MB. Square images work best.</p>
+        </div>
+        <input type="file" id="photo-upload-input" accept="image/*" hidden />
+      </div>
+
+      <form class="dash-settings-form" data-settings-form novalidate>
+        <div class="form-row">
+          <div class="form-field">
+            <label class="form-label" for="settings-fullname" data-i18n="cust_label_fullname">Full Name <span class="required-mark" aria-hidden="true">*</span></label>
+            <input class="form-input" type="text" id="settings-fullname" name="fullName" data-settings-field="fullName" placeholder="Your full name" data-i18n-placeholder="cust_ph_fullname" autocomplete="name" data-required />
+            <span class="form-hint" data-i18n="cust_hint_fullname">This name appears on your bookings and receipts.</span>
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="settings-email" data-i18n="cust_label_email">Email <span class="required-mark" aria-hidden="true">*</span></label>
+            <input class="form-input" type="email" id="settings-email" name="email" data-settings-field="email" placeholder="your@email.com" autocomplete="email" data-required />
+            <span class="form-hint" data-i18n="cust_hint_email">Used for booking confirmations and notifications.</span>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label class="form-label" for="settings-phone" data-i18n="cust_label_phone">Phone <span class="required-mark" aria-hidden="true">*</span></label>
+            <input class="form-input" type="tel" id="settings-phone" name="phone" data-settings-field="phone" placeholder="+20 100 000 0000" autocomplete="tel" data-required />
+            <span class="form-hint" data-i18n="cust_hint_phone">Technicians may contact you on this number.</span>
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="settings-city" data-i18n="cust_label_city">City</label>
+            <input class="form-input" type="text" id="settings-city" name="city" data-settings-field="city" placeholder="e.g. Cairo" data-i18n-placeholder="cust_ph_city" autocomplete="address-level2" />
+            <span class="form-hint" data-i18n="cust_hint_city">Used to match you with nearby technicians.</span>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field form-field--full">
+            <label class="form-label" for="settings-bio" data-i18n="cust_label_bio">Short Bio <span class="form-label-optional" data-i18n="cust_optional">(Optional)</span></label>
+            <textarea class="form-input form-textarea" id="settings-bio" name="bio" data-settings-field="bio" rows="2" placeholder="A few words about yourself or your home service needs…" data-i18n-placeholder="cust_ph_bio" autocomplete="off"></textarea>
+            <span class="form-hint" data-i18n="cust_hint_bio">Visible to technicians you work with regularly.</span>
+          </div>
+        </div>
+        <div class="settings-submit-row">
+          <button class="btn btn--primary" type="submit" data-i18n="cust_save_changes">Save Changes</button>
+        </div>
+      </form>
+    </div>
+
+  </div><!-- /stab-profile -->
+
+  <!-- ══════════════════════════════════════════
+       TAB 2 — SECURITY
+  ══════════════════════════════════════════ -->
+  <div class="stab-pane" id="stab-security" role="tabpanel" aria-labelledby="stab-btn-security" hidden>
+
+    <!-- Change password -->
+    <div class="settings-section">
+      <h2 class="settings-section__heading">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <span data-i18n="cust_settings_security">Security</span>
+      </h2>
+      <p class="settings-section__desc" data-i18n="cust_settings_security_desc">Change your password to keep your account secure.</p>
+
+      <form class="dash-settings-security-form" id="security-form" novalidate>
+        <div class="form-row">
+          <div class="form-field form-field--full">
+            <label class="form-label" for="settings-current-password" data-i18n="cust_label_current_pass">Current Password <span class="required-mark" aria-hidden="true">*</span></label>
+            <div class="input-password-wrap">
+              <input class="form-input" type="password" id="settings-current-password" name="currentPassword" placeholder="Your current password" data-i18n-placeholder="cust_ph_current_pass" autocomplete="current-password" />
+              <button type="button" class="btn-toggle-password" aria-label="Show password">
+                <svg class="eye-icon eye-icon--open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="eye-icon eye-icon--closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label class="form-label" for="settings-new-password" data-i18n="cust_label_new_pass">New Password <span class="required-mark" aria-hidden="true">*</span></label>
+            <div class="input-password-wrap">
+              <input class="form-input" type="password" id="settings-new-password" name="newPassword" data-settings-field="newPassword" placeholder="New password" data-i18n-placeholder="cust_ph_new_pass" autocomplete="new-password" />
+              <button type="button" class="btn-toggle-password" aria-label="Show password">
+                <svg class="eye-icon eye-icon--open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="eye-icon eye-icon--closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              </button>
+            </div>
+            <!-- Strength meter -->
+            <div class="pw-strength-wrap" id="pw-strength-wrap" hidden>
+              <div class="pw-strength-bar">
+                <div class="pw-strength-fill" id="pw-strength-fill"></div>
+              </div>
+              <span class="pw-strength-label" id="pw-strength-label"></span>
+            </div>
+            <!-- Live checklist -->
+            <ul class="pw-checklist" id="pw-checklist" aria-label="Password requirements">
+              <li class="pw-check" id="pwc-length" data-i18n="cust_pwc_length">At least 8 characters</li>
+              <li class="pw-check" id="pwc-upper" data-i18n="cust_pwc_upper">One uppercase letter</li>
+              <li class="pw-check" id="pwc-number" data-i18n="cust_pwc_number">One number</li>
+              <li class="pw-check" id="pwc-special" data-i18n="cust_pwc_special">One special character (!@#$…)</li>
+            </ul>
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="settings-confirm-password" data-i18n="cust_label_confirm_pass">Confirm Password <span class="required-mark" aria-hidden="true">*</span></label>
+            <div class="input-password-wrap">
+              <input class="form-input" type="password" id="settings-confirm-password" name="confirmPassword" data-settings-field="confirmPassword" placeholder="Confirm new password" data-i18n-placeholder="cust_ph_confirm_pass" autocomplete="new-password" />
+              <button type="button" class="btn-toggle-password" aria-label="Show password">
+                <svg class="eye-icon eye-icon--open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="eye-icon eye-icon--closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              </button>
+            </div>
+            <span class="pw-match-hint" id="pw-match-hint" hidden></span>
+          </div>
+        </div>
+        <div class="settings-submit-row">
+          <button class="btn btn--primary" type="submit" data-i18n="cust_update_password">Update Password</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- 2-Factor Authentication -->
+    <div class="settings-section">
+      <h2 class="settings-section__heading">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <span data-i18n="cust_2fa_title">Two-Factor Authentication</span>
+      </h2>
+      <p class="settings-section__desc" data-i18n="cust_2fa_desc">Add an extra layer of security. We'll send a code to your phone when you log in.</p>
+      <div class="settings-toggle-row">
+        <div class="settings-toggle-info">
+          <span class="settings-toggle-label" data-i18n="cust_2fa_label">Enable SMS verification on login</span>
+          <span class="settings-toggle-sub" data-i18n="cust_2fa_sub">A 6-digit code will be sent to your registered phone number.</span>
+        </div>
+        <button type="button" class="stab-toggle" id="toggle-2fa" role="switch" aria-checked="false" data-pref="2fa">
+          <span class="stab-toggle__track"><span class="stab-toggle__thumb"></span></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Active sessions / last login -->
+    <div class="settings-section">
+      <h2 class="settings-section__heading">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        <span data-i18n="cust_sessions_title">Login Activity</span>
+      </h2>
+      <p class="settings-section__desc" data-i18n="cust_sessions_desc">Your recent sign-in history. If you see anything unexpected, change your password immediately.</p>
+      <div class="sessions-list">
+        <div class="session-item session-item--current">
+          <div class="session-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+          </div>
+          <div class="session-details">
+            <span class="session-device" data-i18n="cust_session_this_device">This device — Chrome on Windows</span>
+            <span class="session-meta"><span data-i18n="cust_session_active_now">Active now</span> · Cairo, Egypt</span>
+          </div>
+          <span class="session-badge" data-i18n="cust_session_current">Current</span>
+        </div>
+        <div class="session-item">
+          <div class="session-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+          </div>
+          <div class="session-details">
+            <span class="session-device" data-i18n="cust_session_mobile">Mobile — Safari on iPhone</span>
+            <span class="session-meta"><span data-i18n="cust_session_2d_ago">2 days ago</span> · Cairo, Egypt</span>
+          </div>
+          <button type="button" class="btn-session-revoke" data-i18n="cust_session_revoke">Revoke</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /stab-security -->
+
+  <!-- ══════════════════════════════════════════
+       TAB 3 — NOTIFICATIONS
+  ══════════════════════════════════════════ -->
+  <div class="stab-pane" id="stab-notifications" role="tabpanel" aria-labelledby="stab-btn-notifications" hidden>
+
+    <div class="settings-section">
+      <h2 class="settings-section__heading">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span data-i18n="cust_notif_pref_title">Notification Preferences</span>
+      </h2>
+      <p class="settings-section__desc" data-i18n="cust_notif_pref_desc">Choose what you want to be notified about and how.</p>
+
+      <!-- Booking updates -->
+      <p class="stab-notif-group-label" data-i18n="cust_notif_group_bookings">Booking Updates</p>
+      <div class="stab-notif-list">
+        <div class="settings-toggle-row">
+          <div class="settings-toggle-info">
+            <span class="settings-toggle-label" data-i18n="cust_notif_booking_confirmed">Booking Confirmed</span>
+            <span class="settings-toggle-sub" data-i18n="cust_notif_booking_confirmed_sub">When a technician accepts your booking request.</span>
+          </div>
+          <button type="button" class="stab-toggle stab-toggle--on" role="switch" aria-checked="true" data-pref="notif-booking-confirmed">
+            <span class="stab-toggle__track"><span class="stab-toggle__thumb"></span></span>
+          </button>
+        </div>
+        <div class="settings-toggle-row">
+          <div class="settings-toggle-info">
+            <span class="settings-toggle-label" data-i18n="cust_notif_tech_assigned">Technician Assigned</span>
+            <span class="settings-toggle-sub" data-i18n="cust_notif_tech_assigned_sub">When a specific technician is matched to your job.</span>
+          </div>
+          <button type="button" class="stab-toggle stab-toggle--on" role="switch" aria-checked="true" data-pref="notif-tech-assigned">
+            <span class="stab-toggle__track"><span class="stab-toggle__thumb"></span></span>
+          </button>
+        </div>
+        <div class="settings-toggle-row">
+          <div class="settings-toggle-info">
+            <span class="settings-toggle-label" data-i18n="cust_notif_tech_otw">Technician On the Way</span>
+            <span class="settings-toggle-sub" data-i18n="cust_notif_tech_otw_sub">When your technician is en route to your location.</span>
+          </div>
+          <button type="button" class="stab-toggle stab-toggle--on" role="switch" aria-checked="true" data-pref="notif-tech-otw">
+            <span class="stab-toggle__track"><span class="stab-toggle__thumb"></span></span>
+          </button>
+        </div>
+        <div class="settings-toggle-row">
+          <div class="settings-toggle-info">
+            <span class="settings-toggle-label" data-i18n="cust_notif_job_completed">Job Completed</span>
+            <span class="settings-toggle-sub" data-i18n="cust_notif_job_completed_sub">When a technician marks your job as done.</span>
+          </div>
+          <button type="button" class="stab-toggle stab-toggle--on" role="switch" aria-checked="true" data-pref="notif-job-completed">
+            <span class="stab-toggle__track"><span class="stab-toggle__thumb"></span></span>
+          </button>
+        </div>
+        <div class="settings-toggle-row">
+          <div class="settings-toggle-info">
+            <span class="settings-toggle-label" data-i18n="cust_notif_booking_cancelled">Booking Cancelled</span>
+            <span class="settings-toggle-sub" data-i18n="cust_notif_booking_cancelled_sub">When a booking is cancelled by you or the technician.</span>
+          </div>
+          <button type="button" class="stab-toggle stab-toggle--on" role="switch" aria-checked="true" data-pref="notif-booking-cancelled">
+            <span class="stab-toggle__track"><span class="stab-toggle__thumb"></span></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Payments -->
+      <p class="stab-notif-group-label" data-i18n="cust_notif_group_payments">Payments</p>
+      <div class="stab-notif-list">
+        <div class="settings-toggle-row">
+          <div class="settings-toggle-info">
+            <span class="settings-toggle-label" data-i18n="cust_notif_payment_receipt">Payment Receipt</span>
+            <span class="settings-toggle-sub" data-i18n="cust_notif_payment_receipt_sub">Get a receipt by email after each completed job.</span>
+          </div>
+          <button type="button" class="stab-toggle stab-toggle--on" role="switch" aria-checked="true" data-pref="notif-payment-receipt">
+            <span class="stab-toggle__track"><span class="stab-toggle__thumb"></span></span>
+          </button>
+        </div>
+        <div class="settings-toggle-row">
+          <div class="settings-toggle-info">
+            <span class="settings-toggle-label" data-i18n="cust_notif_payment_reminder">Payment Reminder</span>
+            <span class="settings-toggle-sub" data-i18n="cust_notif_payment_reminder_sub">Remind me if an outstanding payment is due.</span>
+          </div>
+          <button type="button" class="stab-toggle stab-toggle--on" role="switch" aria-checked="true" data-pref="notif-payment-reminder">
+            <span class="stab-toggle__track"><span class="stab-toggle__thumb"></span></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Promotions -->
+      <p class="stab-notif-group-label" data-i18n="cust_notif_group_promos">Promotions &amp; Tips</p>
+      <div class="stab-notif-list">
+        <div class="settings-toggle-row">
+          <div class="settings-toggle-info">
+            <span class="settings-toggle-label" data-i18n="cust_notif_promos">Promotional Offers</span>
+            <span class="settings-toggle-sub" data-i18n="cust_notif_promos_sub">Discounts and seasonal deals from SERVIO.</span>
+          </div>
+          <button type="button" class="stab-toggle" role="switch" aria-checked="false" data-pref="notif-promos">
+            <span class="stab-toggle__track"><span class="stab-toggle__thumb"></span></span>
+          </button>
+        </div>
+        <div class="settings-toggle-row">
+          <div class="settings-toggle-info">
+            <span class="settings-toggle-label" data-i18n="cust_notif_tips">Home Maintenance Tips</span>
+            <span class="settings-toggle-sub" data-i18n="cust_notif_tips_sub">Monthly tips to help you maintain your home.</span>
+          </div>
+          <button type="button" class="stab-toggle" role="switch" aria-checked="false" data-pref="notif-tips">
+            <span class="stab-toggle__track"><span class="stab-toggle__thumb"></span></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Channels -->
+      <p class="stab-notif-group-label" data-i18n="cust_notif_group_channels">Delivery Channels</p>
+      <div class="stab-notif-list">
+        <div class="settings-toggle-row">
+          <div class="settings-toggle-info">
+            <span class="settings-toggle-label" data-i18n="cust_notif_channel_email">Email Notifications</span>
+            <span class="settings-toggle-sub" data-i18n="cust_notif_channel_email_sub">Send all enabled notifications to your email address.</span>
+          </div>
+          <button type="button" class="stab-toggle stab-toggle--on" role="switch" aria-checked="true" data-pref="notif-channel-email">
+            <span class="stab-toggle__track"><span class="stab-toggle__thumb"></span></span>
+          </button>
+        </div>
+        <div class="settings-toggle-row">
+          <div class="settings-toggle-info">
+            <span class="settings-toggle-label" data-i18n="cust_notif_channel_sms">SMS Notifications</span>
+            <span class="settings-toggle-sub" data-i18n="cust_notif_channel_sms_sub">Receive urgent alerts via text message on your phone.</span>
+          </div>
+          <button type="button" class="stab-toggle stab-toggle--on" role="switch" aria-checked="true" data-pref="notif-channel-sms">
+            <span class="stab-toggle__track"><span class="stab-toggle__thumb"></span></span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /stab-notifications -->
+
+  <!-- ══════════════════════════════════════════
+       TAB 4 — LANGUAGE & REGION
+  ══════════════════════════════════════════ -->
+  <div class="stab-pane" id="stab-language" role="tabpanel" aria-labelledby="stab-btn-language" hidden>
+
+    <div class="settings-section">
+      <h2 class="settings-section__heading">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        <span data-i18n="cust_lang_title">Language &amp; Region</span>
+      </h2>
+      <p class="settings-section__desc" data-i18n="cust_lang_desc">Choose your preferred language. The interface will update instantly.</p>
+
+      <div class="lang-cards" role="radiogroup" aria-label="Language selection" id="lang-cards">
+        <button type="button" class="lang-card" data-lang="en" role="radio" aria-checked="false" id="lang-card-en">
+          <span class="lang-card__flag" aria-hidden="true">🇬🇧</span>
+          <span class="lang-card__name">English</span>
+          <span class="lang-card__native">English</span>
+          <span class="lang-card__dir" data-i18n="cust_lang_ltr">Left to right</span>
+          <svg class="lang-card__check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+        </button>
+        <button type="button" class="lang-card" data-lang="ar" role="radio" aria-checked="false" id="lang-card-ar">
+          <span class="lang-card__flag" aria-hidden="true">🇪🇬</span>
+          <span class="lang-card__name">Arabic</span>
+          <span class="lang-card__native">العربية</span>
+          <span class="lang-card__dir" data-i18n="cust_lang_rtl">Right to left</span>
+          <svg class="lang-card__check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+        </button>
+      </div>
+    </div>
+
+  </div><!-- /stab-language -->
+
+  <!-- ══════════════════════════════════════════
+       TAB 5 — APPEARANCE
+  ══════════════════════════════════════════ -->
+  <div class="stab-pane" id="stab-appearance" role="tabpanel" aria-labelledby="stab-btn-appearance" hidden>
+
+    <div class="settings-section">
+      <h2 class="settings-section__heading">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <span data-i18n="cust_appearance_title">Appearance</span>
+      </h2>
+      <p class="settings-section__desc" data-i18n="cust_appearance_desc">Choose how SERVIO looks for you. Your preference is saved on this device.</p>
+
+      <div class="theme-cards" role="radiogroup" aria-label="Theme selection" id="theme-cards">
+        <button type="button" class="theme-card" data-theme-choice="light" role="radio" aria-checked="false" id="theme-card-light">
+          <div class="theme-card__preview theme-card__preview--light">
+            <div class="thp-bar"></div>
+            <div class="thp-content">
+              <div class="thp-line thp-line--lg"></div>
+              <div class="thp-line thp-line--sm"></div>
+            </div>
+          </div>
+          <span class="theme-card__label" data-i18n="cust_theme_light">Light</span>
+          <svg class="theme-card__check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+        </button>
+        <button type="button" class="theme-card" data-theme-choice="dark" role="radio" aria-checked="false" id="theme-card-dark">
+          <div class="theme-card__preview theme-card__preview--dark">
+            <div class="thp-bar"></div>
+            <div class="thp-content">
+              <div class="thp-line thp-line--lg"></div>
+              <div class="thp-line thp-line--sm"></div>
+            </div>
+          </div>
+          <span class="theme-card__label" data-i18n="cust_theme_dark">Dark</span>
+          <svg class="theme-card__check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+        </button>
+        <button type="button" class="theme-card" data-theme-choice="system" role="radio" aria-checked="false" id="theme-card-system">
+          <div class="theme-card__preview theme-card__preview--system">
+            <div class="thp-half thp-half--light">
+              <div class="thp-bar"></div>
+            </div>
+            <div class="thp-half thp-half--dark">
+              <div class="thp-bar"></div>
+            </div>
+          </div>
+          <span class="theme-card__label" data-i18n="cust_theme_system">System Default</span>
+          <svg class="theme-card__check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+        </button>
+      </div>
+    </div>
+
+  </div><!-- /stab-appearance -->
+
+  <!-- ══════════════════════════════════════════
+       TAB 6 — ADDRESSES
+  ══════════════════════════════════════════ -->
+  <div class="stab-pane" id="stab-addresses" role="tabpanel" aria-labelledby="stab-btn-addresses" hidden>
+
+    <div class="settings-section">
+      <h2 class="settings-section__heading">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        <span data-i18n="cust_addr_title">Saved Addresses</span>
+      </h2>
+      <p class="settings-section__desc" data-i18n="cust_addr_desc">Save your frequently used addresses for faster booking. Select one at checkout.</p>
+
+      <div class="addr-list" id="addr-list">
+        <!-- Home address -->
+        <div class="addr-card" data-addr-id="home">
+          <div class="addr-card__icon addr-card__icon--home">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          </div>
+          <div class="addr-card__body">
+            <span class="addr-card__type" data-i18n="cust_addr_home">Home</span>
+            <span class="addr-card__value" id="addr-home-value" data-i18n="cust_addr_not_set">Not set yet — add your home address</span>
+          </div>
+          <button type="button" class="btn-addr-edit" data-addr-target="home" aria-label="Edit home address">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            <span data-i18n="cust_addr_edit">Edit</span>
+          </button>
+        </div>
+        <!-- Work address -->
+        <div class="addr-card" data-addr-id="work">
+          <div class="addr-card__icon addr-card__icon--work">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+          </div>
+          <div class="addr-card__body">
+            <span class="addr-card__type" data-i18n="cust_addr_work">Work</span>
+            <span class="addr-card__value" id="addr-work-value" data-i18n="cust_addr_not_set">Not set yet — add your work address</span>
+          </div>
+          <button type="button" class="btn-addr-edit" data-addr-target="work" aria-label="Edit work address">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            <span data-i18n="cust_addr_edit">Edit</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Add address form (toggled) -->
+      <div class="addr-form-wrap" id="addr-form-wrap" hidden>
+        <div class="addr-form-header">
+          <span class="addr-form-title" id="addr-form-title" data-i18n="cust_addr_edit_title">Edit Address</span>
+          <button type="button" class="btn-addr-cancel" id="btn-addr-cancel" data-i18n="cust_addr_cancel">Cancel</button>
+        </div>
+        <div class="form-row">
+          <div class="form-field form-field--full">
+            <label class="form-label" for="addr-input-street" data-i18n="cust_addr_street">Street Address</label>
+            <input class="form-input" type="text" id="addr-input-street" placeholder="Street, building, apartment…" data-i18n-placeholder="cust_ph_addr_street" autocomplete="street-address" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label class="form-label" for="addr-input-district" data-i18n="cust_addr_district">District / Area</label>
+            <input class="form-input" type="text" id="addr-input-district" placeholder="e.g. Maadi" data-i18n-placeholder="cust_ph_addr_district" />
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="addr-input-city" data-i18n="cust_label_city">City</label>
+            <input class="form-input" type="text" id="addr-input-city" placeholder="e.g. Cairo" data-i18n-placeholder="cust_ph_city" autocomplete="address-level2" />
+          </div>
+        </div>
+        <div class="settings-submit-row">
+          <button class="btn btn--primary" type="button" id="btn-addr-save" data-i18n="cust_addr_save_btn">Save Address</button>
+        </div>
+      </div>
+
+      <button type="button" class="btn-addr-add" id="btn-addr-add">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        <span data-i18n="cust_addr_add_other">Add Another Address</span>
+      </button>
+    </div>
+
+  </div><!-- /stab-addresses -->
+
+  <!-- ══════════════════════════════════════════
+       TAB 7 — ACCOUNT
+  ══════════════════════════════════════════ -->
+  <div class="stab-pane" id="stab-account" role="tabpanel" aria-labelledby="stab-btn-account" hidden>
+
+    <!-- Export data -->
+    <div class="settings-section">
+      <h2 class="settings-section__heading">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span data-i18n="cust_export_title">Export My Data</span>
+      </h2>
+      <p class="settings-section__desc" data-i18n="cust_export_desc">Download a copy of all your SERVIO data — bookings, messages, and profile — in JSON format.</p>
+      <button type="button" class="btn btn--outline" id="btn-export-data" data-i18n="cust_export_btn">Request Data Export</button>
+    </div>
+
+    <!-- Deactivate account -->
+    <div class="settings-section settings-section--warning">
+      <h2 class="settings-section__heading">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="10" y1="15" x2="10" y2="9"/><line x1="14" y1="15" x2="14" y2="9"/></svg>
+        <span data-i18n="cust_deactivate_title">Deactivate Account</span>
+      </h2>
+      <p class="settings-section__desc" data-i18n="cust_deactivate_desc">Temporarily hide your profile and pause all activity. You can reactivate at any time by logging back in.</p>
+      <button type="button" class="btn btn--warning-outline" id="btn-deactivate-account" data-i18n="cust_deactivate_btn">Deactivate Account</button>
+    </div>
+
+    <!-- Delete account -->
+    <div class="settings-section settings-section--danger">
+      <h2 class="settings-section__heading">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+        <span data-i18n="cust_delete_title">Delete Account</span>
+      </h2>
+      <p class="settings-section__desc" data-i18n="cust_delete_desc">Permanently delete your account and all associated data. This action cannot be undone and all your bookings, history, and saved data will be erased.</p>
+      <button class="btn btn--danger" type="button" id="btn-delete-account" data-i18n="cust_delete_account">Delete My Account</button>
+    </div>
+
+  </div><!-- /stab-account -->
+
+        </section>
+
+        <!-- ── Job Posts tab ──────────────────── -->
+        <section class="dash-panel" id="panel-job-posts" role="tabpanel"
+                 aria-labelledby="tab-job-posts" data-panel="job-posts" hidden>
+          <div class="dash-panel__header dash-panel__header-row" style="align-items: center;">
+            <h2 class="dash-panel__title" data-i18n="cust_nav_job_posts" style="margin-bottom: 0;">Job Posts</h2>
+            <button class="btn btn--primary" id="postJobBtn" data-i18n="cust_post_new_job">+ Post New Job</button>
+          </div>
+
+          <div class="job-posts-list" id="jobPostsList">
+            <article class="job-post-card" data-reveal>
+              <div class="job-post-card__header">
+                <span class="jpc-badge jpc-badge--service" data-i18n="cust_cat_plumbing">Plumbing</span>
+                <span class="jpc-badge jpc-badge--open" data-i18n="cust_job_open">Open</span>
+                <span class="jpc-proposals" data-i18n="cust_job_proposals_3">3 proposals</span>
+              </div>
+              <h3 class="job-post-card__title" data-i18n="cust_job1_title">Fix bathroom pipe leak</h3>
+              <div class="job-post-card__meta">
+                <span data-i18n="cust_job1_posted">Posted: 20 Mar 2026</span>
+                <span data-i18n="cust_job1_budget">Budget: 300–600 EGP</span>
+                <span class="ai-est-pill" data-i18n="cust_job1_ai">AI Est: ~480 EGP</span>
+              </div>
+              <div class="job-post-card__actions">
+                <button class="btn btn--outline btn--sm" data-view-proposals data-i18n="cust_view_proposals">View Proposals</button>
+                <button class="btn btn--ghost btn--sm" data-i18n="cust_edit">Edit</button>
+                <button class="btn btn--ghost btn--sm" data-close-job data-i18n="cust_close_job">Close Job</button>
+              </div>
+            </article>
+
+            <article class="job-post-card" data-reveal>
+              <div class="job-post-card__header">
+                <span class="jpc-badge jpc-badge--service" data-i18n="cust_cat_painting">Painting</span>
+                <span class="jpc-badge jpc-badge--open" data-i18n="cust_job_open">Open</span>
+                <span class="jpc-proposals" data-i18n="cust_job_proposals_1">1 proposal</span>
+              </div>
+              <h3 class="job-post-card__title" data-i18n="cust_job2_title">Paint living room walls</h3>
+              <div class="job-post-card__meta">
+                <span data-i18n="cust_job2_posted">Posted: 18 Mar 2026</span>
+                <span data-i18n="cust_job2_budget">Budget: 1,500–2,500 EGP</span>
+                <span class="ai-est-pill" data-i18n="cust_job2_ai">AI Est: ~1,800 EGP</span>
+              </div>
+              <div class="job-post-card__actions">
+                <button class="btn btn--outline btn--sm" data-view-proposals data-i18n="cust_view_proposals">View Proposals</button>
+                <button class="btn btn--ghost btn--sm" data-i18n="cust_edit">Edit</button>
+                <button class="btn btn--ghost btn--sm" data-close-job data-i18n="cust_close_job">Close Job</button>
+              </div>
+            </article>
+          </div>
+
+          <!-- Post New Job modal -->
+          <div class="modal-overlay" id="postJobModal" hidden>
+            <div class="modal-box pjm-box">
+              <div class="modal-box__header pjm-header">
+                <div class="pjm-header__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                </div>
+                <h3 data-i18n="cust_modal_post_title">Post a New Job</h3>
+                <button class="modal-close pjm-close" id="closePostJobModal" aria-label="Close">&times;</button>
+              </div>
+              <form id="postJobForm" novalidate>
+                <div class="pjm-body">
+                  <!-- Service Category -->
+                  <div class="form-field form-field--full">
+                    <label class="form-label" for="pjm-category">
+                      <span data-i18n="cust_modal_cat">Service Category</span>
+                      <span class="required-mark" aria-hidden="true">*</span>
+                    </label>
+                    <select class="form-input" id="pjm-category" name="category" required>
+                      <option value="" data-i18n="cust_modal_select">Select…</option>
+                      <option data-i18n="cust_cat_plumbing">Plumbing</option>
+                      <option data-i18n="cust_cat_electrical">Electrical</option>
+                      <option data-i18n="cust_cat_hvac">A/C Maintenance &amp; HVAC</option>
+                      <option data-i18n="cust_cat_carpentry">Carpentry</option>
+                      <option data-i18n="cust_cat_appliance">Appliance Services</option>
+                      <option data-i18n="cust_cat_handyman">Handyman Tasks</option>
+                      <option data-i18n="cust_cat_finishing">Home Finishing &amp; Renovation</option>
+                      <option data-i18n="cust_cat_painting">Painting</option>
+                      <option data-i18n="cust_cat_flooring">Flooring</option>
+                      <option data-i18n="cust_cat_drywall">Drywall</option>
+                      <option data-i18n="cust_cat_roofing">Roofing</option>
+                      <option data-i18n="cust_cat_pest">Pest Control</option>
+                      <option data-i18n="cust_cat_cleaning">Professional Cleaning</option>
+                      <option data-i18n="cust_cat_landscaping">Landscaping</option>
+                      <option data-i18n="cust_cat_installation">Installation Services</option>
+                    </select>
+                  </div>
+                  <!-- Job Title -->
+                  <div class="form-field form-field--full">
+                    <label class="form-label" for="pjm-title">
+                      <span data-i18n="cust_modal_job_title">Job Title</span>
+                      <span class="required-mark" aria-hidden="true">*</span>
+                    </label>
+                    <input class="form-input" type="text" id="pjm-title" name="title" required placeholder="e.g. Fix kitchen sink leak" data-i18n-placeholder="cust_modal_title_ph" />
+                  </div>
+                  <!-- Description -->
+                  <div class="form-field form-field--full">
+                    <label class="form-label" for="pjm-description">
+                      <span data-i18n="cust_modal_desc">Description</span>
+                    </label>
+                    <textarea class="form-input form-textarea" id="pjm-description" name="description" rows="3" placeholder="Describe the issue…" data-i18n-placeholder="cust_modal_desc_ph"></textarea>
+                  </div>
+                  <!-- Location -->
+                  <div class="form-field form-field--full">
+                    <label class="form-label" for="pjm-location">
+                      <span data-i18n="cust_modal_location">Location</span>
+                    </label>
+                    <input class="form-input" type="text" id="pjm-location" name="location" placeholder="e.g. Maadi, Cairo" data-i18n-placeholder="cust_modal_loc_ph" />
+                  </div>
+                  <!-- Preferred dates -->
+                  <div class="form-row">
+                    <div class="form-field">
+                      <label class="form-label" for="pjm-date-from">
+                        <span data-i18n="cust_modal_pref_from">Preferred From</span>
+                      </label>
+                      <input class="form-input" type="date" id="pjm-date-from" name="dateFrom" />
+                    </div>
+                    <div class="form-field">
+                      <label class="form-label" for="pjm-date-to">
+                        <span data-i18n="cust_modal_pref_to">Preferred To</span>
+                      </label>
+                      <input class="form-input" type="date" id="pjm-date-to" name="dateTo" />
+                    </div>
+                  </div>
+                  <!-- Budget -->
+                  <div class="form-row">
+                    <div class="form-field">
+                      <label class="form-label" for="pjm-budget-min">
+                        <span data-i18n="cust_modal_budget_min">Budget Min (EGP)</span>
+                      </label>
+                      <input class="form-input" type="number" id="pjm-budget-min" name="budgetMin" min="0" placeholder="0" />
+                    </div>
+                    <div class="form-field">
+                      <label class="form-label" for="pjm-budget-max">
+                        <span data-i18n="cust_modal_budget_max">Budget Max (EGP)</span>
+                      </label>
+                      <input class="form-input" type="number" id="pjm-budget-max" name="budgetMax" min="0" placeholder="0" />
+                    </div>
+                  </div>
+                  <!-- Payment preference -->
+                  <div class="form-field form-field--full">
+                    <label class="form-label" for="pjm-payment">
+                      <span data-i18n="cust_modal_pay_pref">Payment Preference</span>
+                    </label>
+                    <select class="form-input" id="pjm-payment" name="paymentPref">
+                      <option value="any" data-i18n="cust_modal_pay_any">Any</option>
+                      <option value="online" data-i18n="cust_modal_pay_online">Online Payment</option>
+                      <option value="cash" data-i18n="cust_pay_cash">Cash</option>
+                    </select>
+                  </div>
+                </div><!-- /pjm-body -->
+                <div class="pjm-footer">
+                  <button type="button" class="btn btn--outline" id="cancelPostJob" data-i18n="cust_cancel">Cancel</button>
+                  <button type="submit" class="btn btn--primary" data-i18n="cust_modal_post_btn">Post Job</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── Proposals tab ──────────────────── -->
+        <section class="dash-panel" id="panel-proposals" role="tabpanel"
+                 aria-labelledby="tab-proposals" data-panel="proposals" hidden>
+          <div class="dash-panel__header">
+            <h2 class="dash-panel__title" data-i18n="cust_nav_proposals">Proposals</h2>
+          </div>
+
+          <!-- Job group 1 -->
+          <div class="proposals-group" data-reveal>
+            <h3 class="proposals-group__title" data-i18n="cust_job1_title">Fix bathroom pipe leak</h3>
+
+            <article class="proposal-card">
+              <div class="proposal-card__tech">
+                <div class="prop-avatar">KM</div>
+                <div class="prop-tech-info">
+                  <strong>Khaled Mohamed</strong>
+                  <span class="prop-stars">★★★★★</span> <small>4.9</small>
+                  <span class="prop-badge prop-badge--verified" data-i18n="cust_prop_verified">✓ Verified</span>
+                </div>
+              </div>
+              <div class="proposal-card__price">520 EGP</div>
+              <p class="proposal-card__note" data-i18n="cust_prop1_note">"Fixed similar in Maadi, can start tomorrow"</p>
+              <div class="proposal-card__avail" data-i18n="cust_prop1_avail">Available: 21 Mar 2026</div>
+              <div class="proposal-card__portfolio"></div>
+              <div class="proposal-card__ai-rec" data-i18n="cust_prop1_ai">
+                AI Est: ~480 EGP · Quote: 520 EGP · <strong>Recommended: 500 EGP</strong>
+              </div>
+              <div class="proposal-card__actions">
+                <button class="btn btn--primary btn--sm" data-accept-proposal
+                        data-tech="Khaled Mohamed" data-price="520" data-i18n="cust_accept_proposal">Accept Proposal</button>
+                <a href="./messages.html" class="btn btn--outline btn--sm" data-i18n="cust_msg_tech">Message Technician</a>
+                <button class="btn btn--ghost btn--sm" data-decline-proposal data-i18n="cust_decline">Decline</button>
+              </div>
+            </article>
+
+            <article class="proposal-card">
+              <div class="proposal-card__tech">
+                <div class="prop-avatar">HA</div>
+                <div class="prop-tech-info">
+                  <strong>Hassan Ali</strong>
+                  <span class="prop-stars">★★★★★</span> <small>4.8</small>
+                  <span class="prop-badge prop-badge--verified" data-i18n="cust_prop_verified">✓ Verified</span>
+                </div>
+              </div>
+              <div class="proposal-card__price">450 EGP</div>
+              <p class="proposal-card__note" data-i18n="cust_prop2_note">"Experienced, bring tools same day"</p>
+              <div class="proposal-card__avail" data-i18n="cust_prop2_avail">Available: 21 Mar 2026</div>
+              <div class="proposal-card__portfolio"></div>
+              <div class="proposal-card__ai-rec" data-i18n="cust_prop2_ai">
+                AI Est: ~480 EGP · Quote: 450 EGP · <strong>Recommended: 465 EGP</strong>
+              </div>
+              <div class="proposal-card__actions">
+                <button class="btn btn--primary btn--sm" data-accept-proposal
+                        data-tech="Hassan Ali" data-price="450" data-i18n="cust_accept_proposal">Accept Proposal</button>
+                <a href="./messages.html" class="btn btn--outline btn--sm" data-i18n="cust_msg_tech">Message Technician</a>
+                <button class="btn btn--ghost btn--sm" data-decline-proposal data-i18n="cust_decline">Decline</button>
+              </div>
+            </article>
+          </div>
+
+          <!-- Job group 2 -->
+          <div class="proposals-group" data-reveal>
+            <h3 class="proposals-group__title" data-i18n="cust_job2_title">Paint living room walls</h3>
+
+            <article class="proposal-card">
+              <div class="proposal-card__tech">
+                <div class="prop-avatar">YS</div>
+                <div class="prop-tech-info">
+                  <strong>Youssef Samir</strong>
+                  <span class="prop-stars">★★★★</span> <small>4.6</small>
+                  <span class="prop-badge prop-badge--verified" data-i18n="cust_prop_verified">✓ Verified</span>
+                </div>
+              </div>
+              <div class="proposal-card__price">1,750 EGP</div>
+              <p class="proposal-card__note" data-i18n="cust_prop3_note">"2 days, I supply all materials"</p>
+              <div class="proposal-card__avail" data-i18n="cust_prop3_avail">Available: 22 Mar 2026</div>
+              <div class="proposal-card__portfolio"></div>
+              <div class="proposal-card__ai-rec" data-i18n="cust_prop3_ai">
+                AI Est: ~1,800 EGP · Quote: 1,750 EGP · <strong>Recommended: 1,775 EGP</strong>
+              </div>
+              <div class="proposal-card__actions">
+                <button class="btn btn--primary btn--sm" data-accept-proposal
+                        data-tech="Youssef Samir" data-price="1750" data-i18n="cust_accept_proposal">Accept Proposal</button>
+                <a href="./messages.html" class="btn btn--outline btn--sm" data-i18n="cust_msg_tech">Message Technician</a>
+                <button class="btn btn--ghost btn--sm" data-decline-proposal data-i18n="cust_decline">Decline</button>
+              </div>
+            </article>
+          </div>
+
+          <!-- Payment method modal -->
+          <div class="modal-overlay" id="paymentModal" hidden>
+            <div class="modal-box">
+              <div class="modal-box__header">
+                <h3 data-i18n="cust_modal_pay_title">Choose Payment Method</h3>
+                <button class="modal-close" id="closePaymentModal" aria-label="Close">&times;</button>
+              </div>
+              <div class="modal-box__body">
+                <div class="payment-method-options">
+                  <label class="pm-option">
+                    <input type="radio" name="paymentMethod" value="online" checked />
+                    <span class="pm-option__indicator" aria-hidden="true"></span>
+                    <span class="pm-option__icon" aria-hidden="true">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                      </svg>
+                    </span>
+                    <div class="pm-option__info">
+                      <strong data-i18n="cust_modal_pay_online">Online Payment</strong>
+                      <p data-i18n="cust_modal_pay_online_desc">Your payment is held securely and released when the job is complete</p>
+                    </div>
+                    <span class="pm-protected">
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                      <span data-i18n="cust_modal_protected">Protected</span>
+                    </span>
+                  </label>
+                  <label class="pm-option">
+                    <input type="radio" name="paymentMethod" value="cash" />
+                    <span class="pm-option__indicator" aria-hidden="true"></span>
+                    <span class="pm-option__icon" aria-hidden="true">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="6" width="20" height="12" rx="2"/>
+                        <circle cx="12" cy="12" r="2"/>
+                        <path d="M6 12h.01M18 12h.01"/>
+                      </svg>
+                    </span>
+                    <div class="pm-option__info">
+                      <strong data-i18n="cust_pay_cash">Cash</strong>
+                      <p data-i18n="cust_modal_cash_desc">Pay the technician directly when the job is done</p>
+                    </div>
+                  </label>
+                </div>
+
+                <div class="booking-summary-block" id="bookingSummaryBlock" hidden>
+                  <h4 data-i18n="cust_booking_summary">Booking Summary</h4>
+                  <p id="summaryTech"></p>
+                  <p id="summaryPrice"></p>
+                  <p id="summaryPayment"></p>
+                  <button class="btn btn--primary" id="confirmBookingBtn" data-i18n="cust_confirm_booking">Confirm Booking</button>
+                </div>
+
+                <button class="btn btn--primary" id="proceedPaymentBtn" style="margin-top:1rem;" data-i18n="cust_proceed">Proceed</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div><!-- /.dash-content -->
+
+    </div><!-- /.dashboard -->
+    </main>
+
+  <footer class="site-footer">
+    <div class="container footer__grid">
+      <div class="footer__brand-col">
+        <h2 class="footer__brand-text" data-i18n="footer_stay_connected">Stay Connected</h2>
+        <p class="footer__desc" data-i18n="footer_newsletter_desc">Join our newsletter for the latest updates and exclusive offers.</p>
+        <form class="footer__newsletter">
+          <input type="email" placeholder="Enter your email" data-i18n-placeholder="footer_email_ph" class="footer__input" required>
+          <button type="submit" class="footer__submit-btn" aria-label="Subscribe">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+          </button>
+        </form>
+      </div>
+      <div class="footer__nav-col">
+        <h3 class="footer__title" data-i18n="footer_quick_links">Quick Links</h3>
+        <ul class="footer__links" role="list">
+          <li><a class="footer__link" href="./index.html" data-i18n="nav_home">Home</a></li>
+          <li><a class="footer__link" href="./about.html" data-i18n="footer_about_us">About Us</a></li>
+          <li><a class="footer__link" href="./services-marketplace.html" data-i18n="nav_services">Services</a></li>
+          <li><a class="footer__link" href="#" data-i18n="footer_products">Products</a></li>
+          <li><a class="footer__link" href="./contact.html" data-i18n="nav_contact">Contact</a></li>
+        </ul>
+      </div>
+      <div class="footer__nav-col">
+        <h3 class="footer__title" data-i18n="footer_contact_us_col">Contact Us</h3>
+        <address class="footer__address">
+          <p data-i18n="footer_city">Cairo, Egypt</p>
+          
+          <p data-i18n="footer_phone">Phone: +20 100 000 0000</p>
+          <p data-i18n-html="footer_email">Email: hello@servio.eg</p>
+        </address>
+      </div>
+      <div class="footer__nav-col">
+        <h3 class="footer__title" data-i18n="footer_follow_us">Follow Us</h3>
+        <div class="footer__socials">
+          <a href="#" class="social-link" aria-label="Facebook">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg>
+          </a>
+          <a href="#" class="social-link" aria-label="Twitter">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"></path></svg>
+          </a>
+          <a href="#" class="social-link" aria-label="Instagram">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+          </a>
+          <a href="#" class="social-link" aria-label="LinkedIn">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path><rect x="2" y="9" width="4" height="12"></rect><circle cx="4" cy="4" r="2"></circle></svg>
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="container footer__bottom-wrapper">
+      <div class="footer__bottom">
+        <p class="footer__fineprint">© <span id="year">2026</span> SERVIO. All rights reserved.</p>
+        <div class="footer__bottom-links">
+          <a href="#" class="footer__small-link" data-i18n="footer_privacy">Privacy Policy</a>
+          <a href="#" class="footer__small-link" data-i18n="footer_terms">Terms of Service</a>
+          <a href="#" class="footer__small-link" data-i18n="footer_cookies">Cookie Settings</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+    <div class="chat-widget" data-chat-widget>
+      <div class="chat-widget__overlay" data-chat-overlay hidden></div>
+      <div class="chat-widget__panel" data-chat-panel hidden role="dialog" aria-label="SERVIO AI chat">
+        <div class="chat-widget__header">
+          <div class="chat-widget__brand">
+          <div class="chat-widget__avatar" aria-hidden="true"><img src="../assets/icons/ai_icon.png" alt="" width="28" height="28" /></div>
+            <div>
+              <div class="chat-widget__title" data-i18n="chat_title">SERVIO AI Command</div>
+              <div class="chat-widget__meta" data-i18n="chat_meta">ACTIVE INTELLIGENCE</div>
+            </div>
+          </div>
+          <button class="chat-widget__close" type="button" data-chat-close aria-label="Close chat">✕</button>
+        </div>
+        <div class="chat-widget__messages" data-chat-messages>
+          <div class="chat-widget__bubble chat-widget__bubble--ai">
+            <span class="chat-widget__label" aria-hidden="true">SERVIO AI</span>
+          <p data-i18n="chat_intro">Tell me what you need and I'll suggest the right technician.</p>
+          </div>
+        </div>
+        <div class="chat-widget__composer">
+          <form class="chat-widget__form" data-chat-form action="#" method="post" novalidate>
+            <input
+              class="chat-widget__input"
+              type="text"
+              name="ai-query"
+              placeholder="Ask for a technician…" data-i18n-placeholder="chat_placeholder"
+              aria-label="Ask SERVIO AI"
+              data-chat-input
+            />
+            <button class="chat-widget__send" type="submit" aria-label="Send message">➤</button>
+          </form>
+        </div>
+      </div>
+    <button class="chat-widget__fab" type="button" data-chat-fab aria-expanded="false" aria-controls="servio-chat" aria-label="Open AI chat">
+      <span class="chat-widget__fab-icon" aria-hidden="true"><img src="../assets/icons/ai_icon.png" alt="" width="24" height="24" /></span>
+      </button>
+    </div>
+
+  <!-- ═══ Dashboard tab navigation — runs WITHOUT ES modules ═══
+       This guarantees sidebar clicks work regardless of whether the
+       module script below loads (file:// protocol, import errors, etc.). -->
+  <script>
+  (function () {
+    'use strict';
+    var TAB_KEY = 'servio_activeTab_customer';
+
+    function initDashTabs() {
+      var tabs   = document.querySelectorAll('[data-tab]');
+      var panels = document.querySelectorAll('[data-panel]');
+      if (!tabs.length || !panels.length) return;
+
+      function showTab(id) {
+        tabs.forEach(function (t) {
+          var on = t.dataset.tab === id;
+          t.classList.toggle('is-active', on);
+          t.setAttribute('aria-selected', String(on));
+        });
+        panels.forEach(function (p) {
+          var on = p.dataset.panel === id;
+          p.classList.toggle('is-active', on);
+          p.hidden = !on;
+        });
+        try { localStorage.setItem(TAB_KEY, id); } catch (e) {}
+      }
+
+      /* sidebar nav buttons */
+      tabs.forEach(function (tab) {
+        tab.addEventListener('click', function () { showTab(tab.dataset.tab); });
+      });
+
+      /* quick-action "view all" and similar links */
+      document.querySelectorAll('[data-tab-link]').forEach(function (btn) {
+        btn.addEventListener('click', function () { showTab(btn.dataset.tabLink); });
+      });
+
+      /* restore last active tab */
+      var saved = 'overview';
+      try { saved = localStorage.getItem(TAB_KEY) || 'overview'; } catch (e) {}
+      showTab(saved);
+    }
+    initDashTabs();
+  })();
+  </script>
+
+    <!-- ── Deactivate Account modal ────────────────────────── -->
+    <div class="modal-overlay acct-modal" id="modal-deactivate" hidden role="dialog" aria-modal="true" aria-labelledby="modal-deactivate-title">
+      <div class="modal-box acct-modal__box">
+        <div class="modal-box__header acct-modal__header acct-modal__header--warning">
+          <div class="acct-modal__icon acct-modal__icon--warning" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="10" y1="15" x2="10" y2="9"/><line x1="14" y1="15" x2="14" y2="9"/></svg>
+          </div>
+          <h3 id="modal-deactivate-title" data-i18n="cust_modal_deactivate_title">Deactivate Your Account?</h3>
+          <button class="modal-close acct-modal__close" id="btn-close-deactivate" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-box__body acct-modal__body">
+          <p class="acct-modal__lead" data-i18n="cust_modal_deactivate_lead">Your account will be put on pause. Here's what that means:</p>
+          <ul class="acct-modal__consequences">
+            <li>
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <span data-i18n="cust_modal_deactivate_c1">Your profile will be hidden from technicians and search results.</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <span data-i18n="cust_modal_deactivate_c2">Active bookings will be kept but no new ones can be made.</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <span data-i18n="cust_modal_deactivate_c3">You can reactivate at any time by logging back in.</span>
+            </li>
+          </ul>
+          <label class="acct-modal__confirm-check">
+            <input type="checkbox" id="deactivate-confirm-check" />
+            <span data-i18n="cust_modal_deactivate_understand">I understand my account will be deactivated</span>
+          </label>
+        </div>
+        <div class="modal-box__footer acct-modal__footer">
+          <button type="button" class="btn btn--outline" id="btn-deactivate-cancel" data-i18n="cust_modal_cancel">Cancel</button>
+          <button type="button" class="btn btn--warning-solid" id="btn-deactivate-confirm" disabled data-i18n="cust_modal_deactivate_confirm">Deactivate Account</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Delete Account modal ──────────────────────────── -->
+    <div class="modal-overlay acct-modal" id="modal-delete" hidden role="dialog" aria-modal="true" aria-labelledby="modal-delete-title">
+      <div class="modal-box acct-modal__box">
+        <div class="modal-box__header acct-modal__header acct-modal__header--danger">
+          <div class="acct-modal__icon acct-modal__icon--danger" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+          </div>
+          <h3 id="modal-delete-title" data-i18n="cust_modal_delete_title">Permanently Delete Your Account?</h3>
+          <button class="modal-close acct-modal__close" id="btn-close-delete" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-box__body acct-modal__body">
+          <div class="acct-modal__warning-banner" role="alert">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <span data-i18n="cust_modal_delete_warning">This action is permanent and cannot be undone.</span>
+          </div>
+          <p class="acct-modal__lead" data-i18n="cust_modal_delete_lead">The following data will be permanently erased:</p>
+          <ul class="acct-modal__consequences acct-modal__consequences--danger">
+            <li>
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+              <span data-i18n="cust_modal_delete_c1">Your profile, photo, and all personal information</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+              <span data-i18n="cust_modal_delete_c2">All booking history and receipts</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+              <span data-i18n="cust_modal_delete_c3">Saved addresses and preferences</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+              <span data-i18n="cust_modal_delete_c4">All reviews you've submitted</span>
+            </li>
+          </ul>
+          <div class="acct-modal__type-confirm">
+            <label class="form-label" for="delete-confirm-input">
+              <span data-i18n="cust_modal_delete_type_label">Type</span>
+              <strong class="acct-modal__type-keyword">DELETE</strong>
+              <span data-i18n="cust_modal_delete_type_label2">to confirm</span>
+            </label>
+            <input class="form-input acct-modal__type-input" type="text" id="delete-confirm-input" autocomplete="off" spellcheck="false" placeholder="DELETE" />
+          </div>
+        </div>
+        <div class="modal-box__footer acct-modal__footer">
+          <button type="button" class="btn btn--outline" id="btn-delete-cancel" data-i18n="cust_modal_cancel">Cancel</button>
+          <button type="button" class="btn btn--danger" id="btn-delete-confirm" disabled data-i18n="cust_modal_delete_confirm">Delete My Account</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="../js/lang.js"></script>
+    <script type="module" src="../js/main.js"></script>
+  <script type="module" src="../js/html/customer-dashboard.js"></script>
+  </body>
+</html>
+
+<!-- . -->
