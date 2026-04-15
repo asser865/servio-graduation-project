@@ -444,4 +444,37 @@
 }
 [data-theme="dark"] .confirmation-payment-card { background: var(--color-surface); }
 
+/* ── RTL ─────────────────────────────────────────── */
+
+/* Timeline connector line: LTR anchors left edge, RTL anchors right edge */
+html[dir="rtl"] .timeline-item::before {
+  left: auto;
+  right: 16px;
+}
+
+/* conf-row value is right-aligned in LTR; in RTL flip to left */
+html[dir="rtl"] .conf-row__value {
+  text-align: left;
+}
+
+/* Booking reference pill: swap internal icon/text order for RTL reading */
+html[dir="rtl"] .booking-ref {
+  flex-direction: row-reverse;
+}
+
+/* Tech row avatar sits on the left in LTR; RTL reverses the row */
+html[dir="rtl"] .conf-tech-row {
+  flex-direction: row-reverse;
+}
+
+/* Timeline item flex: dot on the left in LTR, right in RTL */
+html[dir="rtl"] .timeline-item {
+  flex-direction: row-reverse;
+}
+
+/* Section title icon + text row */
+html[dir="rtl"] .conf-section__title {
+  flex-direction: row-reverse;
+}
+
 /* . */

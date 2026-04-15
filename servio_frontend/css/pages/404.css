@@ -44,4 +44,12 @@
   justify-content: center;
 }
 
+/* ── RTL ─────────────────────────────────────────── */
+
+/* Action buttons row: gap + flex-wrap are direction-neutral;
+   reverse so primary action stays visually first (right side) in RTL */
+html[dir="rtl"] .error-page__actions {
+  flex-direction: row-reverse;
+}
+
 /* . */

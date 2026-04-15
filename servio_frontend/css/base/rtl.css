@@ -964,15 +964,12 @@
 }
 
 [dir="rtl"] .review-card__header {
-  flex-direction: row-reverse;
 }
 
 [dir="rtl"] .review-card__rating {
-  flex-direction: row-reverse;
 }
 
 [dir="rtl"] .star-rating {
-  flex-direction: row-reverse;
 }
 
 /* ── Verification docs ─────────────────────────────────────────── */
@@ -1326,6 +1323,61 @@
   transform: rotate(180deg);
 }
 
+
+/* ── Home Section Indicator ───────────────────────────────────── */
+[dir="rtl"] .home-section-indicator {
+  left: auto;
+  right: 28px;
+  align-items: flex-start;
+}
+
+[dir="rtl"] .home-section-indicator::before {
+  left: auto;
+  right: calc((var(--home-indicator-track) - 1px) / 2);
+}
+
+[dir="rtl"] .home-section-indicator__item {
+  direction: rtl;
+}
+
+[dir="rtl"] .home-section-indicator__label {
+  transform: translateX(10px);
+}
+
+[dir="rtl"] .home-section-indicator__item:hover .home-section-indicator__label,
+[dir="rtl"] .home-section-indicator__item:focus-visible .home-section-indicator__label {
+  transform: translateX(0);
+}
+
+/* ── Live Booking Toast (FOMO) ────────────────────────────────── */
+[dir="rtl"] .booking-toast {
+  text-align: right;
+  direction: rtl;
+}
+
+[dir="rtl"] .booking-toast__content {
+  text-align: right;
+}
+
+/* ── Testimonials ─────────────────────────────────────────────── */
+[dir="rtl"] .testimonial-card,
+[dir="rtl"] .testimonial-card__quote,
+[dir="rtl"] .testimonial-card__stars,
+[dir="rtl"] .testimonial-card__author {
+  text-align: right;
+  direction: rtl;
+}
+
+[dir="rtl"] .testimonial-card::before {
+  right: auto;
+  left: 24px;
+  transform: scaleX(-1);
+}
+
+/* ── Marquee strip ────────────────────────────────────────────── */
+[dir="rtl"] .marquee-item {
+  direction: rtl;
+}
 
 /* . */
 

@@ -94,7 +94,7 @@
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
           <rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
         </svg>
-        <span class="booking-ref__label" data-i18n="conf_ref_label">Booking #SRV-2026-4821</span>
+        <span class="booking-ref__label" data-i18n="conf_ref_label" data-booking-ref>Booking #...</span>
         <span class="booking-ref__copied" data-i18n="conf_copied">Copied!</span>
       </button>
     </div>
@@ -221,7 +221,7 @@
               </div>
               <div class="timeline-content">
                 <div class="timeline-content__title" data-i18n="conf_timeline1_title">Booking submitted</div>
-                <div class="timeline-content__desc" data-i18n="conf_timeline1_desc">Your request has been sent to Omar Tarek. Reference: #SRV-2026-4821</div>
+                <div class="timeline-content__desc" data-i18n="conf_timeline1_desc" data-booking-ref-desc>Your request has been sent to Omar Tarek. Reference: #...</div>
               </div>
             </li>
             <li class="timeline-item">
@@ -358,72 +358,6 @@
 
   <script src="../js/lang.js"></script>
   <script type="module" src="../js/main.js"></script>
-  <script type="module">
-    import { animate, stagger } from 'https://cdn.jsdelivr.net/npm/motion@latest/+esm';
-
-    // ── Entry animations ──────────────────────────────────────────────────────
-
-    window.addEventListener('DOMContentLoaded', () => {
-      const icon    = document.getElementById('successIcon');
-      const heading = document.querySelector('.confirmation-hero h1');
-      const sub     = document.querySelector('.confirmation-hero__sub');
-      const ref     = document.querySelector('.booking-ref');
-
-      // 1. Success icon: scale in with spring-like bounce
-      if (icon) {
-        animate(icon,
-          { scale: [0, 1.2, 0.9, 1.05, 1], opacity: [0, 1, 1, 1, 1] },
-          { duration: 0.7, easing: 'ease-out' }
-        );
-      }
-
-      // 2. Stagger heading, sub, ref badge
-      animate([heading, sub, ref].filter(Boolean),
-        { opacity: [0, 1], y: [16, 0] },
-        { duration: 0.45, delay: stagger(0.1, { start: 0.35 }), easing: 'ease-out' }
-      );
-
-      // 3. Cards reveal
-      const cards = document.querySelectorAll('.conf-card, .timeline, .conf-sidebar-card, .help-card');
-      animate(cards,
-        { opacity: [0, 1], y: [20, 0] },
-        { duration: 0.5, delay: stagger(0.08, { start: 0.55 }), easing: 'ease-out' }
-      );
-
-      // 4. Timeline items stagger
-      const timelineItems = document.querySelectorAll('.timeline-item');
-      animate(timelineItems,
-        { opacity: [0, 1], x: [-12, 0] },
-        { duration: 0.4, delay: stagger(0.1, { start: 0.9 }), easing: 'ease-out' }
-      );
-    });
-
-    // ── Copy booking reference ────────────────────────────────────────────────
-
-    const refBtn = document.getElementById('refCopyBtn');
-    if (refBtn) {
-      refBtn.addEventListener('click', async () => {
-        const ref = '#SRV-2026-4821';
-        try {
-          await navigator.clipboard.writeText(ref);
-        } catch {
-          // fallback: do nothing
-        }
-        refBtn.classList.add('is-copied');
-        animate(refBtn, { scale: [1, 1.08, 1] }, { duration: 0.25 });
-        setTimeout(() => refBtn.classList.remove('is-copied'), 2000);
-      });
-    }
-
-    // ── Cancel booking button ─────────────────────────────────────────────────
-
-    document.getElementById('cancelBtn')?.addEventListener('click', () => {
-      if (confirm(window.t('conf_cancel_confirm'))) {
-        // Would navigate to cancellation flow
-        alert(window.t('conf_cancel_success'));
-      }
-    });
-  </script>
   <script type="module" src="../js/html/booking-confirmation.js"></script>
 </body>
 </html>

@@ -2,6 +2,7 @@
    auth-header.js — Sitewide logged-in header state
    Reads servio_session; injects avatar + dropdown if logged in.
    ═══════════════════════════════════════════════════════════ */
+import { getInitials } from '../utils/string.js';
 
 function getSession() {
   try {
@@ -9,15 +10,6 @@ function getSession() {
   } catch {
     return null;
   }
-}
-
-function getInitials(name) {
-  return (name || '?')
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map(w => w[0].toUpperCase())
-    .join('');
 }
 
 function getDashboardHref(role) {

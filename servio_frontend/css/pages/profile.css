@@ -1223,4 +1223,76 @@
   margin-bottom: 0;
 }
 
+/* ── RTL ─────────────────────────────────────────── */
+
+/* Verified badge: positioned bottom-right in LTR → bottom-left in RTL */
+html[dir="rtl"] .profile-badge--verified {
+  right: auto;
+  left: 6px;
+}
+
+/* Professional summary card: accent border-left → border-right */
+html[dir="rtl"] .profile-section-card {
+  border-left: none;
+  border-right: 3px solid var(--color-primary);
+}
+
+/* Summary meta row: label then value in LTR; RTL reverses reading order */
+html[dir="rtl"] .summary-meta-row {
+  flex-direction: row-reverse;
+}
+
+/* Summary meta label text alignment */
+html[dir="rtl"] .summary-meta__label {
+  text-align: right;
+}
+
+/* Rating bar label: right-aligned number in LTR → left-aligned in RTL */
+html[dir="rtl"] .rating-bar-label {
+  text-align: left;
+}
+
+/* Service card: icon on the left in LTR, right in RTL */
+html[dir="rtl"] .service-card {
+  flex-direction: row-reverse;
+}
+
+/* Credentials list items: icon + text row reversed */
+html[dir="rtl"] .list-credentials li {
+  flex-direction: row-reverse;
+}
+
+/* Similar tech card: avatar on the left in LTR */
+
+/* Review card header: initials on the left in LTR */
+
+/* Reviews overview: big rating on the left in LTR */
+
+/* Portfolio cost badge: top-right in LTR → top-left in RTL */
+html[dir="rtl"] .portfolio-project__cost-badge {
+  right: auto;
+  left: 0.6rem;
+}
+
+/* Lightbox close button: top-right in LTR → top-left in RTL */
+html[dir="rtl"] .portfolio-lightbox__close {
+  right: auto;
+  left: 1.5rem;
+}
+
+/* Booking action card gradient bar: left→right in LTR, right→left in RTL */
+html[dir="rtl"] .booking-action-card::before {
+  background: linear-gradient(270deg, var(--color-accent), var(--color-primary));
+}
+
+/* Availability badge: centered, no change needed; trust line icon+text */
+html[dir="rtl"] .booking-trust-line {
+  flex-direction: row-reverse;
+}
+
+/* Sort label: margin-right in LTR → margin-left in RTL (applies from technicians but defined here on profile too) */
+html[dir="rtl"] .tech-card__availability {
+  text-align: left;
+}
+
 /* . */

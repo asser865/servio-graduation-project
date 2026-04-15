@@ -1,4 +1,5 @@
 import { initThemeToggle } from "../components/theme-toggle.js";
+import { getInitials } from '../utils/string.js';
 
 // Messaging workspace logic
 
@@ -78,18 +79,6 @@ let activeConvId = CONVERSATIONS[0].id;
 
 function nowTime() {
   return new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-}
-
-function getInitials(value) {
-  if (!value) return 'ME';
-  const words = String(value)
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-
-  if (!words.length) return 'ME';
-  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
-  return `${words[0][0] || ''}${words[1][0] || ''}`.toUpperCase();
 }
 
 function getSelfInitials() {

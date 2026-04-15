@@ -2,6 +2,8 @@
    Admin Dashboard — SERVIO
    ═══════════════════════════════════════════════ */
 
+import { showToast } from '../components/toast.js';
+
 // Auth guard
 const session = JSON.parse(localStorage.getItem('servio_session') || 'null');
 if (!session) {
@@ -9,21 +11,11 @@ if (!session) {
   const currentPage = currentPath.substring(currentPath.lastIndexOf('/') + 1) || 'index.html';
   const redirectParam = encodeURIComponent('./' + currentPage + window.location.search);
   window.location.href = './login.html?redirect=' + redirectParam;
+  throw new Error('Unauthenticated — redirecting to login');
 }
-if (session?.role !== 'admin') { window.location.href = './index.html'; }
-
-function showToast(msg, type = 'success') {
-  const t = document.createElement('div');
-  t.className = `toast toast--${type}`;
-  t.textContent = msg;
-  document.body.appendChild(t);
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => t.classList.add('is-visible'));
-  });
-  setTimeout(() => {
-    t.classList.remove('is-visible');
-    setTimeout(() => t.remove(), 300);
-  }, 2500);
+if (session.role !== 'admin') {
+  window.location.href = './index.html';
+  throw new Error('Role redirect — not admin');
 }
 
 // ── Helper: locale-aware date ──────────────────
@@ -416,7 +408,7 @@ function initAdminDashboard() {
       const matchQ = q === '' || name.includes(q) || id.includes(q);
       // For mock purposes, we check if the row's innerHTML contains the status value
       // This is a simple way to handle the status filters in a static mock.
-      const matchStatus = status === '' || row.innerHTML.includes(status);
+      const matchStatus = status === '' || row.dataset.status === status;
 
       row.style.display = (matchQ && matchStatus) ? '' : 'none';
     });

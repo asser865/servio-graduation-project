@@ -3,6 +3,7 @@
    ═══════════════════════════════════════════════════════════ */
 import { showToast } from '../components/toast.js';
 import { revealAll } from '../components/scroll-reveal.js';
+import { getInitials } from '../utils/string.js';
 
 
 const TAB_KEY = 'servio_activeTab_customer';
@@ -29,10 +30,6 @@ function getAccount() {
   try {
     return JSON.parse(localStorage.getItem('servio_account') || 'null');
   } catch { return null; }
-}
-
-function getInitials(name) {
-  return (name || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0].toUpperCase()).join('');
 }
 
 /* ── Tab switching ──────────────────────────────────────── */

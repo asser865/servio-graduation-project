@@ -254,7 +254,7 @@ function renderPage(bk) {
   // Payment summary
   bkPaySummaryMethod.setAttribute('data-i18n', payMethKey);
   bkPaySummaryMethod.textContent = t(payMethKey) || bk.paymentMethod || '—';
-  bkPayAmount.innerHTML = `<strong>${bk.paymentAmount || '—'}</strong>`;
+  bkPayAmount.textContent = bk.paymentAmount || '—';
   const payStatusKey = 'status_' + (bk.paymentStatus || 'Pending').toLowerCase().replace(' ', '_');
   bkPayStatus.setAttribute('data-i18n', payStatusKey);
   bkPayStatus.textContent = t(payStatusKey) || bk.paymentStatus || 'Pending';
@@ -277,7 +277,6 @@ function renderTimeline(currentStatus) {
   steps.forEach((step, i) => {
     let state;
     if (isCancelled) {
-      state = 'done';
       state = i < currentIndex ? 'done' : 'pending';
     } else {
       if (i < currentIndex)      state = 'done';

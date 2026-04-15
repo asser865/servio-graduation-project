@@ -12,8 +12,10 @@
   // ── Role Guard ──────────────────────────────────────────
   if (session.role === 'admin') {
     window.location.href = './admin-dashboard.html';
+    throw new Error('Role redirect — admin');
   } else if (session.role === 'technician') {
     window.location.href = './technician-dashboard.html';
+    throw new Error('Role redirect — technician');
   }
 })();
 
@@ -22,7 +24,7 @@
  * Uses Motion One (vanilla JS Framer Motion) for smooth step transitions
  */
 
-import { animate, stagger } from 'https://cdn.jsdelivr.net/npm/motion@latest/+esm';
+import { animate, stagger } from 'https://cdn.jsdelivr.net/npm/motion@12.38.0/+esm';
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -108,10 +110,12 @@ document.addEventListener('click', (e) => {
   state.data.time = pill.textContent.trim();
 
   // Trigger feedback animation
-  animate(pill, 
-    { scale: [0.94, 1.05, 1], boxShadow: ["0 0 0 rgba(0,0,0,0)", "0 8px 20px rgba(154,140,115,0.3)", "0 4px 15px rgba(154,140,115,0.3)"] }, 
-    { duration: 0.3 }
-  );
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    animate(pill,
+      { scale: [0.94, 1.05, 1], boxShadow: ["0 0 0 rgba(0,0,0,0)", "0 8px 20px rgba(154,140,115,0.3)", "0 4px 15px rgba(154,140,115,0.3)"] },
+      { duration: 0.3 }
+    );
+  }
 });
 
 
@@ -130,13 +134,15 @@ paymentOpts.forEach((opt) => {
     if (cardFields) {
       const show = val === 'card';
       cardFields.classList.toggle('is-hidden', !show);
-      if (show) {
+      if (show && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
         animate(cardFields, { opacity: [0, 1], y: [-8, 0] }, { duration: 0.28 });
       }
     }
 
     // Selection animation
-    animate(opt, { scale: [0.97, 1.02, 1] }, { duration: 0.22 });
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      animate(opt, { scale: [0.97, 1.02, 1] }, { duration: 0.22 });
+    }
   });
 });
 
@@ -153,8 +159,8 @@ document.querySelectorAll('.review-block__edit').forEach((btn) => {
 
 if (confirmBtn) {
   confirmBtn.addEventListener('click', (e) => {
+    e.preventDefault();
     if (!termsCheck || !termsCheck.checked) {
-      e.preventDefault();
       // Shake the terms checkbox
       animate(termsCheck?.closest('.terms-check') || confirmBtn,
         { x: [0, -6, 6, -4, 4, 0] },
@@ -200,9 +206,13 @@ if (confirmBtn) {
     localStorage.setItem('servio_active_booking', JSON.stringify(bookingData));
     const existingBookings = JSON.parse(localStorage.getItem('servio_bookings') || '[]');
     existingBookings.push(bookingData);
+    // Cap at 50 entries to avoid localStorage quota issues
+    if (existingBookings.length > 50) existingBookings.splice(0, existingBookings.length - 50);
     localStorage.setItem('servio_bookings', JSON.stringify(existingBookings));
     // Animate button before navigation
     animate(confirmBtn, { scale: [1, 0.95, 1.02, 1] }, { duration: 0.3 });
+    // Wait for animation then navigate
+    setTimeout(() => { window.location.href = './booking-confirmation.html'; }, 320);
   });
 }
 
@@ -295,34 +305,39 @@ function formatDate(raw) {
 async function goToStep(target) {
   if (target === state.currentStep) return;
 
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const direction = target > state.currentStep ? 1 : -1;
   const fromPanel = document.getElementById(`step-${state.currentStep}`);
   const toPanel   = document.getElementById(`step-${target}`);
   if (!fromPanel || !toPanel) return;
 
   // Animate out current panel
-  await animate(fromPanel,
-    { opacity: [1, 0], x: [0, direction * -30] },
-    { duration: 0.22, easing: 'ease-in' }
-  ).finished;
+  if (!prefersReducedMotion) {
+    await animate(fromPanel,
+      { opacity: [1, 0], x: [0, direction * -30] },
+      { duration: 0.22, easing: 'ease-in' }
+    ).finished;
+  }
 
   fromPanel.classList.remove('is-active');
   fromPanel.style.cssText = '';
 
   // Show next panel
   toPanel.classList.add('is-active');
-  toPanel.style.opacity = '0';
-  toPanel.style.transform = `translateX(${direction * 30}px)`;
+  if (!prefersReducedMotion) {
+    toPanel.style.opacity = '0';
+    toPanel.style.transform = `translateX(${direction * 30}px)`;
 
-  // Animate in
-  animate(toPanel,
-    { opacity: [0, 1], x: [direction * 30, 0] },
-    { duration: 0.3, easing: [0.25, 0.46, 0.45, 0.94] }
-  );
+    // Animate in
+    animate(toPanel,
+      { opacity: [0, 1], x: [direction * 30, 0] },
+      { duration: 0.3, easing: [0.25, 0.46, 0.45, 0.94] }
+    );
+  }
 
   // Stagger-reveal form fields inside new panel
   const revealEls = toPanel.querySelectorAll('.field, .timeslot-section, .payment-option, .review-block');
-  if (revealEls.length) {
+  if (revealEls.length && !prefersReducedMotion) {
     animate(revealEls,
       { opacity: [0, 1], y: [10, 0] },
       { duration: 0.3, delay: stagger(0.05), easing: 'ease-out' }
@@ -331,7 +346,7 @@ async function goToStep(target) {
 
   // Update stepper
   state.currentStep = target;
-  updateStepper();
+  updateStepper(prefersReducedMotion);
 
   // Scroll to top of form
   document.querySelector('.booking-stepper')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -339,7 +354,7 @@ async function goToStep(target) {
 
 // ─── Stepper UI update ───────────────────────────────────────────────────────
 
-function updateStepper() {
+function updateStepper(prefersReducedMotion) {
   stepItems.forEach((item, idx) => {
     const stepNum  = idx + 1;
     const numEl    = item.querySelector('.step-num');
@@ -354,11 +369,11 @@ function updateStepper() {
             <polyline points="20 6 9 17 4 12"></polyline>
           </svg>`;
       }
-      animate(item, { scale: [1, 1.04, 1] }, { duration: 0.25 });
+      if (!prefersReducedMotion) animate(item, { scale: [1, 1.04, 1] }, { duration: 0.25 });
     } else if (stepNum === state.currentStep) {
       item.classList.add('is-active');
       if (numEl) numEl.textContent = stepNum;
-      animate(item.querySelector('.step-num'), { scale: [0.85, 1.1, 1] }, { duration: 0.3 });
+      if (!prefersReducedMotion) animate(item.querySelector('.step-num'), { scale: [0.85, 1.1, 1] }, { duration: 0.3 });
     } else {
       if (numEl) numEl.textContent = stepNum;
     }
@@ -369,7 +384,7 @@ function updateStepper() {
 
 document.getElementById('cardNumber')?.addEventListener('input', (e) => {
   const raw = e.target.value.replace(/\D/g, '').slice(0, 16);
-  e.target.value = raw.replace(/(.{4})/g, '1 EGP ').trim();
+  e.target.value = raw.replace(/(.{4})/g, '$1 ').trim();
 });
 
 document.getElementById('cardExpiry')?.addEventListener('input', (e) => {
