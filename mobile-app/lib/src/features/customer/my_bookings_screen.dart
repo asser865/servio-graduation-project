@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/models/booking_model.dart';
+import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
@@ -109,68 +112,186 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
   }
 
   Widget _buildTabContent() {
+    final bookingsProvider = context.watch<BookingsProvider>();
+
     switch (_tabIndex) {
       case 0:
-        return ListView(
-          children: <Widget>[
-            _BookingCard(
-              active: true,
-              statusLabel: 'In Progress',
-              statusType: ServioStatusChipType.info,
-              actionBuilder: (BuildContext context) {
-                return ServioPrimaryButton(
-                  label: 'View Details',
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const BookingDetailsScreen(),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
-          ],
-        );
-      case 1:
-        return ListView(
-          children: <Widget>[
-            _BookingCard(
-              active: false,
-              statusLabel: 'Completed',
-              statusType: ServioStatusChipType.success,
-              actionBuilder: (BuildContext context) {
-                return Row(
-                  children: <Widget>[
-                    Expanded(child: OutlinedButton(onPressed: () {}, child: const Text('Re-book'))),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => const BookingDetailsScreen(),
-                            ),
-                          );
-                        },
-                        child: const Text('View Details'),
+        final active = bookingsProvider.upcoming;
+        if (active.isEmpty) {
+          return const _EmptyState(message: 'No active bookings yet.');
+        }
+        return ListView.separated(
+          itemCount: active.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 16),
+          itemBuilder: (BuildContext context, int index) {
+            final booking = active[index];
+            return _LiveBookingCard(
+              booking: booking,
+              onViewDetails: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => BookingDetailsScreen(
+                      data: BookingFlowData(
+                        serviceName: booking.serviceName,
+                        technicianName: booking.technicianName,
+                        date: booking.date,
+                        time: booking.time,
+                        location: booking.location,
+                        amount: booking.amount,
+                        reference: booking.reference,
                       ),
                     ),
-                  ],
+                  ),
                 );
               },
-            ),
-          ],
+            );
+          },
+        );
+      case 1:
+        final past = bookingsProvider.past;
+        if (past.isEmpty) {
+          return const _EmptyState(message: 'No booking history yet.');
+        }
+        return ListView.separated(
+          itemCount: past.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 16),
+          itemBuilder: (BuildContext context, int index) {
+            final booking = past[index];
+            return _LiveBookingCard(
+              booking: booking,
+              onViewDetails: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => BookingDetailsScreen(
+                      data: BookingFlowData(
+                        serviceName: booking.serviceName,
+                        technicianName: booking.technicianName,
+                        date: booking.date,
+                        time: booking.time,
+                        location: booking.location,
+                        amount: booking.amount,
+                        reference: booking.reference,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            );
+          },
         );
       default:
         return ListView(
           children: const <Widget>[
-            _FavouriteTechnicianCard(name: 'Ahmed Nabil', specialty: 'Plumbing'),
+            _FavouriteTechnicianCard(name: 'Khaled Mohamed', specialty: 'Plumbing'),
             SizedBox(height: 16),
-            _FavouriteTechnicianCard(name: 'Mariam Adel', specialty: 'Electrical'),
+            _FavouriteTechnicianCard(name: 'Mahmoud Ibrahim', specialty: 'Electrical'),
           ],
         );
     }
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final servio = context.servio;
+    return Center(
+      child: Text(
+        message,
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
+      ),
+    );
+  }
+}
+
+class _LiveBookingCard extends StatelessWidget {
+  const _LiveBookingCard({
+    required this.booking,
+    required this.onViewDetails,
+  });
+
+  final BookingModel booking;
+  final VoidCallback onViewDetails;
+
+  static ServioStatusChipType _chipType(BookingStatus status) => switch (status) {
+        BookingStatus.upcoming => ServioStatusChipType.warning,
+        BookingStatus.inProgress => ServioStatusChipType.info,
+        BookingStatus.completed => ServioStatusChipType.success,
+        BookingStatus.cancelled => ServioStatusChipType.danger,
+      };
+
+  static String _chipLabel(BookingStatus status) => switch (status) {
+        BookingStatus.upcoming => 'Upcoming',
+        BookingStatus.inProgress => 'In Progress',
+        BookingStatus.completed => 'Completed',
+        BookingStatus.cancelled => 'Cancelled',
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final servio = context.servio;
+    final theme = Theme.of(context);
+    final isActive = booking.status == BookingStatus.upcoming ||
+        booking.status == BookingStatus.inProgress;
+
+    return ServioCard(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Container(
+            width: 4,
+            height: 120,
+            decoration: BoxDecoration(
+              color: isActive ? servio.info : servio.success,
+              borderRadius: BorderRadius.circular(ServioRadius.full),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(booking.serviceName, style: theme.textTheme.titleMedium),
+                const SizedBox(height: 6),
+                Text(
+                  '${booking.technicianName} • ${booking.date}',
+                  style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+                ),
+                const SizedBox(height: 10),
+                ServioStatusChip(
+                  label: _chipLabel(booking.status),
+                  type: _chipType(booking.status),
+                ),
+                const SizedBox(height: 14),
+                isActive
+                    ? ServioPrimaryButton(label: 'View Details', onPressed: onViewDetails)
+                    : Row(
+                        children: <Widget>[
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () {},
+                              child: const Text('Re-book'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: onViewDetails,
+                              child: const Text('View Details'),
+                            ),
+                          ),
+                        ],
+                      ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -314,59 +435,6 @@ class BookingDetailsScreen extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _BookingCard extends StatelessWidget {
-  const _BookingCard({
-    required this.active,
-    required this.statusLabel,
-    required this.statusType,
-    required this.actionBuilder,
-  });
-
-  final bool active;
-  final String statusLabel;
-  final ServioStatusChipType statusType;
-  final WidgetBuilder actionBuilder;
-
-  @override
-  Widget build(BuildContext context) {
-    final servio = context.servio;
-
-    return ServioCard(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Container(
-            width: 4,
-            height: 120,
-            decoration: BoxDecoration(
-              color: active ? servio.info : servio.success,
-              borderRadius: BorderRadius.circular(ServioRadius.full),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text('Plumbing Repair Visit', style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 6),
-                Text(
-                  'Ahmed Nabil • 26/03/2026',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: servio.textSecondary),
-                ),
-                const SizedBox(height: 10),
-                ServioStatusChip(label: statusLabel, type: statusType),
-                const SizedBox(height: 14),
-                actionBuilder(context),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }

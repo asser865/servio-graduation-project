@@ -54,17 +54,27 @@ final class ServioTheme {
       ),
     );
 
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: ServioColors.accent,
+    // primary = navyDark (#222831): the primary action / nav-active colour in light mode.
+    // accent (#9A8C73) is the warm taupe used for highlights — NOT the primary.
+    final colorScheme = ColorScheme(
       brightness: Brightness.light,
-      primary: ServioColors.accent,
-      secondary: ServioColors.accentLight,
-      surface: ServioColors.surfaceLight,
-      error: ServioColors.danger,
-    ).copyWith(
+      primary: ServioColors.navyDark,
       onPrimary: Colors.white,
-      onSecondary: ServioColors.textPrimaryLight,
+      primaryContainer: ServioColors.backgroundSoftLight,
+      onPrimaryContainer: ServioColors.navyDark,
+      secondary: ServioColors.accent,
+      onSecondary: Colors.white,
+      secondaryContainer: ServioColors.neutralWarm,
+      onSecondaryContainer: ServioColors.deepBrown,
+      tertiary: ServioColors.accentLight,
+      onTertiary: ServioColors.navyDark,
+      error: ServioColors.danger,
+      onError: Colors.white,
+      surface: ServioColors.surfaceLight,
       onSurface: ServioColors.textPrimaryLight,
+      onSurfaceVariant: ServioColors.textSecondaryLight,
+      outline: ServioColors.borderLight,
+      outlineVariant: ServioColors.backgroundSoftLight,
     );
 
     final base = ThemeData(
@@ -147,17 +157,26 @@ final class ServioTheme {
       ),
     );
 
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: ServioColors.accent,
+    // Dark mode: primary flips to warm sand (#E3D5CA) — the design's dark-primary token.
+    final colorScheme = ColorScheme(
       brightness: Brightness.dark,
-      primary: ServioColors.accent,
-      secondary: ServioColors.accentLight,
-      surface: ServioColors.surfaceDark,
+      primary: ServioColors.neutralWarm,
+      onPrimary: ServioColors.navyDark,
+      primaryContainer: ServioColors.surfaceDark,
+      onPrimaryContainer: ServioColors.neutralWarm,
+      secondary: ServioColors.accent,
+      onSecondary: ServioColors.navyDark,
+      secondaryContainer: ServioColors.surfaceRaisedDark,
+      onSecondaryContainer: ServioColors.accentLight,
+      tertiary: ServioColors.accentLight,
+      onTertiary: ServioColors.navyDark,
       error: ServioColors.danger,
-    ).copyWith(
-      onPrimary: Colors.white,
-      onSecondary: ServioColors.textPrimaryDark,
+      onError: Colors.white,
+      surface: ServioColors.surfaceDark,
       onSurface: ServioColors.textPrimaryDark,
+      onSurfaceVariant: ServioColors.textSecondaryDark,
+      outline: ServioColors.borderDark,
+      outlineVariant: ServioColors.surfaceRaisedDark,
     );
 
     final base = ThemeData(
@@ -175,8 +194,8 @@ final class ServioTheme {
     return _buildTheme(
       base,
       const ServioThemeExtension(
-        backgroundSoft: ServioColors.backgroundSoftDark,
-        surfaceAlt: ServioColors.surfaceRaisedDark,
+        backgroundSoft: ServioColors.backgroundSoftDark,  // #262B34 (was wrong before)
+        surfaceAlt: ServioColors.surfaceAltDark,
         surfaceRaised: ServioColors.surfaceRaisedDark,
         textSecondary: ServioColors.textSecondaryDark,
         border: ServioColors.borderDark,
@@ -263,14 +282,20 @@ final class ServioTheme {
           shape: roundedFull,
           side: BorderSide(color: extension.accent, width: 1.5),
           foregroundColor: extension.accent,
-          textStyle: base.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+          textStyle: base.textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+            fontFamily: 'Inter',
+          ),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           minimumSize: const Size(44, 44),
           foregroundColor: extension.accent,
-          textStyle: base.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+          textStyle: base.textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+            fontFamily: 'Inter',
+          ),
         ),
       ),
       chipTheme: base.chipTheme.copyWith(

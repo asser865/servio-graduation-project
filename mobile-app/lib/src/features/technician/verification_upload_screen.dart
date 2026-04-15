@@ -28,14 +28,28 @@ class VerificationUploadScreen extends StatelessWidget {
               style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary),
             ),
             const SizedBox(height: 10),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(ServioRadius.full),
-              child: LinearProgressIndicator(
-                value: 1 / 3,
-                minHeight: 8,
-                backgroundColor: servio.backgroundSoft,
-                valueColor: AlwaysStoppedAnimation<Color>(servio.accent),
-              ),
+            LayoutBuilder(
+              builder: (BuildContext ctx, BoxConstraints constraints) {
+                return Stack(
+                  children: <Widget>[
+                    Container(
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: servio.backgroundSoft,
+                        borderRadius: BorderRadius.circular(ServioRadius.full),
+                      ),
+                    ),
+                    Container(
+                      height: 8,
+                      width: constraints.maxWidth / 3,
+                      decoration: BoxDecoration(
+                        gradient: ServioGradients.accent,
+                        borderRadius: BorderRadius.circular(ServioRadius.full),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 24),
             Text('Upload Your National ID', style: theme.textTheme.headlineMedium),

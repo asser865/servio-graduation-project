@@ -1,23 +1,60 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:provider/provider.dart';
 
+import 'core/services/storage_service.dart';
+import 'core/state/app_state.dart';
 import 'design_system/servio_theme.dart';
 import 'design_system/servio_tokens.dart';
-import 'features/customer/customer_home_screen.dart';
+import 'features/auth/role_selection_screen.dart';
 
 class ServioApp extends StatelessWidget {
-  const ServioApp({super.key});
+  const ServioApp({required this.storage, super.key});
+
+  final StorageService storage;
 
   @override
   Widget build(BuildContext context) {
+    return MultiProvider(
+      providers: <ChangeNotifierProvider<ChangeNotifier>>[
+        ChangeNotifierProvider<SessionProvider>(
+          create: (_) => SessionProvider.load(storage),
+        ),
+        ChangeNotifierProvider<ThemeProvider>(
+          create: (_) => ThemeProvider(storage),
+        ),
+        ChangeNotifierProvider<LocaleProvider>(
+          create: (_) => LocaleProvider(storage),
+        ),
+        ChangeNotifierProvider<BookingsProvider>(
+          create: (_) => BookingsProvider(storage),
+        ),
+        ChangeNotifierProvider<MessagesProvider>(
+          create: (_) => MessagesProvider(),
+        ),
+      ],
+      child: const _AppView(),
+    );
+  }
+}
+
+class _AppView extends StatelessWidget {
+  const _AppView();
+
+  @override
+  Widget build(BuildContext context) {
+    final themeMode = context.watch<ThemeProvider>().mode;
+    final locale = context.watch<LocaleProvider>().locale;
+
     return MaterialApp(
       title: 'SERVIO',
       debugShowCheckedModeBanner: false,
-      themeMode: ThemeMode.system,
+      themeMode: themeMode,
       themeAnimationCurve: ServioMotion.curve,
       themeAnimationDuration: ServioMotion.micro,
       theme: ServioTheme.light(),
       darkTheme: ServioTheme.dark(),
+      locale: locale,
       supportedLocales: const <Locale>[
         Locale('en'),
         Locale('ar'),
@@ -27,7 +64,19 @@ class ServioApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      home: const CustomerHomeScreen(),
+      home: const _AuthGate(),
     );
+  }
+}
+
+/// Shows the home screen for the logged-in user's role, or [RoleSelectionScreen].
+class _AuthGate extends StatelessWidget {
+  const _AuthGate();
+
+  @override
+  Widget build(BuildContext context) {
+    // Listening to session changes triggers a rebuild when user logs in/out.
+    context.watch<SessionProvider>();
+    return const RoleSelectionScreen();
   }
 }

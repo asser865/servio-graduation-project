@@ -52,14 +52,30 @@ class _AiFinishingEstimatorScreenState extends State<AiFinishingEstimatorScreen>
               style: Theme.of(context).textTheme.bodySmall?.copyWith(color: servio.textSecondary),
             ),
             const SizedBox(height: 10),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(ServioRadius.full),
-              child: LinearProgressIndicator(
-                value: progress,
-                minHeight: 8,
-                backgroundColor: servio.backgroundSoft,
-                valueColor: AlwaysStoppedAnimation<Color>(servio.accent),
-              ),
+            LayoutBuilder(
+              builder: (BuildContext ctx, BoxConstraints constraints) {
+                return Stack(
+                  children: <Widget>[
+                    Container(
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: servio.backgroundSoft,
+                        borderRadius: BorderRadius.circular(ServioRadius.full),
+                      ),
+                    ),
+                    AnimatedContainer(
+                      duration: ServioMotion.normal,
+                      curve: ServioMotion.spring,
+                      height: 8,
+                      width: constraints.maxWidth * progress,
+                      decoration: BoxDecoration(
+                        gradient: ServioGradients.accent,
+                        borderRadius: BorderRadius.circular(ServioRadius.full),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 24),
             AnimatedSwitcher(

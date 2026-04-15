@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/models/message_model.dart';
+import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({
     required this.contactName,
+    this.conversationId,
     super.key,
   });
 
   final String contactName;
+  final String? conversationId;
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -17,11 +22,14 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
-  final List<_ChatMessage> _messages = <_ChatMessage>[
-    const _ChatMessage(text: 'Hello, I am on my way to the address now.', incoming: true, time: '10:08 AM'),
-    const _ChatMessage(text: 'Perfect, I will be there in 15 minutes.', incoming: false, time: '10:09 AM'),
-    const _ChatMessage(text: 'Please keep the booking reference ready.', incoming: true, time: '10:10 AM'),
-  ];
+
+  ConversationModel? get _conversation {
+    final provider = context.read<MessagesProvider>();
+    final id = widget.conversationId;
+    if (id == null) return null;
+    return provider.conversations.where((c) => c.id == id).firstOrNull;
+  }
+
 
   @override
   void dispose() {
@@ -31,20 +39,21 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _sendMessage() {
     final text = _controller.text.trim();
-    if (text.isEmpty) {
-      return;
+    if (text.isEmpty) return;
+    _controller.clear();
+    final id = widget.conversationId;
+    if (id != null) {
+      context.read<MessagesProvider>().sendMessage(id, text);
     }
-
-    setState(() {
-      _messages.add(_ChatMessage(text: text, incoming: false, time: 'Now'));
-      _controller.clear();
-    });
   }
 
   @override
   Widget build(BuildContext context) {
     final servio = context.servio;
     final theme = Theme.of(context);
+    // Watch so the list rebuilds when new messages arrive.
+    context.watch<MessagesProvider>();
+    final messages = _conversation?.messages ?? <ChatMessage>[];
 
     return Scaffold(
       body: SafeArea(
@@ -92,35 +101,35 @@ class _ChatScreenState extends State<ChatScreen> {
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: _messages.length,
+                itemCount: messages.length,
                 itemBuilder: (BuildContext context, int index) {
-                  final message = _messages[index];
+                  final message = messages[index];
 
                   return Align(
-                    alignment: message.incoming ? Alignment.centerLeft : Alignment.centerRight,
+                    alignment: !message.isMe ? Alignment.centerLeft : Alignment.centerRight,
                     child: Padding(
                       padding: const EdgeInsets.only(bottom: 14),
                       child: Column(
                         crossAxisAlignment:
-                            message.incoming ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+                            !message.isMe ? CrossAxisAlignment.start : CrossAxisAlignment.end,
                         children: <Widget>[
                           Container(
                             constraints: const BoxConstraints(maxWidth: 280),
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                             decoration: BoxDecoration(
-                              gradient: message.incoming ? null : ServioGradients.brand,
-                              color: message.incoming ? servio.surfaceRaised : null,
+                              gradient: !message.isMe ? null : ServioGradients.brand,
+                              color: !message.isMe ? servio.surfaceRaised : null,
                               borderRadius: BorderRadius.only(
                                 topLeft: const Radius.circular(ServioRadius.xl),
                                 topRight: const Radius.circular(ServioRadius.xl),
-                                bottomLeft: Radius.circular(message.incoming ? 8 : ServioRadius.xl),
-                                bottomRight: Radius.circular(message.incoming ? ServioRadius.xl : 8),
+                                bottomLeft: Radius.circular(!message.isMe ? 8 : ServioRadius.xl),
+                                bottomRight: Radius.circular(!message.isMe ? ServioRadius.xl : 8),
                               ),
                             ),
                             child: Text(
                               message.text,
                               style: theme.textTheme.bodyMedium?.copyWith(
-                                color: message.incoming ? theme.colorScheme.onSurface : Colors.white,
+                                color: !message.isMe ? theme.colorScheme.onSurface : Colors.white,
                               ),
                             ),
                           ),
@@ -188,14 +197,3 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 }
 
-class _ChatMessage {
-  const _ChatMessage({
-    required this.text,
-    required this.incoming,
-    required this.time,
-  });
-
-  final String text;
-  final bool incoming;
-  final String time;
-}

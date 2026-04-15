@@ -1,21 +1,51 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/models/booking_model.dart';
+import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
 import '../customer/customer_home_screen.dart';
-import '../customer/my_bookings_screen.dart';
+import '../customer/my_bookings_screen.dart' show BookingDetailsScreen, MyBookingsScreen;
 import '../messages/chat_screen.dart';
 import 'booking_flow_data.dart';
 
-class BookingConfirmationScreen extends StatelessWidget {
+class BookingConfirmationScreen extends StatefulWidget {
   const BookingConfirmationScreen({
     required this.data,
     super.key,
   });
 
   final BookingFlowData data;
+
+  @override
+  State<BookingConfirmationScreen> createState() => _BookingConfirmationScreenState();
+}
+
+class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Persist the new booking after the first frame so Provider is available.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final booking = BookingModel(
+        id: 'bk_${DateTime.now().millisecondsSinceEpoch}',
+        reference: widget.data.reference,
+        serviceName: widget.data.serviceName,
+        technicianName: widget.data.technicianName,
+        technicianId: 'tech_unknown',
+        date: widget.data.date,
+        time: widget.data.time,
+        location: widget.data.location,
+        amount: widget.data.amount,
+        status: BookingStatus.upcoming,
+        pin: (1000 + DateTime.now().millisecondsSinceEpoch % 9000).toString(),
+      );
+      context.read<BookingsProvider>().add(booking);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,7 +83,7 @@ class BookingConfirmationScreen extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               Text(
-                data.reference,
+                widget.data.reference,
                 textAlign: TextAlign.center,
                 style: theme.textTheme.headlineMedium?.copyWith(color: servio.accent),
               ),
@@ -63,11 +93,11 @@ class BookingConfirmationScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    _DetailLine(label: 'Service', value: data.serviceName),
-                    _DetailLine(label: 'Technician', value: data.technicianName),
-                    _DetailLine(label: 'Date & Time', value: '${data.date} - ${data.time}'),
-                    _DetailLine(label: 'Location', value: data.location),
-                    _DetailLine(label: 'Amount', value: data.amount),
+                    _DetailLine(label: 'Service', value: widget.data.serviceName),
+                    _DetailLine(label: 'Technician', value: widget.data.technicianName),
+                    _DetailLine(label: 'Date & Time', value: '${widget.data.date} - ${widget.data.time}'),
+                    _DetailLine(label: 'Location', value: widget.data.location),
+                    _DetailLine(label: 'Amount', value: widget.data.amount),
                   ],
                 ),
               ),
@@ -77,7 +107,7 @@ class BookingConfirmationScreen extends StatelessWidget {
                 onPressed: () {
                   Navigator.of(context).pushAndRemoveUntil(
                     MaterialPageRoute<void>(
-                      builder: (_) => BookingDetailsScreen(data: data),
+                      builder: (_) => BookingDetailsScreen(data: widget.data),
                     ),
                     (Route<dynamic> route) => false,
                   );
@@ -88,7 +118,7 @@ class BookingConfirmationScreen extends StatelessWidget {
                 onPressed: () {
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
-                      builder: (_) => ChatScreen(contactName: data.technicianName),
+                      builder: (_) => ChatScreen(contactName: widget.data.technicianName),
                     ),
                   );
                 },

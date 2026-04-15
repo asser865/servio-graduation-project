@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
@@ -26,26 +28,61 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _obscureConfirmPassword = true;
   bool _agreed = true;
   bool _readyImmediately = true;
+  bool _submitting = false;
   String _availability = 'Both';
   final String _strength = 'strong';
   final Set<String> _specialties = <String>{'Plumbing', 'Electrical'};
 
+  final _nameCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  String _city = 'Cairo';
+
   int get _totalSteps => widget.role == AuthRole.technician ? 3 : 2;
 
-  void _continue() {
-    if (_step == _totalSteps - 1) {
-      final Widget destination = widget.role == AuthRole.customer
-          ? const CustomerHomeScreen()
-          : const TechnicianDashboardScreen();
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _emailCtrl.dispose();
+    _phoneCtrl.dispose();
+    super.dispose();
+  }
 
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute<void>(builder: (_) => destination),
-        (Route<dynamic> route) => false,
-      );
+  Future<void> _continue() async {
+    if (_step < _totalSteps - 1) {
+      setState(() => _step += 1);
       return;
     }
 
-    setState(() => _step += 1);
+    setState(() => _submitting = true);
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+    if (!mounted) return;
+
+    final session = context.read<SessionProvider>();
+    if (widget.role == AuthRole.customer) {
+      await session.registerCustomer(
+        name: _nameCtrl.text.trim().isEmpty ? 'New User' : _nameCtrl.text.trim(),
+        email: _emailCtrl.text.trim().isEmpty ? 'user@example.com' : _emailCtrl.text.trim(),
+        phone: _phoneCtrl.text.trim(),
+        city: _city,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute<void>(builder: (_) => const CustomerHomeScreen()),
+        (Route<dynamic> route) => false,
+      );
+    } else {
+      await session.registerTechnician(
+        name: _nameCtrl.text.trim().isEmpty ? 'New Technician' : _nameCtrl.text.trim(),
+        email: _emailCtrl.text.trim().isEmpty ? 'tech@example.com' : _emailCtrl.text.trim(),
+        phone: _phoneCtrl.text.trim(),
+      );
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute<void>(builder: (_) => const TechnicianDashboardScreen()),
+        (Route<dynamic> route) => false,
+      );
+    }
   }
 
   @override
@@ -66,14 +103,31 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary),
               ),
               const SizedBox(height: 12),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(ServioRadius.full),
-                child: LinearProgressIndicator(
-                  value: (_step + 1) / _totalSteps,
-                  minHeight: 8,
-                  backgroundColor: servio.backgroundSoft,
-                  valueColor: AlwaysStoppedAnimation<Color>(servio.accent),
-                ),
+              // Gradient progress bar — matches web linear-gradient(90deg, #9A8C73, #BFB09A)
+              LayoutBuilder(
+                builder: (BuildContext ctx, BoxConstraints constraints) {
+                  return Stack(
+                    children: <Widget>[
+                      Container(
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: servio.backgroundSoft,
+                          borderRadius: BorderRadius.circular(ServioRadius.full),
+                        ),
+                      ),
+                      AnimatedContainer(
+                        duration: ServioMotion.normal,
+                        curve: ServioMotion.spring,
+                        height: 8,
+                        width: constraints.maxWidth * (_step + 1) / _totalSteps,
+                        decoration: BoxDecoration(
+                          gradient: ServioGradients.accent,
+                          borderRadius: BorderRadius.circular(ServioRadius.full),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 24),
               Text(
@@ -89,8 +143,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
               _buildStepContent(context),
               const SizedBox(height: 24),
               ServioPrimaryButton(
-                label: _step == _totalSteps - 1 ? 'Create Account' : 'Continue',
-                onPressed: _continue,
+                label: _submitting
+                    ? 'Creating account…'
+                    : _step == _totalSteps - 1
+                        ? 'Create Account'
+                        : 'Continue',
+                onPressed: _submitting ? null : _continue,
               ),
               const SizedBox(height: 20),
             ],
@@ -128,13 +186,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
     return Column(
       children: <Widget>[
-        const TextField(
-          decoration: InputDecoration(labelText: 'Full Name'),
+        TextField(
+          controller: _nameCtrl,
+          textCapitalization: TextCapitalization.words,
+          textInputAction: TextInputAction.next,
+          decoration: const InputDecoration(labelText: 'Full Name'),
         ),
         const SizedBox(height: 16),
-        const TextField(
+        TextField(
+          controller: _emailCtrl,
           keyboardType: TextInputType.emailAddress,
-          decoration: InputDecoration(labelText: 'Email'),
+          textInputAction: TextInputAction.next,
+          decoration: const InputDecoration(labelText: 'Email'),
         ),
         const SizedBox(height: 16),
         Row(
@@ -151,10 +214,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
               ),
             ),
             const SizedBox(width: 12),
-            const Expanded(
+            Expanded(
               child: TextField(
+                controller: _phoneCtrl,
                 keyboardType: TextInputType.phone,
-                decoration: InputDecoration(labelText: 'Mobile Number'),
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(labelText: 'Mobile Number'),
               ),
             ),
           ],
@@ -219,7 +284,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
             DropdownMenuItem<String>(value: 'Alexandria', child: Text('Alexandria')),
             DropdownMenuItem<String>(value: 'Giza', child: Text('Giza')),
           ],
-          onChanged: (_) {},
+          onChanged: (String? v) => setState(() => _city = v ?? _city),
           decoration: const InputDecoration(labelText: 'Address / City'),
         ),
         const SizedBox(height: 16),

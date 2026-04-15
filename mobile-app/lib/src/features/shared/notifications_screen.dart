@@ -9,9 +9,6 @@ class NotificationsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final servio = context.servio;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Notifications'),
