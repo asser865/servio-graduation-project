@@ -35,23 +35,74 @@ export function initBackToTop() {
 
   let isVisible = false;
 
+  // Determine the primary scroll container. Dashboards use internal scrolling.
+  const getScrollContainer = () => {
+    return document.querySelector('.admin-content') || document.querySelector('.dash-content');
+  };
+
   const handleScroll = () => {
-    // Show button after scrolling down 400px
-    const shouldBeVisible = window.scrollY > 400;
+    const container = getScrollContainer();
+    
+    // Capture from every standard scrolling element
+    let scrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+    
+    if (container && container.scrollTop !== undefined) {
+      scrollY = container.scrollTop;
+    }
+    
+    // Show button after scrolling down 200px (eager)
+    const shouldBeVisible = scrollY > 200;
 
     if (shouldBeVisible !== isVisible) {
       isVisible = shouldBeVisible;
       btn.classList.toggle("is-visible", isVisible);
+      
+      // Inline styles guarantee it shows despite potential CSS specificity bugs
+      if (isVisible) {
+        btn.style.setProperty("opacity", "1", "important");
+        btn.style.setProperty("visibility", "visible", "important");
+        btn.style.setProperty("transform", "translateX(-50%) translateY(0)", "important");
+        btn.style.setProperty("display", "flex", "important");
+      } else {
+        btn.style.setProperty("opacity", "0", "important");
+        btn.style.setProperty("visibility", "hidden", "important");
+        btn.style.setProperty("transform", "translateX(-50%) translateY(30px)", "important");
+      }
     }
   };
 
+  // Listen thoroughly everywhere
   window.addEventListener("scroll", () => requestAnimationFrame(handleScroll), { passive: true });
+  document.body.addEventListener("scroll", () => requestAnimationFrame(handleScroll), { passive: true }, true);
+  document.addEventListener("scroll", () => requestAnimationFrame(handleScroll), { passive: true }, true);
+  
+  // Also watch potential dashboard scroll containers (using event delegation essentially or direct)
+  const attachDashboardScroll = () => {
+    const adminContent = document.querySelector('.admin-content');
+    if (adminContent) {
+      adminContent.addEventListener("scroll", () => requestAnimationFrame(handleScroll), { passive: true });
+    }
+    const dashContent = document.querySelector('.dash-content');
+    if (dashContent) {
+      dashContent.addEventListener("scroll", () => requestAnimationFrame(handleScroll), { passive: true });
+    }
+  };
+  
+  // Small delay to ensure dashboard js might have rendered them
+  setTimeout(attachDashboardScroll, 500);
 
   btn.addEventListener("click", () => {
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth"
-    });
+    // Scroll the dashboard inner container if applicable
+    const container = getScrollContainer();
+    if (container && typeof container.scrollTo === "function" && container !== document.body) {
+      container.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    // Scroll both html and body directly — window.scrollTo can silently fail
+    // when scrollbar-width: none / overflow-x: clip is set on html (reset.css).
+    document.documentElement.scrollTo({ top: 0, behavior: "smooth" });
+    document.body.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   });
 
   // Initial check

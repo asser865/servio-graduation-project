@@ -30,7 +30,30 @@ export function initSplashLoader() {
   // Record that the user has seen the splash this session
   sessionStorage.setItem('splash_seen', 'true');
 
+  // ── Reduced-motion check ──
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
   document.body.classList.add('is-loading');
+
+  if (prefersReducedMotion) {
+    // Skip all stagger/letter animations; show splash briefly then exit
+    const letters = splash.querySelectorAll('.splash-loader__letter');
+    const barFill = splash.querySelector('.splash-loader__bar-fill');
+
+    // Make all letters immediately visible and fill the bar instantly
+    letters.forEach(letter => letter.classList.add('is-visible'));
+    if (barFill) barFill.style.width = '100%';
+
+    setTimeout(() => {
+      splash.classList.add('is-exiting');
+      setTimeout(() => {
+        splash.classList.add('is-done');
+        document.body.classList.remove('is-loading');
+      }, 400);
+    }, 400);
+
+    return;
+  }
 
   const letters = splash.querySelectorAll('.splash-loader__letter');
   const barFill = splash.querySelector('.splash-loader__bar-fill');

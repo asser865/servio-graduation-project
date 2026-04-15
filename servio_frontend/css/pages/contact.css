@@ -459,4 +459,77 @@
   }
 }
 
+/* ── RTL ─────────────────────────────────────────── */
+
+/* Hero kicker: decorative dash + icon + text — reverse for RTL */
+html[dir="rtl"] .contact-hero__kicker {
+  flex-direction: row-reverse;
+}
+
+/* Hero kicker decorative dash: in LTR it's a ::before (appears on left).
+   In RTL hide ::before and show a matching ::after on the right side. */
+html[dir="rtl"] .contact-hero__kicker::before {
+  display: none;
+}
+
+html[dir="rtl"] .contact-hero__kicker::after {
+  content: "";
+  width: 20px;
+  height: 2px;
+  background: var(--color-primary);
+}
+
+/* Contact grid: form on left, sidebar on right in LTR → swap columns */
+html[dir="rtl"] .contact-main__grid {
+  direction: rtl;
+}
+
+/* Form header: icon on left + headings in LTR */
+html[dir="rtl"] .contact-form__header {
+  flex-direction: row-reverse;
+}
+
+/* Sidebar cards: accent border on the left in LTR → right in RTL */
+html[dir="rtl"] .contact-sidebar__card {
+  border-left: none;
+  border-right: 4px solid var(--color-secondary);
+  border-radius: 16px 0 0 16px;
+}
+
+/* Sidebar list items: icon on the left in LTR → right in RTL */
+html[dir="rtl"] .contact-sidebar__list li {
+  flex-direction: row-reverse;
+}
+
+/* Hours header: clock icon + title */
+html[dir="rtl"] .contact-sidebar__hours-header {
+  flex-direction: row-reverse;
+}
+
+/* Hours row: day name on left, time on right in LTR → swap */
+html[dir="rtl"] .contact-sidebar__hours-row {
+  flex-direction: row-reverse;
+}
+
+/* Promise card: icon on the left in LTR → right in RTL */
+html[dir="rtl"] .contact-sidebar__promise {
+  flex-direction: row-reverse;
+}
+
+/* Promise text block: left-aligned in LTR → right-aligned in RTL */
+html[dir="rtl"] .contact-sidebar__promise strong,
+html[dir="rtl"] .contact-sidebar__promise p {
+  text-align: right;
+}
+
+/* FAQ question: text on left, chevron on right in LTR → swap */
+html[dir="rtl"] .contact-faq__question {
+  flex-direction: row-reverse;
+}
+
+/* FAQ kicker */
+html[dir="rtl"] .contact-faq__kicker {
+  flex-direction: row-reverse;
+}
+
 /* . */

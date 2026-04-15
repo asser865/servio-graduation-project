@@ -1354,4 +1354,565 @@
   }
 }
 
+/* ─────────────────────────────────────────────────────────
+   ENHANCEMENT 1: Ken-Burns Zoom on Hero BG
+──────────────────────────────────────────────────────── */
+.home-hero__bg-img {
+  animation: kenBurns 22s ease-in-out infinite alternate;
+}
+
+@keyframes kenBurns {
+  0%   { transform: scale(1) translate(0, 0); }
+  100% { transform: scale(1.06) translate(-1%, 1%); }
+}
+
+/* ─────────────────────────────────────────────────────────
+   ENHANCEMENT 2: Search Autocomplete Dropdown
+──────────────────────────────────────────────────────── */
+.hero-search {
+  position: relative;
+}
+
+.hero-search__autocomplete {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: rgba(15, 10, 5, 0.92);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 20px;
+  overflow: hidden;
+  z-index: 50;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  animation: fadeInDown 180ms ease forwards;
+}
+
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.hero-autocomplete__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 14px 20px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.95rem;
+  cursor: pointer;
+  text-align: start;
+  transition: background 180ms ease, color 180ms ease, padding-inline-start 180ms ease;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.hero-autocomplete__item:last-child {
+  border-bottom: none;
+}
+
+.hero-autocomplete__item:hover,
+.hero-autocomplete__item:focus {
+  background: rgba(255, 255, 255, 0.07);
+  color: #BFB09A;
+  padding-inline-start: 28px;
+  outline: none;
+}
+
+
+/* ─────────────────────────────────────────────────────────
+   ENHANCEMENT 5: Per-Category Glow on Hover
+──────────────────────────────────────────────────────── */
+.category-card--plumbing:hover  { box-shadow: 0 20px 48px rgba(154, 140, 115, 0.18), 0 0 0 1px rgba(154,140,115,0.28); }
+.category-card--electrical:hover { box-shadow: 0 20px 48px rgba(218, 165, 32, 0.18), 0 0 0 1px rgba(218,165,32,0.28); }
+.category-card--ac:hover         { box-shadow: 0 20px 48px rgba(100, 165, 210, 0.18), 0 0 0 1px rgba(100,165,210,0.28); }
+.category-card--cleaning:hover   { box-shadow: 0 20px 48px rgba(90, 170, 155, 0.18), 0 0 0 1px rgba(90,170,155,0.28); }
+.category-card--painting:hover   { box-shadow: 0 20px 48px rgba(200, 110, 80, 0.18), 0 0 0 1px rgba(200,110,80,0.28); }
+.category-card--carpentry:hover  { box-shadow: 0 20px 48px rgba(140, 95, 50, 0.18), 0 0 0 1px rgba(140,95,50,0.28); }
+
+/* ─────────────────────────────────────────────────────────
+   ENHANCEMENT 6: Metric Cards — Gradient Borders
+──────────────────────────────────────────────────────── */
+.metric-card {
+  position: relative;
+  border: none;
+}
+
+.metric-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 32px;
+  padding: 1.5px;
+  background: linear-gradient(135deg, rgba(154, 140, 115, 0.5), rgba(154, 140, 115, 0.08), rgba(154, 140, 115, 0.35));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.metric-card:hover .metric-card__val {
+  color: var(--color-accent);
+  transition: color 300ms ease;
+}
+
+/* ─────────────────────────────────────────────────────────
+   ENHANCEMENT 7: Why SERVIO Feature Strip
+──────────────────────────────────────────────────────── */
+.why-servio {
+  padding: 52px 0;
+  background: var(--color-bg);
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  position: relative;
+  overflow: hidden;
+}
+
+.why-servio::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 100%, rgba(154, 140, 115, 0.06), transparent 70%);
+  pointer-events: none;
+}
+
+.why-servio__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.why-servio__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 28px 32px;
+  border-inline-end: 1px solid var(--color-border);
+}
+
+.why-servio__item:last-child {
+  border-inline-end: none;
+}
+
+.why-servio__icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  background: rgba(154, 140, 115, 0.1);
+  border: 1px solid rgba(154, 140, 115, 0.2);
+  display: grid;
+  place-items: center;
+  color: var(--color-accent);
+  flex-shrink: 0;
+  transition: transform 300ms ease, box-shadow 300ms ease;
+}
+
+.why-servio__item:hover .why-servio__icon {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(154, 140, 115, 0.2);
+}
+
+.why-servio__icon--gold  { background: rgba(251, 191, 36, 0.1); border-color: rgba(251, 191, 36, 0.2); color: #D97706; }
+.why-servio__icon--green { background: rgba(34, 197, 94, 0.1);  border-color: rgba(34, 197, 94, 0.2);  color: #16A34A; }
+.why-servio__icon--blue  { background: rgba(96, 165, 250, 0.1); border-color: rgba(96, 165, 250, 0.2); color: #2563EB; }
+
+.why-servio__title {
+  font-family: var(--font-heading);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0 0 6px;
+}
+
+.why-servio__text {
+  font-size: 0.875rem;
+  line-height: 1.65;
+  color: var(--color-text-light);
+  margin: 0;
+}
+
+@media (max-width: 1024px) {
+  .why-servio__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .why-servio__item:nth-child(2) {
+    border-inline-end: none;
+  }
+  .why-servio__item:nth-child(1),
+  .why-servio__item:nth-child(2) {
+    border-bottom: 1px solid var(--color-border);
+  }
+}
+
+@media (max-width: 640px) {
+  .why-servio__grid {
+    grid-template-columns: 1fr;
+  }
+  .why-servio__item {
+    border-inline-end: none;
+    border-bottom: 1px solid var(--color-border);
+  }
+  .why-servio__item:last-child {
+    border-bottom: none;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────
+   ENHANCEMENT 8: Testimonials Section
+──────────────────────────────────────────────────────── */
+.testimonials {
+  padding: 60px 0;
+  background: var(--color-bg);
+}
+
+.testimonial-count {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-accent);
+  background: rgba(154, 140, 115, 0.1);
+  border: 1px solid rgba(154, 140, 115, 0.22);
+  padding: 6px 14px;
+  border-radius: 999px;
+}
+
+.testimonials__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.testimonial-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 28px;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: transform 300ms ease, box-shadow 300ms ease, border-color 300ms ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.testimonial-card::before {
+  content: "\201C";
+  position: absolute;
+  top: 16px;
+  inset-inline-end: 24px;
+  font-family: var(--font-editorial);
+  font-size: 6rem;
+  line-height: 1;
+  color: rgba(154, 140, 115, 0.1);
+  pointer-events: none;
+  font-style: italic;
+}
+
+.testimonial-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 20px 48px rgba(34, 40, 49, 0.08);
+  border-color: rgba(154, 140, 115, 0.3);
+}
+
+.testimonial-card--featured {
+  background: linear-gradient(135deg, #3C2415 0%, #2A1A0E 100%);
+  border-color: rgba(191, 176, 154, 0.22);
+  color: #ffffff;
+}
+
+.testimonial-card--featured::before {
+  color: rgba(191, 176, 154, 0.15);
+}
+
+.testimonial-card--featured .testimonial-card__quote p {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.testimonial-card--featured .testimonial-card__name {
+  color: #ffffff;
+}
+
+.testimonial-card--featured .testimonial-card__service {
+  color: rgba(191, 176, 154, 0.7);
+}
+
+.testimonial-card__stars {
+  color: #F59E0B;
+  font-size: 1rem;
+  letter-spacing: 2px;
+}
+
+.testimonial-card__quote {
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.testimonial-card__quote p {
+  font-size: 0.97rem;
+  line-height: 1.75;
+  color: var(--color-text);
+  margin: 0;
+  font-style: italic;
+}
+
+.testimonial-card__author {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+  margin-top: auto;
+}
+
+.testimonial-card--featured .testimonial-card__author {
+  border-top-color: rgba(255, 255, 255, 0.1);
+}
+
+.testimonial-card__avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(154, 140, 115, 0.3);
+  flex-shrink: 0;
+}
+
+.testimonial-card__name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--color-text);
+}
+
+.testimonial-card__service {
+  font-size: 0.78rem;
+  color: var(--color-text-light);
+  margin-top: 2px;
+}
+
+@media (max-width: 1024px) {
+  .testimonials__grid {
+    grid-template-columns: 1fr;
+    max-width: 580px;
+    margin: 0 auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .testimonials__grid {
+    max-width: 100%;
+  }
+  .testimonial-card {
+    padding: 24px;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────
+   ENHANCEMENT 9: Testimonial Marquee Strip
+──────────────────────────────────────────────────────── */
+.marquee-strip {
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  padding: 16px 0;
+  overflow: hidden;
+}
+
+.marquee-strip__track {
+  overflow: hidden;
+}
+
+.marquee-strip__inner {
+  display: flex;
+  gap: 0;
+  white-space: nowrap;
+  will-change: transform;
+  animation: marqueeScroll 38s linear infinite;
+}
+
+.marquee-strip:hover .marquee-strip__inner {
+  animation-play-state: paused;
+}
+
+@keyframes marqueeScroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.marquee-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 36px;
+  font-size: 0.88rem;
+  color: var(--color-text-light);
+  font-weight: 500;
+  border-inline-end: 1px solid var(--color-border);
+}
+
+.marquee-item__stars {
+  color: #F59E0B;
+  font-size: 0.75rem;
+  letter-spacing: 1px;
+}
+
+/* ─────────────────────────────────────────────────────────
+   ENHANCEMENT 10: Live Booking Toast Notification
+──────────────────────────────────────────────────────── */
+.booking-toast {
+  position: fixed;
+  bottom: 32px;
+  inset-inline-start: 32px;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  border-radius: 100px;
+  padding: 10px 18px 10px 10px;
+  box-shadow: var(--shadow-md);
+  min-width: 290px;
+  max-width: 360px;
+  transform: translateY(20px) scale(0.95);
+  transition: transform 500ms cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 500ms ease;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.booking-toast:not([hidden]) {
+  display: flex;
+}
+
+.booking-toast[hidden] {
+  display: none !important;
+}
+
+.booking-toast.is-visible {
+  transform: translateY(0) scale(1);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.booking-toast__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--color-success-bg);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  display: grid;
+  place-items: center;
+  color: var(--color-success);
+  flex-shrink: 0;
+  box-shadow: 0 0 15px rgba(34, 197, 94, 0.2);
+}
+
+.booking-toast__icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.booking-toast__content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.booking-toast__title {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.2px;
+}
+
+.booking-toast__sub {
+  font-size: 0.78rem;
+  color: var(--color-text-light);
+  margin-top: 2px;
+}
+
+.booking-toast__close {
+  background: var(--color-bg-soft);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-light);
+  cursor: pointer;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  transition: all 200ms ease;
+  flex-shrink: 0;
+  margin-inline-start: 6px;
+}
+
+.booking-toast__close:hover {
+  background: var(--color-surface-alt);
+  color: var(--color-accent);
+  transform: scale(1.1);
+}
+
+/* ─────────────────────────────────────────────────────────
+   ENHANCEMENT 11: Wave Section Divider (Hero → Why SERVIO)
+──────────────────────────────────────────────────────── */
+.home-hero {
+  padding-bottom: 0;
+}
+
+.why-servio {
+  position: relative;
+}
+
+/* Sparkle shine on elite verified badge on card hover */
+.elite-card:hover .elite-verified-badge {
+  animation: badgeSparkle 600ms ease 1;
+}
+
+@keyframes badgeSparkle {
+  0%   { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.6); }
+  50%  { box-shadow: 0 0 0 8px rgba(76, 175, 80, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
+}
+
+/* Subtle elite card top sheen on hover */
+.elite-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 28px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 50%);
+  opacity: 0;
+  transition: opacity 350ms ease;
+  pointer-events: none;
+}
+
+.elite-card:hover::after {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-hero__bg-img,
+  .marquee-strip__inner,
+  .hero-scroll-cue,
+  .booking-toast {
+    animation: none !important;
+  }
+  .hero-scroll-cue {
+    bottom: 32px;
+  }
+}
+
 /* . */

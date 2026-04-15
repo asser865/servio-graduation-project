@@ -3,11 +3,20 @@
  * Dynamic profile population + entry animations + portfolio lightbox.
  */
 
-import { animate, stagger } from 'https://cdn.jsdelivr.net/npm/motion@latest/+esm';
+import { animate, stagger } from 'https://cdn.jsdelivr.net/npm/motion@12.38.0/+esm';
 import { TECHNICIANS } from '../data/technicians-data.js';
 import { SERVICES } from '../data/services-data.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 function getParam(key) {
   return new URLSearchParams(window.location.search).get(key);
@@ -69,7 +78,11 @@ function render(tech, techId, serviceKey, lang) {
   // Services grid
   const servicesGrid = el('services-grid');
   if (servicesGrid) {
-    servicesGrid.innerHTML = tech.services.map(svc => `
+    servicesGrid.innerHTML = tech.services.map(svc => {
+      const svcName     = escapeHtml(isAr ? svc.nameAr     : svc.nameEn);
+      const svcPrice    = escapeHtml(isAr ? svc.priceAr    : svc.priceEn);
+      const svcDuration = escapeHtml(isAr ? svc.durationAr : svc.durationEn);
+      return `
       <div class="service-card${svc.emergency ? ' service-card--emergency' : ''}">
         <div class="service-card__icon-wrap">
           <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8">
@@ -80,16 +93,17 @@ function render(tech, techId, serviceKey, lang) {
         </div>
         <div class="service-card__body">
           <div class="service-card__name">
-            ${isAr ? svc.nameAr : svc.nameEn}
+            ${svcName}
             ${svc.emergency ? '<span class="emergency-badge">24/7</span>' : ''}
           </div>
-          <div class="service-card__price">${isAr ? svc.priceAr : svc.priceEn}</div>
+          <div class="service-card__price">${svcPrice}</div>
           <div class="service-card__duration">
             ${CLOCK_SVG}
-            <span>${isAr ? svc.durationAr : svc.durationEn}</span>
+            <span>${svcDuration}</span>
           </div>
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   }
 
   // Coverage areas
@@ -98,7 +112,7 @@ function render(tech, techId, serviceKey, lang) {
     const areaStr = isAr ? tech.areaAr : tech.area;
     coverageAreas.innerHTML = areaStr
       .split(', ')
-      .map(a => `<span class="coverage-tag">${a}</span>`)
+      .map(a => `<span class="coverage-tag">${escapeHtml(a)}</span>`)
       .join('');
   }
 

@@ -3,6 +3,7 @@
    ═══════════════════════════════════════════════════════════ */
 import { revealAll } from '../components/scroll-reveal.js';
 import { showToast } from '../components/toast.js';
+import { getInitials } from '../utils/string.js';
 
 const TAB_KEY = 'servio_activeTab_technician';
 const DAYS_KEYS = ['avail_day_mon','avail_day_tue','avail_day_wed','avail_day_thu','avail_day_fri','avail_day_sat','avail_day_sun'];
@@ -39,16 +40,6 @@ if (!session) {
 function getAccount() {
   try { return JSON.parse(localStorage.getItem('servio_account') || 'null'); } catch { return null; }
 }
-function getInitials(name) {
-  return (name || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0].toUpperCase()).join('');
-}
-
-/* ── Topbar title ───────────────────────────────────────── */
-function updateTopbarTitle(tabName) {
-  const el = document.getElementById('dash-topbar-title');
-  if (el) el.textContent = tabName;
-}
-
 /* ── Topbar notification badge ──────────────────────────── */
 function updateTopbarBadge(count) {
   const badge = document.getElementById('topbar-notif-badge');
@@ -102,7 +93,17 @@ function initTabs() {
     localStorage.setItem(TAB_KEY, id);
     // Update topbar title
     const labelKey = TAB_LABEL_KEYS[id];
-    updateTopbarTitle(labelKey && typeof window.t === 'function' ? window.t(labelKey) : id);
+    const el = document.getElementById('dash-topbar-title');
+    if (el) {
+      if (labelKey && typeof window.t === 'function') {
+        el.textContent = window.t(labelKey);
+        el.removeAttribute('data-i18n');
+      } else if (labelKey) {
+        el.setAttribute('data-i18n', labelKey);
+      } else {
+        el.textContent = id;
+      }
+    }
   }
 
   tabs.forEach(tab => tab.addEventListener('click', () => showTab(tab.dataset.tab)));

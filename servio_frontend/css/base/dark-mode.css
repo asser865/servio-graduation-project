@@ -33,13 +33,6 @@
   background-clip: text;
 }
 
-[data-theme="dark"] .nav-shell {
-  background: rgba(0, 0, 0, 0.45);
-  border-color: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-
 [data-theme="dark"] .avatar-circle {
   border-color: rgba(255, 255, 255, 0.22);
 }

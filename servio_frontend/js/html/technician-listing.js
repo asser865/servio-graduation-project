@@ -9,6 +9,15 @@ import { TECHNICIANS } from '../data/technicians-data.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function getParam(key) {
   return new URLSearchParams(window.location.search).get(key);
 }
@@ -49,13 +58,17 @@ function buildCard(id, tech, serviceKey, lang, delay) {
   const viewLabel = isAr ? 'عرض الملف الشخصي' : 'View Profile';
   const startingLabel = isAr ? 'ابتداءً من' : 'Starting';
 
+  const safeName  = escapeHtml(name);
+  const safeDesc  = escapeHtml(desc);
+  const safeAvail = escapeHtml(avail);
+
   return `
     <article class="tech-card" data-reveal data-reveal-delay="${delay}" data-distance="${tech.distance}" data-price="${tech.price}" data-avail="${tech.availability.toLowerCase()}" data-tech-id="${id}">
       <div class="tech-card__top">
-        <img class="tech-card__avatar" src="${tech.avatar}" alt="${name}">
+        <img class="tech-card__avatar" src="${tech.avatar}" alt="${safeName}">
         <div class="tech-card__info">
           <h3 class="tech-card__name">
-            ${name}
+            ${safeName}
             ${tech.verified ? BADGE_VERIFIED_SVG : ''}
           </h3>
           <div class="tech-card__trust">
@@ -65,14 +78,14 @@ function buildCard(id, tech, serviceKey, lang, delay) {
           </div>
         </div>
       </div>
-      <p class="tech-card__desc">${desc}</p>
+      <p class="tech-card__desc">${safeDesc}</p>
       <div class="tech-card__footer">
         <div class="tech-card__price-blurb">
           <span class="tech-card__price-label">${startingLabel}</span>
           <div class="tech-card__price">${tech.price} EGP<span>/hr</span></div>
         </div>
         <div>
-          <div class="tech-card__availability">${avail}</div>
+          <div class="tech-card__availability">${safeAvail}</div>
           <a class="tech-card__action" href="${profileHref}">${viewLabel}</a>
         </div>
       </div>

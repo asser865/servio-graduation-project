@@ -298,4 +298,57 @@
       margin-bottom: 2rem;
     }
 
+/* ── RTL ─────────────────────────────────────────── */
+
+/* Breadcrumb: left-to-right chevron separators read backwards in RTL */
+html[dir="rtl"] .breadcrumb {
+  flex-direction: row-reverse;
+}
+
+/* Tech card top section: avatar on left in LTR → right in RTL */
+html[dir="rtl"] .tech-card__top {
+  flex-direction: row-reverse;
+}
+
+/* Card name row (name + verified badge) */
+html[dir="rtl"] .tech-card__name {
+  flex-direction: row-reverse;
+}
+
+/* Card trust row (rating + reviews) */
+html[dir="rtl"] .tech-card__trust {
+  flex-direction: row-reverse;
+}
+
+/* Card footer: price on left, action button on right in LTR → swap */
+html[dir="rtl"] .tech-card__footer {
+  flex-direction: row-reverse;
+}
+
+/* Availability text: right-aligned in LTR → left-aligned in RTL */
+html[dir="rtl"] .tech-card__availability {
+  text-align: left;
+}
+
+/* Sort label: margin-right separates it from select in LTR */
+html[dir="rtl"] .sort-label {
+  margin-right: 0;
+  margin-left: 0.5rem;
+}
+
+/* Location row: pin icon + text */
+html[dir="rtl"] .tech-card__location {
+  flex-direction: row-reverse;
+}
+
+/* Hover action: slides in from left (translateX(-5px)) in LTR;
+   in RTL it should slide from the right */
+html[dir="rtl"] .tech-card__action {
+  transform: translateX(5px);
+}
+
+html[dir="rtl"] .tech-card:hover .tech-card__action {
+  transform: translateX(0);
+}
+
 /* . */

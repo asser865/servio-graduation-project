@@ -659,4 +659,80 @@
   }
 }
 
+/* ── RTL ─────────────────────────────────────────── */
+
+/* Hero background orbs: mirrored horizontal positions */
+html[dir="rtl"] .about-hero__bg::before {
+  right: auto;
+  left: -160px;
+}
+
+html[dir="rtl"] .about-hero__bg::after {
+  left: auto;
+  right: -140px;
+}
+
+/* Kicker pill: icon + dash + text reversed for RTL reading */
+html[dir="rtl"] .about-hero__kicker {
+  flex-direction: row-reverse;
+}
+
+/* Hero actions: already flex-wrap+justify-center, no structural change needed;
+   on mobile (column) keep stretch alignment */
+
+/* Story grid: visual card (left in LTR) moves to right in RTL via column reversal */
+html[dir="rtl"] .about-story__grid {
+  direction: rtl;
+}
+
+/* Story visual card: top accent bar gradient direction */
+html[dir="rtl"] .about-story__visual-card::before {
+  background: linear-gradient(270deg, #3C2415, #9A8C73);
+}
+
+/* Story visual card: left-align items → right-align in RTL */
+html[dir="rtl"] .about-story__visual-card {
+  align-items: flex-end;
+}
+
+/* Story chapter: number column on the left in LTR → right in RTL */
+html[dir="rtl"] .about-story__chapter {
+  direction: rtl;
+}
+
+/* Stat bar gradients: directional bars should mirror */
+html[dir="rtl"] .about-stat__bar--primary  { background: linear-gradient(270deg, #3C2415, #5C3D2E); }
+html[dir="rtl"] .about-stat__bar--secondary { background: linear-gradient(270deg, #5C3D2E, #9A8C73); }
+html[dir="rtl"] .about-stat__bar--accent   { background: linear-gradient(270deg, #9A8C73, #BFB09A); }
+html[dir="rtl"] .about-stat__bar--navy     { background: linear-gradient(270deg, #3C2415, #9A8C73); }
+
+/* "What makes us different" header: left-aligned text in LTR → right in RTL */
+html[dir="rtl"] .about-different__header {
+  align-items: flex-end;
+}
+
+/* Value cards: text-align left in LTR → right in RTL */
+html[dir="rtl"] .about-value {
+  text-align: right;
+}
+
+/* Value bottom lines: same gradient but mirrored */
+html[dir="rtl"] .about-value__line {
+  background: unset;
+}
+html[dir="rtl"] .about-value--trust .about-value__line       { background: var(--color-primary); }
+html[dir="rtl"] .about-value--transparency .about-value__line { background: var(--color-secondary); }
+html[dir="rtl"] .about-value--quality .about-value__line     { background: var(--color-accent); }
+html[dir="rtl"] .about-value--customer .about-value__line    { background: #F59E0B; }
+
+/* CTA panel: row-reverse so text stays on the right and buttons on the left */
+html[dir="rtl"] .about-cta__panel {
+  flex-direction: row-reverse;
+}
+
+/* CTA actions */
+html[dir="rtl"] .about-cta__actions {
+  flex-direction: row-reverse;
+}
+
 /* . */

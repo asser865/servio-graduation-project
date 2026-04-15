@@ -1,55 +1,87 @@
 document.addEventListener('DOMContentLoaded', () => {
   // ── Hero search navigation ─────────────────────────────────────────────
-  const heroInput = document.querySelector('.hero-search__input');
-  const heroBtn   = document.querySelector('.hero-search__btn');
+  const heroInput    = document.querySelector('.hero-search__input');
+  const heroBtn      = document.querySelector('.hero-search__btn');
+  const autocomplete = document.getElementById('hero-autocomplete');
 
-  function navigateToMarketplace() {
-    const q = heroInput ? heroInput.value.trim() : '';
+  function navigateToMarketplace(query) {
+    const q = query || (heroInput ? heroInput.value.trim() : '');
     window.location.href = q
       ? `./services-marketplace.html?q=${encodeURIComponent(q)}`
       : './services-marketplace.html';
   }
 
-  if (heroBtn)   heroBtn.addEventListener('click', navigateToMarketplace);
+  if (heroBtn)   heroBtn.addEventListener('click', () => navigateToMarketplace());
   if (heroInput) heroInput.addEventListener('keydown', e => { if (e.key === 'Enter') navigateToMarketplace(); });
+
+  // ── Autocomplete dropdown ─────────────────────────────────────────────
+  const SERVICES = ['Plumbing', 'Electrical', 'AC Maintenance', 'Professional Cleaning', 'Painting', 'Carpentry'];
+
+  function showAutocomplete(filterText) {
+    if (!autocomplete) return;
+    const items = autocomplete.querySelectorAll('.hero-autocomplete__item');
+    items.forEach((item, i) => {
+      const svc   = SERVICES[i] || '';
+      const match = !filterText || svc.toLowerCase().includes(filterText.toLowerCase());
+      item.style.display = match ? '' : 'none';
+    });
+    autocomplete.hidden = false;
+  }
+
+  function hideAutocomplete() {
+    if (autocomplete) autocomplete.hidden = true;
+  }
+
+  if (heroInput && autocomplete) {
+    heroInput.addEventListener('focus', () => showAutocomplete(heroInput.value));
+    heroInput.addEventListener('input', () => showAutocomplete(heroInput.value));
+    heroInput.addEventListener('keydown', e => { if (e.key === 'Escape') hideAutocomplete(); });
+
+    autocomplete.querySelectorAll('.hero-autocomplete__item').forEach(btn => {
+      btn.addEventListener('mousedown', e => {
+        e.preventDefault();
+        const svc = btn.dataset.service;
+        if (heroInput) heroInput.value = svc;
+        hideAutocomplete();
+        navigateToMarketplace(svc);
+      });
+    });
+
+    document.addEventListener('click', e => {
+      const searchWrap = heroInput.closest('.hero-search');
+      if (searchWrap && !searchWrap.contains(e.target)) hideAutocomplete();
+    });
+  }
 
   // ── Elite Network carousel ────────────────────────────────────────────
   const eliteScroll = document.querySelector('#elite-scroll');
-  const elitePrev = document.querySelector('.elite-carousel__btn--prev');
-  const eliteNext = document.querySelector('.elite-carousel__btn--next');
+  const elitePrev   = document.querySelector('.elite-carousel__btn--prev');
+  const eliteNext   = document.querySelector('.elite-carousel__btn--next');
 
   function eliteScrollStep() {
     if (!eliteScroll) return 360;
     const card = eliteScroll.querySelector('.elite-card');
     if (!card) return 360;
     const gapStr = getComputedStyle(eliteScroll).gap;
-    const gap = parseFloat(gapStr) || 24;
+    const gap    = parseFloat(gapStr) || 24;
     return card.offsetWidth + gap;
   }
 
   function updateEliteCarouselButtons() {
     if (!eliteScroll || !elitePrev || !eliteNext) return;
-    const el = eliteScroll;
+    const el  = eliteScroll;
     const max = Math.max(0, el.scrollWidth - el.clientWidth);
-    if (max <= 0) {
-      elitePrev.disabled = true;
-      eliteNext.disabled = true;
-      return;
-    }
-    const sl = el.scrollLeft;
+    if (max <= 0) { elitePrev.disabled = true; eliteNext.disabled = true; return; }
+    const sl  = el.scrollLeft;
     const rtl = getComputedStyle(el).direction === 'rtl';
     const tol = 6;
-    let atStart;
-    let atEnd;
+    let atStart, atEnd;
     if (rtl && sl <= 0) {
-      atStart = sl >= -tol;
-      atEnd = sl <= -max + tol;
+      atStart = sl >= -tol; atEnd = sl <= -max + tol;
     } else if (rtl && sl > 0) {
-      atStart = sl <= tol;
-      atEnd = sl >= max - tol;
+      atStart = sl <= tol; atEnd = sl >= max - tol;
     } else {
-      atStart = sl <= tol;
-      atEnd = sl >= max - tol;
+      atStart = sl <= tol; atEnd = sl >= max - tol;
     }
     elitePrev.disabled = atStart;
     eliteNext.disabled = atEnd;
@@ -57,8 +89,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function scrollElite(direction) {
     if (!eliteScroll) return;
-    const step = eliteScrollStep();
-    const rtl = getComputedStyle(eliteScroll).direction === 'rtl';
+    const step  = eliteScrollStep();
+    const rtl   = getComputedStyle(eliteScroll).direction === 'rtl';
     const delta = (rtl ? -direction : direction) * step;
     eliteScroll.scrollBy({ left: delta, behavior: 'smooth' });
   }
@@ -71,9 +103,9 @@ document.addEventListener('DOMContentLoaded', () => {
     updateEliteCarouselButtons();
   }
 
-  // Section indicator scroll spy
+  // ── Section indicator scroll spy ───────────────────────────────────────
   const indicatorLinks = Array.from(document.querySelectorAll('[data-home-indicator-link]'));
-  const sectionMap = indicatorLinks
+  const sectionMap     = indicatorLinks
     .map(link => {
       const id = link.getAttribute('href');
       if (!id || !id.startsWith('#')) return null;
@@ -86,36 +118,98 @@ document.addEventListener('DOMContentLoaded', () => {
     indicatorLinks.forEach(link => {
       const isActive = link === activeLink;
       link.classList.toggle('is-active', isActive);
-      if (isActive) {
-        link.setAttribute('aria-current', 'true');
-      } else {
-        link.removeAttribute('aria-current');
-      }
+      if (isActive) link.setAttribute('aria-current', 'true');
+      else           link.removeAttribute('aria-current');
     });
   }
 
   if (sectionMap.length) {
     const observer = new IntersectionObserver(entries => {
       const visibleEntries = entries
-        .filter(entry => entry.isIntersecting)
+        .filter(e => e.isIntersecting)
         .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
-
       if (!visibleEntries.length) return;
-
-      const activeEntry = visibleEntries[0];
-      const activeItem = sectionMap.find(item => item.section === activeEntry.target);
+      const activeItem = sectionMap.find(item => item.section === visibleEntries[0].target);
       if (activeItem) setActiveIndicator(activeItem.link);
-    }, {
-      root: null,
-      threshold: [0.3, 0.5, 0.7],
-      rootMargin: '-18% 0px -32% 0px'
-    });
+    }, { root: null, threshold: [0.3, 0.5, 0.7], rootMargin: '-18% 0px -32% 0px' });
 
     sectionMap.forEach(item => observer.observe(item.section));
+    indicatorLinks.forEach(link => link.addEventListener('click', (e) => {
+      e.preventDefault();
+      const id = link.getAttribute('href');
+      const section = id && id.startsWith('#') ? document.querySelector(id) : null;
+      if (section) section.scrollIntoView({ behavior: 'smooth' });
+      setActiveIndicator(link);
+    }));
+  }
 
-    indicatorLinks.forEach(link => {
-      link.addEventListener('click', () => setActiveIndicator(link));
-    });
+  // ── Hero background parallax ──────────────────────────────────────────
+  const heroBgImg   = document.querySelector('.home-hero__bg-img');
+  const heroSection = document.querySelector('.home-hero');
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (heroBgImg && heroSection && !reducedMotion) {
+    window.addEventListener('scroll', () => {
+      const scrolled = window.scrollY;
+      const heroH    = heroSection.offsetHeight;
+      if (scrolled < heroH) {
+        const pct = scrolled / heroH;
+        // Combine parallax with ken-burns — keep scale, shift Y gently
+        heroBgImg.style.transform = `scale(1.06) translateY(${pct * 14}%) translate(-1%, 1%)`;
+      }
+    }, { passive: true });
+  }
+
+
+  // ── Live Booking Toast ─────────────────────────────────────────────────
+  const toastEl    = document.getElementById('booking-toast');
+  const toastTitle = document.getElementById('toast-title');
+  const toastSub   = document.getElementById('toast-sub');
+  const toastClose = document.getElementById('toast-close');
+
+  const BOOKINGS = [
+    { name: 'Ahmed S.',  service: 'AC Maintenance',        ago: '2 min ago', nameAr: 'أحمد س.', serviceAr: 'صيانة تكييف', agoAr: 'منذ دقيقتين' },
+    { name: 'Layla M.',  service: 'Professional Cleaning', ago: '4 min ago', nameAr: 'ليلى م.', serviceAr: 'تنظيف احترافي', agoAr: 'منذ ٤ دقائق' },
+    { name: 'Omar K.',   service: 'Plumbing',              ago: '1 min ago', nameAr: 'عمر ك.', serviceAr: 'سباكة', agoAr: 'منذ دقيقة واحدة' },
+    { name: 'Dina R.',   service: 'Electrical',            ago: '6 min ago', nameAr: 'دينا ر.', serviceAr: 'كهرباء', agoAr: 'منذ ٦ دقائق' },
+    { name: 'Karim W.',  service: 'Carpentry',             ago: '3 min ago', nameAr: 'كريم و.', serviceAr: 'نجارة', agoAr: 'منذ ٣ دقائق' },
+    { name: 'Farah N.',  service: 'Painting',              ago: '5 min ago', nameAr: 'فرح ن.', serviceAr: 'دهانات', agoAr: 'منذ ٥ دقائق' },
+  ];
+
+  let toastIndex    = 0;
+  let toastTimer    = null;
+  let dismissTimer  = null;
+
+  function showToast() {
+    if (!toastEl || !toastTitle || !toastSub) return;
+    const booking      = BOOKINGS[toastIndex % BOOKINGS.length];
+    toastIndex++;
+
+    const isAr = document.documentElement.getAttribute('lang') === 'ar';
+    toastTitle.textContent = isAr ? `قام ${booking.nameAr} للتو بالحجز` : `${booking.name} just booked`;
+    toastSub.textContent   = `${isAr ? booking.serviceAr : booking.service} \u00b7 ${isAr ? booking.agoAr : booking.ago}`;
+
+    toastEl.hidden = false;
+    requestAnimationFrame(() => requestAnimationFrame(() => toastEl.classList.add('is-visible')));
+
+    clearTimeout(dismissTimer);
+    dismissTimer = setTimeout(hideToast, 5500);
+  }
+
+  function hideToast() {
+    if (!toastEl) return;
+    toastEl.classList.remove('is-visible');
+    setTimeout(() => { toastEl.hidden = true; }, 460);
+  }
+
+  function scheduleNextToast() {
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { showToast(); scheduleNextToast(); }, 9000);
+  }
+
+  if (toastEl) {
+    setTimeout(() => { showToast(); scheduleNextToast(); }, 4000);
+    if (toastClose) toastClose.addEventListener('click', () => { clearTimeout(dismissTimer); hideToast(); });
   }
 });
 

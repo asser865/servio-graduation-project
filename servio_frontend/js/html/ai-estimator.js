@@ -3,7 +3,7 @@
  * 4-step wizard: Room Type → Dimensions → Finishing Level → Results
  */
 
-import { animate, stagger } from 'https://cdn.jsdelivr.net/npm/motion@latest/+esm';
+import { animate, stagger } from 'https://cdn.jsdelivr.net/npm/motion@12.38.0/+esm';
 
 const t = (key, vars) => window.t ? window.t(key, vars) : key;
 
