@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
-import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
 import '../customer/ai_smart_match_screen.dart';
 

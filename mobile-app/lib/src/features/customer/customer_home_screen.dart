@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/data/demo_technicians.dart';
+import '../../core/models/booking_model.dart';
+import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
@@ -10,8 +14,11 @@ import 'ai_smart_match_screen.dart';
 import 'ai_finishing_estimator_screen.dart';
 import 'customer_profile_screen.dart';
 import 'my_bookings_screen.dart';
+import 'service_detail_screen.dart';
 import 'services_marketplace_screen.dart';
+import 'technician_listing_screen.dart';
 import 'technician_profile_screen.dart';
+import '../messages/messages_screen.dart';
 import '../shared/notifications_screen.dart';
 import '../shared/search_results_screen.dart';
 
@@ -22,20 +29,29 @@ class CustomerHomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
+    final userName = context.watch<SessionProvider>().account?.name ?? 'there';
+    final unreadMessages = context.watch<MessagesProvider>().totalUnread;
+    final locale = context.watch<LocaleProvider>().locale.languageCode;
+    final recentBookings = context.watch<BookingsProvider>().upcoming;
+    final featuredTechs = kDemoTechnicians.take(3).toList();
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       bottomNavigationBar: ServioBottomNavigationBar(
-        items: const <ServioBottomNavItem>[
-          ServioBottomNavItem(icon: Icons.home_rounded, label: 'Home'),
-          ServioBottomNavItem(icon: Icons.grid_view_rounded, label: 'Services'),
-          ServioBottomNavItem(
+        items: <ServioBottomNavItem>[
+          const ServioBottomNavItem(icon: Icons.home_rounded, label: 'Home'),
+          const ServioBottomNavItem(icon: Icons.grid_view_rounded, label: 'Services'),
+          const ServioBottomNavItem(
             icon: Icons.auto_awesome_rounded,
             label: 'Smart Match',
             highlighted: true,
           ),
-          ServioBottomNavItem(icon: Icons.calendar_month_rounded, label: 'Bookings'),
-          ServioBottomNavItem(icon: Icons.person_rounded, label: 'Profile'),
+          ServioBottomNavItem(
+            icon: Icons.chat_bubble_outline_rounded,
+            label: 'Messages',
+            badgeCount: unreadMessages,
+          ),
+          const ServioBottomNavItem(icon: Icons.person_rounded, label: 'Profile'),
         ],
         currentIndex: 0,
         onTap: (int index) {
@@ -54,7 +70,7 @@ class CustomerHomeScreen extends StatelessWidget {
           } else if (index == 3) {
             Navigator.of(context).push(
               MaterialPageRoute<void>(
-                builder: (_) => const MyBookingsScreen(),
+                builder: (_) => const MessagesScreen(),
               ),
             );
           } else if (index == 4) {
@@ -133,7 +149,7 @@ class CustomerHomeScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Text('Mostafa Abdelaal', style: theme.textTheme.headlineMedium),
+                    Text(userName.split(' ').first, style: theme.textTheme.headlineMedium),
                     const SizedBox(height: 20),
                     TextField(
                       readOnly: true,
@@ -209,142 +225,200 @@ class CustomerHomeScreen extends StatelessWidget {
                       mainAxisSpacing: 16,
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
-                      children: const <Widget>[
-                        _ServiceItem(icon: Icons.cleaning_services_rounded, label: 'Cleaning'),
-                        _ServiceItem(icon: Icons.plumbing_rounded, label: 'Plumbing'),
-                        _ServiceItem(icon: Icons.electrical_services_rounded, label: 'Electrical'),
-                        _ServiceItem(icon: Icons.format_paint_rounded, label: 'Painting'),
-                        _ServiceItem(icon: Icons.ac_unit_rounded, label: 'HVAC'),
-                        _ServiceItem(icon: Icons.local_shipping_rounded, label: 'Moving'),
-                        _ServiceItem(icon: Icons.yard_rounded, label: 'Garden'),
-                        _ServiceItem(icon: Icons.more_horiz_rounded, label: 'More'),
+                      children: <Widget>[
+                        _ServiceItem(
+                          icon: Icons.cleaning_services_rounded,
+                          label: locale == 'ar' ? 'تنظيف' : 'Cleaning',
+                        ),
+                        _ServiceItem(
+                          icon: Icons.plumbing_rounded,
+                          label: locale == 'ar' ? 'سباكة' : 'Plumbing',
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const ServiceDetailScreen(serviceId: 'plumbing'),
+                            ),
+                          ),
+                        ),
+                        _ServiceItem(
+                          icon: Icons.electrical_services_rounded,
+                          label: locale == 'ar' ? 'كهرباء' : 'Electrical',
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const ServiceDetailScreen(serviceId: 'electrical'),
+                            ),
+                          ),
+                        ),
+                        _ServiceItem(
+                          icon: Icons.format_paint_rounded,
+                          label: locale == 'ar' ? 'دهان' : 'Painting',
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const ServiceDetailScreen(serviceId: 'painting'),
+                            ),
+                          ),
+                        ),
+                        _ServiceItem(
+                          icon: Icons.ac_unit_rounded,
+                          label: locale == 'ar' ? 'تكييف' : 'HVAC',
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const ServiceDetailScreen(serviceId: 'ac-maintenance'),
+                            ),
+                          ),
+                        ),
+                        _ServiceItem(
+                          icon: Icons.handyman_rounded,
+                          label: locale == 'ar' ? 'نجارة' : 'Carpentry',
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const ServiceDetailScreen(serviceId: 'carpentry'),
+                            ),
+                          ),
+                        ),
+                        _ServiceItem(icon: Icons.local_shipping_rounded, label: locale == 'ar' ? 'نقل' : 'Moving'),
+                        _ServiceItem(
+                          icon: Icons.more_horiz_rounded,
+                          label: locale == 'ar' ? 'المزيد' : 'More',
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const ServicesMarketplaceScreen(),
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: ServioSpacing.sectionGap),
-                    const ServioSectionHeading(title: 'Recent Activity'),
-                    const SizedBox(height: 14),
-                    ServioCard(
-                      radius: ServioRadius.md,
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          Container(
-                            width: 4,
-                            height: 108,
-                            decoration: BoxDecoration(
-                              color: servio.warning,
-                              borderRadius: BorderRadius.circular(ServioRadius.full),
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: <Widget>[
-                                Row(
-                                  children: <Widget>[
-                                    Expanded(
-                                      child: Text(
-                                        'Bathroom Plumbing Fix',
-                                        style: theme.textTheme.titleMedium,
-                                      ),
-                                    ),
-                                    Text(
-                                      '850 EGP',
-                                      style: theme.textTheme.titleMedium?.copyWith(
-                                        color: servio.accent,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 10),
-                                Row(
-                                  children: <Widget>[
-                                    const ServioStatusChip(
-                                      label: 'Pending',
-                                      type: ServioStatusChipType.warning,
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Text(
-                                      '26/03/2026',
-                                      style: theme.textTheme.bodySmall?.copyWith(
-                                        color: servio.textSecondary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 14),
-                                Row(
-                                  children: <Widget>[
-                                    Expanded(
-                                      child: OutlinedButton(
-                                        onPressed: () {},
-                                        child: const Text('Book Again'),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    TextButton(
-                                      onPressed: () {},
-                                      child: const Text('View Receipt'),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                    ServioSectionHeading(
+                      title: locale == 'ar' ? 'النشاط الأخير' : 'Recent Activity',
+                      actionLabel: locale == 'ar' ? 'عرض الكل' : 'See All',
+                      onActionTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const MyBookingsScreen(),
+                        ),
                       ),
                     ),
+                    const SizedBox(height: 14),
+                    if (recentBookings.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: ServioSpacing.sectionGap),
+                        child: Text(
+                          locale == 'ar' ? 'لا توجد حجوزات نشطة.' : 'No active bookings yet.',
+                          style: theme.textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
+                        ),
+                      )
+                    else
+                      ...recentBookings.take(2).map((BookingModel booking) => Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: ServioCard(
+                              radius: ServioRadius.md,
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: <Widget>[
+                                  Container(
+                                    width: 4,
+                                    height: 108,
+                                    decoration: BoxDecoration(
+                                      color: booking.status == BookingStatus.inProgress
+                                          ? servio.info
+                                          : servio.warning,
+                                      borderRadius: BorderRadius.circular(ServioRadius.full),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: <Widget>[
+                                        Row(
+                                          children: <Widget>[
+                                            Expanded(
+                                              child: Text(
+                                                booking.serviceName,
+                                                style: theme.textTheme.titleMedium,
+                                              ),
+                                            ),
+                                            Text(
+                                              booking.amount,
+                                              style: theme.textTheme.titleMedium?.copyWith(
+                                                color: servio.accent,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 10),
+                                        Row(
+                                          children: <Widget>[
+                                            ServioStatusChip(
+                                              label: booking.status == BookingStatus.inProgress
+                                                  ? (locale == 'ar' ? 'قيد التنفيذ' : 'In Progress')
+                                                  : (locale == 'ar' ? 'قادم' : 'Upcoming'),
+                                              type: booking.status == BookingStatus.inProgress
+                                                  ? ServioStatusChipType.info
+                                                  : ServioStatusChipType.warning,
+                                            ),
+                                            const SizedBox(width: 10),
+                                            Text(
+                                              booking.date,
+                                              style: theme.textTheme.bodySmall?.copyWith(
+                                                color: servio.textSecondary,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 14),
+                                        Row(
+                                          children: <Widget>[
+                                            Expanded(
+                                              child: OutlinedButton(
+                                                onPressed: () {},
+                                                child: Text(locale == 'ar' ? 'احجز مجدداً' : 'Book Again'),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            TextButton(
+                                              onPressed: () {},
+                                              child: Text(locale == 'ar' ? 'التفاصيل' : 'View Details'),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )),
                     const SizedBox(height: ServioSpacing.sectionGap),
-                    const ServioSectionHeading(title: 'Recommended For You'),
+                    ServioSectionHeading(
+                      title: locale == 'ar' ? 'موصى بهم لك' : 'Recommended For You',
+                      actionLabel: locale == 'ar' ? 'عرض الكل' : 'See All',
+                      onActionTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const TechnicianListingScreen(),
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 14),
                     SizedBox(
                       height: 230,
-                      child: ListView(
+                      child: ListView.separated(
                         scrollDirection: Axis.horizontal,
-                        children: <Widget>[
-                          _TechnicianCard(
-                            name: 'Ahmed Nabil',
-                            specialty: 'Plumbing',
-                            rating: '4.9',
-                            reviews: '328',
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                  builder: (_) => const TechnicianProfileScreen(),
-                                ),
-                              );
-                            },
-                          ),
-                          const SizedBox(width: 16),
-                          _TechnicianCard(
-                            name: 'Mariam Adel',
-                            specialty: 'Electrical',
-                            rating: '4.8',
-                            reviews: '214',
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                  builder: (_) => const TechnicianProfileScreen(),
-                                ),
-                              );
-                            },
-                          ),
-                          const SizedBox(width: 16),
-                          _TechnicianCard(
-                            name: 'Youssef Tarek',
-                            specialty: 'Painting',
-                            rating: '4.7',
-                            reviews: '176',
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                  builder: (_) => const TechnicianProfileScreen(),
-                                ),
-                              );
-                            },
-                          ),
-                        ],
+                        itemCount: featuredTechs.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 16),
+                        itemBuilder: (BuildContext context, int index) {
+                          final tech = featuredTechs[index];
+                          return _TechnicianCard(
+                            name: tech.name.of(locale),
+                            specialty: tech.title.of(locale),
+                            rating: tech.rating.toStringAsFixed(1),
+                            reviews: '${tech.reviewCount}',
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => TechnicianProfileScreen(technicianId: tech.id),
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -542,33 +616,38 @@ class _ServiceItem extends StatelessWidget {
   const _ServiceItem({
     required this.icon,
     required this.label,
+    this.onTap,
   });
 
   final IconData icon;
   final String label;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final servio = context.servio;
 
-    return Column(
-      children: <Widget>[
-        Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            color: servio.backgroundSoft,
-            borderRadius: BorderRadius.circular(ServioRadius.full),
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: <Widget>[
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: servio.backgroundSoft,
+              borderRadius: BorderRadius.circular(ServioRadius.full),
+            ),
+            child: Icon(icon, color: servio.accent),
           ),
-          child: Icon(icon, color: servio.accent),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          label,
-          style: Theme.of(context).textTheme.bodySmall,
-          textAlign: TextAlign.center,
-        ),
-      ],
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall,
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
     );
   }
 }

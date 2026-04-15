@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/data/demo_services.dart';
+import '../../core/models/service_model.dart';
+import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
@@ -26,14 +30,30 @@ class _ServicesMarketplaceScreenState extends State<ServicesMarketplaceScreen> {
     'Electrical',
     'Painting',
     'HVAC',
-    'Cleaning',
-    'More',
+    'Carpentry',
   ];
+
+  // Map category label → service id for filtering
+  static const Map<String, String> _categoryToId = <String, String>{
+    'Plumbing': 'plumbing',
+    'Electrical': 'electrical',
+    'Painting': 'painting',
+    'HVAC': 'ac-maintenance',
+    'Carpentry': 'carpentry',
+  };
+
+  List<ServiceModel> get _filteredServices {
+    if (_selectedCategory == 0) return kDemoServices;
+    final id = _categoryToId[_categories[_selectedCategory]];
+    return kDemoServices.where((s) => s.id == id).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
+    final locale = context.watch<LocaleProvider>().languageCode;
+    final services = _filteredServices;
 
     return Scaffold(
       bottomNavigationBar: ServioBottomNavigationBar(
@@ -210,20 +230,23 @@ class _ServicesMarketplaceScreenState extends State<ServicesMarketplaceScreen> {
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (BuildContext context, int index) {
+                    final service = services[index];
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 16),
                       child: _MarketplaceServiceCard(
+                        service: service,
+                        locale: locale,
                         onTap: () {
                           Navigator.of(context).push(
                             MaterialPageRoute<void>(
-                              builder: (_) => const ServiceDetailScreen(),
+                              builder: (_) => ServiceDetailScreen(serviceId: service.id),
                             ),
                           );
                         },
                       ),
                     );
                   },
-                  childCount: 4,
+                  childCount: services.length,
                 ),
               ),
             ),
@@ -267,15 +290,31 @@ class _ToggleIcon extends StatelessWidget {
 
 class _MarketplaceServiceCard extends StatelessWidget {
   const _MarketplaceServiceCard({
+    required this.service,
+    required this.locale,
     required this.onTap,
   });
 
+  final ServiceModel service;
+  final String locale;
   final VoidCallback onTap;
+
+  static const Map<String, IconData> _icons = <String, IconData>{
+    'drop': Icons.water_drop_outlined,
+    'bolt': Icons.electrical_services_rounded,
+    'temp': Icons.ac_unit_rounded,
+    'wrench': Icons.handyman_rounded,
+    'paint': Icons.format_paint_rounded,
+    'gear': Icons.settings_rounded,
+    'home': Icons.home_repair_service_rounded,
+    'shield': Icons.shield_outlined,
+  };
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
+    final icon = _icons[service.icon] ?? Icons.home_repair_service_rounded;
 
     return GestureDetector(
       onTap: onTap,
@@ -287,9 +326,9 @@ class _MarketplaceServiceCard extends StatelessWidget {
           children: <Widget>[
             Container(
               height: 140,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 gradient: ServioGradients.brand,
-                borderRadius: const BorderRadius.vertical(
+                borderRadius: BorderRadius.vertical(
                   top: Radius.circular(ServioRadius.lg),
                 ),
               ),
@@ -297,11 +336,7 @@ class _MarketplaceServiceCard extends StatelessWidget {
                 alignment: Alignment.bottomRight,
                 child: Padding(
                   padding: const EdgeInsets.all(20),
-                  child: Icon(
-                    Icons.plumbing_rounded,
-                    size: 56,
-                    color: Colors.white.withValues(alpha: 0.7),
-                  ),
+                  child: Icon(icon, size: 56, color: Colors.white.withValues(alpha: 0.7)),
                 ),
               ),
             ),
@@ -317,16 +352,16 @@ class _MarketplaceServiceCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(ServioRadius.sm),
                     ),
                     child: Text(
-                      'PLUMBING',
+                      service.id.toUpperCase(),
                       style: theme.textTheme.labelSmall?.copyWith(color: servio.accent),
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Text('Plumbing Repair Visit', style: theme.textTheme.titleMedium),
+                  Text(service.title.of(locale), style: theme.textTheme.titleMedium),
                   const SizedBox(height: 8),
                   Text(
-                    'Leak checks, faucet repairs, pressure issues, and fast maintenance support.',
-                    maxLines: 1,
+                    service.lead.of(locale),
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
                   ),
@@ -335,7 +370,7 @@ class _MarketplaceServiceCard extends StatelessWidget {
                     children: <Widget>[
                       Expanded(
                         child: Text(
-                          '850 EGP - 1,200 EGP / session',
+                          service.priceBadge.of(locale),
                           style: theme.textTheme.titleMedium?.copyWith(color: servio.accent),
                         ),
                       ),
@@ -349,11 +384,6 @@ class _MarketplaceServiceCard extends StatelessWidget {
                         child: const Text('View Details'),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '4.9 rating  •  328 reviews  •  2-2.5 Hours',
-                    style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary),
                   ),
                 ],
               ),

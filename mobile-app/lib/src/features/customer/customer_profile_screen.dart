@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
-import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
 import '../../design_system/widgets/servio_card.dart';
+import '../auth/role_selection_screen.dart';
 import '../messages/messages_screen.dart';
 
 class CustomerProfileScreen extends StatelessWidget {
@@ -13,19 +15,14 @@ class CustomerProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final servio = context.servio;
     final theme = Theme.of(context);
+    final account = context.watch<SessionProvider>().account;
+    final themeProvider = context.watch<ThemeProvider>();
+    final localeProvider = context.watch<LocaleProvider>();
+    final isDark = themeProvider.mode == ThemeMode.dark ||
+        (themeProvider.mode == ThemeMode.system &&
+            MediaQuery.platformBrightnessOf(context) == Brightness.dark);
 
     return Scaffold(
-      bottomNavigationBar: ServioBottomNavigationBar(
-        items: const <ServioBottomNavItem>[
-          ServioBottomNavItem(icon: Icons.home_rounded, label: 'Home'),
-          ServioBottomNavItem(icon: Icons.grid_view_rounded, label: 'Services'),
-          ServioBottomNavItem(icon: Icons.auto_awesome_rounded, label: 'Smart Match', highlighted: true),
-          ServioBottomNavItem(icon: Icons.calendar_month_rounded, label: 'Bookings'),
-          ServioBottomNavItem(icon: Icons.person_rounded, label: 'Profile'),
-        ],
-        currentIndex: 4,
-        onTap: (_) {},
-      ),
       appBar: AppBar(
         title: const Text('Profile & Settings'),
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -49,8 +46,9 @@ class CustomerProfileScreen extends StatelessWidget {
                       ),
                       child: Center(
                         child: Text(
-                          'MA',
-                          style: theme.textTheme.headlineMedium?.copyWith(color: ServioColors.deepBrown),
+                          account?.initials ?? 'U',
+                          style: theme.textTheme.headlineMedium
+                              ?.copyWith(color: ServioColors.deepBrown),
                         ),
                       ),
                     ),
@@ -64,17 +62,22 @@ class CustomerProfileScreen extends StatelessWidget {
                           color: servio.accent,
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.camera_alt_outlined, color: Colors.white, size: 16),
+                        child: const Icon(Icons.camera_alt_outlined,
+                            color: Colors.white, size: 16),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 14),
-                Text('Mostafa Abdelaal', style: theme.textTheme.headlineMedium),
+                Text(
+                  account?.name ?? 'Guest',
+                  style: theme.textTheme.headlineMedium,
+                ),
                 const SizedBox(height: 4),
                 Text(
-                  'Member since 2023',
-                  style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+                  account?.email ?? '',
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: servio.textSecondary),
                 ),
               ],
             ),
@@ -83,7 +86,7 @@ class CustomerProfileScreen extends StatelessWidget {
               children: const <Widget>[
                 Expanded(child: _ProfileStat(value: '12', label: 'Bookings')),
                 Expanded(child: _ProfileStat(value: '8', label: 'Reviews')),
-                Expanded(child: _ProfileStat(value: '2023', label: 'Since')),
+                Expanded(child: _ProfileStat(value: '2025', label: 'Since')),
               ],
             ),
             const SizedBox(height: 24),
@@ -100,11 +103,27 @@ class CustomerProfileScreen extends StatelessWidget {
             const SizedBox(height: 16),
             Text('Preferences', style: theme.textTheme.titleMedium),
             const SizedBox(height: 12),
-            const _SettingsCard(
-              items: <String>[
-                'Dark Mode',
-                'Language EN / AR',
-              ],
+            ServioCard(
+              radius: ServioRadius.lg,
+              child: Column(
+                children: <Widget>[
+                  _SwitchRow(
+                    label: 'Dark Mode',
+                    value: isDark,
+                    onChanged: (bool v) => themeProvider.setMode(
+                      v ? ThemeMode.dark : ThemeMode.light,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _SwitchRow(
+                    label: localeProvider.isArabic
+                        ? 'Language: العربية'
+                        : 'Language: English',
+                    value: localeProvider.isArabic,
+                    onChanged: (_) => localeProvider.toggle(),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 16),
             Text('Support', style: theme.textTheme.titleMedium),
@@ -134,12 +153,26 @@ class CustomerProfileScreen extends StatelessWidget {
                 'Privacy Policy',
               ],
             ),
-            const SizedBox(height: 18),
-            Text(
-              'Log Out',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(color: servio.danger),
+            const SizedBox(height: 24),
+            GestureDetector(
+              onTap: () async {
+                await context.read<SessionProvider>().logout();
+                if (context.mounted) {
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute<void>(
+                        builder: (_) => const RoleSelectionScreen()),
+                    (Route<dynamic> _) => false,
+                  );
+                }
+              },
+              child: Text(
+                'Log Out',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(color: servio.danger, fontWeight: FontWeight.w600),
+              ),
             ),
+            const SizedBox(height: 20),
           ],
         ),
       ),
@@ -160,12 +193,45 @@ class _ProfileStat extends StatelessWidget {
       children: <Widget>[
         Text(
           value,
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(color: servio.accent),
+          style: Theme.of(context)
+              .textTheme
+              .headlineMedium
+              ?.copyWith(color: servio.accent),
         ),
         const SizedBox(height: 4),
         Text(
           label,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+          style: Theme.of(context)
+              .textTheme
+              .bodySmall
+              ?.copyWith(color: servio.textSecondary),
+        ),
+      ],
+    );
+  }
+}
+
+class _SwitchRow extends StatelessWidget {
+  const _SwitchRow({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String label;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final servio = context.servio;
+    return Row(
+      children: <Widget>[
+        Expanded(child: Text(label)),
+        Switch(
+          value: value,
+          onChanged: onChanged,
+          activeColor: servio.accent,
         ),
       ],
     );
@@ -173,10 +239,7 @@ class _ProfileStat extends StatelessWidget {
 }
 
 class _SettingsCard extends StatelessWidget {
-  const _SettingsCard({
-    required this.items,
-    this.onItemTap,
-  });
+  const _SettingsCard({required this.items, this.onItemTap});
 
   final List<String> items;
   final ValueChanged<String>? onItemTap;

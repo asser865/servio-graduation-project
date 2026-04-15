@@ -14,7 +14,7 @@ void showServioToast(
   late final OverlayEntry entry;
 
   entry = OverlayEntry(
-    builder: (BuildContext context) {
+    builder: (BuildContext ctx) {
       return _ServioToastOverlay(
         message: message,
         type: type,
@@ -55,20 +55,22 @@ class _ServioToastOverlayState extends State<_ServioToastOverlay>
       duration: ServioMotion.toast,
       reverseDuration: ServioMotion.toast,
     );
+    // Slides up from bottom, same direction as web's translateX slide-in
     _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 1),
+      begin: const Offset(0, 0.25),
       end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _controller, curve: ServioMotion.curve));
-    _fadeAnimation = CurvedAnimation(parent: _controller, curve: ServioMotion.curve);
+    ).animate(CurvedAnimation(parent: _controller, curve: ServioMotion.spring));
+    _fadeAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: ServioMotion.spring,
+    );
 
     _controller.forward();
     Future<void>.delayed(const Duration(seconds: 3), _dismiss);
   }
 
   Future<void> _dismiss() async {
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
     await _controller.reverse();
     widget.onDismissed();
   }
@@ -82,14 +84,14 @@ class _ServioToastOverlayState extends State<_ServioToastOverlay>
   @override
   Widget build(BuildContext context) {
     final servio = context.servio;
-    final palette = _paletteFor(servio, widget.type);
+    final (IconData icon, Color accentColor) = _paletteFor(widget.type);
 
     return IgnorePointer(
       child: SafeArea(
         child: Align(
           alignment: Alignment.bottomCenter,
           child: Padding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
             child: FadeTransition(
               opacity: _fadeAnimation,
               child: SlideTransition(
@@ -98,26 +100,41 @@ class _ServioToastOverlayState extends State<_ServioToastOverlay>
                   color: Colors.transparent,
                   child: Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: servio.surfaceRaised,
                       borderRadius: BorderRadius.circular(ServioRadius.md),
-                      border: Border.all(color: servio.border),
-                      boxShadow: ServioShadows.rest,
+                      // 4px left-border accent strip — matches web toast design
+                      border: Border(
+                        left: BorderSide(color: accentColor, width: 4),
+                        top: BorderSide(color: servio.border),
+                        right: BorderSide(color: servio.border),
+                        bottom: BorderSide(color: servio.border),
+                      ),
+                      boxShadow: ServioShadows.elevated,
                     ),
-                    child: Row(
-                      children: <Widget>[
-                        Icon(palette.$1, color: palette.$2),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            widget.message,
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  color: Theme.of(context).colorScheme.onSurface,
-                                ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                      child: Row(
+                        children: <Widget>[
+                          Icon(icon, color: accentColor, size: 20),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              widget.message,
+                              style:
+                                  Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface,
+                                        height: 1.4,
+                                      ),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -129,12 +146,12 @@ class _ServioToastOverlayState extends State<_ServioToastOverlay>
     );
   }
 
-  (IconData, Color) _paletteFor(ServioThemeExtension servio, ServioToastType type) {
+  (IconData, Color) _paletteFor(ServioToastType type) {
     return switch (type) {
-      ServioToastType.success => (Icons.check_circle_rounded, servio.success),
-      ServioToastType.warning => (Icons.warning_amber_rounded, servio.warning),
-      ServioToastType.info => (Icons.info_rounded, servio.info),
-      ServioToastType.danger => (Icons.error_rounded, servio.danger),
+      ServioToastType.success => (Icons.check_circle_rounded,  ServioColors.success),
+      ServioToastType.warning => (Icons.warning_amber_rounded, ServioColors.warning),
+      ServioToastType.info    => (Icons.info_rounded,          ServioColors.info),
+      ServioToastType.danger  => (Icons.error_rounded,         ServioColors.danger),
     };
   }
 }

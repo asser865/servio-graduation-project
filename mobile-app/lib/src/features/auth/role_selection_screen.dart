@@ -42,6 +42,22 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               const SizedBox(height: 32),
+              // Brand header — gradient text matching web primary-gradient
+              ShaderMask(
+                shaderCallback: (Rect bounds) =>
+                    ServioGradients.brand.createShader(bounds),
+                blendMode: BlendMode.srcIn,
+                child: Text(
+                  'SERVIO',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.headlineLarge?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
               Text(
                 'How will you use SERVIO?',
                 textAlign: TextAlign.center,

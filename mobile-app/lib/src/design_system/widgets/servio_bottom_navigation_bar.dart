@@ -8,13 +8,30 @@ class ServioBottomNavItem {
     required this.icon,
     required this.label,
     this.highlighted = false,
+    this.badgeCount = 0,
   });
 
   final IconData icon;
   final String label;
+
+  /// When true the active state uses the accent gradient instead of a
+  /// plain background fill — used for the Smart Match AI tab.
   final bool highlighted;
+
+  /// When > 0 a red dot badge is shown on the icon.
+  final int badgeCount;
 }
 
+/// SERVIO bottom navigation bar.
+///
+/// Design spec:
+/// - Edge-to-edge, no horizontal floating margin.
+/// - Surface background + 1px top border (matches web nav separator).
+/// - Active tab: accent-coloured icon + label, subtle backgroundSoft pill.
+/// - Active highlighted tab: accent gradient pill (AI feature).
+/// - Inactive: textSecondary icon + label.
+/// - Height: 56dp content + SafeArea bottom inset.
+/// - Spring animation on active state transition.
 class ServioBottomNavigationBar extends StatelessWidget {
   const ServioBottomNavigationBar({
     required this.items,
@@ -31,77 +48,130 @@ class ServioBottomNavigationBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final servio = context.servio;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surface = isDark ? servio.surfaceRaised : Theme.of(context).colorScheme.surface;
 
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
-        child: Container(
-          height: 76,
-          decoration: BoxDecoration(
-            color: isDark ? servio.surfaceRaised : Theme.of(context).colorScheme.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(ServioRadius.xl)),
-            border: Border.all(
-              color: servio.border.withValues(alpha: isDark ? 0.45 : 1),
-            ),
-            boxShadow: isDark ? null : ServioShadows.rest,
-          ),
-          child: Row(
-            children: List<Widget>.generate(items.length, (int index) {
-              final item = items[index];
-              final isActive = index == currentIndex;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        // 1px top divider — matches web nav border
+        Divider(
+          height: 1,
+          thickness: 1,
+          color: servio.border.withValues(alpha: isDark ? 0.35 : 0.7),
+        ),
+        ColoredBox(
+          color: surface,
+          child: SafeArea(
+            top: false,
+            child: SizedBox(
+              height: 56,
+              child: Row(
+                children: List<Widget>.generate(items.length, (int index) {
+                  final item = items[index];
+                  final isActive = index == currentIndex;
 
-              return Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(ServioRadius.xl),
-                    onTap: () => onTap(index),
-                    child: AnimatedContainer(
-                      duration: ServioMotion.tabSwitch,
-                      curve: ServioMotion.curve,
-                      decoration: BoxDecoration(
-                        gradient: isActive && item.highlighted ? ServioGradients.accent : null,
-                        borderRadius: BorderRadius.circular(ServioRadius.xl),
-                        color: isActive && !item.highlighted
-                            ? servio.backgroundSoft
-                            : Colors.transparent,
-                      ),
-                      padding: EdgeInsets.symmetric(
-                        vertical: item.highlighted ? 6 : 8,
-                        horizontal: 8,
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: <Widget>[
-                          Icon(
-                            item.icon,
-                            size: item.highlighted ? 24 : 22,
-                            color: isActive
-                                ? (item.highlighted ? Colors.white : servio.accent)
-                                : servio.textSecondary,
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            item.label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                  color: isActive
-                                      ? (item.highlighted ? Colors.white : servio.accent)
-                                      : servio.textSecondary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
+                  return Expanded(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => onTap(index),
+                      child: _NavTab(
+                        item: item,
+                        isActive: isActive,
+                        servio: servio,
                       ),
                     ),
-                  ),
-                ),
-              );
-            }),
+                  );
+                }),
+              ),
+            ),
           ),
+        ),
+      ],
+    );
+  }
+}
+
+class _NavTab extends StatelessWidget {
+  const _NavTab({
+    required this.item,
+    required this.isActive,
+    required this.servio,
+  });
+
+  final ServioBottomNavItem item;
+  final bool isActive;
+  final ServioThemeExtension servio;
+
+  @override
+  Widget build(BuildContext context) {
+    final iconColor = isActive
+        ? (item.highlighted ? Colors.white : servio.accent)
+        : servio.textSecondary;
+    final labelColor = iconColor;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+      child: AnimatedContainer(
+        duration: ServioMotion.tabSwitch,
+        curve: ServioMotion.spring,
+        decoration: BoxDecoration(
+          gradient: isActive && item.highlighted ? ServioGradients.accent : null,
+          color: isActive && !item.highlighted
+              ? servio.backgroundSoft
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(ServioRadius.navItem),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            AnimatedScale(
+              scale: isActive ? 1.0 : 0.92,
+              duration: ServioMotion.tabSwitch,
+              curve: ServioMotion.spring,
+              child: item.badgeCount > 0
+                  ? Stack(
+                      clipBehavior: Clip.none,
+                      children: <Widget>[
+                        Icon(item.icon, size: 22, color: iconColor),
+                        Positioned(
+                          top: -4,
+                          right: -6,
+                          child: Container(
+                            width: 14,
+                            height: 14,
+                            decoration: const BoxDecoration(
+                              color: ServioColors.danger,
+                              shape: BoxShape.circle,
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              item.badgeCount > 9 ? '9+' : '${item.badgeCount}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 8,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  : Icon(item.icon, size: 22, color: iconColor),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              item.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: labelColor,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                fontSize: 10,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       ),
     );

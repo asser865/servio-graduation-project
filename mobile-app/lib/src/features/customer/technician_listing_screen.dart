@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/data/demo_technicians.dart';
+import '../../core/models/technician_model.dart';
+import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
@@ -7,14 +11,16 @@ import '../../design_system/widgets/servio_status_chip.dart';
 import 'technician_profile_screen.dart';
 
 class TechnicianListingScreen extends StatefulWidget {
-  const TechnicianListingScreen({super.key});
+  const TechnicianListingScreen({this.serviceId, super.key});
+
+  final String? serviceId;
 
   @override
   State<TechnicianListingScreen> createState() => _TechnicianListingScreenState();
 }
 
 class _TechnicianListingScreenState extends State<TechnicianListingScreen> {
-  final Set<int> _selectedIndexes = <int>{};
+  final Set<String> _selectedIds = <String>{};
 
   static const List<String> _filters = <String>[
     'Rating 4+',
@@ -23,12 +29,17 @@ class _TechnicianListingScreenState extends State<TechnicianListingScreen> {
     'Verified Only',
   ];
 
-  void _toggleSelection(int index) {
+  List<TechnicianModel> get _technicians {
+    if (widget.serviceId == null) return kDemoTechnicians;
+    return kDemoTechnicians.where((t) => t.specialty == widget.serviceId).toList();
+  }
+
+  void _toggleSelection(String id) {
     setState(() {
-      if (_selectedIndexes.contains(index)) {
-        _selectedIndexes.remove(index);
+      if (_selectedIds.contains(id)) {
+        _selectedIds.remove(id);
       } else {
-        _selectedIndexes.add(index);
+        _selectedIds.add(id);
       }
     });
   }
@@ -37,6 +48,8 @@ class _TechnicianListingScreenState extends State<TechnicianListingScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
+    final locale = context.watch<LocaleProvider>().languageCode;
+    final technicians = _technicians;
 
     return Scaffold(
       body: Stack(
@@ -51,7 +64,7 @@ class _TechnicianListingScreenState extends State<TechnicianListingScreen> {
                       children: <Widget>[
                         Expanded(
                           child: Text(
-                            '24 Technicians Available',
+                            '${technicians.length} Technicians Available',
                             style: theme.textTheme.headlineMedium,
                           ),
                         ),
@@ -70,7 +83,7 @@ class _TechnicianListingScreenState extends State<TechnicianListingScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                       scrollDirection: Axis.horizontal,
                       itemCount: _filters.length,
-                      separatorBuilder: (BuildContext context, int index) => const SizedBox(width: 10),
+                      separatorBuilder: (_, __) => const SizedBox(width: 10),
                       itemBuilder: (BuildContext context, int index) {
                         return Container(
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -92,30 +105,32 @@ class _TechnicianListingScreenState extends State<TechnicianListingScreen> {
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate(
                       (BuildContext context, int index) {
+                        final tech = technicians[index];
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 16),
                           child: _TechnicianListCard(
-                            index: index,
-                            selected: _selectedIndexes.contains(index),
-                            onSelect: () => _toggleSelection(index),
+                            technician: tech,
+                            locale: locale,
+                            selected: _selectedIds.contains(tech.id),
+                            onSelect: () => _toggleSelection(tech.id),
                             onViewProfile: () {
                               Navigator.of(context).push(
                                 MaterialPageRoute<void>(
-                                  builder: (_) => const TechnicianProfileScreen(),
+                                  builder: (_) => TechnicianProfileScreen(technicianId: tech.id),
                                 ),
                               );
                             },
                           ),
                         );
                       },
-                      childCount: 5,
+                      childCount: technicians.length,
                     ),
                   ),
                 ),
               ],
             ),
           ),
-          if (_selectedIndexes.length >= 2)
+          if (_selectedIds.length >= 2)
             Align(
               alignment: Alignment.bottomCenter,
               child: SafeArea(
@@ -132,12 +147,12 @@ class _TechnicianListingScreenState extends State<TechnicianListingScreen> {
                     children: <Widget>[
                       Expanded(
                         child: Text(
-                          'Compare (${_selectedIndexes.length})',
+                          'Compare (${_selectedIds.length})',
                           style: theme.textTheme.titleMedium,
                         ),
                       ),
                       IconButton(
-                        onPressed: () => setState(_selectedIndexes.clear),
+                        onPressed: () => setState(_selectedIds.clear),
                         icon: const Icon(Icons.close_rounded),
                       ),
                       OutlinedButton(
@@ -157,13 +172,15 @@ class _TechnicianListingScreenState extends State<TechnicianListingScreen> {
 
 class _TechnicianListCard extends StatelessWidget {
   const _TechnicianListCard({
-    required this.index,
+    required this.technician,
+    required this.locale,
     required this.selected,
     required this.onSelect,
     required this.onViewProfile,
   });
 
-  final int index;
+  final TechnicianModel technician;
+  final String locale;
   final bool selected;
   final VoidCallback onSelect;
   final VoidCallback onViewProfile;
@@ -172,8 +189,6 @@ class _TechnicianListCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
-    final names = <String>['Ahmed Nabil', 'Mariam Adel', 'Youssef Tarek', 'Nour Hany', 'Karim Adel'];
-    final specialties = <String>['Plumbing', 'Electrical', 'Painting', 'HVAC', 'Cleaning'];
 
     return ServioCard(
       radius: ServioRadius.lg,
@@ -192,7 +207,7 @@ class _TechnicianListCard extends StatelessWidget {
                 ),
                 child: Center(
                   child: Text(
-                    names[index][0],
+                    technician.avatarInitials,
                     style: theme.textTheme.labelLarge?.copyWith(color: ServioColors.deepBrown),
                   ),
                 ),
@@ -202,20 +217,20 @@ class _TechnicianListCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text(names[index], style: theme.textTheme.titleMedium),
+                    Text(technician.name.of(locale), style: theme.textTheme.titleMedium),
                     const SizedBox(height: 4),
                     Text(
-                      specialties[index],
+                      technician.title.of(locale),
                       style: theme.textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      '4.${9 - index} rating  •  (${328 - (index * 21)} reviews)  •  Responds <2h',
+                      '${technician.rating} rating  •  (${technician.reviewCount} reviews)  •  ${technician.responseTime}',
                       style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '${150 + (index * 20)} EGP / hour',
+                      '${technician.pricePerHour} EGP / hour',
                       style: theme.textTheme.titleMedium?.copyWith(color: servio.accent),
                     ),
                   ],
@@ -229,7 +244,8 @@ class _TechnicianListCard extends StatelessWidget {
                     onChanged: (_) => onSelect(),
                     activeColor: servio.accent,
                   ),
-                  const ServioStatusChip(label: 'Verified'),
+                  if (technician.verified)
+                    const ServioStatusChip(label: 'Verified'),
                 ],
               ),
             ],
