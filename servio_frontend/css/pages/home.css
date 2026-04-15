@@ -22,6 +22,7 @@
   flex-direction: column;
   gap: 12px;
   transform: translateY(-50%);
+  transition: color 400ms ease;
 }
 
 .home-section-indicator::before {
@@ -50,9 +51,9 @@
   height: var(--home-indicator-dot);
   justify-self: center;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.26);
-  box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.70);
+  border: 1px solid rgba(255, 255, 255, 0.50);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.30);
   transition: transform 250ms ease, background-color 250ms ease, box-shadow 250ms ease, border-color 250ms ease;
 }
 
@@ -87,6 +88,56 @@
   background: #ffffff;
   border-color: rgba(255, 255, 255, 0.92);
   box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.14);
+}
+
+/* ── Over-dark-section: white dots (default state) ── */
+.home-section-indicator.is-over-dark::before {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.36), rgba(255, 255, 255, 0.12));
+}
+.home-section-indicator.is-over-dark .home-section-indicator__item {
+  color: #ffffff;
+}
+.home-section-indicator.is-over-dark .home-section-indicator__dot {
+  background: rgba(255, 255, 255, 0.70);
+  border-color: rgba(255, 255, 255, 0.50);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.30);
+}
+.home-section-indicator.is-over-dark .home-section-indicator__label {
+  background: rgba(15, 10, 5, 0.72);
+  color: rgba(255, 255, 255, 0.92);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+.home-section-indicator.is-over-dark .home-section-indicator__item:hover .home-section-indicator__dot,
+.home-section-indicator.is-over-dark .home-section-indicator__item:focus-visible .home-section-indicator__dot,
+.home-section-indicator.is-over-dark .home-section-indicator__item.is-active .home-section-indicator__dot {
+  background: #ffffff;
+  border-color: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.14);
+}
+
+/* ── Over-light-section: dark dots ── */
+.home-section-indicator.is-over-light::before {
+  background: linear-gradient(180deg, rgba(30, 20, 10, 0.50), rgba(30, 20, 10, 0.20));
+}
+.home-section-indicator.is-over-light .home-section-indicator__item {
+  color: #1a1009;
+}
+.home-section-indicator.is-over-light .home-section-indicator__dot {
+  background: #5a4535;
+  border-color: rgba(30, 20, 10, 0.60);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.20);
+}
+.home-section-indicator.is-over-light .home-section-indicator__label {
+  background: rgba(255, 252, 248, 0.92);
+  color: rgba(30, 20, 10, 0.92);
+  border-color: rgba(30, 20, 10, 0.18);
+}
+.home-section-indicator.is-over-light .home-section-indicator__item:hover .home-section-indicator__dot,
+.home-section-indicator.is-over-light .home-section-indicator__item:focus-visible .home-section-indicator__dot,
+.home-section-indicator.is-over-light .home-section-indicator__item.is-active .home-section-indicator__dot {
+  background: #1a1009;
+  border-color: rgba(30, 20, 10, 0.90);
+  box-shadow: 0 0 0 5px rgba(30, 20, 10, 0.14);
 }
 
 .home-section-indicator__item:focus-visible {
@@ -1766,8 +1817,8 @@
 ──────────────────────────────────────────────────────── */
 .booking-toast {
   position: fixed;
-  bottom: 32px;
-  inset-inline-start: 32px;
+  top: 90px;
+  inset-inline-end: 32px;
   z-index: 9999;
   display: flex;
   align-items: center;

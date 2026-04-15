@@ -104,6 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ── Section indicator scroll spy ───────────────────────────────────────
+  const indicatorNav   = document.querySelector('.home-section-indicator');
   const indicatorLinks = Array.from(document.querySelectorAll('[data-home-indicator-link]'));
   const sectionMap     = indicatorLinks
     .map(link => {
@@ -114,13 +115,32 @@ document.addEventListener('DOMContentLoaded', () => {
     })
     .filter(Boolean);
 
-  function setActiveIndicator(activeLink) {
+  function updateIndicatorTheme(section) {
+    if (!indicatorNav || !section) return;
+    const bg = section.dataset.sectionBg;
+    const isDarkTheme = document.documentElement.getAttribute('data-theme') === 'dark';
+    const isOverDark = bg === 'dark' || (bg === 'adaptive' && isDarkTheme);
+    indicatorNav.classList.toggle('is-over-dark', isOverDark);
+    indicatorNav.classList.toggle('is-over-light', !isOverDark);
+  }
+
+  function setActiveIndicator(activeLink, activeSection) {
     indicatorLinks.forEach(link => {
       const isActive = link === activeLink;
       link.classList.toggle('is-active', isActive);
       if (isActive) link.setAttribute('aria-current', 'true');
       else           link.removeAttribute('aria-current');
     });
+    if (activeSection) updateIndicatorTheme(activeSection);
+  }
+
+  // Also re-evaluate when theme is toggled
+  if (indicatorNav) {
+    const themeObserver = new MutationObserver(() => {
+      const activeItem = sectionMap.find(item => item.link.classList.contains('is-active'));
+      if (activeItem) updateIndicatorTheme(activeItem.section);
+    });
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   }
 
   if (sectionMap.length) {
@@ -130,7 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
         .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
       if (!visibleEntries.length) return;
       const activeItem = sectionMap.find(item => item.section === visibleEntries[0].target);
-      if (activeItem) setActiveIndicator(activeItem.link);
+      if (activeItem) setActiveIndicator(activeItem.link, activeItem.section);
     }, { root: null, threshold: [0.3, 0.5, 0.7], rootMargin: '-18% 0px -32% 0px' });
 
     sectionMap.forEach(item => observer.observe(item.section));
@@ -139,7 +159,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const id = link.getAttribute('href');
       const section = id && id.startsWith('#') ? document.querySelector(id) : null;
       if (section) section.scrollIntoView({ behavior: 'smooth' });
-      setActiveIndicator(link);
+      const mapItem = sectionMap.find(item => item.link === link);
+      setActiveIndicator(link, mapItem ? mapItem.section : null);
     }));
   }
 
