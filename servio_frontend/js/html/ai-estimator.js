@@ -34,9 +34,9 @@ const ROOM_LABELS = {
 };
 
 const LEVEL_LABELS = {
-  economy:  t('est_finish_economy'),
-  standard: t('est_finish_standard'),
-  premium:  t('est_finish_premium'),
+  economy:  'est_finish_economy',
+  standard: 'est_finish_standard',
+  premium:  'est_finish_premium',
 };
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -89,6 +89,23 @@ function getMetricDims() {
 
 function fmt(n) {
   return n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+
+function getLang() {
+  return window.__lang === 'ar' ? 'ar' : 'en';
+}
+
+function formatCurrency(amount) {
+  const value = fmt(Math.round(amount));
+  return getLang() === 'ar' ? `${value} جنيه` : `${value} EGP`;
+}
+
+function formatCurrencyRange(low, high) {
+  const start = fmt(Math.round(low));
+  const end = fmt(Math.round(high));
+  return getLang() === 'ar'
+    ? `${start} – ${end} جنيه`
+    : `${start} EGP – ${end} EGP`;
 }
 
 function fmtArea(sqm) {
@@ -273,7 +290,7 @@ function renderResults() {
 
   // Total range
   document.getElementById('results-total-range').textContent =
-    `${fmt(costs.low)} EGP – ${fmt(costs.high)} EGP`;
+    formatCurrencyRange(costs.low, costs.high);
 
   // Market badge
   const savings = Math.round(Math.random() * 8 + 3);
@@ -282,11 +299,11 @@ function renderResults() {
 
   // Meta pills
   document.getElementById('results-room-label').textContent =
-    ROOM_LABELS[state.roomType];
+    t(ROOM_LABELS[state.roomType]);
   document.getElementById('results-level-label').textContent =
-    LEVEL_LABELS[state.level];
+    t(LEVEL_LABELS[state.level]);
   document.getElementById('results-area-label').textContent =
-    fmtArea(area) + ' floor';
+    `${fmtArea(area)} ${t('est_area_suffix')}`;
 
   // Breakdown bars
   renderBreakdown(costs);
@@ -328,7 +345,7 @@ function renderBreakdown(costs) {
           <div class="breakdown-bar__fill breakdown-bar__fill--${cls}" data-target="${pct}" style="width:0"></div>
         </div>
         <div>
-          <div class="breakdown-bar__amount">${fmt(Math.round(amount))} EGP</div>
+          <div class="breakdown-bar__amount">${formatCurrency(amount)}</div>
           <div class="breakdown-bar__pct">${pct}%</div>
         </div>
       </div>
@@ -352,17 +369,21 @@ function renderMaterials(areaSqm) {
   const grout      = (areaSqm * groutPerSqm).toFixed(1);
   const primer     = (state.wallArea / 12).toFixed(1);
 
-  const materialGrade = { economy: 'Standard', standard: 'Mid-Grade', premium: 'High-End' }[level];
+  const materialGrade = {
+    economy: t('est_grade_standard'),
+    standard: t('est_grade_mid'),
+    premium: t('est_grade_high')
+  }[level];
 
   const rows = [
-    { material: t('est_mat_floor_tiles', { grade: materialGrade }), qty: `${floorTiles} m²`, note: '+10% waste allowance' },
+    { material: t('est_mat_floor_tiles', { grade: materialGrade }), qty: `${floorTiles} m²`, note: t('est_note_waste') },
     ...(parseFloat(wallTiles) > 0 ? [
-      { material: t('est_mat_wall_tiles', { grade: materialGrade }), qty: `${wallTiles} m²`, note: 'Kitchen/Bath walls' }
+      { material: t('est_mat_wall_tiles', { grade: materialGrade }), qty: `${wallTiles} m²`, note: t('est_note_walls') }
     ] : []),
-    { material: t('est_mat_paint'),    qty: `${paintLiters} L`,  note: '2 coats + primer coat' },
-    { material: t('est_mat_primer'),   qty: `${primer} L`,        note: 'Pre-paint treatment' },
-    { material: t('est_mat_grout'),    qty: `${grout} kg`,        note: 'Joints & gaps' },
-    { material: t('est_mat_adhesive'), qty: `${(areaSqm * 5).toFixed(0)} kg`, note: 'Floor & wall fixing' },
+    { material: t('est_mat_paint'),    qty: `${paintLiters} L`,  note: t('est_note_coats') },
+    { material: t('est_mat_primer'),   qty: `${primer} L`,        note: t('est_note_prepaint') },
+    { material: t('est_mat_grout'),    qty: `${grout} kg`,        note: t('est_note_joints') },
+    { material: t('est_mat_adhesive'), qty: `${(areaSqm * 5).toFixed(0)} kg`, note: t('est_note_fixing') },
   ];
 
   const container = document.getElementById('materials-table');
@@ -385,7 +406,7 @@ function renderMaterials(areaSqm) {
 function renderVendors(materialsCost) {
   const vendors = [
     {
-      name:     'EliteFinish Supply',
+      name:     t('est_vendor_elitefinish'),
       rating:   4.8,
       stock:    'in',
       stockLabel: 'In Stock',
@@ -393,7 +414,7 @@ function renderVendors(materialsCost) {
       best:     false,
     },
     {
-      name:     'ProBuild Materials',
+      name:     t('est_vendor_probuild'),
       rating:   4.6,
       stock:    'low',
       stockLabel: 'Limited Stock',
@@ -401,7 +422,7 @@ function renderVendors(materialsCost) {
       best:     false,
     },
     {
-      name:     'CraftHub Wholesale',
+      name:     t('est_vendor_crafthub'),
       rating:   4.7,
       stock:    'in',
       stockLabel: 'In Stock',
@@ -427,7 +448,7 @@ function renderVendors(materialsCost) {
           ★ ${v.rating.toFixed(1)}
         </div>
         <div class="vendor-card__stock vendor-card__stock--${v.stock}">● ${t(v.stock === 'in' ? 'est_in_stock' : 'est_low_stock')}</div>
-        <div class="vendor-card__price">${fmt(price)} EGP</div>
+        <div class="vendor-card__price">${formatCurrency(price)}</div>
         <div class="vendor-card__discount">${t('est_save_pct', { n: v.discount })}</div>
         <a class="btn btn--sm vendor-card__btn" href="./booking.html">${t('est_book_service')}</a>
       </div>
@@ -472,6 +493,14 @@ restartBtn.addEventListener('click', () => {
 });
 
 // ── Hero canvas — particle network ────────────────────────────────────────────
+document.addEventListener('langchange', () => {
+  if (state.step === 4 && !document.getElementById('estimator-results')?.hidden) {
+    renderResults();
+  } else {
+    updateAreaPreview();
+  }
+});
+
 (function initHeroCanvas() {
   const canvas = document.getElementById('estimator-hero-canvas');
   if (!canvas) return;

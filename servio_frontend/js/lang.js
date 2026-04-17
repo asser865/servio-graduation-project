@@ -1161,6 +1161,9 @@
       booking_breadcrumb_home:     'Home',
       booking_breadcrumb_services: 'Services',
       booking_breadcrumb_current:  'Book Service',
+      booking_strip_type:          'Master Plumber · Nasr City',
+      booking_summary_role:        'Master Plumber · 12 yrs exp.',
+      booking_summary_reviews:     '4.9 · 342 reviews',
 
       /* ── Booking Confirmation ── */
       booking_conf_title:    'Booking Confirmed!',
@@ -1171,6 +1174,8 @@
       conf_pin_title:        'Your Arrival PIN',
       conf_pin_desc:         'Share this 4-digit PIN with your technician when they arrive to start the job clock. Keep it private until then.',
       conf_payment_title:    'Payment Summary',
+      conf_tracker_label:    'Current Status',
+      conf_tracker_status:   'Awaiting Technician Confirmation',
       conf_section_tech:     'Technician',
       conf_status_pending:   'Awaiting Confirmation',
       conf_section_service:  'Service Details',
@@ -2218,6 +2223,8 @@
       smart_suggestion_2:         'Architectural designer in Madinaty specialized in modern minimalism',
       smart_suggestion_3:         'I want a plumber to fix my water leak within one hour near Nasr City that wont exceed $50',
       smart_available_badge:      'Available Within 45 Mins',
+      smart_match_role:           'Master Plumber — 12 yrs exp.',
+      smart_match_distance:       '0.8 miles away (Nasr City)',
       smart_tag_verified_emergency:'Verified Emergency',
       smart_tag_leak_specialist:  'Leak Specialist',
       /* AI Estimator */
@@ -2246,6 +2253,19 @@
       est_lux_item_3:             'Premium fixtures & fittings',
       est_finishing_luxury_rate:  '~110 EGP / m²',
       est_calc_analyzing:         'Analyzing room dimensions…',
+      est_area_suffix:            'floor',
+      est_grade_standard:         'Standard',
+      est_grade_mid:              'Mid-Grade',
+      est_grade_high:             'High-End',
+      est_note_waste:             '+10% waste allowance',
+      est_note_walls:             'Kitchen/Bath walls',
+      est_note_coats:             '2 coats + primer coat',
+      est_note_prepaint:          'Pre-paint treatment',
+      est_note_joints:            'Joints & gaps',
+      est_note_fixing:            'Floor & wall fixing',
+      est_vendor_elitefinish:     'EliteFinish Supply',
+      est_vendor_probuild:        'ProBuild Materials',
+      est_vendor_crafthub:        'CraftHub Wholesale',
       /* Join as Technician */
       jt_earn_unit:               'EGP / month',
       jt_commission_prefix:       'SERVIO takes only',
@@ -2713,6 +2733,38 @@
       admin_audit_col_ip:            'IP Address',
       admin_audit_col_status:        'Status',
       admin_audit_no_results:        'No audit entries match your filters.',
+      admin_audit_search_aria:       'Search audit log',
+      admin_audit_filter_type_aria:  'Filter audit log by type',
+      admin_audit_filter_date_aria:  'Filter audit log by date',
+      admin_audit_prev_aria:         'Previous page',
+      admin_audit_next_aria:         'Next page',
+      admin_audit_status_ok:         'OK',
+      admin_audit_status_warn:       'Warning',
+      admin_audit_status_fail:       'Failed',
+      admin_audit_actor_unknown:     'Unknown',
+      admin_audit_target_platform_settings: 'Platform Settings',
+      admin_audit_target_admin_dashboard:   'Admin Dashboard',
+      admin_audit_target_system_settings:   'System Settings',
+      admin_audit_target_reports:           'Reports',
+      admin_audit_evt_commission_12:        'Updated commission rate to 12%',
+      admin_audit_evt_suspend_user:         'Suspended user account',
+      admin_audit_evt_resolved_dispute_4412:'Resolved dispute #D-4412',
+      admin_audit_evt_admin_login:          'Admin login',
+      admin_audit_evt_failed_login:         'Failed login attempt',
+      admin_audit_evt_settlement_4200:      'Processed settlement EGP 4,200',
+      admin_audit_evt_maintenance_on:       'Enabled Maintenance Mode',
+      admin_audit_evt_maintenance_off:      'Disabled Maintenance Mode',
+      admin_audit_evt_assign_finance_role:  'Assigned role: Finance Manager',
+      admin_audit_evt_approved_technician:  'Approved technician',
+      admin_audit_evt_rejected_technician:  'Rejected technician application',
+      admin_audit_evt_exported_bookings_csv:'Exported Bookings Report (CSV)',
+      admin_audit_evt_cancelled_booking_admin:'Cancelled booking by admin',
+      admin_audit_evt_cash_debt_ceiling:    'Updated cash debt ceiling',
+      admin_audit_evt_reset_password:       'Reset user password',
+      admin_audit_evt_settlement_2800:      'Processed settlement EGP 2,800',
+      admin_audit_evt_changed_support_email:'Changed platform support email',
+      admin_audit_evt_suspend_user_fraud:   'Suspended user (fraud flag)',
+      admin_audit_export_filename:          'audit-log',
 
       /* Password strength */
       pw_strength_very_weak:  'Very Weak',
@@ -4163,6 +4215,9 @@
       booking_breadcrumb_home:     'الرئيسية',
       booking_breadcrumb_services: 'الخدمات',
       booking_breadcrumb_current:  'حجز خدمة',
+      booking_strip_type:          'سباك محترف · مدينة نصر',
+      booking_summary_role:        'سباك محترف · 12 سنة خبرة',
+      booking_summary_reviews:     '4.9 · 342 تقييم',
 
       /* ── Booking Confirmation ── */
       booking_conf_title:    'تم تأكيد الحجز!',
@@ -4173,6 +4228,8 @@
       conf_pin_title:        'رمز الوصول',
       conf_pin_desc:         'شارك هذا الرمز المكون من 4 أرقام مع الفني عند وصوله لبدء ساعة العمل. احتفظ به سريًا حتى ذلك الحين.',
       conf_payment_title:    'ملخص الدفع',
+      conf_tracker_label:    'الحالة الحالية',
+      conf_tracker_status:   'بانتظار تأكيد الفني',
       conf_section_tech:     'الفني',
       conf_status_pending:   'في انتظار التأكيد',
       conf_section_service:  'تفاصيل الخدمة',
@@ -5161,6 +5218,8 @@
       smart_suggestion_2:         'مصمم معماري في مدينتي متخصص في الأسلوب العصري البسيط',
       smart_suggestion_3:         'أريد سباكاً لإصلاح تسرب المياه خلال ساعة بالقرب من مدينة نصر بميزانية لا تتجاوز 50 دولاراً',
       smart_available_badge:      'متاح خلال 45 دقيقة',
+      smart_match_role:           'سباك محترف — 12 سنة خبرة',
+      smart_match_distance:       'يبعد 0.8 ميل (مدينة نصر)',
       smart_tag_verified_emergency:'طوارئ موثقة',
       smart_tag_leak_specialist:  'متخصص في التسربات',
       /* AI Estimator */
@@ -5189,6 +5248,19 @@
       est_lux_item_3:             'تركيبات وتجهيزات فاخرة',
       est_finishing_luxury_rate:  '~110 جنيه / م²',
       est_calc_analyzing:         'جارٍ تحليل أبعاد الغرفة…',
+      est_area_suffix:            'أرضية',
+      est_grade_standard:         'قياسي',
+      est_grade_mid:              'متوسط',
+      est_grade_high:             'فاخر',
+      est_note_waste:             '+10٪ هالك إضافي',
+      est_note_walls:             'حوائط المطبخ/الحمام',
+      est_note_coats:             'طبقتان + طبقة تأسيس',
+      est_note_prepaint:          'معالجة قبل الدهان',
+      est_note_joints:            'الفواصل والشقوق',
+      est_note_fixing:            'تثبيت الأرضيات والحوائط',
+      est_vendor_elitefinish:     'إيليت فينيش للتوريد',
+      est_vendor_probuild:        'بروبيلد للمواد',
+      est_vendor_crafthub:        'كرافت هب للجملة',
       /* Join as Technician */
       jt_earn_unit:               'جنيه / شهر',
       jt_commission_prefix:       'سيرفيو يأخذ فقط',
@@ -5683,6 +5755,38 @@
       admin_audit_col_ip:            'عنوان IP',
       admin_audit_col_status:        'الحالة',
       admin_audit_no_results:        'لا توجد إدخالات تطابق الفلاتر المحددة.',
+      admin_audit_search_aria:       'البحث في سجل التدقيق',
+      admin_audit_filter_type_aria:  'تصفية سجل التدقيق حسب النوع',
+      admin_audit_filter_date_aria:  'تصفية سجل التدقيق حسب التاريخ',
+      admin_audit_prev_aria:         'الصفحة السابقة',
+      admin_audit_next_aria:         'الصفحة التالية',
+      admin_audit_status_ok:         'سليم',
+      admin_audit_status_warn:       'تحذير',
+      admin_audit_status_fail:       'فشل',
+      admin_audit_actor_unknown:     'غير معروف',
+      admin_audit_target_platform_settings: 'إعدادات المنصة',
+      admin_audit_target_admin_dashboard:   'لوحة تحكم المشرف',
+      admin_audit_target_system_settings:   'إعدادات النظام',
+      admin_audit_target_reports:           'التقارير',
+      admin_audit_evt_commission_12:        'تم تحديث نسبة العمولة إلى 12٪',
+      admin_audit_evt_suspend_user:         'تم تعليق حساب المستخدم',
+      admin_audit_evt_resolved_dispute_4412:'تم حل النزاع #D-4412',
+      admin_audit_evt_admin_login:          'تسجيل دخول المشرف',
+      admin_audit_evt_failed_login:         'فشلت محاولة تسجيل الدخول',
+      admin_audit_evt_settlement_4200:      'تمت معالجة تسوية بقيمة 4,200 جنيه',
+      admin_audit_evt_maintenance_on:       'تم تفعيل وضع الصيانة',
+      admin_audit_evt_maintenance_off:      'تم إلغاء وضع الصيانة',
+      admin_audit_evt_assign_finance_role:  'تم تعيين دور: مدير مالي',
+      admin_audit_evt_approved_technician:  'تمت الموافقة على الفني',
+      admin_audit_evt_rejected_technician:  'تم رفض طلب الفني',
+      admin_audit_evt_exported_bookings_csv:'تم تصدير تقرير الحجوزات (CSV)',
+      admin_audit_evt_cancelled_booking_admin:'تم إلغاء الحجز بواسطة المشرف',
+      admin_audit_evt_cash_debt_ceiling:    'تم تحديث الحد الأقصى للمديونية النقدية',
+      admin_audit_evt_reset_password:       'تمت إعادة تعيين كلمة مرور المستخدم',
+      admin_audit_evt_settlement_2800:      'تمت معالجة تسوية بقيمة 2,800 جنيه',
+      admin_audit_evt_changed_support_email:'تم تغيير بريد دعم المنصة',
+      admin_audit_evt_suspend_user_fraud:   'تم تعليق المستخدم لاشتباه احتيال',
+      admin_audit_export_filename:          'سجل-التدقيق',
 
       /* Password strength */
       pw_strength_very_weak:  'ضعيفة جداً',
@@ -6137,11 +6241,20 @@
   function replaceCurrencyTokens(str, lang) {
     if (typeof str !== 'string' || !str) return str;
     if (lang === 'ar') {
-      return str.replace(/\bEGP\b/g, 'جنيه');
+      return str
+        .replace(/([\d.,]+)\s*EGP\s*[–-]\s*([\d.,]+)\s*EGP/g, '$1 – $2 جنيه')
+        .replace(/EGP\s*([\d.,]+)/g, '$1 جنيه')
+        .replace(/([\d.,]+)\s*EGP\s*(?:\/\s*hr|\/hr)/g, '$1 جنيه/ساعة')
+        .replace(/([\d.,]+)\s*EGP\b/g, '$1 جنيه')
+        .replace(/\bEGP\b/g, 'جنيه')
+        .replace(/\/\s*hr\b/g, '/ساعة');
     }
-    return str.replace(/(^|[\s([+\-~])جنيه(?=$|[\s)\]+\-\/.,:؛،])/g, function (_, prefix) {
-      return (prefix || '') + 'EGP';
-    });
+    return str
+      .replace(/([\d.,]+)\s*[–-]\s*([\d.,]+)\s*جنيه/g, '$1 – $2 EGP')
+      .replace(/([\d.,]+)\s*جنيه\/ساعة/g, '$1 EGP/hr')
+      .replace(/([\d.,]+)\s*جنيه\b/g, '$1 EGP')
+      .replace(/جنيه\s*([\d.,]+)/g, 'EGP $1')
+      .replace(/\/\s*ساعة/g, '/hr');
   }
 
   function syncCurrencyStyle(lang) {

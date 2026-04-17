@@ -1016,6 +1016,7 @@ function initAdminDashboard() {
   document.addEventListener('langchange', () => {
     _updateOverviewDate();
     _updateUserCount();
+    _renderAuditTable();
   });
 
   // ── Mobile sidebar toggle ──────────────────────────────
@@ -1043,28 +1044,56 @@ function initAdminDashboard() {
   let _auditPage = 1;
   let _auditFiltered = [];
 
+  const _auditTypeLabel = type => {
+    const map = {
+      auth: _T('admin_audit_type_auth') || 'Authentication',
+      user: _T('admin_audit_type_user') || 'User Management',
+      settings: _T('admin_audit_type_settings') || 'Settings',
+      booking: _T('admin_audit_type_booking') || 'Booking',
+      finance: _T('admin_audit_type_finance') || 'Finance',
+      system: _T('admin_audit_type_system') || 'System',
+    };
+    return map[type] || type;
+  };
+
+  const _auditStatusLabel = status => {
+    const map = {
+      ok: _T('admin_audit_status_ok') || 'OK',
+      warn: _T('admin_audit_status_warn') || 'Warn',
+      fail: _T('admin_audit_status_fail') || 'Fail',
+    };
+    return map[status] || status;
+  };
+
+  const _auditLabel = row => {
+    const action = row.actionKey ? (_T(row.actionKey) || row.action) : row.action;
+    const target = row.targetKey ? (_T(row.targetKey) || row.target) : row.target;
+    const actor = row.actorKey ? (_T(row.actorKey) || row.actor) : row.actor;
+    return { action, target, actor };
+  };
+
   // Mock data
   const _auditData = [
-    { ts: '2026-04-14 11:42:03', actor: 'admin@servio.eg', type: 'settings', action: 'Updated commission rate to 12%', target: 'Platform Settings', ip: '196.158.4.21', status: 'ok' },
-    { ts: '2026-04-14 11:30:17', actor: 'admin@servio.eg', type: 'user',     action: 'Suspended user account',        target: 'U-1080 Ahmed Yasser',  ip: '196.158.4.21', status: 'ok' },
-    { ts: '2026-04-14 10:58:44', actor: 'sara.m@servio.eg',type: 'booking',  action: 'Resolved dispute #D-4412',      target: 'Booking #BK-9920',     ip: '41.72.100.5',  status: 'ok' },
-    { ts: '2026-04-14 10:45:11', actor: 'admin@servio.eg', type: 'auth',     action: 'Admin login',                   target: 'Admin Dashboard',      ip: '196.158.4.21', status: 'ok' },
-    { ts: '2026-04-14 09:22:30', actor: 'unknown',         type: 'auth',     action: 'Failed login attempt',          target: 'Admin Dashboard',      ip: '185.220.101.3',status: 'fail' },
-    { ts: '2026-04-14 09:18:55', actor: 'omar.t@servio.eg',type: 'finance',  action: 'Processed settlement EGP 4,200',target: 'T-0042 Fady Naguib',   ip: '102.33.9.8',   status: 'ok' },
-    { ts: '2026-04-13 17:05:22', actor: 'admin@servio.eg', type: 'settings', action: 'Enabled Maintenance Mode',      target: 'System Settings',      ip: '196.158.4.21', status: 'warn' },
-    { ts: '2026-04-13 16:48:09', actor: 'admin@servio.eg', type: 'settings', action: 'Disabled Maintenance Mode',     target: 'System Settings',      ip: '196.158.4.21', status: 'ok' },
-    { ts: '2026-04-13 14:33:47', actor: 'nour.h@servio.eg',type: 'user',     action: 'Assigned role: Finance Manager',target: 'U-1083 Nour Hassan',   ip: '41.65.200.14', status: 'ok' },
-    { ts: '2026-04-13 13:11:00', actor: 'admin@servio.eg', type: 'user',     action: 'Approved technician',           target: 'T-0061 Khaled Saber',  ip: '196.158.4.21', status: 'ok' },
-    { ts: '2026-04-13 11:27:38', actor: 'sara.m@servio.eg',type: 'user',     action: 'Rejected technician application',target:'T-0062 Tarek Mahmoud', ip: '41.72.100.5',  status: 'ok' },
-    { ts: '2026-04-12 16:55:12', actor: 'admin@servio.eg', type: 'system',   action: 'Exported Bookings Report (CSV)','target':'Reports',             ip: '196.158.4.21', status: 'ok' },
-    { ts: '2026-04-12 15:00:00', actor: 'unknown',         type: 'auth',     action: 'Failed login attempt',          target: 'Admin Dashboard',      ip: '91.108.4.55',  status: 'fail' },
-    { ts: '2026-04-12 09:14:29', actor: 'omar.t@servio.eg',type: 'booking',  action: 'Cancelled booking by admin',    target: 'Booking #BK-9911',     ip: '102.33.9.8',   status: 'ok' },
-    { ts: '2026-04-11 18:30:01', actor: 'admin@servio.eg', type: 'settings', action: 'Updated cash debt ceiling',     target: 'Platform Settings',    ip: '196.158.4.21', status: 'ok' },
-    { ts: '2026-04-11 14:22:17', actor: 'admin@servio.eg', type: 'user',     action: 'Reset user password',           target: 'U-1081 Sara Mohamed',  ip: '196.158.4.21', status: 'ok' },
-    { ts: '2026-04-10 11:45:00', actor: 'nour.h@servio.eg',type: 'finance',  action: 'Processed settlement EGP 2,800',target: 'T-0038 Youssef Ali',   ip: '41.65.200.14', status: 'ok' },
-    { ts: '2026-04-10 09:03:55', actor: 'admin@servio.eg', type: 'auth',     action: 'Admin login',                   target: 'Admin Dashboard',      ip: '196.158.4.21', status: 'ok' },
-    { ts: '2026-04-09 17:12:44', actor: 'admin@servio.eg', type: 'system',   action: 'Changed platform support email','target':'System Settings',     ip: '196.158.4.21', status: 'ok' },
-    { ts: '2026-04-09 10:58:11', actor: 'sara.m@servio.eg',type: 'user',     action: 'Suspended user (fraud flag)',   target: 'U-1085 Hana Mostafa',  ip: '41.72.100.5',  status: 'warn' },
+    { ts: '2026-04-14 11:42:03', actor: 'admin@servio.eg', type: 'settings', actionKey: 'admin_audit_evt_commission_12',           targetKey: 'admin_audit_target_platform_settings', ip: '196.158.4.21', status: 'ok' },
+    { ts: '2026-04-14 11:30:17', actor: 'admin@servio.eg', type: 'user',     actionKey: 'admin_audit_evt_suspend_user',            target: 'U-1080 Ahmed Yasser',                       ip: '196.158.4.21', status: 'ok' },
+    { ts: '2026-04-14 10:58:44', actor: 'sara.m@servio.eg',type: 'booking',  actionKey: 'admin_audit_evt_resolved_dispute_4412',   target: 'Booking #BK-9920',                          ip: '41.72.100.5',  status: 'ok' },
+    { ts: '2026-04-14 10:45:11', actor: 'admin@servio.eg', type: 'auth',     actionKey: 'admin_audit_evt_admin_login',             targetKey: 'admin_audit_target_admin_dashboard',   ip: '196.158.4.21', status: 'ok' },
+    { ts: '2026-04-14 09:22:30', actorKey: 'admin_audit_actor_unknown', type: 'auth', actionKey: 'admin_audit_evt_failed_login',   targetKey: 'admin_audit_target_admin_dashboard',   ip: '185.220.101.3',status: 'fail' },
+    { ts: '2026-04-14 09:18:55', actor: 'omar.t@servio.eg',type: 'finance',  actionKey: 'admin_audit_evt_settlement_4200',         target: 'T-0042 Fady Naguib',                        ip: '102.33.9.8',   status: 'ok' },
+    { ts: '2026-04-13 17:05:22', actor: 'admin@servio.eg', type: 'settings', actionKey: 'admin_audit_evt_maintenance_on',          targetKey: 'admin_audit_target_system_settings',   ip: '196.158.4.21', status: 'warn' },
+    { ts: '2026-04-13 16:48:09', actor: 'admin@servio.eg', type: 'settings', actionKey: 'admin_audit_evt_maintenance_off',         targetKey: 'admin_audit_target_system_settings',   ip: '196.158.4.21', status: 'ok' },
+    { ts: '2026-04-13 14:33:47', actor: 'nour.h@servio.eg',type: 'user',     actionKey: 'admin_audit_evt_assign_finance_role',     target: 'U-1083 Nour Hassan',                        ip: '41.65.200.14', status: 'ok' },
+    { ts: '2026-04-13 13:11:00', actor: 'admin@servio.eg', type: 'user',     actionKey: 'admin_audit_evt_approved_technician',     target: 'T-0061 Khaled Saber',                       ip: '196.158.4.21', status: 'ok' },
+    { ts: '2026-04-13 11:27:38', actor: 'sara.m@servio.eg',type: 'user',     actionKey: 'admin_audit_evt_rejected_technician',     target: 'T-0062 Tarek Mahmoud',                      ip: '41.72.100.5',  status: 'ok' },
+    { ts: '2026-04-12 16:55:12', actor: 'admin@servio.eg', type: 'system',   actionKey: 'admin_audit_evt_exported_bookings_csv',   targetKey: 'admin_audit_target_reports',           ip: '196.158.4.21', status: 'ok' },
+    { ts: '2026-04-12 15:00:00', actorKey: 'admin_audit_actor_unknown', type: 'auth', actionKey: 'admin_audit_evt_failed_login',   targetKey: 'admin_audit_target_admin_dashboard',   ip: '91.108.4.55',  status: 'fail' },
+    { ts: '2026-04-12 09:14:29', actor: 'omar.t@servio.eg',type: 'booking',  actionKey: 'admin_audit_evt_cancelled_booking_admin', target: 'Booking #BK-9911',                          ip: '102.33.9.8',   status: 'ok' },
+    { ts: '2026-04-11 18:30:01', actor: 'admin@servio.eg', type: 'settings', actionKey: 'admin_audit_evt_cash_debt_ceiling',       targetKey: 'admin_audit_target_platform_settings', ip: '196.158.4.21', status: 'ok' },
+    { ts: '2026-04-11 14:22:17', actor: 'admin@servio.eg', type: 'user',     actionKey: 'admin_audit_evt_reset_password',          target: 'U-1081 Sara Mohamed',                       ip: '196.158.4.21', status: 'ok' },
+    { ts: '2026-04-10 11:45:00', actor: 'nour.h@servio.eg',type: 'finance',  actionKey: 'admin_audit_evt_settlement_2800',         target: 'T-0038 Youssef Ali',                        ip: '41.65.200.14', status: 'ok' },
+    { ts: '2026-04-10 09:03:55', actor: 'admin@servio.eg', type: 'auth',     actionKey: 'admin_audit_evt_admin_login',             targetKey: 'admin_audit_target_admin_dashboard',   ip: '196.158.4.21', status: 'ok' },
+    { ts: '2026-04-09 17:12:44', actor: 'admin@servio.eg', type: 'system',   actionKey: 'admin_audit_evt_changed_support_email',   targetKey: 'admin_audit_target_system_settings',   ip: '196.158.4.21', status: 'ok' },
+    { ts: '2026-04-09 10:58:11', actor: 'sara.m@servio.eg',type: 'user',     actionKey: 'admin_audit_evt_suspend_user_fraud',      target: 'U-1085 Hana Mostafa',                       ip: '41.72.100.5',  status: 'warn' },
   ];
 
   function _renderAuditTable() {
@@ -1086,21 +1115,29 @@ function initAdminDashboard() {
       if (emptyEl) emptyEl.hidden = false;
     } else {
       if (emptyEl) emptyEl.hidden = true;
-      tbody.innerHTML = slice.map(r => `
+      tbody.innerHTML = slice.map(r => {
+        const label = _auditLabel(r);
+        return `
         <tr>
           <td class="audit-ts">${r.ts}</td>
-          <td class="audit-actor">${r.actor}</td>
+          <td class="audit-actor">${label.actor}</td>
           <td class="audit-action">
-            <span class="audit-type-pill">${r.type}</span><br>${r.action}
+            <span class="audit-type-pill">${_auditTypeLabel(r.type)}</span><br>${label.action}
           </td>
-          <td class="audit-target">${r.target}</td>
+          <td class="audit-target">${label.target}</td>
           <td class="audit-ip">${r.ip}</td>
           <td>
             <span class="audit-badge audit-badge--${r.status}">
               ${r.status === 'ok' ? '✓ OK' : r.status === 'warn' ? '⚠ Warn' : '✕ Fail'}
             </span>
           </td>
-        </tr>`).join('');
+        </tr>`;
+      }).join('');
+      tbody.querySelectorAll('.audit-badge').forEach(badge => {
+        if (badge.classList.contains('audit-badge--ok')) badge.textContent = `✓ ${_auditStatusLabel('ok')}`;
+        else if (badge.classList.contains('audit-badge--warn')) badge.textContent = `⚠ ${_auditStatusLabel('warn')}`;
+        else if (badge.classList.contains('audit-badge--fail')) badge.textContent = `✕ ${_auditStatusLabel('fail')}`;
+      });
     }
 
     if (pageInfo) pageInfo.textContent = `${_auditPage} / ${totalPages}`;
@@ -1123,7 +1160,8 @@ function initAdminDashboard() {
     _auditFiltered = _auditData.filter(r => {
       if (type && r.type !== type) return false;
       if (cutoff && r.ts.slice(0, 10) < cutoff) return false;
-      if (q && !r.actor.toLowerCase().includes(q) && !r.action.toLowerCase().includes(q) && !r.ip.includes(q)) return false;
+      const label = _auditLabel(r);
+      if (q && !label.actor.toLowerCase().includes(q) && !label.action.toLowerCase().includes(q) && !label.target.toLowerCase().includes(q) && !r.ip.includes(q)) return false;
       return true;
     });
     _auditPage = 1;
@@ -1142,15 +1180,26 @@ function initAdminDashboard() {
   document.getElementById('auditNextBtn')?.addEventListener('click', () => { _auditPage++; _renderAuditTable(); });
 
   document.getElementById('auditExportBtn')?.addEventListener('click', () => {
-    const rows = [['Timestamp','Actor','Type','Action','Target','IP','Status']];
-    _auditFiltered.forEach(r => rows.push([r.ts, r.actor, r.type, r.action, r.target, r.ip, r.status]));
+    const rows = [[
+      _T('admin_audit_col_time') || 'Timestamp',
+      _T('admin_audit_col_actor') || 'Actor',
+      _T('admin_audit_type_col') || 'Type',
+      _T('admin_audit_col_action') || 'Action',
+      _T('admin_audit_col_target') || 'Target',
+      _T('admin_audit_col_ip') || 'IP Address',
+      _T('admin_audit_col_status') || 'Status'
+    ]];
+    _auditFiltered.forEach(r => {
+      const label = _auditLabel(r);
+      rows.push([r.ts, label.actor, _auditTypeLabel(r.type), label.action, label.target, r.ip, _auditStatusLabel(r.status)]);
+    });
     const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
-    a.href = url; a.download = 'audit-log.csv'; a.click();
+    a.href = url; a.download = (_T('admin_audit_export_filename') || 'audit-log') + '.csv'; a.click();
     URL.revokeObjectURL(url);
-    showToast(_T('toast_report_exported') || 'Audit log exported', 'success');
+    showToast(_T('toast_audit_exported') || 'Audit log exported', 'success');
   });
 
   // Re-render audit table when switching to the audit panel (for stat refresh)
