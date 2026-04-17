@@ -601,6 +601,7 @@
   font-weight: 700;
   color: var(--color-accent);
   white-space: nowrap;
+  unicode-bidi: plaintext;
 }
 
 .service-strip__verified {
@@ -1054,6 +1055,12 @@
   font-size: 0.75rem;
   color: var(--color-text-light);
   margin-top: 0.2rem;
+}
+
+.summary-tech__rating,
+.price-row__value,
+.review-row__value {
+  unicode-bidi: plaintext;
 }
 
 .summary-tech__rating svg { color: #f59e0b; }

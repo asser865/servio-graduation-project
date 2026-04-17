@@ -447,6 +447,13 @@
   letter-spacing: -0.02em;
 }
 
+.tech-stat-card__value--currency {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.35rem;
+}
+
 .tech-stat-card__label {
   font-size: 0.72rem;
   font-weight: 700;
@@ -2395,11 +2402,45 @@
 }
 
 /* Payout schedule: radio button on the right, text on the left */
+[dir="rtl"] .payout-method-cards {
+  direction: rtl;
+  justify-content: flex-start;
+}
+[dir="rtl"] .payout-method-card {
+  direction: rtl;
+  text-align: center;
+}
+[dir="rtl"] #payout-details-section .form-label,
+[dir="rtl"] #payout-details-section .form-hint,
+[dir="rtl"] #payout-details-section .settings-section__desc {
+  text-align: right;
+}
+[dir="rtl"] #payout-details-section .form-input {
+  direction: rtl;
+  text-align: right;
+}
+[dir="rtl"] #payout-details-section select.form-input {
+  direction: rtl;
+}
+[dir="rtl"] .payout-schedule-options {
+  direction: rtl;
+  align-items: flex-start;
+}
 [dir="rtl"] .payout-schedule-label {
-  flex-direction: row-reverse;
+  flex-direction: row;
+  justify-content: flex-start;
+  align-items: flex-start;
+  width: 100%;
 }
 [dir="rtl"] .payout-schedule-card {
+  direction: rtl;
   text-align: right;
+  flex: 0 1 auto;
+}
+[dir="rtl"] .payout-schedule-label input[type="radio"] {
+  margin-top: 3px;
+  margin-inline-start: 0;
+  margin-inline-end: 0;
 }
 
 /* Payment checkboxes: checkbox on the right in RTL */
@@ -2410,4 +2451,15 @@
 /* Avatar hint: remove max-width cap — Arabic words can be longer */
 [dir="rtl"] .settings-avatar-hint {
   max-width: none;
+}
+
+/* Overview stats */
+[dir="rtl"] .tech-stat-grid {
+  direction: rtl;
+}
+[dir="rtl"] .tech-stat-card {
+  text-align: center;
+}
+[dir="rtl"] .tech-stat-card__value--currency {
+  direction: rtl;
 }

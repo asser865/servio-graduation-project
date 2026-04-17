@@ -539,7 +539,7 @@ function initHistoryPanel() {
       if (priceEl) {
         const raw = priceEl.textContent.replace(/[^\d.,]/g, '').trim();
         if (lang === 'ar') {
-           priceEl.textContent = `${raw} ج.م`;
+           priceEl.textContent = `${raw} ${_t('currency_egp')}`;
         } else {
            priceEl.textContent = `${raw} EGP`;
         }

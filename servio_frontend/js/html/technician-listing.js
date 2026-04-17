@@ -54,6 +54,10 @@ function buildCard(id, tech, serviceKey, lang, delay) {
   const name = isAr ? tech.nameAr : tech.name;
   const desc = isAr ? tech.descAr : tech.descEn;
   const avail = isAr ? tech.availabilityAr : tech.availability;
+  const ratingLabel = isAr ? `${tech.rating} تقييم` : `${tech.rating} Avg`;
+  const distanceLabel = isAr ? `${tech.distance} ميل` : `${tech.distance} mi.`;
+  const currencyLabel = isAr ? 'جنيه' : 'EGP';
+  const priceUnit = isAr ? '/ساعة' : '/hr';
   const profileHref = `./technician-profile.html?id=${id}&service=${serviceKey}`;
   const viewLabel = isAr ? 'عرض الملف الشخصي' : 'View Profile';
   const startingLabel = isAr ? 'ابتداءً من' : 'Starting';
@@ -72,9 +76,9 @@ function buildCard(id, tech, serviceKey, lang, delay) {
             ${tech.verified ? BADGE_VERIFIED_SVG : ''}
           </h3>
           <div class="tech-card__trust">
-            <span class="tech-card__rating">${tech.rating} Avg</span>
+            <span class="tech-card__rating">${ratingLabel}</span>
             <span>(${tech.reviewCount})</span>
-            <span class="tech-card__location">${LOC_SVG} ${tech.distance} mi.</span>
+            <span class="tech-card__location">${LOC_SVG} ${distanceLabel}</span>
           </div>
         </div>
       </div>
@@ -82,7 +86,7 @@ function buildCard(id, tech, serviceKey, lang, delay) {
       <div class="tech-card__footer">
         <div class="tech-card__price-blurb">
           <span class="tech-card__price-label">${startingLabel}</span>
-          <div class="tech-card__price">${tech.price} EGP<span>/hr</span></div>
+          <div class="tech-card__price">${tech.price} ${currencyLabel}<span>${priceUnit}</span></div>
         </div>
         <div>
           <div class="tech-card__availability">${safeAvail}</div>

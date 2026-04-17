@@ -176,6 +176,7 @@
       font-size: 1.5rem;
       font-weight: 800;
       color: var(--color-on-surface);
+      unicode-bidi: plaintext;
     }
     .tech-card__price span {
       font-size: 0.875rem;
@@ -339,6 +340,12 @@ html[dir="rtl"] .sort-label {
 /* Location row: pin icon + text */
 html[dir="rtl"] .tech-card__location {
   flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .tech-card__rating,
+html[dir="rtl"] .tech-card__location,
+html[dir="rtl"] .tech-card__price {
+  unicode-bidi: plaintext;
 }
 
 /* Hover action: slides in from left (translateX(-5px)) in LTR;
