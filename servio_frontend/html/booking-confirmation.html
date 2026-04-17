@@ -99,6 +99,52 @@
       </button>
     </div>
 
+    <!-- ── BOOKING STATUS TRACKER ── -->
+    <section class="booking-tracker" aria-label="Booking Status">
+      <div class="container">
+        <div class="tracker-meta">
+          <p class="tracker-current-label" data-i18n="conf_tracker_label">Current Status</p>
+          <div class="tracker-current-status">
+            <span class="tracker-pulse-dot" aria-hidden="true"></span>
+            <span data-i18n="conf_tracker_status">Awaiting Technician Confirmation</span>
+          </div>
+        </div>
+        <div class="tracker-steps" role="list" aria-label="Booking progress">
+          <div class="tracker-step is-done" role="listitem">
+            <div class="tracker-step__circle">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </div>
+            <span class="tracker-step__label" data-i18n="conf_bar_booked">Booked</span>
+          </div>
+          <div class="tracker-connector is-done" aria-hidden="true"></div>
+          <div class="tracker-step is-current" role="listitem">
+            <div class="tracker-step__circle">2</div>
+            <span class="tracker-step__label" data-i18n="conf_bar_confirms">Technician<br>Confirms</span>
+          </div>
+          <div class="tracker-connector" aria-hidden="true"></div>
+          <div class="tracker-step" role="listitem">
+            <div class="tracker-step__circle">3</div>
+            <span class="tracker-step__label" data-i18n="conf_bar_enroute">En Route</span>
+          </div>
+          <div class="tracker-connector" aria-hidden="true"></div>
+          <div class="tracker-step" role="listitem">
+            <div class="tracker-step__circle">4</div>
+            <span class="tracker-step__label" data-i18n="conf_bar_arrives">Arrived</span>
+          </div>
+          <div class="tracker-connector" aria-hidden="true"></div>
+          <div class="tracker-step" role="listitem">
+            <div class="tracker-step__circle">5</div>
+            <span class="tracker-step__label" data-i18n="conf_bar_inprogress">In Progress</span>
+          </div>
+          <div class="tracker-connector" aria-hidden="true"></div>
+          <div class="tracker-step" role="listitem">
+            <div class="tracker-step__circle">6</div>
+            <span class="tracker-step__label" data-i18n="conf_bar_complete">Complete</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- PIN card -->
     <div class="confirmation-pin-card">
       <h3 data-i18n="conf_pin_title">Your Arrival PIN</h3>
@@ -110,16 +156,6 @@
     <div class="confirmation-payment-card">
       <h3 data-i18n="conf_payment_title">Payment Summary</h3>
       <div id="confirmationPaymentDetails" data-i18n="conf_loading_payment">Loading payment details...</div>
-    </div>
-
-    <!-- What Happens Next timeline -->
-    <div class="confirmation-timeline">
-      <div class="timeline-step is-current" data-i18n="conf_bar_booked">Booked ✓</div>
-      <div class="timeline-step" data-i18n="conf_bar_confirms">Technician Confirms</div>
-      <div class="timeline-step" data-i18n="conf_bar_enroute">Technician En Route</div>
-      <div class="timeline-step" data-i18n="conf_bar_arrives">Technician Arrives</div>
-      <div class="timeline-step" data-i18n="conf_bar_inprogress">Job In Progress</div>
-      <div class="timeline-step" data-i18n="conf_bar_complete">Complete</div>
     </div>
 
     <!-- ── MAIN LAYOUT ── -->
@@ -211,42 +247,6 @@
 
         </div>
 
-        <!-- What happens next -->
-        <div class="timeline u-margin-top-24" data-reveal data-reveal-delay="100">
-          <h3 data-i18n="conf_what_next">What Happens Next</h3>
-          <ol class="timeline-list">
-            <li class="timeline-item">
-              <div class="timeline-dot timeline-dot--active">
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
-              </div>
-              <div class="timeline-content">
-                <div class="timeline-content__title" data-i18n="conf_timeline1_title">Booking submitted</div>
-                <div class="timeline-content__desc" data-i18n="conf_timeline1_desc" data-booking-ref-desc>Your request has been sent to Omar Tarek. Reference: #...</div>
-              </div>
-            </li>
-            <li class="timeline-item">
-              <div class="timeline-dot">2</div>
-              <div class="timeline-content">
-                <div class="timeline-content__title" data-i18n="conf_timeline2_title">Technician confirms</div>
-                <div class="timeline-content__desc" data-i18n="conf_timeline2_desc">You'll receive an in-app notification when Omar Tarek accepts — typically within 30 minutes.</div>
-              </div>
-            </li>
-            <li class="timeline-item">
-              <div class="timeline-dot">3</div>
-              <div class="timeline-content">
-                <div class="timeline-content__title" data-i18n="conf_timeline3_title">Service day</div>
-                <div class="timeline-content__desc" data-i18n="conf_timeline3_desc">Omar will arrive at the scheduled time. You'll receive a reminder 1 hour before.</div>
-              </div>
-            </li>
-            <li class="timeline-item">
-              <div class="timeline-dot">4</div>
-              <div class="timeline-content">
-                <div class="timeline-content__title" data-i18n="conf_timeline4_title">Complete &amp; review</div>
-                <div class="timeline-content__desc" data-i18n="conf_timeline4_desc">After the service, leave a review to help other customers find great professionals.</div>
-              </div>
-            </li>
-          </ol>
-        </div>
 
       </div>
 
