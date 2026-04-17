@@ -4628,8 +4628,8 @@
       cust_label_location:     'الموقع',
       cust_label_pref_from:    'التاريخ المفضل من',
       cust_label_pref_to:      'التاريخ المفضل إلى',
-      cust_label_budget_min:   'الحد الأدنى للميزانية (EGP)',
-      cust_label_budget_max:   'الحد الأقصى للميزانية (EGP)',
+      cust_label_budget_min:   'الحد الأدنى للميزانية (جنيه)',
+      cust_label_budget_max:   'الحد الأقصى للميزانية (جنيه)',
       cust_label_payment_pref: 'طريقة الدفع المفضلة',
       cust_post_job_btn:       'نشر الطلب',
       cust_ph_job_title:       'مثال: إصلاح بالوعة المطبخ',
@@ -4727,11 +4727,11 @@
       tech_settings_sub:     'تحديث ملفك الشخصي وتفاصيل حسابك.',
       tech_label_specialty:  'التخصص / المهنة',
       tech_label_experience: 'سنوات الخبرة',
-      tech_label_rate:       'السعر بالساعة (EGP)',
+      tech_label_rate:       'السعر بالساعة (جنيه)',
       tech_job_board_title:  'لوحة الوظائف',
       tech_jb_all_categories:'جميع الفئات',
       tech_jb_all_areas:     'جميع المناطق',
-      tech_jb_quoted_price:  'السعر المقترح (EGP)',
+      tech_jb_quoted_price:  'السعر المقترح (جنيه)',
       tech_jb_message:       'رسالة',
       tech_jb_start_date:    'تاريخ البدء المتاح',
       tech_jb_payment_methods:'طرق الدفع التي أقبلها:',
@@ -5129,7 +5129,7 @@
       signup_otp_hint:            'أرقام فقط. تنتهي صلاحية الرمز خلال 10 دقائق.',
       tech_stat_awaiting_review:  'في انتظار المراجعة',
       tech_stat_due_date:         'تاريخ الاستحقاق {date}',
-      signup_currency_egp:        'جنيه مصري — EGP',
+      signup_currency_egp:        'الجنيه المصري',
       signup_currency_usd:        'دولار أمريكي — USD',
       signup_currency_eur:        'يورو — EUR',
       signup_rate_hint:           'أدخل قيمة بين 50 و 2000 جنيه مصري',
@@ -6116,6 +6116,73 @@
     }
   }
 
+  function replaceCurrencyTokens(str, lang) {
+    if (typeof str !== 'string' || !str) return str;
+    if (lang === 'ar') {
+      return str.replace(/\bEGP\b/g, 'جنيه');
+    }
+    return str.replace(/(^|[\s([+\-~])جنيه(?=$|[\s)\]+\-\/.,:؛،])/g, function (_, prefix) {
+      return (prefix || '') + 'EGP';
+    });
+  }
+
+  function syncCurrencyStyle(lang) {
+    var style = document.getElementById('i18n-currency-style');
+    if (!style) {
+      style = document.createElement('style');
+      style.id = 'i18n-currency-style';
+      document.head.appendChild(style);
+    }
+    style.textContent = (lang === 'ar')
+      ? 'html[data-lang="ar"] .price-input-wrapper::before{content:"جنيه";}'
+      : '';
+  }
+
+  function localizeCurrency(root) {
+    var lang = _currentLang === 'ar' ? 'ar' : 'en';
+    var scope = (root && root.nodeType === 1) ? root : (document.body || document.documentElement);
+    if (!scope) return;
+
+    syncCurrencyStyle(lang);
+
+    if (typeof NodeFilter !== 'undefined' && typeof document.createTreeWalker === 'function') {
+      var walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT, {
+        acceptNode: function (node) {
+          if (!node || !node.nodeValue) return NodeFilter.FILTER_REJECT;
+          if (node.nodeValue.indexOf('EGP') === -1 && node.nodeValue.indexOf('جنيه') === -1) {
+            return NodeFilter.FILTER_REJECT;
+          }
+          var parent = node.parentNode;
+          if (!parent || !parent.nodeName) return NodeFilter.FILTER_REJECT;
+          var tag = parent.nodeName.toUpperCase();
+          if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'NOSCRIPT' || tag === 'TEXTAREA') {
+            return NodeFilter.FILTER_REJECT;
+          }
+          return NodeFilter.FILTER_ACCEPT;
+        }
+      });
+
+      var textNode;
+      while ((textNode = walker.nextNode())) {
+        var nextText = replaceCurrencyTokens(textNode.nodeValue, lang);
+        if (nextText !== textNode.nodeValue) {
+          textNode.nodeValue = nextText;
+        }
+      }
+    }
+
+    scope.querySelectorAll && scope.querySelectorAll('[placeholder],[title],[aria-label],[data-tooltip]').forEach(function (el) {
+      ['placeholder', 'title', 'aria-label', 'data-tooltip'].forEach(function (attr) {
+        var value = el.getAttribute(attr);
+        if (!value) return;
+        var nextValue = replaceCurrencyTokens(value, lang);
+        if (nextValue !== value) {
+          el.setAttribute(attr, nextValue);
+        }
+      });
+    });
+  }
+
   /* ─────────────────────────────────────────────────────────────
      APPLY LANGUAGE
   ───────────────────────────────────────────────────────────── */
@@ -6128,6 +6195,8 @@
     /* 1. Translate all annotated elements */
     document.querySelectorAll('[data-i18n],[data-i18n-placeholder],[data-i18n-aria-label],[data-i18n-title],[data-i18n-alt],[data-i18n-html],[data-i18n-tooltip]')
       .forEach(function (el) { translateEl(el, dict); });
+
+    localizeCurrency(document.body || document.documentElement);
 
     /* 2. Direction + lang + data-lang + body class */
     html.setAttribute('data-lang', _currentLang);
@@ -6211,14 +6280,23 @@
         }
         node.querySelectorAll && node.querySelectorAll(I18N_SELECTOR)
           .forEach(function (el) { translateEl(el, dict); });
+        localizeCurrency(node);
       });
     }
 
     var observer = new MutationObserver(function (mutations) {
       mutations.forEach(function (mutation) {
-        mutation.addedNodes.forEach(function (node) {
-          if (node.nodeType === 1) _pendingNodes.push(node);
-        });
+        if (mutation.type === 'childList') {
+          mutation.addedNodes.forEach(function (node) {
+            if (node.nodeType === 1) {
+              _pendingNodes.push(node);
+            } else if (node.nodeType === 3 && node.parentElement) {
+              _pendingNodes.push(node.parentElement);
+            }
+          });
+        } else if (mutation.type === 'characterData' && mutation.target && mutation.target.parentElement) {
+          _pendingNodes.push(mutation.target.parentElement);
+        }
       });
       if (_pendingNodes.length && !_debounceTimer) {
         _debounceTimer = setTimeout(flushPending, 16);
@@ -6226,7 +6304,8 @@
     });
     observer.observe(document.body || document.documentElement, {
       childList: true,
-      subtree: true
+      subtree: true,
+      characterData: true
     });
   }
 
