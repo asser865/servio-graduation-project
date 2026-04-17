@@ -1,32 +1,43 @@
-/* ─── AI MATCHMAKER ─── */
 .ai-match-page {
   background: var(--color-surface);
   min-height: 100vh;
   padding-bottom: 6rem;
+  padding-top: 0 !important;
 }
 
 .hero-ai {
-  padding: 8rem 0 4rem;
+  padding: 13rem 0 14rem;
   text-align: center;
   position: relative;
   overflow: hidden;
+  background: linear-gradient(135deg, rgba(254, 193, 149, 0.15), rgba(245, 235, 225, 0.4) 50%, rgba(154, 140, 115, 0.15));
 }
 
 .hero-ai::before {
   content: '';
   position: absolute;
-  top: -50%;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 80vw;
-  height: 80vw;
-  background: radial-gradient(circle, rgba(30, 27, 75, 0.15), transparent 60%);
+  top: -20%;
+  left: -20%;
+  width: 140%;
+  height: 140%;
+  background: 
+    radial-gradient(circle at 20% 20%, rgba(254, 193, 149, 0.7), transparent 55%),
+    radial-gradient(circle at 80% 30%, rgba(154, 140, 115, 0.6), transparent 55%),
+    radial-gradient(circle at 50% 80%, rgba(227, 213, 202, 0.6), transparent 60%);
   pointer-events: none;
   z-index: 0;
+  filter: blur(80px);
+}
+
+[data-theme="dark"] .hero-ai {
+  background: linear-gradient(135deg, rgba(34, 40, 49, 0.8), rgba(26, 29, 35, 0.9) 50%, rgba(21, 25, 32, 0.9));
 }
 
 [data-theme="dark"] .hero-ai::before {
-  background: radial-gradient(circle, rgba(90, 248, 251, 0.08), transparent 60%);
+  background: 
+    radial-gradient(circle at 20% 20%, rgba(254, 193, 149, 0.25), transparent 55%),
+    radial-gradient(circle at 80% 30%, rgba(154, 140, 115, 0.25), transparent 55%),
+    radial-gradient(circle at 50% 80%, rgba(227, 213, 202, 0.2), transparent 60%);
 }
 
 .hero-ai .container {
@@ -71,20 +82,24 @@
 .hero-ai__title {
   font-family: var(--font-editorial);
   font-size: clamp(3rem, 5vw, 4.5rem);
-  font-weight: 700;
+  font-weight: 1000;
+  line-height: 1.1;
   letter-spacing: -0.02em;
-  margin-bottom: 1.5rem;
+  margin-bottom: 3rem;
+  color: var(--color-on-surface);
 }
 
 .hero-ai__title span {
-  background: linear-gradient(135deg, var(--color-secondary), var(--color-primary));
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: #fec195;
+  background: none;
+  -webkit-text-fill-color: unset;
 }
 
 .hero-ai__lead {
-  font-size: 1.25rem;
+  font-size: 1.2rem;
+  font-weight: 200;
+  max-width: 650px;
+  margin: 0 auto;
   color: var(--color-on-surface-variant);
   line-height: 1.6;
 }
@@ -99,6 +114,7 @@
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
   overflow: hidden;
   position: relative;
+  z-index: 10;
 }
 
 .ai-composer__textarea {

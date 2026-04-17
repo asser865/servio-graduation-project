@@ -271,13 +271,6 @@
   50%       { opacity: 0.3; }
 }
 
-html[dir="rtl"] .conf-tech-row {
-  display: flex;
-  flex-direction: row-reverse;
-  justify-content: space-between;
-  align-items: center;
-  text-align: right;
-}
 
 [data-theme="dark"] .status-badge--pending {
   background: rgba(245, 158, 11, 0.08);
@@ -357,7 +350,7 @@ html[dir="rtl"] .conf-tech-row {
   align-items: flex-start;
   max-width: 720px;
   margin: 0 auto;
-  padding: 0 1rem;
+  padding: 0.5rem 1rem;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -509,7 +502,8 @@ html[dir="rtl"] .conf-tech-row {
 }
 
 [dir="rtl"] .booking-tracker .tracker-current-status {
-  flex-direction: row-reverse;
+  padding-right: 0.9rem;
+  padding-left: 1.1rem;
 }
 
 [dir="rtl"] .booking-tracker .tracker-steps {
@@ -531,25 +525,9 @@ html[dir="rtl"] .conf-tech-row {
   text-align: left;
 }
 
-/* Booking reference pill */
-[dir="rtl"] .booking-ref {
-  flex-direction: row-reverse;
-}
-
 /* Tech row */
 [dir="rtl"] .conf-tech-row {
-  flex-direction: row-reverse;
   text-align: right;
-  width: 100%;
-}
-
-[dir="rtl"] .conf-tech-row__main {
-  flex-direction: row-reverse;
-}
-
-/* Section title icon + text row */
-[dir="rtl"] .conf-section__title {
-  flex-direction: row-reverse;
 }
 
 [dir="rtl"] .conf-tech-row__status {
@@ -558,16 +536,8 @@ html[dir="rtl"] .conf-tech-row {
 }
 
 [dir="rtl"] .conf-tech-row__rating {
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
-[dir="rtl"] .conf-tech-row__avatar {
-  grid-column: 3;
-}
-
-[dir="rtl"] .conf-tech-row > div:not(.u-margin-left-auto) {
-  grid-column: 2;
-  text-align: right;
-}
 
 /* . */
