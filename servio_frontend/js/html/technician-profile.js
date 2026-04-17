@@ -54,7 +54,9 @@ function render(tech, techId, serviceKey, lang) {
   setText('title', title);
 
   // Meta
-  setText('location', `${tech.distance} mi. (${isAr ? tech.areaAr : tech.area})`);
+  setText('location', isAr
+    ? `${tech.distance} ميل (${tech.areaAr})`
+    : `${tech.distance} mi. (${tech.area})`);
   setText('rating', String(tech.rating));
   const reviewMeta = el('review-meta');
   if (reviewMeta) {

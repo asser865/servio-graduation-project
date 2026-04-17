@@ -3582,16 +3582,35 @@
 [dir="rtl"] .stab-toggle--on .stab-toggle__thumb { transform: translateX(-18px); }
 
 /* Audit toolbar */
-[dir="rtl"] .audit-toolbar { flex-direction: row; }
-[dir="rtl"] .audit-filters { flex-direction: row-reverse; }
-[dir="rtl"] .audit-search-input { padding-inline-start: 2.1rem; padding-inline-end: 0.75rem; }
-[dir="rtl"] .audit-stats-row { flex-direction: row-reverse; }
+[dir="rtl"] .audit-toolbar { flex-direction: row-reverse; }
+[dir="rtl"] .audit-search-wrap { order: 1; }
+[dir="rtl"] .audit-filters { flex-direction: row-reverse; order: 2; }
+[dir="rtl"] .audit-search-icon {
+  inset-inline-start: auto;
+  inset-inline-end: 10px;
+}
+[dir="rtl"] .audit-search-input {
+  direction: rtl;
+  text-align: right;
+  padding-inline-start: 0.75rem;
+  padding-inline-end: 2.1rem;
+}
+[dir="rtl"] .audit-stats-row {
+  flex-direction: row-reverse;
+  justify-content: flex-end;
+}
 
 /* Audit table */
+[dir="rtl"] .audit-table { direction: rtl; }
 [dir="rtl"] .audit-table thead th,
 [dir="rtl"] .audit-table tbody td { text-align: end; }
 [dir="rtl"] .audit-table thead th:first-child,
 [dir="rtl"] .audit-table tbody td:first-child { text-align: end; }
+[dir="rtl"] .audit-type-pill {
+  text-transform: none;
+  letter-spacing: normal;
+}
+[dir="rtl"] .audit-pagination { flex-direction: row-reverse; }
 
 /* Permission matrix */
 [dir="rtl"] .perm-matrix th,
@@ -3615,7 +3634,24 @@
 [dir="rtl"] .report-card__info { text-align: right; }
 
 /* Verify cards (technician approval) */
-[dir="rtl"] .th-verify-card { flex-direction: row-reverse; }
+[dir="rtl"] .th-verify-card { flex-direction: column; }
+[dir="rtl"] .th-verify-identity {
+  flex-direction: row-reverse;
+  justify-content: flex-end;
+}
+[dir="rtl"] .th-identity-text {
+  text-align: right;
+}
+[dir="rtl"] .th-verify-docs {
+  text-align: right;
+}
+[dir="rtl"] .th-doc {
+  flex-direction: row-reverse;
+  justify-content: flex-end;
+}
+[dir="rtl"] .th-verify-actions {
+  flex-direction: row-reverse;
+}
 
 /* Active session */
 [dir="rtl"] .admin-active-session__info { text-align: right; }

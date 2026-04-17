@@ -191,7 +191,19 @@
 .conf-tech-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 1rem;
+}
+
+.conf-tech-row__main {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.conf-tech-row__info {
+  min-width: 0;
 }
 
 .conf-tech-row__avatar {
@@ -222,6 +234,7 @@
   font-size: 0.75rem;
   color: var(--color-text-light);
   margin-top: 0.2rem;
+  unicode-bidi: plaintext;
 }
 
 .conf-tech-row__rating svg { color: #f59e0b; }
@@ -256,6 +269,14 @@
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0.3; }
+}
+
+html[dir="rtl"] .conf-tech-row {
+  display: flex;
+  flex-direction: row-reverse;
+  justify-content: space-between;
+  align-items: center;
+  text-align: right;
 }
 
 [data-theme="dark"] .status-badge--pending {
@@ -483,37 +504,70 @@
 /* ── RTL ─────────────────────────────────────────── */
 
 /* Tracker: reverse step order and status pill in RTL */
-html[dir="rtl"] .tracker-steps {
+[dir="rtl"] .booking-tracker .tracker-meta {
+  direction: rtl;
+}
+
+[dir="rtl"] .booking-tracker .tracker-current-status {
   flex-direction: row-reverse;
 }
 
-html[dir="rtl"] .tracker-current-status {
+[dir="rtl"] .booking-tracker .tracker-steps {
+  direction: ltr;
   flex-direction: row-reverse;
+  justify-content: flex-start;
+}
+
+[dir="rtl"] .booking-tracker .tracker-step {
+  direction: rtl;
+}
+
+[dir="rtl"] .booking-tracker .tracker-step__label {
+  text-align: center;
 }
 
 /* conf-row value is right-aligned in LTR; in RTL flip to left */
-html[dir="rtl"] .conf-row__value {
+[dir="rtl"] .conf-row__value {
   text-align: left;
 }
 
 /* Booking reference pill */
-html[dir="rtl"] .booking-ref {
-  flex-direction: row;
+[dir="rtl"] .booking-ref {
+  flex-direction: row-reverse;
 }
 
 /* Tech row */
-html[dir="rtl"] .conf-tech-row {
-  flex-direction: row;
+[dir="rtl"] .conf-tech-row {
+  flex-direction: row-reverse;
+  text-align: right;
+  width: 100%;
+}
+
+[dir="rtl"] .conf-tech-row__main {
+  flex-direction: row-reverse;
 }
 
 /* Section title icon + text row */
-html[dir="rtl"] .conf-section__title {
-  flex-direction: row;
+[dir="rtl"] .conf-section__title {
+  flex-direction: row-reverse;
 }
 
-html[dir="rtl"] .u-margin-left-auto {
-  margin-left: 0;
+[dir="rtl"] .conf-tech-row__status {
   margin-right: auto;
+  margin-left: 0;
+}
+
+[dir="rtl"] .conf-tech-row__rating {
+  justify-content: flex-end;
+}
+
+[dir="rtl"] .conf-tech-row__avatar {
+  grid-column: 3;
+}
+
+[dir="rtl"] .conf-tech-row > div:not(.u-margin-left-auto) {
+  grid-column: 2;
+  text-align: right;
 }
 
 /* . */
