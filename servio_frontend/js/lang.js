@@ -856,8 +856,8 @@
       smart_results_badge: '98% Match Score',
       smart_accept_book: 'Accept & Book Now',
       /* sm_ aliases used in smart-match.html */
-      sm_hero_title:    'Supercharged Matching',
-      sm_hero_lead:     'Describe exactly what you need in plain english. Our semantic engine will instantly analyze 1,800+ profiles to find the perfect elite professional for your project constraints.',
+      sm_hero_title:    'Smart matching for<br><span>real home issues</span>',
+      sm_hero_lead:     'Describe the full problem once. Servio separates immediate hazards from follow-up work so you know what to book first, what should happen the same day, and what can wait.',
       sm_composer_ph:   'e.g. I want a plumber to fix my water leak within one hour near Nasr City that will do the work wont exceed $50...',
       sm_criteria:      'Supported criteria: Location, Budget, Urgency, Service',
       sm_generate:      'Generate',
@@ -3892,8 +3892,8 @@
       smart_results_badge: 'نسبة تطابق 98٪',
       smart_accept_book: 'قبول والحجز الآن',
       /* sm_ aliases */
-      sm_hero_title:    'مطابقة فائقة الذكاء',
-      sm_hero_lead:     'صِف ما تحتاجه بلغة عادية. سيحلل محركنا الدلالي على الفور أكثر من 1800 ملف لإيجاد المتخصص المثالي.',
+      sm_hero_title:    'مطابقة ذكية لـ<br><span>مشاكل المنزل الحقيقية</span>',
+      sm_hero_lead:     'صف المشكلة بالكامل مرة واحدة. يفصل Servio المخاطر الفورية عن أعمال المتابعة حتى تعرف ما يجب حجزه أولاً، وما يجب أن يحدث في نفس اليوم، وما يمكن أن ينتظر.',
       sm_composer_ph:   'مثل: أريد سباكاً لإصلاح تسرب مياه خلال ساعة في نصر سيتي بأقل من 50 دولار...',
       sm_criteria:      'المعايير المدعومة: الموقع، الميزانية، الإلحاح، الخدمة',
       sm_generate:      'ابحث',

@@ -357,7 +357,7 @@ html[dir="rtl"] .conf-tech-row {
   align-items: flex-start;
   max-width: 720px;
   margin: 0 auto;
-  padding: 0 1rem;
+  padding: 0.5rem 1rem;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -569,5 +569,10 @@ html[dir="rtl"] .conf-tech-row {
   grid-column: 2;
   text-align: right;
 }
+
+[dir="rtl"] .conf-tech-row__rating {
+  justify-content: flex-start;
+}
+
 
 /* . */
