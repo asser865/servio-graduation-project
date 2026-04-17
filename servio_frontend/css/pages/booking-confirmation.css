@@ -271,6 +271,13 @@
   50%       { opacity: 0.3; }
 }
 
+html[dir="rtl"] .conf-tech-row {
+  display: flex;
+  flex-direction: row-reverse;
+  justify-content: space-between;
+  align-items: center;
+  text-align: right;
+}
 
 [data-theme="dark"] .status-badge--pending {
   background: rgba(245, 158, 11, 0.08);
@@ -502,8 +509,7 @@
 }
 
 [dir="rtl"] .booking-tracker .tracker-current-status {
-  padding-right: 0.9rem;
-  padding-left: 1.1rem;
+  flex-direction: row-reverse;
 }
 
 [dir="rtl"] .booking-tracker .tracker-steps {
@@ -525,14 +531,43 @@
   text-align: left;
 }
 
+/* Booking reference pill */
+[dir="rtl"] .booking-ref {
+  flex-direction: row-reverse;
+}
+
 /* Tech row */
 [dir="rtl"] .conf-tech-row {
+  flex-direction: row-reverse;
   text-align: right;
+  width: 100%;
+}
+
+[dir="rtl"] .conf-tech-row__main {
+  flex-direction: row-reverse;
+}
+
+/* Section title icon + text row */
+[dir="rtl"] .conf-section__title {
+  flex-direction: row-reverse;
 }
 
 [dir="rtl"] .conf-tech-row__status {
   margin-right: auto;
   margin-left: 0;
+}
+
+[dir="rtl"] .conf-tech-row__rating {
+  justify-content: flex-end;
+}
+
+[dir="rtl"] .conf-tech-row__avatar {
+  grid-column: 3;
+}
+
+[dir="rtl"] .conf-tech-row > div:not(.u-margin-left-auto) {
+  grid-column: 2;
+  text-align: right;
 }
 
 [dir="rtl"] .conf-tech-row__rating {
