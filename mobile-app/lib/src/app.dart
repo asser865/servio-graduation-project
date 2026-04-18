@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
+import 'core/models/user_account.dart';
 import 'core/services/storage_service.dart';
 import 'core/state/app_state.dart';
 import 'design_system/servio_theme.dart';
 import 'design_system/servio_tokens.dart';
 import 'features/auth/role_selection_screen.dart';
+import 'features/customer/customer_home_screen.dart';
+import 'features/technician/technician_dashboard_screen.dart';
 
 class ServioApp extends StatelessWidget {
   const ServioApp({required this.storage, super.key});
@@ -75,8 +78,10 @@ class _AuthGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Listening to session changes triggers a rebuild when user logs in/out.
-    context.watch<SessionProvider>();
-    return const RoleSelectionScreen();
+    final session = context.watch<SessionProvider>();
+    if (!session.isLoggedIn) return const RoleSelectionScreen();
+    return session.account!.role == UserRole.technician
+        ? const TechnicianDashboardScreen()
+        : const CustomerHomeScreen();
   }
 }
