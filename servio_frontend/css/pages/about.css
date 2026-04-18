@@ -1,10 +1,13 @@
 /* ─── About page: Premium Redesign ─── */
 
-/* ===================== HERO ===================== */
+.about-page {
+  padding-top: 0 !important;
+}
+
 .about-hero {
   position: relative;
-  padding: 100px 0 80px;
-  background: var(--color-surface);
+  padding: 130px 0 80px;
+  background: #101217;
   overflow: hidden;
   border-bottom: none;
 }
@@ -30,19 +33,21 @@
 .about-hero__bg::before {
   width: 600px;
   height: 600px;
-  background: radial-gradient(circle, #3C2415, #222831);
+  background: radial-gradient(circle, rgba(254, 193, 149, 0.4), transparent 60%);
   top: -220px;
   right: -160px;
   animation-delay: 0.2s;
+  z-index: 3;
 }
 
 .about-hero__bg::after {
   width: 500px;
   height: 500px;
-  background: radial-gradient(circle, rgba(154, 140, 115, 0.5), rgba(60, 36, 21, 0.5));
+  background: radial-gradient(circle, rgba(154, 140, 115, 0.4), transparent 60%);
   bottom: -200px;
   left: -140px;
   animation-delay: 0.6s;
+  z-index: 3;
 }
 
 @keyframes aboutOrbFade {
@@ -114,16 +119,17 @@
 }
 
 .about-hero__title {
-  font-size: clamp(2.4rem, 2rem + 2.5vw, 3.5rem);
-  line-height: 1.08;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  margin: 0;
-  color: var(--color-text);
+  font-family: var(--font-editorial);
+  font-size: clamp(3rem, 5.5vw, 4.5rem);
+  line-height: 1.05;
+  font-weight: 1000;
+  letter-spacing: -0.02em;
+  margin: 12px 0 16px;
+  color: #ffffff;
 }
 
 .about-hero__title-accent {
-  background: linear-gradient(135deg, #3C2415, #9A8C73);
+  background: linear-gradient(135deg, #BFB09A, #9A8C73);
   background-size: 200% 200%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -141,10 +147,11 @@
 .about-hero__lead {
   margin: 0;
   max-width: 56ch;
-  font-size: 1.1rem;
-  line-height: 1.7;
-  color: var(--color-text-light);
-  font-weight: 500;
+  font-family: var(--font-primary);
+  font-size: 1.05rem;
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 300;
 }
 
 .about-hero__actions {

@@ -243,24 +243,43 @@ function startCalculation() {
   logEl.innerHTML  = '';
 
   let i = 0;
+  let activeItem = null;
+
   const interval = setInterval(() => {
     if (i < LOG_MESSAGES.length) {
+      // Mark previous item as done
+      if (activeItem) {
+        activeItem.classList.remove('is-active');
+        activeItem.classList.add('is-done');
+      }
+
       statusEl.textContent = t(LOG_MESSAGES[i]);
+
       const item = document.createElement('div');
-      item.className = 'calc-log__item';
+      item.className = 'calc-log__item is-active';
       item.style.animationDelay = '0ms';
-      item.textContent = '✓ ' + t(LOG_MESSAGES[i]);
+
+      const spinner = document.createElement('span');
+      spinner.className = 'calc-log__spinner';
+      item.appendChild(spinner);
+      item.appendChild(document.createTextNode(t(LOG_MESSAGES[i])));
+
       logEl.appendChild(item);
+      activeItem = item;
       i++;
     } else {
+      if (activeItem) {
+        activeItem.classList.remove('is-active');
+        activeItem.classList.add('is-done');
+      }
       clearInterval(interval);
       setTimeout(() => {
         calcEl.hidden    = true;
         resultsEl.hidden = false;
         renderResults();
-      }, 400);
+      }, 500);
     }
-  }, 420);
+  }, 480);
 }
 
 function calcCosts() {

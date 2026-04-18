@@ -2,6 +2,7 @@
 .estimator-page {
   background: var(--color-bg);
   min-height: 100vh;
+  padding-top: 0 !important;
 }
 
 /* ── Header forced to dark-hero palette while transparent ── */
@@ -38,14 +39,14 @@
 /* ===================== HERO ===================== */
 .estimator-hero {
   position: relative;
-  min-height: 520px;
+  min-height: auto;
   display: flex;
   align-items: center;
   overflow: hidden;
   background: #1e2229;           /* hardcoded — never flips to beige in dark mode */
   
-  padding-top: 140px;
-  padding-bottom: 80px;
+  padding-top: 100px;
+  padding-bottom: 60px;
 }
 
 [data-theme="dark"] .estimator-hero {
@@ -94,12 +95,18 @@
 .estimator-hero__content {
   position: relative;
   z-index: 3;
-  max-width: 700px;
+  max-width: 900px;
+  margin: 0 auto;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .estimator-hero__badge {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
   background: rgba(154, 140, 115, 0.15);
   border: 1px solid rgba(154, 140, 115, 0.3);
@@ -120,13 +127,13 @@
 }
 
 .estimator-hero__title {
-  font-family: var(--font-heading);
-  font-size: clamp(2.2rem, 5vw, 3.6rem);
-  font-weight: 800;
+  font-family: var(--font-editorial);
+  font-size: clamp(2.5rem, 5vw, 4rem);
+  font-weight: 1000;
   color: #fff;
   line-height: 1.1;
-  letter-spacing: -0.03em;
-  margin-bottom: 1.25rem;
+  letter-spacing: -0.02em;
+  margin-bottom: 1rem;
 }
 
 .estimator-hero__title-accent {
@@ -139,14 +146,16 @@
 .estimator-hero__lead {
   color: rgba(255,255,255,0.68);
   font-size: 1.1rem;
+  font-weight: 300;
   line-height: 1.7;
   max-width: 560px;
-  margin-bottom: 2.5rem;
+  margin-bottom: 1.5rem;
 }
 
 .estimator-hero__stats {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 2rem;
   flex-wrap: wrap;
 }
@@ -1226,6 +1235,302 @@
 [dir="rtl"] .finishing-card__features li::before {
   left: auto;
   right: 0;
+}
+
+/* ===================== POLISH — SMART MATCH PARITY ===================== */
+
+/* ── AI Icon in Hero ── */
+.estimator-hero__icon {
+  margin-bottom: 1.5rem;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.estimator-hero__icon img {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  animation: est-pulse-glow 3s infinite alternate ease-in-out;
+  filter: brightness(0) saturate(100%) invert(87%) sepia(8%) saturate(430%) hue-rotate(340deg);
+}
+
+@keyframes est-pulse-glow {
+  0%   { filter: brightness(0) saturate(100%) invert(87%) sepia(8%) saturate(430%) hue-rotate(340deg) drop-shadow(0 0 8px rgba(227, 213, 202, 0.15)); }
+  100% { filter: brightness(0) saturate(100%) invert(87%) sepia(8%) saturate(430%) hue-rotate(340deg) drop-shadow(0 0 28px rgba(254, 193, 149, 0.75)); }
+}
+
+/* ── Title accent: match smart-match warm tone ── */
+.estimator-hero__title-accent {
+  color: #fec195;
+  background: none !important;
+  -webkit-text-fill-color: #fec195 !important;
+  background-clip: unset !important;
+  -webkit-background-clip: unset !important;
+}
+
+/* ── Enhanced hero orbs for light mode ── */
+.estimator-hero__orb--1 {
+  opacity: 0.22;
+}
+.estimator-hero__orb--2 {
+  background: #fec195;
+  opacity: 0.12;
+}
+
+/* ── Wizard card — elevated like ai-composer ── */
+.wizard-card {
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+}
+
+[data-theme="dark"] .wizard-card {
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* ── Stepper active circle glow matches smart-match ── */
+.wizard-step--active .wizard-step__circle {
+  box-shadow: 0 0 0 6px rgba(254, 193, 149, 0.15);
+}
+
+/* ── STAR-BURST CALCULATE BUTTON ── */
+.est-calculate-btn {
+  position: relative;
+  padding: 12px 35px;
+  background: #fec195;
+  font-size: 17px;
+  font-weight: 600;
+  color: #181818;
+  border: 3px solid #fec195;
+  border-radius: 16px;
+  box-shadow: 0 0 0 #fec1958c;
+  transition: all 0.3s ease-in-out;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-family: var(--font-body);
+  overflow: visible;
+}
+
+.est-calculate-btn span {
+  transition: all 0.3s ease;
+  z-index: 10;
+}
+
+.est-btn__sparkle {
+  fill: #181818;
+  transition: all 0.3s ease;
+  z-index: 10;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.est-star-base {
+  transition: all 0.3s ease;
+}
+
+.est-calculate-btn:hover .est-star-base {
+  transform: scale(0.9);
+  opacity: 0.8;
+}
+
+.est-calculate-btn:hover {
+  background: transparent;
+  color: #fec195;
+  box-shadow: 0 0 25px #fec1958c;
+}
+
+.est-calculate-btn:hover span {
+  color: #fec195;
+}
+
+.est-calculate-btn:hover .est-btn__sparkle {
+  fill: #fec195;
+  transform: scale(1.2);
+}
+
+.est-calculate-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  filter: grayscale(0.8);
+}
+
+.est-calculate-btn:disabled:hover {
+  background: #fec195;
+  color: #181818;
+  box-shadow: none;
+}
+
+.est-calculate-btn:disabled:hover .est-star-1,
+.est-calculate-btn:disabled:hover .est-star-2,
+.est-calculate-btn:disabled:hover .est-star-3,
+.est-calculate-btn:disabled:hover .est-star-4,
+.est-calculate-btn:disabled:hover .est-star-5,
+.est-calculate-btn:disabled:hover .est-star-6 {
+  display: none;
+}
+
+/* Star particles */
+.est-star-1, .est-star-2, .est-star-3,
+.est-star-4, .est-star-5, .est-star-6 {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 0 0 #fffdef);
+  z-index: -5;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.est-star-1 { width: 25px; height: auto; transition: all 1s   cubic-bezier(0.05, 0.83, 0.43, 0.96); }
+.est-star-2 { width: 15px; height: auto; transition: all 1s   cubic-bezier(0, 0.4, 0, 1.01); }
+.est-star-3 { width: 5px;  height: auto; transition: all 1s   cubic-bezier(0, 0.4, 0, 1.01); }
+.est-star-4 { width: 8px;  height: auto; transition: all 0.8s cubic-bezier(0, 0.4, 0, 1.01); }
+.est-star-5 { width: 15px; height: auto; transition: all 0.6s cubic-bezier(0, 0.4, 0, 1.01); }
+.est-star-6 { width: 5px;  height: auto; transition: all 0.8s ease; }
+
+.est-calculate-btn:hover .est-star-1 { top: -80%; left: -30%; filter: drop-shadow(0 0 10px #fffdef); z-index: 2; opacity: 1; }
+.est-calculate-btn:hover .est-star-2 { top: -25%; left:  10%; filter: drop-shadow(0 0 10px #fffdef); z-index: 2; opacity: 1; }
+.est-calculate-btn:hover .est-star-3 { top:  55%; left:  25%; filter: drop-shadow(0 0 10px #fffdef); z-index: 2; opacity: 1; }
+.est-calculate-btn:hover .est-star-4 { top:  30%; left:  80%; filter: drop-shadow(0 0 10px #fffdef); z-index: 2; opacity: 1; }
+.est-calculate-btn:hover .est-star-5 { top:  25%; left: 115%; filter: drop-shadow(0 0 10px #fffdef); z-index: 2; opacity: 1; }
+.est-calculate-btn:hover .est-star-6 { top:   5%; left:  60%; filter: drop-shadow(0 0 10px #fffdef); z-index: 2; opacity: 1; }
+
+.est-fil0 { fill: #fffdef; }
+
+[data-theme="light"] .est-fil0 { fill: #e6b17a; }
+
+[data-theme="light"] .est-calculate-btn:hover .est-star-1,
+[data-theme="light"] .est-calculate-btn:hover .est-star-2,
+[data-theme="light"] .est-calculate-btn:hover .est-star-3,
+[data-theme="light"] .est-calculate-btn:hover .est-star-4,
+[data-theme="light"] .est-calculate-btn:hover .est-star-5,
+[data-theme="light"] .est-calculate-btn:hover .est-star-6 {
+  filter: drop-shadow(0 0 10px rgba(185, 125, 48, 0.4));
+}
+
+/* ── Processing Log — smart-match style ── */
+.estimator-calculating {
+  padding: 5rem 3rem;
+}
+
+.calc-spinner {
+  width: 52px;
+  height: 52px;
+  border-width: 3px;
+  border-top-color: #fec195;
+  box-shadow: 0 0 0 6px rgba(254, 193, 149, 0.08);
+}
+
+.calc-status {
+  font-size: 1.1rem;
+  color: var(--color-on-surface);
+  letter-spacing: 0.01em;
+}
+
+.calc-log {
+  font-family: monospace;
+  gap: 0.75rem;
+  max-width: 460px;
+}
+
+.calc-log__item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.88rem;
+  color: var(--color-outline);
+  opacity: 0;
+  transform: translateY(8px);
+  animation: fadeSlideUp 0.4s ease forwards;
+  text-align: left;
+}
+
+.calc-log__item.is-active {
+  color: var(--color-secondary);
+}
+
+.calc-log__item.is-done {
+  color: var(--color-on-surface);
+  opacity: 0.65 !important;
+}
+
+.calc-log__item .calc-log__spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  border-top-color: currentColor;
+  animation: spin 0.9s linear infinite;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.calc-log__item.is-done .calc-log__spinner {
+  display: none;
+}
+
+.calc-log__item.is-done::before {
+  content: '✓';
+  color: #4ADE80;
+  font-weight: 700;
+  font-size: 0.9rem;
+  width: 14px;
+  flex-shrink: 0;
+}
+
+/* ── How It Works — enhanced polish ── */
+.how-card {
+  background: var(--color-surface);
+  transition: all 0.25s ease;
+}
+
+.how-card:hover {
+  border-color: rgba(254, 193, 149, 0.4);
+  box-shadow: 0 8px 32px rgba(154, 140, 115, 0.12);
+}
+
+[data-theme="dark"] .how-card:hover {
+  border-color: rgba(254, 193, 149, 0.25);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.how-card__number {
+  background: linear-gradient(135deg, rgba(254,193,149,0.6), rgba(154,140,115,0.6));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  opacity: 0.5;
+  transition: opacity 0.25s ease;
+}
+
+.how-card:hover .how-card__number {
+  opacity: 1;
+}
+
+/* ── Results CTA: star button for Find a Pro ── */
+.results-cta__actions .btn--star-cta {
+  position: relative;
+  overflow: visible;
+  background: #fec195;
+  color: #181818;
+  border-color: #fec195;
+  font-weight: 600;
+  transition: all 0.3s ease-in-out;
+}
+
+.results-cta__actions .btn--star-cta:hover {
+  background: transparent;
+  color: #fec195;
+  box-shadow: 0 0 20px #fec1958c;
+}
+
+/* ── RTL: Calculate button ── */
+[dir="rtl"] .est-calculate-btn {
+  flex-direction: row-reverse;
 }
 
 /* . */
