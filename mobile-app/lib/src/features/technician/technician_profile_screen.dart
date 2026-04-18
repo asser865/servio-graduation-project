@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
 import '../../design_system/widgets/servio_card.dart';
+import '../auth/role_selection_screen.dart';
 import 'verification_upload_screen.dart';
 
 class TechnicianSettingsProfileScreen extends StatelessWidget {
@@ -13,6 +16,11 @@ class TechnicianSettingsProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final servio = context.servio;
     final theme = Theme.of(context);
+    final account = context.watch<SessionProvider>().account;
+    final themeProvider = context.watch<ThemeProvider>();
+    final isDark = themeProvider.mode == ThemeMode.dark ||
+        (themeProvider.mode == ThemeMode.system &&
+            MediaQuery.platformBrightnessOf(context) == Brightness.dark);
 
     return Scaffold(
       bottomNavigationBar: ServioBottomNavigationBar(
@@ -49,7 +57,7 @@ class TechnicianSettingsProfileScreen extends StatelessWidget {
                       ),
                       child: Center(
                         child: Text(
-                          'AH',
+                          account?.initials ?? 'T',
                           style: theme.textTheme.headlineMedium?.copyWith(color: ServioColors.deepBrown),
                         ),
                       ),
@@ -70,10 +78,10 @@ class TechnicianSettingsProfileScreen extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 14),
-                Text('Ahmed Nabil', style: theme.textTheme.headlineMedium),
+                Text(account?.name ?? 'Technician', style: theme.textTheme.headlineMedium),
                 const SizedBox(height: 4),
                 Text(
-                  'Member since 2023',
+                  account?.email ?? '',
                   style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary),
                 ),
               ],
@@ -141,7 +149,23 @@ class TechnicianSettingsProfileScreen extends StatelessWidget {
             const SizedBox(height: 16),
             Text('Settings', style: theme.textTheme.titleMedium),
             const SizedBox(height: 12),
-            const _SettingsCard(),
+            _SettingsCard(
+              isDark: isDark,
+              onToggleDark: (bool v) => themeProvider.setMode(
+                v ? ThemeMode.dark : ThemeMode.light,
+              ),
+              onLogout: () async {
+                await context.read<SessionProvider>().logout();
+                if (context.mounted) {
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const RoleSelectionScreen(),
+                    ),
+                    (Route<dynamic> _) => false,
+                  );
+                }
+              },
+            ),
           ],
         ),
       ),
@@ -255,7 +279,15 @@ class _StatusRow extends StatelessWidget {
 }
 
 class _SettingsCard extends StatelessWidget {
-  const _SettingsCard();
+  const _SettingsCard({
+    required this.isDark,
+    required this.onToggleDark,
+    required this.onLogout,
+  });
+
+  final bool isDark;
+  final ValueChanged<bool> onToggleDark;
+  final VoidCallback onLogout;
 
   @override
   Widget build(BuildContext context) {
@@ -266,13 +298,31 @@ class _SettingsCard extends StatelessWidget {
         children: <Widget>[
           const _SimpleSetting(label: 'Edit Profile'),
           const _SimpleSetting(label: 'Notification Settings'),
-          const _SimpleSetting(label: 'Language'),
-          const _SimpleSetting(label: 'Help Center'),
           Padding(
-            padding: const EdgeInsets.only(top: 12),
-            child: Text(
-              'Log Out',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: servio.danger),
+            padding: const EdgeInsets.only(bottom: 14),
+            child: Row(
+              children: <Widget>[
+                const Expanded(child: Text('Dark Mode')),
+                Switch(
+                  value: isDark,
+                  onChanged: onToggleDark,
+                  activeColor: servio.accent,
+                ),
+              ],
+            ),
+          ),
+          const _SimpleSetting(label: 'Help Center'),
+          GestureDetector(
+            onTap: onLogout,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                'Log Out',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: servio.danger,
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
             ),
           ),
         ],

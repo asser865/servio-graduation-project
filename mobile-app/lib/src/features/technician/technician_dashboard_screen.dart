@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
@@ -18,6 +20,8 @@ class TechnicianDashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
+    final account = context.watch<SessionProvider>().account;
+    final firstName = (account?.name ?? 'Ahmed').split(' ').first;
 
     return Scaffold(
       bottomNavigationBar: ServioBottomNavigationBar(
@@ -69,7 +73,7 @@ class TechnicianDashboardScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        Text('Good Morning, Ahmed.', style: theme.textTheme.headlineMedium),
+                        Text('Good Morning, $firstName.', style: theme.textTheme.headlineMedium),
                         const SizedBox(height: 6),
                         Text(
                           '26/03/2026',
