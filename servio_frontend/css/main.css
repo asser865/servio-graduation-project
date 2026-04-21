@@ -17,6 +17,7 @@
 @import "./components/back-to-top.css";
 
 @import "./pages/home.css";
+@import "./pages/home-luxe.css";
 @import "./pages/about.css";
 @import "./pages/contact.css";
 @import "./pages/auth.css";

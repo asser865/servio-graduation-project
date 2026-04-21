@@ -14,6 +14,82 @@ document.addEventListener('DOMContentLoaded', () => {
   if (heroBtn)   heroBtn.addEventListener('click', () => navigateToMarketplace());
   if (heroInput) heroInput.addEventListener('keydown', e => { if (e.key === 'Enter') navigateToMarketplace(); });
 
+  // ── Typewriter placeholder effect ─────────────────────────────────────
+  if (heroInput) {
+    const TYPEWRITER_PHRASES = [
+      'Find a master plumber…',
+      'Certified electrician?',
+      'AC repair & services…',
+      'Professional cleaning…',
+      'Need a pro painter?',
+      'Expert carpentry work…',
+      'What service do you need?',
+    ];
+
+    let twPhraseIdx   = 0;
+    let twCharIdx     = 0;
+    let twDeleting    = false;
+    let twTimer       = null;
+    let twPaused      = false;  // paused while user focuses the input
+
+    const TYPE_SPEED   = 55;   // ms per character while typing
+    const DELETE_SPEED = 28;   // ms per character while deleting
+    const PAUSE_AFTER  = 1800; // ms pause after fully typed
+    const PAUSE_BEFORE = 380;  // ms pause before starting next phrase
+
+    function twTick() {
+      if (twPaused) return;  // user is interacting — freeze
+
+      const phrase = TYPEWRITER_PHRASES[twPhraseIdx];
+
+      if (!twDeleting) {
+        // Typing forward
+        twCharIdx++;
+        heroInput.setAttribute('placeholder', phrase.slice(0, twCharIdx));
+
+        if (twCharIdx === phrase.length) {
+          // Fully typed — pause then start deleting
+          twTimer = setTimeout(() => { twDeleting = true; twTick(); }, PAUSE_AFTER);
+          return;
+        }
+      } else {
+        // Deleting backward
+        twCharIdx--;
+        heroInput.setAttribute('placeholder', phrase.slice(0, twCharIdx));
+
+        if (twCharIdx === 0) {
+          // Fully erased — move to next phrase
+          twDeleting  = false;
+          twPhraseIdx = (twPhraseIdx + 1) % TYPEWRITER_PHRASES.length;
+          twTimer = setTimeout(twTick, PAUSE_BEFORE);
+          return;
+        }
+      }
+
+      twTimer = setTimeout(twTick, twDeleting ? DELETE_SPEED : TYPE_SPEED);
+    }
+
+    // Pause animation while user types; restore on blur
+    heroInput.addEventListener('focus', () => {
+      twPaused = true;
+      clearTimeout(twTimer);
+      // Show a clean placeholder hint while focused
+      heroInput.setAttribute('placeholder', 'Search services…');
+    });
+
+    heroInput.addEventListener('blur', () => {
+      twPaused = false;
+      // If the input is empty, restart the typewriter
+      if (!heroInput.value.trim()) {
+        clearTimeout(twTimer);
+        twTimer = setTimeout(twTick, 600);
+      }
+    });
+
+    // Kick off after a short delay so the splash loader finishes first
+    twTimer = setTimeout(twTick, 1400);
+  }
+
   // ── Autocomplete dropdown ─────────────────────────────────────────────
   const SERVICES = ['Plumbing', 'Electrical', 'AC Maintenance', 'Professional Cleaning', 'Painting', 'Carpentry'];
 
