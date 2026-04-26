@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -707,7 +709,7 @@ class _BasicInformationStep extends StatelessWidget {
   }
 }
 
-class _OtpStep extends StatelessWidget {
+class _OtpStep extends StatefulWidget {
   const _OtpStep({
     required this.controller,
     required this.phone,
@@ -719,12 +721,60 @@ class _OtpStep extends StatelessWidget {
   final VoidCallback onResend;
 
   @override
+  State<_OtpStep> createState() => _OtpStepState();
+}
+
+class _OtpStepState extends State<_OtpStep> {
+  static const int _cooldown = 30;
+  int _secondsLeft = _cooldown;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _startTimer();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _startTimer() {
+    _timer?.cancel();
+    setState(() => _secondsLeft = _cooldown);
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      setState(() {
+        if (_secondsLeft > 0) {
+          _secondsLeft -= 1;
+        } else {
+          timer.cancel();
+        }
+      });
+    });
+  }
+
+  void _handleResend() {
+    widget.onResend();
+    _startTimer();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final canResend = _secondsLeft == 0;
+    final mm = (_secondsLeft ~/ 60).toString().padLeft(2, '0');
+    final ss = (_secondsLeft % 60).toString().padLeft(2, '0');
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         TextField(
-          controller: controller,
+          controller: widget.controller,
           maxLength: 6,
           keyboardType: TextInputType.number,
           decoration: const InputDecoration(
@@ -738,8 +788,10 @@ class _OtpStep extends StatelessWidget {
         Align(
           alignment: AlignmentDirectional.centerEnd,
           child: TextButton(
-            onPressed: onResend,
-            child: const Text('Resend code in 00:30'),
+            onPressed: canResend ? _handleResend : null,
+            child: Text(
+              canResend ? 'Resend code' : 'Resend code in $mm:$ss',
+            ),
           ),
         ),
       ],
