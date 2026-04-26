@@ -7,6 +7,8 @@ import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
 import '../auth/role_selection_screen.dart';
 import '../messages/messages_screen.dart';
+import '../shared/about_screen.dart';
+import '../shared/contact_screen.dart';
 
 class CustomerProfileScreen extends StatelessWidget {
   const CustomerProfileScreen({super.key});
@@ -131,14 +133,20 @@ class CustomerProfileScreen extends StatelessWidget {
             _SettingsCard(
               items: const <String>[
                 'Help Center',
-                'Report a Problem',
+                'About Us',
                 'Contact Us',
               ],
               onItemTap: (String item) {
-                if (item == 'Contact Us') {
+                if (item == 'About Us') {
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
-                      builder: (_) => const MessagesScreen(),
+                      builder: (_) => const AboutScreen(),
+                    ),
+                  );
+                } else if (item == 'Contact Us') {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const ContactScreen(),
                     ),
                   );
                 }
