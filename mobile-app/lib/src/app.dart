@@ -10,6 +10,7 @@ import 'design_system/servio_tokens.dart';
 import 'features/auth/role_selection_screen.dart';
 import 'features/customer/customer_dashboard_screen.dart';
 import 'features/technician/technician_dashboard_screen.dart';
+import 'features/onboarding/splash_screen.dart';
 
 class ServioApp extends StatelessWidget {
   const ServioApp({required this.storage, super.key});
@@ -67,7 +68,7 @@ class _AppView extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      home: const _AuthGate(),
+      home: const SplashScreen(),
     );
   }
 }

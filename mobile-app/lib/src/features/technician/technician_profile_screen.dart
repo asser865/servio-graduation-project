@@ -7,6 +7,8 @@ import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
 import '../../design_system/widgets/servio_card.dart';
 import '../auth/role_selection_screen.dart';
+import '../marketing/about_screen.dart';
+import '../marketing/contact_screen.dart';
 import 'verification_upload_screen.dart';
 
 class TechnicianSettingsProfileScreen extends StatelessWidget {
@@ -312,6 +314,22 @@ class _SettingsCard extends StatelessWidget {
             ),
           ),
           const _SimpleSetting(label: 'Help Center'),
+          _SimpleSetting(
+            label: 'About Us',
+            onTap: () {
+              Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => const AboutScreen(),
+              ));
+            },
+          ),
+          _SimpleSetting(
+            label: 'Contact Us',
+            onTap: () {
+              Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => const ContactScreen(),
+              ));
+            },
+          ),
           GestureDetector(
             onTap: onLogout,
             child: Padding(
@@ -332,20 +350,24 @@ class _SettingsCard extends StatelessWidget {
 }
 
 class _SimpleSetting extends StatelessWidget {
-  const _SimpleSetting({required this.label});
+  const _SimpleSetting({required this.label, this.onTap});
 
   final String label;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final servio = context.servio;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: Row(
-        children: <Widget>[
-          Expanded(child: Text(label)),
-          Icon(Icons.chevron_right_rounded, color: servio.textSecondary),
-        ],
+    return GestureDetector(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 14),
+        child: Row(
+          children: <Widget>[
+            Expanded(child: Text(label)),
+            Icon(Icons.chevron_right_rounded, color: servio.textSecondary),
+          ],
+        ),
       ),
     );
   }
