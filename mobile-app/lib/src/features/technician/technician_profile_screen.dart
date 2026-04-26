@@ -7,8 +7,8 @@ import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
 import '../../design_system/widgets/servio_card.dart';
 import '../auth/role_selection_screen.dart';
-import '../shared/about_screen.dart';
-import '../shared/contact_screen.dart';
+import '../marketing/about_screen.dart';
+import '../marketing/contact_screen.dart';
 import 'verification_upload_screen.dart';
 
 class TechnicianSettingsProfileScreen extends StatelessWidget {

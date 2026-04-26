@@ -8,7 +8,7 @@ import 'core/state/app_state.dart';
 import 'design_system/servio_theme.dart';
 import 'design_system/servio_tokens.dart';
 import 'features/auth/role_selection_screen.dart';
-import 'features/customer/customer_home_screen.dart';
+import 'features/customer/customer_dashboard_screen.dart';
 import 'features/technician/technician_dashboard_screen.dart';
 import 'features/onboarding/splash_screen.dart';
 
@@ -83,6 +83,6 @@ class _AuthGate extends StatelessWidget {
     if (!session.isLoggedIn) return const RoleSelectionScreen();
     return session.account!.role == UserRole.technician
         ? const TechnicianDashboardScreen()
-        : const CustomerHomeScreen();
+        : const CustomerDashboardScreen();
   }
 }
