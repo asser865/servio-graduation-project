@@ -6,6 +6,8 @@ import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
 import '../auth/role_selection_screen.dart';
+import '../marketing/about_screen.dart';
+import '../marketing/contact_screen.dart';
 import '../messages/messages_screen.dart';
 
 class CustomerProfileScreen extends StatelessWidget {
@@ -138,6 +140,12 @@ class CustomerProfileScreen extends StatelessWidget {
                 if (item == 'Contact Us') {
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
+                      builder: (_) => const ContactScreen(),
+                    ),
+                  );
+                } else if (item == 'Report a Problem') {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
                       builder: (_) => const MessagesScreen(),
                     ),
                   );
@@ -147,11 +155,21 @@ class CustomerProfileScreen extends StatelessWidget {
             const SizedBox(height: 16),
             Text('Legal', style: theme.textTheme.titleMedium),
             const SizedBox(height: 12),
-            const _SettingsCard(
-              items: <String>[
+            _SettingsCard(
+              items: const <String>[
+                'About SERVIO',
                 'Terms of Service',
                 'Privacy Policy',
               ],
+              onItemTap: (String item) {
+                if (item == 'About SERVIO') {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const AboutScreen(),
+                    ),
+                  );
+                }
+              },
             ),
             const SizedBox(height: 24),
             GestureDetector(
@@ -168,8 +186,8 @@ class CustomerProfileScreen extends StatelessWidget {
               child: Text(
                 'Log Out',
                 textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(color: servio.danger, fontWeight: FontWeight.w600),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                    color: servio.danger, fontWeight: FontWeight.w600),
               ),
             ),
             const SizedBox(height: 20),
@@ -259,7 +277,8 @@ class _SettingsCard extends StatelessWidget {
               child: Row(
                 children: <Widget>[
                   Expanded(child: Text(item)),
-                  Icon(Icons.chevron_right_rounded, color: servio.textSecondary),
+                  Icon(Icons.chevron_right_rounded,
+                      color: servio.textSecondary),
                 ],
               ),
             ),
