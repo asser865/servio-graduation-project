@@ -465,6 +465,11 @@ class BookingDetailsScreen extends StatelessWidget {
                   ),
                 );
               },
+              child: const Text('Write a Review'),
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton(
+              onPressed: () => Navigator.of(context).pop(),
               style: OutlinedButton.styleFrom(
                 side: BorderSide(color: servio.danger),
                 foregroundColor: servio.danger,
