@@ -329,7 +329,14 @@ class VerificationUploadCard extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: <Widget>[
-                      Text(title, style: theme.textTheme.labelLarge),
+                      Flexible(
+                        child: Text(
+                          title,
+                          style: theme.textTheme.labelLarge,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                       const SizedBox(width: 6),
                       Text(
                         requiredLabel ? 'Required' : 'Optional',
