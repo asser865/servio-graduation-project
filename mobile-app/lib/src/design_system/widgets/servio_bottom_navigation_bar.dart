@@ -48,7 +48,8 @@ class ServioBottomNavigationBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final servio = context.servio;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final surface = isDark ? servio.surfaceRaised : Theme.of(context).colorScheme.surface;
+    final surface =
+        isDark ? servio.surfaceRaised : Theme.of(context).colorScheme.surface;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -64,7 +65,7 @@ class ServioBottomNavigationBar extends StatelessWidget {
           child: SafeArea(
             top: false,
             child: SizedBox(
-              height: 56,
+              height: 64,
               child: Row(
                 children: List<Widget>.generate(items.length, (int index) {
                   final item = items[index];
@@ -110,18 +111,19 @@ class _NavTab extends StatelessWidget {
     final labelColor = iconColor;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
       child: AnimatedContainer(
         duration: ServioMotion.tabSwitch,
         curve: ServioMotion.spring,
         decoration: BoxDecoration(
-          gradient: isActive && item.highlighted ? ServioGradients.accent : null,
+          gradient:
+              isActive && item.highlighted ? ServioGradients.accent : null,
           color: isActive && !item.highlighted
               ? servio.backgroundSoft
               : Colors.transparent,
           borderRadius: BorderRadius.circular(ServioRadius.navItem),
         ),
-        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 3),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
@@ -159,17 +161,25 @@ class _NavTab extends StatelessWidget {
                     )
                   : Icon(item.icon, size: 22, color: iconColor),
             ),
-            const SizedBox(height: 3),
-            Text(
-              item.label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: labelColor,
-                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                fontSize: 10,
+            const SizedBox(height: 4),
+            SizedBox(
+              height: 13,
+              width: double.infinity,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  item.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: labelColor,
+                        fontWeight:
+                            isActive ? FontWeight.w700 : FontWeight.w500,
+                        fontSize: 10,
+                      ),
+                  textAlign: TextAlign.center,
+                ),
               ),
-              textAlign: TextAlign.center,
             ),
           ],
         ),

@@ -6,7 +6,14 @@ import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
 
 class WriteReviewScreen extends StatefulWidget {
-  const WriteReviewScreen({super.key});
+  const WriteReviewScreen({
+    required this.technicianName,
+    required this.jobSummary,
+    super.key,
+  });
+
+  final String technicianName;
+  final String jobSummary;
 
   @override
   State<WriteReviewScreen> createState() => _WriteReviewScreenState();
@@ -16,6 +23,7 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
   int _rating = 0;
   final Set<String> _selectedTags = <String>{};
   final TextEditingController _controller = TextEditingController();
+  int _photoCount = 0;
 
   static const List<String> _tags = <String>[
     'Professional',
@@ -30,6 +38,20 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  bool get _canSubmit => _rating > 0 && _controller.text.trim().isNotEmpty;
+
+  void _submit() {
+    if (!_canSubmit) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Review submitted. Thank you.')),
+    );
+    Navigator.of(context).pop(true);
+  }
+
+  void _skip() {
+    Navigator.of(context).pop(false);
   }
 
   @override
@@ -58,18 +80,21 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
                       shape: BoxShape.circle,
                       border: Border.all(color: servio.accent, width: 2),
                     ),
-                    child: const Center(child: Text('AN')),
+                    child:
+                        Center(child: Text(_initials(widget.technicianName))),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        Text('Ahmed Nabil', style: theme.textTheme.titleMedium),
+                        Text(widget.technicianName,
+                            style: theme.textTheme.titleMedium),
                         const SizedBox(height: 4),
                         Text(
-                          'Plumbing Repair Visit',
-                          style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+                          widget.jobSummary,
+                          style: theme.textTheme.bodySmall
+                              ?.copyWith(color: servio.textSecondary),
                         ),
                       ],
                     ),
@@ -102,12 +127,27 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
             TextField(
               controller: _controller,
               maxLines: 5,
+              maxLength: 300,
               decoration: InputDecoration(
                 hintText: 'Share your experience in detail...',
                 alignLabelWithHint: true,
-                helperText: '${_controller.text.length}/300',
+                counterText: '',
               ),
               onChanged: (_) => setState(() {}),
+            ),
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: Text(
+                '${_controller.text.length}/300',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: _controller.text.length >= 300
+                      ? servio.danger
+                      : servio.textSecondary,
+                  fontWeight: _controller.text.length >= 300
+                      ? FontWeight.w700
+                      : FontWeight.w400,
+                ),
+              ),
             ),
             const SizedBox(height: 20),
             Wrap(
@@ -126,7 +166,8 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
                     });
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
                       color: selected ? servio.accent : servio.backgroundSoft,
                       borderRadius: BorderRadius.circular(ServioRadius.full),
@@ -144,26 +185,60 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
             const SizedBox(height: 24),
             Row(
               children: <Widget>[
-                Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: servio.accent, style: BorderStyle.solid),
-                    borderRadius: BorderRadius.circular(ServioRadius.full),
+                GestureDetector(
+                  onTap: _photoCount >= 3
+                      ? null
+                      : () => setState(() => _photoCount += 1),
+                  child: Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: _photoCount >= 3 ? servio.border : servio.accent,
+                      ),
+                      borderRadius: BorderRadius.circular(ServioRadius.full),
+                    ),
+                    child: Icon(
+                      Icons.add_a_photo_outlined,
+                      color: _photoCount >= 3
+                          ? servio.textSecondary
+                          : servio.accent,
+                    ),
                   ),
-                  child: Icon(Icons.add_rounded, color: servio.accent),
                 ),
                 const SizedBox(width: 12),
                 ...List<Widget>.generate(
-                  3,
+                  _photoCount,
                   (int index) => Padding(
                     padding: const EdgeInsets.only(right: 12),
                     child: Container(
                       width: 52,
                       height: 52,
                       decoration: BoxDecoration(
-                        gradient: index.isEven ? ServioGradients.brand : ServioGradients.warm,
+                        gradient: index.isEven
+                            ? ServioGradients.brand
+                            : ServioGradients.warm,
                         borderRadius: BorderRadius.circular(ServioRadius.md),
+                      ),
+                      child: Align(
+                        alignment: Alignment.topRight,
+                        child: GestureDetector(
+                          onTap: () => setState(() => _photoCount -= 1),
+                          child: Container(
+                            margin: const EdgeInsets.all(4),
+                            width: 18,
+                            height: 18,
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.close_rounded,
+                              size: 13,
+                              color: servio.danger,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -171,10 +246,13 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
               ],
             ),
             const SizedBox(height: 24),
-            const ServioPrimaryButton(label: 'Submit Review'),
+            ServioPrimaryButton(
+              label: 'Submit Review',
+              onPressed: _canSubmit ? _submit : null,
+            ),
             const SizedBox(height: 12),
             TextButton(
-              onPressed: () => Navigator.of(context).maybePop(),
+              onPressed: _skip,
               child: const Text('Skip for now'),
             ),
           ],
@@ -182,4 +260,15 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
       ),
     );
   }
+}
+
+String _initials(String name) {
+  return name
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((part) => part.isNotEmpty)
+      .take(2)
+      .map((part) => part[0])
+      .join()
+      .toUpperCase();
 }

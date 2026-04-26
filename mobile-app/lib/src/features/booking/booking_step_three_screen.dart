@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
@@ -20,23 +21,60 @@ class BookingStepThreeScreen extends StatefulWidget {
 }
 
 class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
-  String _paymentMethod = 'Cash on Completion';
+  bool _termsAccepted = false;
+
+  // ── helpers ──────────────────────────────────────────────────────────────────
+
+  /// Navigate back to step 2 (date / payment).
+  void _editPayment() {
+    Navigator.of(context).pop();
+  }
+
+  void _editServiceDetails() {
+    Navigator.of(context)
+      ..pop()
+      ..pop();
+  }
+
+  void _showLegalNotice(String title) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$title will open from the legal center.')),
+    );
+  }
+
+  void _confirmBooking() {
+    if (!_termsAccepted) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => BookingConfirmationScreen(data: widget.data),
+      ),
+    );
+  }
+
+  // ── build ────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
-    const methods = <String>[
-      'Cash on Completion',
-      'Credit / Debit Card',
-      'Vodafone Cash',
-      'InstaPay',
-    ];
+
+    final total = _moneyValue(widget.data.amount);
+    final platformFee = (total * 0.05).round();
+    final baseRate = total - platformFee;
+
+    final bgColor = Theme.of(context).scaffoldBackgroundColor;
 
     return Scaffold(
+      backgroundColor: bgColor,
       appBar: AppBar(
+        backgroundColor: bgColor,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => Navigator.of(context).pop(),
+          tooltip: 'Back to step 2',
+        ),
         title: const Text('Review & Confirm'),
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -44,112 +82,278 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
+              // ── Step indicator ───────────────────────────────────────────────
+              _StepIndicator(currentStep: 3),
+              const SizedBox(height: 24),
+
+              // ── Service Details review ───────────────────────────────────────
+              _SectionCard(
+                title: 'Service Details',
+                onEdit: _editServiceDetails,
+                children: <Widget>[
+                  _ReviewRow(
+                      label: 'Technician', value: widget.data.technicianName),
+                  _ReviewRow(label: 'Service', value: widget.data.serviceName),
+                  _ReviewRow(label: 'Date', value: widget.data.date),
+                  _ReviewRow(label: 'Time', value: widget.data.time),
+                  _ReviewRow(
+                      label: 'Address',
+                      value: widget.data.location,
+                      isLast: true),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // ── Payment review ───────────────────────────────────────────────
+              _SectionCard(
+                title: 'Payment',
+                onEdit: _editPayment,
+                children: <Widget>[
+                  _ReviewRow(label: 'Method', value: widget.data.paymentMethod),
+                  _ReviewRow(label: 'Base Rate', value: '$baseRate EGP'),
+                  _ReviewRow(
+                      label: 'Platform Fee', value: '$platformFee EGP (5%)'),
+                  _ReviewRow(
+                    label: 'Est. Total',
+                    value: widget.data.amount,
+                    valueColor: servio.accent,
+                    isBold: true,
+                    isLast: true,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // ── Order Summary card ───────────────────────────────────────────
               ServioCard(
                 radius: ServioRadius.lg,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    _SummaryRow(label: 'Service', value: widget.data.serviceName),
-                    _SummaryRow(label: 'Technician', value: widget.data.technicianName),
-                    _SummaryRow(label: 'Date & Time', value: '${widget.data.date} • ${widget.data.time}'),
-                    _SummaryRow(label: 'Location', value: widget.data.location),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: <Widget>[
-                  const Expanded(
-                    child: TextField(
-                      decoration: InputDecoration(
-                        labelText: 'Promo code',
-                        prefixIcon: Icon(Icons.sell_outlined),
-                      ),
+                    Text(
+                      'Order Summary',
+                      style: theme.textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w700),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  OutlinedButton(onPressed: () {}, child: const Text('Apply')),
-                ],
-              ),
-              const SizedBox(height: 24),
-              Text('Payment Method', style: theme.textTheme.titleMedium),
-              const SizedBox(height: 12),
-              ...methods.map((String method) {
-                final selected = _paymentMethod == method;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: GestureDetector(
-                    onTap: () => setState(() => _paymentMethod = method),
-                    child: ServioCard(
-                      radius: ServioRadius.md,
-                      borderColor: selected ? servio.accent : servio.border,
-                      child: Row(
-                        children: <Widget>[
-                          Expanded(child: Text(method, style: theme.textTheme.bodyMedium)),
-                          Icon(
-                            selected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-                            color: selected ? servio.accent : servio.textSecondary,
+                    const SizedBox(height: 16),
+                    // Technician mini-profile
+                    Row(
+                      children: <Widget>[
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            gradient: ServioGradients.warm,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: servio.accent, width: 2),
                           ),
-                        ],
-                      ),
+                          child: Center(
+                            child: Text(
+                              widget.data.technicianName
+                                  .trim()
+                                  .split(' ')
+                                  .take(2)
+                                  .map((w) => w[0])
+                                  .join()
+                                  .toUpperCase(),
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                color: ServioColors.deepBrown,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(
+                                widget.data.technicianName,
+                                style: theme.textTheme.titleSmall
+                                    ?.copyWith(fontWeight: FontWeight.w600),
+                              ),
+                              Text(
+                                widget.data.specialty,
+                                style: theme.textTheme.bodySmall
+                                    ?.copyWith(color: servio.textSecondary),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Star rating
+                        Row(
+                          children: <Widget>[
+                            Icon(Icons.star_rounded,
+                                color: servio.accent, size: 16),
+                            const SizedBox(width: 4),
+                            Text(
+                              '4.9',
+                              style: theme.textTheme.labelLarge
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            Text(
+                              ' (128)',
+                              style: theme.textTheme.labelSmall
+                                  ?.copyWith(color: servio.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                  ),
-                );
-              }),
-              if (_paymentMethod == 'Credit / Debit Card') ...<Widget>[
-                const SizedBox(height: 4),
-                const TextField(decoration: InputDecoration(labelText: 'Card number')),
-                const SizedBox(height: 12),
-                Row(
-                  children: const <Widget>[
-                    Expanded(child: TextField(decoration: InputDecoration(labelText: 'Expiry'))),
-                    SizedBox(width: 12),
-                    Expanded(child: TextField(decoration: InputDecoration(labelText: 'CVV'))),
-                  ],
-                ),
-              ],
-              const SizedBox(height: 24),
-              ServioCard(
-                child: Column(
-                  children: <Widget>[
-                    _PriceRow(label: 'Service fee', value: '900 EGP'),
-                    _PriceRow(label: 'Platform fee', value: '150 EGP'),
-                    _PriceRow(label: 'Promo discount', value: '-0 EGP', valueColor: servio.success),
-                    const Divider(height: 24),
-                    _PriceRow(
-                      label: 'Total',
+                    const SizedBox(height: 16),
+                    const Divider(height: 1),
+                    const SizedBox(height: 16),
+                    // Pricing rows
+                    _PriceLine(
+                        label: 'Base rate (1 hr min)', value: '$baseRate EGP'),
+                    const SizedBox(height: 8),
+                    _PriceLine(
+                        label: 'Platform fee (5%)', value: '$platformFee EGP'),
+                    const SizedBox(height: 8),
+                    _PriceLine(label: 'Parts & materials', value: 'As quoted'),
+                    const SizedBox(height: 12),
+                    const Divider(height: 1),
+                    const SizedBox(height: 12),
+                    _PriceLine(
+                      label: 'Estimated Total',
                       value: widget.data.amount,
                       isBold: true,
                       valueColor: servio.accent,
                     ),
+                    const SizedBox(height: 20),
+                    // Trust signals
+                    ...<_TrustItem>[
+                      const _TrustItem(
+                          'Free cancellation up to 2 hours before'),
+                      const _TrustItem('SERVIO Service Guarantee'),
+                      const _TrustItem('Identity & licence verified'),
+                      const _TrustItem('No hidden fees'),
+                    ].map((_TrustItem item) => Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: Row(
+                            children: <Widget>[
+                              Container(
+                                width: 20,
+                                height: 20,
+                                decoration: BoxDecoration(
+                                  color:
+                                      ServioColors.tint(ServioColors.success),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.check_rounded,
+                                    color: ServioColors.success, size: 12),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  item.text,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: servio.textSecondary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )),
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: ServioColors.tint(servio.info),
-                  borderRadius: BorderRadius.circular(ServioRadius.md),
-                ),
-                child: Text(
-                  'Your payment is held securely in escrow until service completion is confirmed.',
-                  style: theme.textTheme.bodyMedium?.copyWith(color: servio.info),
-                ),
-              ),
               const SizedBox(height: 20),
-              ServioPrimaryButton(
-                label: 'Confirm Booking',
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => BookingConfirmationScreen(
-                        data: widget.data.copyWith(paymentMethod: _paymentMethod),
+
+              // ── Terms & Conditions consent ────────────────────────────────────
+              ServioCard(
+                radius: ServioRadius.md,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: Checkbox(
+                        value: _termsAccepted,
+                        onChanged: (bool? v) =>
+                            setState(() => _termsAccepted = v ?? false),
+                        activeColor: servio.accent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(4),
+                        ),
                       ),
                     ),
-                  );
-                },
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: RichText(
+                        text: TextSpan(
+                          style: theme.textTheme.bodySmall
+                              ?.copyWith(color: servio.textSecondary),
+                          children: <InlineSpan>[
+                            const TextSpan(text: 'I agree to the '),
+                            TextSpan(
+                              text: 'Terms of Service',
+                              recognizer: TapGestureRecognizer()
+                                ..onTap =
+                                    () => _showLegalNotice('Terms of Service'),
+                              style: TextStyle(
+                                color: servio.accent,
+                                fontWeight: FontWeight.w600,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                            const TextSpan(text: ' and '),
+                            TextSpan(
+                              text: 'Privacy Policy',
+                              recognizer: TapGestureRecognizer()
+                                ..onTap =
+                                    () => _showLegalNotice('Privacy Policy'),
+                              style: TextStyle(
+                                color: servio.accent,
+                                fontWeight: FontWeight.w600,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                            const TextSpan(
+                              text:
+                                  '. By confirming this booking you authorise the escrow hold.',
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
+              const SizedBox(height: 28),
+
+              // ── Bottom action row ────────────────────────────────────────────
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: servio.border),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(ServioRadius.md),
+                        ),
+                      ),
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Back'),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    flex: 2,
+                    child: Opacity(
+                      opacity: _termsAccepted ? 1.0 : 0.5,
+                      child: ServioPrimaryButton(
+                        label: 'Confirm Booking',
+                        onPressed: _termsAccepted ? _confirmBooking : null,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
             ],
           ),
         ),
@@ -158,40 +362,193 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
   }
 }
 
-class _SummaryRow extends StatelessWidget {
-  const _SummaryRow({
-    required this.label,
-    required this.value,
-  });
+// ── Sub-widgets ────────────────────────────────────────────────────────────────
 
-  final String label;
-  final String value;
+class _StepIndicator extends StatelessWidget {
+  const _StepIndicator({required this.currentStep});
+
+  final int currentStep;
 
   @override
   Widget build(BuildContext context) {
     final servio = context.servio;
+    const labels = <String>['Details', 'Date & Time', 'Confirm'];
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
+    return Row(
+      children: List<Widget>.generate(3, (int i) {
+        final step = i + 1;
+        final isDone = step < currentStep;
+        final isActive = step == currentStep;
+
+        return Expanded(
+          child: Row(
+            children: <Widget>[
+              // Circle
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  gradient: isActive || isDone ? ServioGradients.brand : null,
+                  color: isActive || isDone ? null : servio.surfaceAlt,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color:
+                        isActive || isDone ? Colors.transparent : servio.border,
+                  ),
+                ),
+                child: Center(
+                  child: isDone
+                      ? const Icon(Icons.check_rounded,
+                          color: Colors.white, size: 14)
+                      : Text(
+                          '$step',
+                          style:
+                              Theme.of(context).textTheme.labelSmall?.copyWith(
+                                    color: isActive
+                                        ? Colors.white
+                                        : servio.textSecondary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                        ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      labels[i],
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: isActive
+                                ? Theme.of(context).colorScheme.onSurface
+                                : servio.textSecondary,
+                            fontWeight:
+                                isActive ? FontWeight.w700 : FontWeight.w400,
+                          ),
+                    ),
+                    if (i < 2)
+                      Container(
+                        margin: const EdgeInsets.only(top: 8),
+                        height: 2,
+                        decoration: BoxDecoration(
+                          gradient: isDone ? ServioGradients.accent : null,
+                          color: isDone ? null : servio.border,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      }),
+    );
+  }
+}
+
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({
+    required this.title,
+    required this.children,
+    this.onEdit,
+  });
+
+  final String title;
+  final List<Widget> children;
+  final VoidCallback? onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+
+    return ServioCard(
+      radius: ServioRadius.lg,
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          SizedBox(width: 90, child: Text(label)),
-          Expanded(
-            child: Text(
-              value,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
-            ),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  title,
+                  style: theme.textTheme.titleSmall
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+              ),
+              if (onEdit != null)
+                GestureDetector(
+                  onTap: onEdit,
+                  child: Text(
+                    'Edit',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: servio.accent,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+            ],
           ),
-          TextButton(onPressed: () {}, child: const Text('Edit')),
+          const SizedBox(height: 14),
+          ...children,
         ],
       ),
     );
   }
 }
 
-class _PriceRow extends StatelessWidget {
-  const _PriceRow({
+class _ReviewRow extends StatelessWidget {
+  const _ReviewRow({
+    required this.label,
+    required this.value,
+    this.valueColor,
+    this.isBold = false,
+    this.isLast = false,
+  });
+
+  final String label;
+  final String value;
+  final Color? valueColor;
+  final bool isBold;
+  final bool isLast;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: isLast ? 0 : 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          SizedBox(
+            width: 100,
+            child: Text(
+              label,
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: servio.textSecondary),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: valueColor ?? theme.colorScheme.onSurface,
+                fontWeight: isBold ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PriceLine extends StatelessWidget {
+  const _PriceLine({
     required this.label,
     required this.value,
     this.isBold = false,
@@ -205,17 +562,37 @@ class _PriceRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+
     return Row(
       children: <Widget>[
-        Expanded(child: Text(label)),
+        Expanded(
+          child: Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: servio.textSecondary,
+            ),
+          ),
+        ),
         Text(
           value,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: isBold ? FontWeight.w700 : FontWeight.w500,
-                color: valueColor,
-              ),
+          style: theme.textTheme.bodySmall?.copyWith(
+            fontWeight: isBold ? FontWeight.w700 : FontWeight.w500,
+            color: valueColor ?? theme.colorScheme.onSurface,
+          ),
         ),
       ],
     );
   }
+}
+
+class _TrustItem {
+  const _TrustItem(this.text);
+  final String text;
+}
+
+int _moneyValue(String value) {
+  final numeric = value.replaceAll(RegExp(r'[^0-9]'), '');
+  return int.tryParse(numeric) ?? 0;
 }

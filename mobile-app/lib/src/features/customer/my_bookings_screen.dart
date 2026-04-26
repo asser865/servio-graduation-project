@@ -46,8 +46,12 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
         items: const <ServioBottomNavItem>[
           ServioBottomNavItem(icon: Icons.home_rounded, label: 'Home'),
           ServioBottomNavItem(icon: Icons.grid_view_rounded, label: 'Services'),
-          ServioBottomNavItem(icon: Icons.auto_awesome_rounded, label: 'Smart Match', highlighted: true),
-          ServioBottomNavItem(icon: Icons.calendar_month_rounded, label: 'Bookings'),
+          ServioBottomNavItem(
+              icon: Icons.auto_awesome_rounded,
+              label: 'Smart Match',
+              highlighted: true),
+          ServioBottomNavItem(
+              icon: Icons.calendar_month_rounded, label: 'Bookings'),
           ServioBottomNavItem(icon: Icons.person_rounded, label: 'Profile'),
         ],
         currentIndex: 3,
@@ -87,14 +91,18 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                         curve: ServioMotion.curve,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         decoration: BoxDecoration(
-                          color: active ? Theme.of(context).colorScheme.surface : Colors.transparent,
-                          borderRadius: BorderRadius.circular(ServioRadius.full),
+                          color: active
+                              ? Theme.of(context).colorScheme.surface
+                              : Colors.transparent,
+                          borderRadius:
+                              BorderRadius.circular(ServioRadius.full),
                         ),
                         child: Text(
                           tabs[index],
                           textAlign: TextAlign.center,
                           style: theme.textTheme.labelLarge?.copyWith(
-                            color: active ? servio.accent : servio.textSecondary,
+                            color:
+                                active ? servio.accent : servio.textSecondary,
                           ),
                         ),
                       ),
@@ -182,9 +190,11 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
       default:
         return ListView(
           children: const <Widget>[
-            _FavouriteTechnicianCard(name: 'Khaled Mohamed', specialty: 'Plumbing'),
+            _FavouriteTechnicianCard(
+                name: 'Khaled Mohamed', specialty: 'Plumbing'),
             SizedBox(height: 16),
-            _FavouriteTechnicianCard(name: 'Mahmoud Ibrahim', specialty: 'Electrical'),
+            _FavouriteTechnicianCard(
+                name: 'Mahmoud Ibrahim', specialty: 'Electrical'),
           ],
         );
     }
@@ -202,7 +212,10 @@ class _EmptyState extends StatelessWidget {
     return Center(
       child: Text(
         message,
-        style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
+        style: Theme.of(context)
+            .textTheme
+            .bodyMedium
+            ?.copyWith(color: servio.textSecondary),
       ),
     );
   }
@@ -217,7 +230,8 @@ class _LiveBookingCard extends StatelessWidget {
   final BookingModel booking;
   final VoidCallback onViewDetails;
 
-  static ServioStatusChipType _chipType(BookingStatus status) => switch (status) {
+  static ServioStatusChipType _chipType(BookingStatus status) =>
+      switch (status) {
         BookingStatus.upcoming => ServioStatusChipType.warning,
         BookingStatus.inProgress => ServioStatusChipType.info,
         BookingStatus.completed => ServioStatusChipType.success,
@@ -259,7 +273,8 @@ class _LiveBookingCard extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   '${booking.technicianName} • ${booking.date}',
-                  style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: servio.textSecondary),
                 ),
                 const SizedBox(height: 10),
                 ServioStatusChip(
@@ -268,7 +283,8 @@ class _LiveBookingCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 14),
                 isActive
-                    ? ServioPrimaryButton(label: 'View Details', onPressed: onViewDetails)
+                    ? ServioPrimaryButton(
+                        label: 'View Details', onPressed: onViewDetails)
                     : Row(
                         children: <Widget>[
                           Expanded(
@@ -331,10 +347,22 @@ class BookingDetailsScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: const <Widget>[
-                  _TimelineRow(label: 'Booking Placed', complete: true, meta: '25/03/2026 05:30 PM'),
-                  _TimelineRow(label: 'Payment Confirmed', complete: true, meta: 'Held in Escrow'),
-                  _TimelineRow(label: 'Technician En Route', complete: true, meta: 'Arriving soon'),
-                  _TimelineRow(label: 'In Progress', active: true, meta: 'Current stage'),
+                  _TimelineRow(
+                      label: 'Booking Placed',
+                      complete: true,
+                      meta: '25/03/2026 05:30 PM'),
+                  _TimelineRow(
+                      label: 'Payment Confirmed',
+                      complete: true,
+                      meta: 'Held in Escrow'),
+                  _TimelineRow(
+                      label: 'Technician En Route',
+                      complete: true,
+                      meta: 'Arriving soon'),
+                  _TimelineRow(
+                      label: 'In Progress',
+                      active: true,
+                      meta: 'Current stage'),
                   _TimelineRow(label: 'Completed', meta: 'Upcoming'),
                 ],
               ),
@@ -360,11 +388,13 @@ class BookingDetailsScreen extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
-                            Text(data.technicianName, style: theme.textTheme.titleMedium),
+                            Text(data.technicianName,
+                                style: theme.textTheme.titleMedium),
                             const SizedBox(height: 4),
                             Text(
                               '4.9 rating',
-                              style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+                              style: theme.textTheme.bodySmall
+                                  ?.copyWith(color: servio.textSecondary),
                             ),
                           ],
                         ),
@@ -379,14 +409,17 @@ class BookingDetailsScreen extends StatelessWidget {
                           onPressed: () {
                             Navigator.of(context).push(
                               MaterialPageRoute<void>(
-                                builder: (_) => ChatScreen(contactName: data.technicianName),
+                                builder: (_) => ChatScreen(
+                                    contactName: data.technicianName),
                               ),
                             );
                           },
                           child: const Text('Message'),
                         ),
                       ),
-                      Expanded(child: TextButton(onPressed: () {}, child: const Text('Call'))),
+                      Expanded(
+                          child: TextButton(
+                              onPressed: () {}, child: const Text('Call'))),
                     ],
                   ),
                 ],
@@ -400,7 +433,8 @@ class BookingDetailsScreen extends StatelessWidget {
                   _DetailsPair(label: 'Date', value: data.date),
                   _DetailsPair(label: 'Time', value: data.time),
                   _DetailsPair(label: 'Location', value: data.location),
-                  _DetailsPair(label: 'Total', value: data.amount, highlight: true),
+                  _DetailsPair(
+                      label: 'Total', value: data.amount, highlight: true),
                 ],
               ),
             ),
@@ -414,7 +448,8 @@ class BookingDetailsScreen extends StatelessWidget {
               child: Center(
                 child: Text(
                   'Map Preview',
-                  style: theme.textTheme.titleMedium?.copyWith(color: servio.accent),
+                  style: theme.textTheme.titleMedium
+                      ?.copyWith(color: servio.accent),
                 ),
               ),
             ),
@@ -423,7 +458,10 @@ class BookingDetailsScreen extends StatelessWidget {
               onPressed: () {
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) => const WriteReviewScreen(),
+                    builder: (_) => WriteReviewScreen(
+                      technicianName: data.technicianName,
+                      jobSummary: data.serviceName,
+                    ),
                   ),
                 );
               },
@@ -485,7 +523,10 @@ class _TimelineRow extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   meta,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: servio.textSecondary),
                 ),
               ],
             ),
@@ -565,7 +606,10 @@ class _FavouriteTechnicianCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   specialty,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: servio.textSecondary),
                 ),
               ],
             ),
