@@ -68,7 +68,9 @@ class _AiSmartMatchScreenState extends State<AiSmartMatchScreen> {
         ],
         currentIndex: 2,
         onTap: (int index) {
-          if (index == 1) {
+          if (index == 0) {
+            Navigator.of(context).popUntil((route) => route.isFirst);
+          } else if (index == 1) {
             Navigator.of(context).push(
               MaterialPageRoute<void>(
                 builder: (_) => const ServicesMarketplaceScreen(),

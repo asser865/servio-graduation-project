@@ -13,6 +13,8 @@ import '../booking/booking_flow_data.dart';
 import '../messages/chat_screen.dart';
 import 'customer_profile_screen.dart';
 import 'write_review_screen.dart';
+import 'ai_smart_match_screen.dart';
+import 'services_marketplace_screen.dart';
 
 class MyBookingsScreen extends StatefulWidget {
   const MyBookingsScreen({
@@ -56,7 +58,21 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
         ],
         currentIndex: 3,
         onTap: (int index) {
-          if (index == 4) {
+          if (index == 0) {
+            Navigator.of(context).popUntil((route) => route.isFirst);
+          } else if (index == 1) {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const ServicesMarketplaceScreen(),
+              ),
+            );
+          } else if (index == 2) {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const AiSmartMatchScreen(),
+              ),
+            );
+          } else if (index == 4) {
             Navigator.of(context).push(
               MaterialPageRoute<void>(
                 builder: (_) => const CustomerProfileScreen(),
@@ -328,6 +344,43 @@ class BookingDetailsScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Booking Details'),
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      ),
+      bottomNavigationBar: ServioBottomNavigationBar(
+        items: const <ServioBottomNavItem>[
+          ServioBottomNavItem(icon: Icons.home_rounded, label: 'Home'),
+          ServioBottomNavItem(icon: Icons.grid_view_rounded, label: 'Services'),
+          ServioBottomNavItem(
+              icon: Icons.auto_awesome_rounded,
+              label: 'Smart Match',
+              highlighted: true),
+          ServioBottomNavItem(
+              icon: Icons.calendar_month_rounded, label: 'Bookings'),
+          ServioBottomNavItem(icon: Icons.person_rounded, label: 'Profile'),
+        ],
+        currentIndex: 4,
+        onTap: (int index) {
+          if (index == 0) {
+            Navigator.of(context).popUntil((route) => route.isFirst);
+          } else if (index == 1) {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const ServicesMarketplaceScreen(),
+              ),
+            );
+          } else if (index == 2) {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const AiSmartMatchScreen(),
+              ),
+            );
+          } else if (index == 3) {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const MyBookingsScreen(),
+              ),
+            );
+          }
+        },
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(ServioSpacing.screenPadding),
