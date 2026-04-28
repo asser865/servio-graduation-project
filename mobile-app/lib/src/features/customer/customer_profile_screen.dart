@@ -145,14 +145,6 @@ class CustomerProfileScreen extends StatelessWidget {
                       v ? ThemeMode.dark : ThemeMode.light,
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  _SwitchRow(
-                    label: localeProvider.isArabic
-                        ? 'Language: العربية'
-                        : 'Language: English',
-                    value: localeProvider.isArabic,
-                    onChanged: (_) => localeProvider.toggle(),
-                  ),
                 ],
               ),
             ),
@@ -161,7 +153,6 @@ class CustomerProfileScreen extends StatelessWidget {
             const SizedBox(height: 12),
             _SettingsCard(
               items: const <String>[
-                'Help Center',
                 'Report a Problem',
                 'Contact Us',
               ],
@@ -197,11 +188,11 @@ class CustomerProfileScreen extends StatelessWidget {
                   );
                 } else if (item == 'Terms of Service') {
                   Navigator.of(context).push(
-                    MaterialPageRoute<void>(builder: (_) => const TermsOfServiceScreen(isTechnician: false)),
+                    MaterialPageRoute<void>(builder: (_) => const TermsOfServiceScreen()),
                   );
                 } else if (item == 'Privacy Policy') {
                   Navigator.of(context).push(
-                    MaterialPageRoute<void>(builder: (_) => const PrivacyPolicyScreen(isTechnician: false)),
+                    MaterialPageRoute<void>(builder: (_) => const PrivacyPolicyScreen()),
                   );
                 }
               },

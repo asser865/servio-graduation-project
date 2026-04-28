@@ -6,7 +6,9 @@ import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
 import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
 import '../../design_system/widgets/servio_status_chip.dart';
+import 'customer_home_screen.dart';
 import 'customer_profile_screen.dart';
+import 'my_bookings_screen.dart';
 import 'service_detail_screen.dart';
 import 'services_marketplace_screen.dart';
 import 'technician_profile_screen.dart';
@@ -68,10 +70,22 @@ class _AiSmartMatchScreenState extends State<AiSmartMatchScreen> {
         ],
         currentIndex: 2,
         onTap: (int index) {
-          if (index == 1) {
+          if (index == 0) {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const CustomerHomeScreen(),
+              ),
+            );
+          } else if (index == 1) {
             Navigator.of(context).push(
               MaterialPageRoute<void>(
                 builder: (_) => const ServicesMarketplaceScreen(),
+              ),
+            );
+          } else if (index == 3) {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const MyBookingsScreen(),
               ),
             );
           } else if (index == 4) {

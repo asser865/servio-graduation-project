@@ -112,9 +112,7 @@ class _NavTab extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
-      child: AnimatedContainer(
-        duration: ServioMotion.tabSwitch,
-        curve: ServioMotion.spring,
+      child: Container(
         decoration: BoxDecoration(
           gradient:
               isActive && item.highlighted ? ServioGradients.accent : null,

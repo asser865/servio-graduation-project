@@ -11,7 +11,10 @@ import '../../design_system/widgets/servio_primary_button.dart';
 import '../../design_system/widgets/servio_status_chip.dart';
 import '../booking/booking_flow_data.dart';
 import '../messages/chat_screen.dart';
+import 'ai_smart_match_screen.dart';
+import 'customer_home_screen.dart';
 import 'customer_profile_screen.dart';
+import 'services_marketplace_screen.dart';
 import 'write_review_screen.dart';
 
 class MyBookingsScreen extends StatefulWidget {
@@ -56,7 +59,25 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
         ],
         currentIndex: 3,
         onTap: (int index) {
-          if (index == 4) {
+          if (index == 0) {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const CustomerHomeScreen(),
+              ),
+            );
+          } else if (index == 1) {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const ServicesMarketplaceScreen(),
+              ),
+            );
+          } else if (index == 2) {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const AiSmartMatchScreen(),
+              ),
+            );
+          } else if (index == 4) {
             Navigator.of(context).push(
               MaterialPageRoute<void>(
                 builder: (_) => const CustomerProfileScreen(),
