@@ -9,6 +9,11 @@ import '../../design_system/widgets/servio_card.dart';
 import '../auth/role_selection_screen.dart';
 import '../marketing/about_screen.dart';
 import '../marketing/contact_screen.dart';
+import '../marketing/privacy_policy_screen.dart';
+import '../marketing/terms_of_service_screen.dart';
+import 'technician_change_password_screen.dart';
+import 'technician_edit_profile_screen.dart';
+import 'technician_notification_settings_screen.dart';
 import 'verification_upload_screen.dart';
 
 class TechnicianSettingsProfileScreen extends StatelessWidget {
@@ -298,8 +303,30 @@ class _SettingsCard extends StatelessWidget {
       radius: ServioRadius.lg,
       child: Column(
         children: <Widget>[
-          const _SimpleSetting(label: 'Edit Profile'),
-          const _SimpleSetting(label: 'Notification Settings'),
+          _SimpleSetting(
+            label: 'Edit Profile',
+            onTap: () {
+              Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => const TechnicianEditProfileScreen(),
+              ));
+            },
+          ),
+          _SimpleSetting(
+            label: 'Notification Settings',
+            onTap: () {
+              Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => const TechnicianNotificationSettingsScreen(),
+              ));
+            },
+          ),
+          _SimpleSetting(
+            label: 'Change Password',
+            onTap: () {
+              Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => const TechnicianChangePasswordScreen(),
+              ));
+            },
+          ),
           Padding(
             padding: const EdgeInsets.only(bottom: 14),
             child: Row(
@@ -315,10 +342,26 @@ class _SettingsCard extends StatelessWidget {
           ),
           const _SimpleSetting(label: 'Help Center'),
           _SimpleSetting(
-            label: 'About Us',
+            label: 'About SERVIO',
             onTap: () {
               Navigator.of(context).push(MaterialPageRoute<void>(
                 builder: (_) => const AboutScreen(),
+              ));
+            },
+          ),
+          _SimpleSetting(
+            label: 'Terms of Service',
+            onTap: () {
+              Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => const TermsOfServiceScreen(isTechnician: true),
+              ));
+            },
+          ),
+          _SimpleSetting(
+            label: 'Privacy Policy',
+            onTap: () {
+              Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => const PrivacyPolicyScreen(isTechnician: true),
               ));
             },
           ),
