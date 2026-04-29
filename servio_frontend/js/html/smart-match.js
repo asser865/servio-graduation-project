@@ -172,23 +172,44 @@ document.addEventListener('DOMContentLoaded', () => {
       await generateProcessingLog(steps[i], i === steps.length - 1);
     }
 
-    // Show Results
+    // Try real API, fall back to static HTML results on failure
+    try {
+      const { recommendService } = await import('../api/ai.js');
+      const res = await recommendService({ description: composer.value.trim() });
+      const matches = res?.matches || res?.workers || [];
+      if (matches.length) {
+        resultsArea.innerHTML = matches.map(w => `
+          <div class="tech-card" style="cursor:pointer" onclick="window.location.href='./technician-profile.html?id=${w._id}'">
+            <div class="tech-card__top">
+              <img class="tech-card__avatar" src="${w.profileImage || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(w.name||'T') + '&background=0d6efd&color=fff&size=128'}" alt="${w.name || 'Technician'}">
+              <div class="tech-card__info">
+                <h3 class="tech-card__name">${w.name || 'Technician'}</h3>
+                <p class="tech-card__type">${w.category || 'Expert'}</p>
+                <div class="tech-card__trust">
+                  <span>${(w.averageRating||0).toFixed(1)} ★</span>
+                  <span>(${w.totalReviews||0})</span>
+                </div>
+              </div>
+            </div>
+            <div class="tech-card__footer">
+                 <span class="tech-card__price">From ${w.hourlyRate || 50} EGP/hr</span>
+                 <button class="btn btn--sm btn--primary">View Profile</button>
+            </div>
+          </div>`).join('');
+      } else {
+        resultsArea.innerHTML = '<div style="text-align:center; padding:2rem; grid-column: 1/-1; color:var(--color-text-muted);">No matching technicians found for this specific query. Try a different request.</div>';
+      }
+      resultsArea.hidden = false;
+    } catch (err) {
+      console.error('AI Match Error:', err);
+      // API unavailable — show static pre-rendered results
+      resultsArea.hidden = false;
+    }
+
     processingArea.hidden = true;
-    resultsArea.hidden = false;
     composer.disabled = false;
     btnSubmit.disabled = false;
-    
-    // Smooth scroll to results
     resultsArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-    // Link result card to profile
-    const matchCard = resultsArea.querySelector('.tech-card');
-    if (matchCard) {
-      matchCard.style.cursor = 'pointer';
-      matchCard.addEventListener('click', () => {
-        window.location.href = './technician-profile.html';
-      });
-    }
   });
 
   function generateProcessingLog(text, isFinal) {
@@ -220,4 +241,4 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-// .
+

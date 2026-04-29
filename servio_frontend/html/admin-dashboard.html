@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SERVIO | Admin Dashboard</title>
+  <script src="../js/config.js"></script>
   <script src="../js/theme-init.js"></script>
   <script src="../js/lang-init.js"></script>
   <link rel="stylesheet" href="../css/main.css" />
@@ -154,7 +155,7 @@
           <div class="admin-kpi-card">
             <div class="admin-kpi-card__main">
               <span class="admin-kpi-card__label" data-i18n="admin_total_users">Total Users</span>
-              <div class="admin-kpi-card__value">1,284</div>
+              <div class="admin-kpi-card__value" id="kpi-overview-users">—</div>
             </div>
             <div class="admin-kpi-card__icon" style="background: var(--color-info-bg); color: var(--color-info);">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -165,7 +166,7 @@
           <div class="admin-kpi-card">
             <div class="admin-kpi-card__main">
               <span class="admin-kpi-card__label" data-i18n="admin_total_techs_label">Total Technicians</span>
-              <div class="admin-kpi-card__value">347</div>
+              <div class="admin-kpi-card__value" id="kpi-overview-techs">—</div>
             </div>
             <div class="admin-kpi-card__icon" style="background: var(--color-primary-bg); color: var(--color-primary);">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
@@ -176,7 +177,7 @@
           <div class="admin-kpi-card">
             <div class="admin-kpi-card__main">
               <span class="admin-kpi-card__label" data-i18n="admin_stat_revenue">Revenue This Month</span>
-              <div class="admin-kpi-card__value">84,500 <small style="font-size:0.5em;">EGP</small></div>
+              <div class="admin-kpi-card__value" id="kpi-overview-revenue">— <small style="font-size:0.5em;">EGP</small></div>
             </div>
             <div class="admin-kpi-card__icon" style="background: var(--color-success-bg); color: var(--color-success);">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
@@ -187,7 +188,7 @@
           <div class="admin-kpi-card">
             <div class="admin-kpi-card__main">
               <span class="admin-kpi-card__label" data-i18n="admin_open_disputes">Open Disputes</span>
-              <div class="admin-kpi-card__value" style="color: var(--color-danger);">3</div>
+              <div class="admin-kpi-card__value" id="kpi-overview-disputes" style="color: var(--color-danger);">—</div>
             </div>
             <div class="admin-kpi-card__icon" style="background: var(--color-danger-bg); color: var(--color-danger);">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -206,7 +207,7 @@
                 <p class="overview-section__subtitle" data-i18n="admin_revenue_subtitle">Daily revenue for the past 7 days</p>
               </div>
               <div class="overview-chart-summary">
-                <div class="overview-chart-total">85,700 EGP</div>
+                <div class="overview-chart-total" id="kpi-revenue-chart-total">— EGP</div>
                 <div class="overview-chart-vs" data-i18n="admin_revenue_vs_last_week">
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" aria-hidden="true"><polyline points="18 15 12 9 6 15"/></svg>
                   <span data-i18n="admin_revenue_pct_badge">+18.5% vs last week</span>
@@ -255,7 +256,7 @@
             <h3 class="admin-section__title overview-section__title--no-mb" data-i18n="admin_booking_status">Booking Status</h3>
             <p class="overview-section__subtitle" data-i18n="admin_booking_status_subtitle">Distribution of current bookings</p>
             <div class="booking-status-total">
-              <span class="booking-status-total-val">3,294</span>
+              <span class="booking-status-total-val">—</span>
               <span class="booking-status-total-label" data-i18n="admin_total_bookings_label">Total Bookings</span>
             </div>
 
@@ -272,28 +273,28 @@
                 <div class="booking-status-item__header">
                   <span class="booking-status-dot booking-status-dot--green"></span>
                   <span class="booking-status-label" data-i18n="status_completed">Completed</span>
-                  <span class="booking-status-pct">65%</span>
+                  <span class="booking-status-pct" id="bk-pct-completed">—</span>
                 </div>
               </div>
               <div class="booking-status-item">
                 <div class="booking-status-item__header">
                   <span class="booking-status-dot booking-status-dot--blue"></span>
                   <span class="booking-status-label" data-i18n="status_in_progress">In Progress</span>
-                  <span class="booking-status-pct">28%</span>
+                  <span class="booking-status-pct" id="bk-pct-inprogress">—</span>
                 </div>
               </div>
               <div class="booking-status-item">
                 <div class="booking-status-item__header">
                   <span class="booking-status-dot booking-status-dot--amber"></span>
                   <span class="booking-status-label" data-i18n="status_scheduled">Scheduled</span>
-                  <span class="booking-status-pct">10%</span>
+                  <span class="booking-status-pct" id="bk-pct-scheduled">—</span>
                 </div>
               </div>
               <div class="booking-status-item">
                 <div class="booking-status-item__header">
                   <span class="booking-status-dot booking-status-dot--red"></span>
                   <span class="booking-status-label" data-i18n="status_cancelled">Cancelled</span>
-                  <span class="booking-status-pct">2%</span>
+                  <span class="booking-status-pct" id="bk-pct-cancelled">—</span>
                 </div>
               </div>
             </div>
@@ -301,11 +302,11 @@
             <div class="booking-status-footer">
               <div class="booking-status-stat">
                 <span class="booking-status-stat-label" data-i18n="admin_stat_new_24h">New (24h)</span>
-                <span class="booking-status-stat-val">+42</span>
+                <span class="booking-status-stat-val" id="bk-stat-new24h">—</span>
               </div>
               <div class="booking-status-stat">
                 <span class="booking-status-stat-label" data-i18n="admin_stat_success_rate">Success Rate</span>
-                <span class="booking-status-stat-val">98.2%</span>
+                <span class="booking-status-stat-val" id="bk-stat-successrate">—</span>
               </div>
             </div>
           </div>
@@ -449,7 +450,7 @@
               <div class="quick-action-card__icon">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
               </div>
-              <div class="quick-action-card__label"><span data-i18n="admin_view_open_disputes">View Open Disputes</span> <span class="nav-badge nav-badge--red">3</span></div>
+              <div class="quick-action-card__label"><span data-i18n="admin_view_open_disputes">View Open Disputes</span> <span class="nav-badge nav-badge--red" id="qa-dispute-badge">0</span></div>
             </button>
             <button class="quick-action-card" type="button" data-goto-tab="settlements">
               <div class="quick-action-card__icon">
@@ -472,7 +473,7 @@
           <div class="admin-kpi-card">
             <div class="admin-kpi-card__main">
               <span class="admin-kpi-card__label" data-i18n="admin_total_users">Total Users</span>
-              <div class="admin-kpi-card__value">1,248</div>
+              <div class="admin-kpi-card__value" id="kpi-users-total">—</div>
             </div>
             <div class="admin-kpi-card__icon" style="background: var(--color-bg-soft); color: var(--color-primary);">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
@@ -481,7 +482,7 @@
           <div class="admin-kpi-card">
             <div class="admin-kpi-card__main">
               <span class="admin-kpi-card__label" data-i18n="admin_active_users">Active Users</span>
-              <div class="admin-kpi-card__value">1,180</div>
+              <div class="admin-kpi-card__value" id="kpi-users-active">—</div>
             </div>
             <div class="admin-kpi-card__icon" style="background: var(--color-success-bg); color: var(--color-success);">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
@@ -490,7 +491,7 @@
           <div class="admin-kpi-card">
             <div class="admin-kpi-card__main">
               <span class="admin-kpi-card__label" data-i18n="admin_suspended_users">Suspended Users</span>
-              <div class="admin-kpi-card__value">12</div>
+              <div class="admin-kpi-card__value" id="kpi-users-suspended">—</div>
             </div>
             <div class="admin-kpi-card__icon" style="background: var(--color-danger-bg); color: var(--color-danger);">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
@@ -499,7 +500,7 @@
           <div class="admin-kpi-card">
             <div class="admin-kpi-card__main">
               <span class="admin-kpi-card__label" data-i18n="admin_new_users">New Users</span>
-              <div class="admin-kpi-card__value">84</div>
+              <div class="admin-kpi-card__value" id="kpi-users-new">—</div>
             </div>
             <div class="admin-kpi-card__icon" style="background: var(--color-info-bg); color: var(--color-info);">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><line x1="19" y1="8" x2="19" y2="14"></line><line x1="16" y1="11" x2="22" y2="11"></line></svg>
@@ -538,132 +539,13 @@
                 <th data-i18n="admin_th_actions" class="center-align" style="width: 250px;">Actions</th>
               </tr>
             </thead>
-            <tbody>
-              <tr class="booking-row" data-status="active">
-                <td><span style="font-family:monospace; font-weight:600; color:var(--color-text);">#U-1080</span></td>
-                <td><div style="font-weight:600;">Ahmed Yasser</div></td>
-                <td><div style="color:var(--color-text-muted);">ahmed@test.com</div></td>
-                <td>5 Jan 2026</td>
-                <td class="center-align" style="font-weight:600; color:var(--color-text);">6</td>
-                <td><span class="bk-badge bk-badge--completed status-badge" data-i18n="status_active">Active</span></td>
-                <td>
-                  <div class="table-actions">
-                    <button class="bk-action-btn bk-action-btn--xs" data-action="view" data-i18n="admin_action_view">View</button>
-                    <button class="bk-action-btn bk-action-btn--xs bk-action-btn--suspend" data-action="suspend" data-i18n="admin_action_suspend">Suspend</button>
-                    <button class="bk-action-btn bk-action-btn--xs bk-action-btn--delete" data-action="delete" data-i18n="admin_action_delete">Delete</button>
-                  </div>
-                </td>
-              </tr>
-              <tr class="booking-row" data-status="active">
-                <td><span style="font-family:monospace; font-weight:600; color:var(--color-text);">#U-1081</span></td>
-                <td><div style="font-weight:600;">Sara Mohamed</div></td>
-                <td><div style="color:var(--color-text-muted);">sara@email.com</div></td>
-                <td>12 Jan 2026</td>
-                <td class="center-align" style="font-weight:600; color:var(--color-text);">3</td>
-                <td><span class="bk-badge bk-badge--completed status-badge" data-i18n="status_active">Active</span></td>
-                <td>
-                  <div class="table-actions">
-                    <button class="bk-action-btn bk-action-btn--xs" data-action="view" data-i18n="admin_action_view">View</button>
-                    <button class="bk-action-btn bk-action-btn--xs bk-action-btn--suspend" data-action="suspend" data-i18n="admin_action_suspend">Suspend</button>
-                    <button class="bk-action-btn bk-action-btn--xs bk-action-btn--delete" data-action="delete" data-i18n="admin_action_delete">Delete</button>
-                  </div>
-                </td>
-              </tr>
-              <tr class="booking-row" data-status="active">
-                <td><span style="font-family:monospace; font-weight:600; color:var(--color-text);">#U-1082</span></td>
-                <td><div style="font-weight:600;">Omar Tarek</div></td>
-                <td><div style="color:var(--color-text-muted);">omar.tarek@email.com</div></td>
-                <td>20 Jan 2026</td>
-                <td class="center-align" style="font-weight:600; color:var(--color-text);">2</td>
-                <td><span class="bk-badge bk-badge--completed status-badge" data-i18n="status_active">Active</span></td>
-                <td>
-                  <div class="table-actions">
-                    <button class="bk-action-btn bk-action-btn--xs" data-action="view" data-i18n="admin_action_view">View</button>
-                    <button class="bk-action-btn bk-action-btn--xs bk-action-btn--suspend" data-action="suspend" data-i18n="admin_action_suspend">Suspend</button>
-                    <button class="bk-action-btn bk-action-btn--xs bk-action-btn--delete" data-action="delete" data-i18n="admin_action_delete">Delete</button>
-                  </div>
-                </td>
-              </tr>
-              <tr class="booking-row" data-status="active">
-                <td><span style="font-family:monospace; font-weight:600; color:var(--color-text);">#U-1083</span></td>
-                <td><div style="font-weight:600;">Nour Hassan</div></td>
-                <td><div style="color:var(--color-text-muted);">nour.hassan@email.com</div></td>
-                <td>3 Feb 2026</td>
-                <td class="center-align" style="font-weight:600; color:var(--color-text);">1</td>
-                <td><span class="bk-badge bk-badge--completed status-badge" data-i18n="status_active">Active</span></td>
-                <td>
-                  <div class="table-actions">
-                    <button class="bk-action-btn bk-action-btn--xs" data-action="view" data-i18n="admin_action_view">View</button>
-                    <button class="bk-action-btn bk-action-btn--xs bk-action-btn--suspend" data-action="suspend" data-i18n="admin_action_suspend">Suspend</button>
-                    <button class="bk-action-btn bk-action-btn--xs bk-action-btn--delete" data-action="delete" data-i18n="admin_action_delete">Delete</button>
-                  </div>
-                </td>
-              </tr>
-              <tr class="booking-row" data-status="active">
-                <td><span style="font-family:monospace; font-weight:600; color:var(--color-text);">#U-1084</span></td>
-                <td><div style="font-weight:600;">Karim Adel</div></td>
-                <td><div style="color:var(--color-text-muted);">karim.adel@email.com</div></td>
-                <td>14 Feb 2026</td>
-                <td class="center-align" style="font-weight:700; color:var(--color-text);">2</td>
-                <td><span class="bk-badge bk-badge--completed status-badge" data-i18n="status_active">Active</span></td>
-                <td>
-                  <div class="table-actions">
-                    <button class="bk-action-btn bk-action-btn--xs" data-action="view" data-i18n="admin_action_view">View</button>
-                    <button class="bk-action-btn bk-action-btn--xs bk-action-btn--suspend" data-action="suspend" data-i18n="admin_action_suspend">Suspend</button>
-                    <button class="bk-action-btn bk-action-btn--xs bk-action-btn--delete" data-action="delete" data-i18n="admin_action_delete">Delete</button>
-                  </div>
-                </td>
-              </tr>
-              <tr class="booking-row" data-status="active">
-                <td><span style="font-family:monospace; font-weight:700; color:var(--color-text);">#U-1085</span></td>
-                <td><div style="font-weight:600;">Hana Mostafa</div></td>
-                <td><div style="color:var(--color-text-muted);">hana.mostafa@email.com</div></td>
-                <td>1 Mar 2026</td>
-                <td class="center-align" style="font-weight:700; color:var(--color-text);">0</td>
-                <td><span class="bk-badge bk-badge--completed status-badge" data-i18n="status_active">Active</span></td>
-                <td>
-                  <div class="table-actions">
-                    <button class="bk-action-btn bk-action-btn--xs" data-action="view" data-i18n="admin_action_view">View</button>
-                    <button class="bk-action-btn bk-action-btn--xs bk-action-btn--suspend" data-action="suspend" data-i18n="admin_action_suspend">Suspend</button>
-                    <button class="bk-action-btn bk-action-btn--xs bk-action-btn--delete" data-action="delete" data-i18n="admin_action_delete">Delete</button>
-                  </div>
-                </td>
-              </tr>
-              <tr class="booking-row" data-status="suspended">
-                <td><span style="font-family:monospace; font-weight:700; color:var(--color-text);">#U-1086</span></td>
-                <td><div style="font-weight:600;">Walid Fathy</div></td>
-                <td><div style="color:var(--color-text-muted);">walid.fathy@email.com</div></td>
-                <td>10 Mar 2026</td>
-                <td class="center-align" style="font-weight:700; color:var(--color-text);">1</td>
-                <td><span class="bk-badge bk-badge--overdue status-badge" data-i18n="status_suspended">Suspended</span></td>
-                <td>
-                  <div class="table-actions">
-                    <button class="bk-action-btn bk-action-btn--xs" data-action="view" data-i18n="admin_action_view">View</button>
-                    <button class="bk-action-btn bk-action-btn--xs bk-action-btn--suspend" data-action="suspend" data-i18n="admin_action_unsuspend">Unsuspend</button>
-                    <button class="bk-action-btn bk-action-btn--xs bk-action-btn--delete" data-action="delete" data-i18n="admin_action_delete">Delete</button>
-                  </div>
-                </td>
-              </tr>
-              <tr class="booking-row" data-status="active">
-                <td><span style="font-family:monospace; font-weight:700; color:var(--color-text);">#U-1087</span></td>
-                <td><div style="font-weight:600;">Rania Saeed</div></td>
-                <td><div style="color:var(--color-text-muted);">rania.saeed@email.com</div></td>
-                <td>18 Mar 2026</td>
-                <td class="center-align" style="font-weight:700; color:var(--color-text);">0</td>
-                <td><span class="bk-badge bk-badge--completed status-badge" data-i18n="status_active">Active</span></td>
-                <td>
-                  <div class="table-actions">
-                    <button class="bk-action-btn bk-action-btn--xs" data-action="view" data-i18n="admin_action_view">View</button>
-                    <button class="bk-action-btn bk-action-btn--xs bk-action-btn--suspend" data-action="suspend" data-i18n="admin_action_suspend">Suspend</button>
-                    <button class="bk-action-btn bk-action-btn--xs bk-action-btn--delete" data-action="delete" data-i18n="admin_action_delete">Delete</button>
-                  </div>
-                </td>
-              </tr>
+            <tbody id="usersTable">
+              <tr><td colspan="7" class="center-align" style="padding:2rem; color:var(--color-text-muted);">Loading users…</td></tr>
             </tbody>
           </table>
 
           <div style="padding: 1rem 1.25rem; border-top: 1px solid var(--color-border); background: var(--color-bg-soft); display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
-            <span style="color: var(--color-text-muted); font-weight:500;" id="userPaginationInfo" data-i18n="admin_pagination_showing" data-i18n-v="8" data-i18n-n="8">Showing 8 of 8 users</span>
+            <span style="color: var(--color-text-muted); font-weight:500;" id="userPaginationInfo" data-i18n="admin_pagination_users" data-i18n-v="8" data-i18n-n="8">Showing 8 of 8 users</span>
             <div style="display: flex; gap: 0.5rem;" class="user-pagination-controls">
               <button class="bk-action-btn" disabled style="opacity: 0.5; cursor: not-allowed;" data-i18n="admin_pagination_prev">Previous</button>
               <button class="bk-action-btn" disabled style="opacity: 0.5; cursor: not-allowed;" data-i18n="admin_pagination_next">Next</button>
@@ -684,7 +566,7 @@
           <div class="admin-kpi-card">
             <div class="admin-kpi-card__main">
               <span class="admin-kpi-card__label" data-i18n="admin_stat_total_techs">Total Technicians</span>
-              <div class="admin-kpi-card__value">347</div>
+              <div class="admin-kpi-card__value" id="kpi-techs-total">—</div>
             </div>
             <div class="admin-kpi-card__icon" style="background: var(--color-info-bg); color: var(--color-info);">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a2 2 0 0 1-2.83-2.83l-3.94 3.94Z"/><path d="m20 13 2 2"/><path d="m7 10 2 2"/><path d="m3.5 14.5 2 2"/><path d="m11 18 2 2"/><path d="M16 4.5l-2-2"/><path d="m19 16 2-2"/><path d="m5 10 2-2"/><path d="m15 15 2 2"/><path d="m11 11-3.61 3.61a2 2 0 0 0 0 2.83l1.17 1.17a2 2 0 0 0 2.83 0L15 15"/><path d="m5 21 2-2"/><path d="M4.5 16l-2-2"/></svg>
@@ -695,7 +577,7 @@
           <div class="admin-kpi-card">
             <div class="admin-kpi-card__main">
               <span class="admin-kpi-card__label" data-i18n="admin_pending_verif">Pending Approval</span>
-              <div class="admin-kpi-card__value">2</div>
+              <div class="admin-kpi-card__value" id="kpi-techs-pending">—</div>
             </div>
             <div class="admin-kpi-card__icon" style="background: var(--color-warning-bg); color: var(--color-warning);">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -706,7 +588,7 @@
           <div class="admin-kpi-card">
             <div class="admin-kpi-card__main">
               <span class="admin-kpi-card__label" data-i18n="admin_th_status_verified">Verified</span>
-              <div class="admin-kpi-card__value">333</div>
+              <div class="admin-kpi-card__value" id="kpi-techs-verified">—</div>
             </div>
             <div class="admin-kpi-card__icon" style="background: var(--color-success-bg); color: var(--color-success);">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
@@ -717,7 +599,7 @@
           <div class="admin-kpi-card">
             <div class="admin-kpi-card__main">
               <span class="admin-kpi-card__label" data-i18n="status_suspended">Suspended</span>
-              <div class="admin-kpi-card__value">12</div>
+              <div class="admin-kpi-card__value" id="kpi-techs-suspended">—</div>
             </div>
             <div class="admin-kpi-card__icon" style="background: var(--color-danger-bg); color: var(--color-danger);">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
@@ -728,45 +610,10 @@
         <div class="admin-section" style="margin-bottom: 2.5rem;">
           <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
             <span data-i18n="admin_pending_verif">Pending Verification</span>
-            <span class="bk-pay-badge bk-pay--pending">2</span>
+            <span class="bk-pay-badge bk-pay--pending" id="kpi-techs-pending-badge">0</span>
           </h3>
           <div class="pending-cards-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1rem;">
-            <!-- Pending Card 1 -->
-            <div class="th-verify-card" data-email="amr.gamal@demo.eg">
-              <div class="th-verify-identity">
-                <div class="th-avatar">AG</div>
-                <div class="th-identity-text">
-                  <strong>Amr Gamal</strong>
-                  <span data-i18n="home_cat_carpentry">Carpentry</span>
-                </div>
-              </div>
-              <div class="th-verify-docs">
-                <div class="th-doc th-doc--ok"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg> <span data-i18n="doc_national_id">National ID</span></div>
-                <div class="th-doc th-doc--missing"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> <span data-i18n="doc_trade_license">Trade License</span></div>
-              </div>
-              <div class="th-verify-actions">
-                <button class="bk-action-btn th-btn-approve" data-action="approve" data-i18n="admin_action_approve">Approve</button>
-                <button class="bk-action-btn th-btn-reject" data-action="reject" data-i18n="admin_action_reject">Reject</button>
-              </div>
-            </div>
-            <!-- Pending Card 2 -->
-            <div class="th-verify-card" data-email="layla.mansour@demo.eg">
-              <div class="th-verify-identity">
-                <div class="th-avatar th-avatar--purple">LM</div>
-                <div class="th-identity-text">
-                  <strong>Layla Mansour</strong>
-                  <span data-i18n="home_cat_appliance">Appliance Services</span>
-                </div>
-              </div>
-              <div class="th-verify-docs">
-                <div class="th-doc th-doc--ok"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg> <span data-i18n="doc_national_id">National ID</span></div>
-                <div class="th-doc th-doc--missing"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> <span data-i18n="doc_trade_license">Trade License</span></div>
-              </div>
-              <div class="th-verify-actions">
-                <button class="bk-action-btn th-btn-approve" data-action="approve" data-i18n="admin_action_approve">Approve</button>
-                <button class="bk-action-btn th-btn-reject" data-action="reject" data-i18n="admin_action_reject">Reject</button>
-              </div>
-            </div>
+            <div style="grid-column: 1/-1; text-align: center; color: var(--color-text-muted); padding: 1rem;">Loading pending verifications…</div>
           </div>
         </div>
 
@@ -782,6 +629,7 @@
                 <option value="All" data-i18n="admin_filter_all_statuses">All Statuses</option>
                 <option value="Verified" data-i18n="status_verified">Verified</option>
                 <option value="Pending" data-i18n="status_pending">Pending</option>
+                <option value="Rejected">Rejected</option>
                 <option value="Suspended" data-i18n="status_suspended">Suspended</option>
               </select>
             </div>
@@ -802,97 +650,13 @@
                   <th data-i18n="admin_th_actions" class="center-align">Actions</th>
                 </tr>
               </thead>
-              <tbody>
-                <tr class="booking-row" data-status="Verified">
-                  <td style="white-space: nowrap;"><span style="font-family:monospace; font-weight:700; color:var(--color-text);">#001</span></td>
-                  <td><div style="font-weight:600;">Khaled Mohamed</div></td>
-                  <td class="t-specialty" data-i18n="home_cat_plumbing">Plumbing</td>
-                  <td><div style="color:var(--color-text-muted);" data-i18n="admin_loc_maadi_helio">Maadi / Heliopolis</div></td>
-                  <td><div class="th-rating"><svg width="14" height="14" fill="#f59e0b" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg> 4.9</div></td>
-                  <td class="center-align" style="font-weight:700; color:var(--color-text);">28</td>
-                  <td class="bk-amount">16,200 EGP</td>
-                  <td style="white-space: nowrap;"><span class="bk-badge bk-badge--completed status-badge" data-i18n="status_verified">Verified</span></td>
-                  <td>
-                    <div class="table-actions">
-                      <button class="bk-action-btn bk-action-btn--xs view-tech-link" data-id="TEC001" data-i18n="admin_action_profile">Profile</button>
-                      <button class="bk-action-btn bk-action-btn--xs bk-action-btn--suspend" data-action="suspend" data-id="TEC001" data-i18n="admin_action_suspend">Suspend</button>
-                      <button class="bk-action-btn bk-action-btn--xs bk-action-btn--delete" data-action="delete" data-id="TEC001" data-i18n="admin_action_delete">Delete</button>
-                    </div>
-                  </td>
-                </tr>
-                <tr class="booking-row" data-status="Verified">
-                  <td><span style="font-family:monospace; font-weight:700; color:var(--color-text);">#002</span></td>
-                  <td><div style="font-weight:600;">Mahmoud Ibrahim</div></td>
-                  <td class="t-specialty" data-i18n="home_cat_electrical">Electrical</td>
-                  <td><div style="color:var(--color-text-muted);" data-i18n="admin_loc_nasr_helio">Nasr City / Heliopolis</div></td>
-                  <td><div class="th-rating"><svg width="14" height="14" fill="#f59e0b" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg> 4.7</div></td>
-                  <td class="center-align" style="font-weight:700; color:var(--color-text);">19</td>
-                  <td class="bk-amount">8,640 EGP</td>
-                  <td><span class="bk-badge bk-badge--completed status-badge" data-i18n="status_verified">Verified</span></td>
-                  <td>
-                    <div class="table-actions">
-                      <button class="bk-action-btn bk-action-btn--xs view-tech-link" data-id="TEC002" data-i18n="admin_action_profile">Profile</button>
-                      <button class="bk-action-btn bk-action-btn--xs bk-action-btn--suspend" data-action="suspend" data-id="TEC002" data-i18n="admin_action_suspend">Suspend</button>
-                      <button class="bk-action-btn bk-action-btn--xs bk-action-btn--delete" data-action="delete" data-id="TEC002" data-i18n="admin_action_delete">Delete</button>
-                    </div>
-                  </td>
-                </tr>
-                <tr class="booking-row" data-status="Verified">
-                  <td><span style="font-family:monospace; font-weight:700; color:var(--color-text);">#003</span></td>
-                  <td><div style="font-weight:600;">Hassan Ali</div></td>
-                  <td class="t-specialty" data-i18n="admin_skill_hvac_cleaning">HVAC + Cleaning</td>
-                  <td><div style="color:var(--color-text-muted);" data-i18n="admin_loc_zamalek_dokki">Zamalek / Dokki</div></td>
-                  <td><div class="th-rating"><svg width="14" height="14" fill="#f59e0b" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg> 4.8</div></td>
-                  <td class="center-align" style="font-weight:700; color:var(--color-text);">24</td>
-                  <td class="bk-amount">14,850 EGP</td>
-                  <td><span class="bk-badge bk-badge--completed status-badge" data-i18n="status_verified">Verified</span></td>
-                  <td>
-                    <div class="table-actions">
-                      <button class="bk-action-btn bk-action-btn--xs view-tech-link" data-id="TEC003" data-i18n="admin_action_profile">Profile</button>
-                      <button class="bk-action-btn bk-action-btn--xs bk-action-btn--suspend" data-action="suspend" data-id="TEC003" data-i18n="admin_action_suspend">Suspend</button>
-                      <button class="bk-action-btn bk-action-btn--xs bk-action-btn--delete" data-action="delete" data-id="TEC003" data-i18n="admin_action_delete">Delete</button>
-                    </div>
-                  </td>
-                </tr>
-                <tr class="booking-row" data-status="Verified">
-                  <td><span style="font-family:monospace; font-weight:700; color:var(--color-text);">#004</span></td>
-                  <td><div style="font-weight:600;">Youssef Samir</div></td>
-                  <td class="t-specialty" data-i18n="home_cat_painting">Painting</td>
-                  <td><div style="color:var(--color-text-muted);" data-i18n="admin_loc_new_cairo_oct">New Cairo / 6th October</div></td>
-                  <td><div class="th-rating"><svg width="14" height="14" fill="#f59e0b" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg> 4.6</div></td>
-                  <td class="center-align" style="font-weight:700; color:var(--color-text);">15</td>
-                  <td class="bk-amount">9,750 EGP</td>
-                  <td><span class="bk-badge bk-badge--completed status-badge" data-i18n="status_verified">Verified</span></td>
-                  <td>
-                    <div class="table-actions">
-                      <button class="bk-action-btn bk-action-btn--xs view-tech-link" data-id="TEC004" data-i18n="admin_action_profile">Profile</button>
-                      <button class="bk-action-btn bk-action-btn--xs bk-action-btn--suspend" data-action="suspend" data-id="TEC004" data-i18n="admin_action_suspend">Suspend</button>
-                      <button class="bk-action-btn bk-action-btn--xs bk-action-btn--delete" data-action="delete" data-id="TEC004" data-i18n="admin_action_delete">Delete</button>
-                    </div>
-                  </td>
-                </tr>
-                <tr class="booking-row" data-status="Pending">
-                  <td><span style="font-family:monospace; font-weight:700; color:var(--color-text);">#005</span></td>
-                  <td><div style="font-weight:600;">Amr Gamal</div></td>
-                  <td class="t-specialty" data-i18n="home_cat_carpentry">Carpentry</td>
-                  <td><div style="color:var(--color-text-muted);" data-i18n="admin_loc_maadi_dokki">Maadi / Dokki</div></td>
-                  <td><div class="th-rating"><svg width="14" height="14" fill="#f59e0b" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg> 4.5</div></td>
-                  <td class="center-align" style="font-weight:700; color:var(--color-text);">7</td>
-                  <td class="bk-amount">4,725 EGP</td>
-                  <td><span class="bk-badge bk-badge--active status-badge" data-i18n="status_pending">Pending</span></td>
-                  <td>
-                    <div class="table-actions">
-                      <button class="bk-action-btn bk-action-btn--xs view-tech-link" data-id="TEC005" data-i18n="admin_action_profile">Profile</button>
-                      <button class="bk-action-btn bk-action-btn--xs bk-action-btn--suspend" data-action="suspend" data-id="TEC005" data-i18n="admin_action_suspend">Suspend</button>
-                      <button class="bk-action-btn bk-action-btn--xs bk-action-btn--delete" data-action="delete" data-id="TEC005" data-i18n="admin_action_delete">Delete</button>
-                    </div>
-                  </td>
-                </tr>
+              <tbody id="allTechsTable">
+                <tr><td colspan="9" class="center-align" style="padding:2rem; color:var(--color-text-muted);">Loading technicians…</td></tr>
               </tbody>
             </table>
-            
-            <div style="padding: 1rem 1.25rem; border-top: 1px solid var(--color-border); background: var(--color-bg-soft); display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
-              <span style="color: var(--color-text-muted); font-weight:500;" id="techPaginationInfo" data-i18n="admin_pagination_showing" data-i18n-v="5" data-i18n-n="5">Showing 5 of 5 technicians</span>
+
+          <div style="padding: 1rem 1.25rem; border-top: 1px solid var(--color-border); background: var(--color-bg-soft); display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
+              <span style="color: var(--color-text-muted); font-weight:500;" id="techPaginationInfo" data-i18n="admin_pagination_techs" data-i18n-v="5" data-i18n-n="5">Showing 5 of 5 technicians</span>
               <div style="display: flex; gap: 0.5rem;" class="tech-pagination-controls">
                 <button class="bk-action-btn" disabled style="opacity: 0.5; cursor: not-allowed;" data-i18n="admin_pagination_prev">Previous</button>
                 <button class="bk-action-btn" disabled style="opacity: 0.5; cursor: not-allowed;" data-i18n="admin_pagination_next">Next</button>
@@ -914,7 +678,7 @@
           <div class="admin-kpi-card">
             <div class="admin-kpi-card__main">
               <span class="admin-kpi-card__label" data-i18n="admin_bookings_title">Total Bookings</span>
-              <div class="admin-kpi-card__value">9</div>
+              <div class="admin-kpi-card__value" id="kpi-bookings-total">—</div>
             </div>
             <div class="admin-kpi-card__icon" style="background: var(--color-info-bg); color: var(--color-info);">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
@@ -925,7 +689,7 @@
           <div class="admin-kpi-card">
             <div class="admin-kpi-card__main">
               <span class="admin-kpi-card__label" data-i18n="admin_stat_active">Active</span>
-              <div class="admin-kpi-card__value">2</div>
+              <div class="admin-kpi-card__value" id="kpi-bookings-active">—</div>
             </div>
             <div class="admin-kpi-card__icon" style="background: var(--color-warning-bg); color: var(--color-warning);">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
@@ -936,7 +700,7 @@
           <div class="admin-kpi-card">
             <div class="admin-kpi-card__main">
               <span class="admin-kpi-card__label" data-i18n="status_completed">Completed</span>
-              <div class="admin-kpi-card__value">4</div>
+              <div class="admin-kpi-card__value" id="kpi-bookings-completed">—</div>
             </div>
             <div class="admin-kpi-card__icon" style="background: var(--color-success-bg); color: var(--color-success);">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
@@ -947,7 +711,7 @@
           <div class="admin-kpi-card">
             <div class="admin-kpi-card__main">
               <span class="admin-kpi-card__label" data-i18n="admin_stat_disputed">Disputed</span>
-              <div class="admin-kpi-card__value">3</div>
+              <div class="admin-kpi-card__value" id="kpi-bookings-disputed">—</div>
             </div>
             <div class="admin-kpi-card__icon" style="background: var(--color-danger-bg); color: var(--color-danger);">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -1141,8 +905,9 @@
               </tr>
             </tbody>
           </table>
+
           <div style="padding: 1rem 1.25rem; border-top: 1px solid var(--color-border); background: var(--color-bg-soft); display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
-            <span style="color: var(--color-text-muted); font-weight:500;" data-i18n="admin_pagination_showing" data-i18n-v="9" data-i18n-n="9">Showing 9 of 9 bookings</span>
+            <span style="color: var(--color-text-muted); font-weight:500;" id="bookingPaginationInfo" data-i18n="admin_pagination_bookings" data-i18n-v="9" data-i18n-n="9">Showing 9 of 9 bookings</span>
             <div style="display: flex; gap: 0.5rem;">
               <button class="bk-action-btn" disabled style="opacity: 0.5; cursor: not-allowed;">Previous</button>
               <button class="bk-action-btn" disabled style="opacity: 0.5; cursor: not-allowed;">Next</button>
@@ -1165,7 +930,7 @@
           <div class="admin-kpi-card">
             <div class="admin-kpi-card__main">
               <span class="admin-kpi-card__label" data-i18n="admin_total_services">Total Services</span>
-              <div class="admin-kpi-card__value">24</div>
+              <div class="admin-kpi-card__value" id="totalServicesCount">—</div>
             </div>
             <div class="admin-kpi-card__icon" style="background: var(--color-info-bg); color: var(--color-info);">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
@@ -1174,7 +939,7 @@
           <div class="admin-kpi-card">
             <div class="admin-kpi-card__main">
               <span class="admin-kpi-card__label" data-i18n="admin_active_services">Active</span>
-              <div class="admin-kpi-card__value" style="color: var(--color-success);">21</div>
+              <div class="admin-kpi-card__value" id="activeCategoriesCount" style="color: var(--color-success);">—</div>
             </div>
             <div class="admin-kpi-card__icon" style="background: var(--color-success-bg); color: var(--color-success);">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
@@ -1233,497 +998,9 @@
               <!-- More service rows... -->
             </tbody>
           </table>
-        </div>
-      </section>
-
-      <!-- ── Panel: Disputes ────────────────────── -->
-      <section class="admin-panel" data-panel="disputes">
-        <div class="admin-panel__header">
-          <h2>
-            <span data-i18n="admin_disputes_title">Open Disputes</span> 
-            <span class="nav-badge nav-badge--red" id="disputeCount" style="vertical-align: middle; margin-left:8px;">3</span>
-          </h2>
-        </div>
-
-        <div class="admin-kpi-grid" style="margin-bottom: 2rem;">
-          <div class="admin-kpi-card">
-            <div class="admin-kpi-card__main">
-              <span class="admin-kpi-card__label" data-i18n="admin_total_disputes">Total Disputes</span>
-              <div class="admin-kpi-card__value">156</div>
-            </div>
-            <div class="admin-kpi-card__icon" style="background: var(--color-bg-soft); color: var(--color-primary);">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-            </div>
-          </div>
-          <div class="admin-kpi-card">
-            <div class="admin-kpi-card__main">
-              <span class="admin-kpi-card__label" data-i18n="status_open">Open</span>
-              <div class="admin-kpi-card__value" style="color: var(--color-danger);">23</div>
-            </div>
-            <div class="admin-kpi-card__icon" style="background: var(--color-danger-bg); color: var(--color-danger);">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-            </div>
-          </div>
-          <div class="admin-kpi-card">
-            <div class="admin-kpi-card__main">
-              <span class="admin-kpi-card__label" data-i18n="status_under_review">Under Review</span>
-              <div class="admin-kpi-card__value" style="color: var(--color-warning);">18</div>
-            </div>
-            <div class="admin-kpi-card__icon" style="background: var(--color-warning-bg); color: var(--color-warning);">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-            </div>
-          </div>
-          <div class="admin-kpi-card">
-            <div class="admin-kpi-card__main">
-              <span class="admin-kpi-card__label" data-i18n="status_resolved">Resolved</span>
-              <div class="admin-kpi-card__value" style="color: var(--color-success);">115</div>
-            </div>
-            <div class="admin-kpi-card__icon" style="background: var(--color-success-bg); color: var(--color-success);">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-            </div>
-          </div>
-        </div>
-
-        <div class="bk-toolbar" style="margin-bottom:1.5rem;">
-          <div class="bk-toolbar-main">
-            <div class="bk-search-wrap" style="flex:1;">
-              <svg class="bk-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              <input type="text" id="disputeSearch" placeholder="Search by dispute ID, booking ID, or name..." data-i18n-placeholder="admin_search_disputes_ph_full" class="bk-search-input" />
-            </div>
-            <div style="display: flex; gap: 0.75rem;">
-              <select id="disputeStatusFilter" class="bk-select" style="min-width: 140px;">
-                <option value="" data-i18n="admin_filter_all_status">All Statuses</option>
-                <option value="Open" data-i18n="status_open">Open</option>
-                <option value="Reviewing" data-i18n="status_under_review">Under Review</option>
-                <option value="Resolved" data-i18n="status_resolved">Resolved</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <div id="disputesList" class="disputes-list">
-          <!-- Dispute 1 -->
-          <div class="dispute-card">
-            <div class="dispute-card__main">
-              <div class="dispute-card__top">
-                <div class="dispute-card__id-group">
-                  <div class="dispute-id-badge">
-                    <span class="dispute-id-label" data-i18n="admin_dispute_id">Dispute ID</span>
-                    <span class="dispute-id-val">#D-8012</span>
-                  </div>
-                  <div class="dispute-id-badge dispute-id-badge--alt">
-                    <span class="dispute-id-label" data-i18n="admin_booking_id">Booking ID</span>
-                    <span class="dispute-id-val">#S-2801</span>
-                  </div>
-                  <span class="dispute-badge" data-i18n="status_open">Open</span>
-                </div>
-                <span class="dispute-date">11 Mar 2026, 2:30 PM</span>
-              </div>
-              
-              <div class="dispute-card__body">
-                <div class="dispute-parties-grid">
-                  <div class="dispute-party-col">
-                    <div class="dispute-party-icon-wrap dispute-party-icon-wrap--cust">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                    </div>
-                    <div class="dispute-party-text">
-                      <span class="dispute-party-role" data-i18n="admin_role_customer">Customer</span>
-                      <strong class="dispute-party-name">Sara Mohamed</strong>
-                    </div>
-                  </div>
-                  <div class="dispute-party-col">
-                    <div class="dispute-party-icon-wrap dispute-party-icon-wrap--tech">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
-                    </div>
-                    <div class="dispute-party-text">
-                      <span class="dispute-party-role" data-i18n="admin_role_technician">Technician</span>
-                      <strong class="dispute-party-name">Youssef Samir</strong>
-                    </div>
-                  </div>
-                </div>
-                
-                <div class="dispute-card__content">
-                  <div class="dispute-reason-label" data-i18n="admin_complaint_summary">Complaint Summary</div>
-                  <div class="dispute-reason-text" data-i18n="admin_dispute_reason_1">"Customer says painter left without finishing 2 walls"</div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="dispute-card__footer">
-              <div class="dispute-actions">
-                <button class="dispute-btn dispute-btn--resolve-cust" data-action="resolve">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-                  <span data-i18n="admin_resolve_customer">Resolve → Customer</span>
-                </button>
-                <button class="dispute-btn dispute-btn--resolve-tech" data-action="resolve">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-                  <span data-i18n="admin_resolve_tech">Resolve → Technician</span>
-                </button>
-                <button class="dispute-btn dispute-btn--more-info" data-action="more-info">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                  <span data-i18n="admin_request_more_info">Request More Info</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Dispute 2 -->
-          <div class="dispute-card">
-            <div class="dispute-card__main">
-              <div class="dispute-card__top">
-                <div class="dispute-card__id-group">
-                  <div class="dispute-id-badge">
-                    <span class="dispute-id-label" data-i18n="admin_dispute_id">Dispute ID</span>
-                    <span class="dispute-id-val">#D-7950</span>
-                  </div>
-                  <div class="dispute-id-badge dispute-id-badge--alt">
-                    <span class="dispute-id-label" data-i18n="admin_booking_id">Booking ID</span>
-                    <span class="dispute-id-val">#S-2795</span>
-                  </div>
-                  <span class="dispute-badge" data-i18n="status_open">Open</span>
-                </div>
-                <span class="dispute-date">8 Mar 2026, 11:15 AM</span>
-              </div>
-              
-              <div class="dispute-card__body">
-                <div class="dispute-parties-grid">
-                  <div class="dispute-party-col">
-                    <div class="dispute-party-icon-wrap dispute-party-icon-wrap--cust">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                    </div>
-                    <div class="dispute-party-text">
-                      <span class="dispute-party-role" data-i18n="admin_role_customer">Customer</span>
-                      <strong class="dispute-party-name">Karim Adel</strong>
-                    </div>
-                  </div>
-                  <div class="dispute-party-col">
-                    <div class="dispute-party-icon-wrap dispute-party-icon-wrap--tech">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
-                    </div>
-                    <div class="dispute-party-text">
-                      <span class="dispute-party-role" data-i18n="admin_role_technician">Technician</span>
-                      <strong class="dispute-party-name">Mahmoud Ibrahim</strong>
-                    </div>
-                  </div>
-                </div>
-                
-                <div class="dispute-card__content">
-                  <div class="dispute-reason-label" data-i18n="admin_complaint_summary">Complaint Summary</div>
-                  <div class="dispute-reason-text" data-i18n="admin_dispute_reason_2">"Electrical work caused a short circuit the next day"</div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="dispute-card__footer">
-              <div class="dispute-actions">
-                <button class="dispute-btn dispute-btn--resolve-cust" data-action="resolve">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-                  <span data-i18n="admin_resolve_customer">Resolve → Customer</span>
-                </button>
-                <button class="dispute-btn dispute-btn--resolve-tech" data-action="resolve">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-                  <span data-i18n="admin_resolve_tech">Resolve → Technician</span>
-                </button>
-                <button class="dispute-btn dispute-btn--more-info" data-action="more-info">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                  <span data-i18n="admin_request_more_info">Request More Info</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Dispute 3 -->
-          <div class="dispute-card">
-            <div class="dispute-card__main">
-              <div class="dispute-card__top">
-                <div class="dispute-card__id-group">
-                  <div class="dispute-id-badge">
-                    <span class="dispute-id-label" data-i18n="admin_dispute_id">Dispute ID</span>
-                    <span class="dispute-id-val">#D-7882</span>
-                  </div>
-                  <div class="dispute-id-badge dispute-id-badge--alt">
-                    <span class="dispute-id-label" data-i18n="admin_booking_id">Booking ID</span>
-                    <span class="dispute-id-val">#S-2788</span>
-                  </div>
-                  <span class="dispute-badge" data-i18n="status_open">Open</span>
-                </div>
-                <span class="dispute-date">3 Mar 2026, 4:45 PM</span>
-              </div>
-              
-              <div class="dispute-card__body">
-                <div class="dispute-parties-grid">
-                  <div class="dispute-party-col">
-                    <div class="dispute-party-icon-wrap dispute-party-icon-wrap--cust">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                    </div>
-                    <div class="dispute-party-text">
-                      <span class="dispute-party-role" data-i18n="admin_role_customer">Customer</span>
-                      <strong class="dispute-party-name">Nour Hassan</strong>
-                    </div>
-                  </div>
-                  <div class="dispute-party-col">
-                    <div class="dispute-party-icon-wrap dispute-party-icon-wrap--tech">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
-                    </div>
-                    <div class="dispute-party-text">
-                      <span class="dispute-party-role" data-i18n="admin_role_technician">Technician</span>
-                      <strong class="dispute-party-name">Amr Gamal</strong>
-                    </div>
-                  </div>
-                </div>
-                
-                <div class="dispute-card__content">
-                  <div class="dispute-reason-label" data-i18n="admin_complaint_summary">Complaint Summary</div>
-                  <div class="dispute-reason-text" data-i18n="admin_dispute_reason_3">"Carpenter used wrong wood type despite agreement"</div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="dispute-card__footer">
-              <div class="dispute-actions">
-                <button class="dispute-btn dispute-btn--resolve-cust" data-action="resolve">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-                  <span data-i18n="admin_resolve_customer">Resolve → Customer</span>
-                </button>
-                <button class="dispute-btn dispute-btn--resolve-tech" data-action="resolve">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-                  <span data-i18n="admin_resolve_tech">Resolve → Technician</span>
-                </button>
-                <button class="dispute-btn dispute-btn--more-info" data-action="more-info">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                  <span data-i18n="admin_request_more_info">Request More Info</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <div style="padding: 1.5rem; text-align: center;">
-          <span style="color: var(--color-text-muted); font-size: 0.85rem; font-weight:500;" data-i18n="admin_pagination_showing" data-i18n-v="3" data-i18n-n="3">Showing 3 of 3 disputes</span>
-        </div>
-      </section>
-
-      <!-- ── Panel: Cash Settlements ───────────── -->
-      <section class="admin-panel" data-panel="settlements">
-        <div class="admin-panel__header">
-          <h2 data-i18n="admin_settlements_title">Cash Settlements</h2>
-        </div>
-
-        <!-- Settlement Summary Section -->
-        <div class="admin-kpi-grid" style="margin-bottom: 2rem;">
-          <div class="admin-kpi-card">
-            <div class="admin-kpi-card__main">
-              <span class="admin-kpi-card__label" data-i18n="admin_stat_total_owed">Total Amount Owed</span>
-              <div class="admin-kpi-card__value">3,095 <span data-i18n="admin_currency">EGP</span></div>
-            </div>
-            <div class="admin-kpi-card__icon" style="background: var(--color-warning-bg); color: var(--color-warning);">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-            </div>
-          </div>
-
-          <div class="admin-kpi-card">
-            <div class="admin-kpi-card__main">
-              <span class="admin-kpi-card__label" data-i18n="admin_stat_overdue_amount">Overdue Amount</span>
-              <div class="admin-kpi-card__value" style="color: var(--color-danger);">1,250 <span data-i18n="admin_currency">EGP</span></div>
-            </div>
-            <div class="admin-kpi-card__icon" style="background: var(--color-danger-bg); color: var(--color-danger);">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-            </div>
-          </div>
-
-          <div class="admin-kpi-card">
-            <div class="admin-kpi-card__main">
-              <span class="admin-kpi-card__label" data-i18n="admin_stat_pending_settlement_techs">Technicians Pending Settlement</span>
-              <div class="admin-kpi-card__value">18</div>
-            </div>
-            <div class="admin-kpi-card__icon" style="background: var(--color-info-bg); color: var(--color-info);">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            </div>
-          </div>
-
-          <div class="admin-kpi-card">
-            <div class="admin-kpi-card__main">
-              <span class="admin-kpi-card__label" data-i18n="admin_stat_collected_month">Collected This Month</span>
-              <div class="admin-kpi-card__value" style="color: var(--color-success);">12,450 <span data-i18n="admin_currency">EGP</span></div>
-            </div>
-            <div class="admin-kpi-card__icon" style="background: var(--color-success-bg); color: var(--color-success);">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-            </div>
-          </div>
-        </div>
-
-        <!-- Filters Toolbar -->
-        <div class="bk-toolbar" style="margin-bottom: 1.5rem; background: var(--color-surface); padding: 1rem; border-radius: 12px; border: 1px solid var(--color-border);">
-          <div class="bk-toolbar-main" style="display: flex; gap: 1rem; flex-wrap: wrap; width: 100%;">
-            <div class="bk-search-wrap" style="flex: 1; min-width: 280px; position: relative;">
-              <svg class="bk-search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--color-text-muted);"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              <input type="text" id="settlementSearch" placeholder="Search technician by name or ID..." class="bk-search-input" data-i18n-placeholder="admin_search_tech_ph" style="width: 100%; padding: 10px 12px 10px 40px; border-radius: 8px; border: 1px solid var(--color-border); background: var(--color-bg-soft); color: var(--color-text); font-size: 0.9rem;" />
-            </div>
-            <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
-              <select id="settlementStatusFilter" class="bk-select" style="padding: 10px 14px; border-radius: 8px; border: 1px solid var(--color-border); background: var(--color-bg-soft); color: var(--color-text); font-size: 0.9rem; cursor: pointer;">
-                <option value="" data-i18n="admin_filter_all_statuses">All Statuses</option>
-                <option value="Pending" data-i18n="status_pending_settlement">Pending Settlement</option>
-                <option value="Partial" data-i18n="status_partially_paid">Partially Paid</option>
-                <option value="Overdue" data-i18n="status_overdue">Overdue</option>
-                <option value="Settled" data-i18n="status_settled">Settled</option>
-              </select>
-              <select id="settlementSort" class="bk-select" style="padding: 10px 14px; border-radius: 8px; border: 1px solid var(--color-border); background: var(--color-bg-soft); color: var(--color-text); font-size: 0.9rem; cursor: pointer;">
-                <option value="newest" data-i18n="admin_sort_newest">Newest First</option>
-                <option value="amount-desc" data-i18n="sort_amount_desc">Highest Owed</option>
-                <option value="overdue-desc" data-i18n="sort_overdue_days">Most Overdue</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <!-- Main Settlements Table -->
-        <div class="admin-table-wrap" style="border: 1px solid var(--color-border); border-radius: 12px; overflow-x: auto; background: var(--color-surface); box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
-          <table class="bk-table" id="settlementsTable" style="min-width: 960px;">
-            <thead>
-              <tr>
-                <th data-i18n="admin_th_technician">Technician</th>
-                <th class="center-align" data-i18n="admin_th_cash_jobs_count">Cash Jobs</th>
-                <th class="center-align" data-i18n="admin_th_amount_owed">Amount Owed</th>
-                <th class="center-align" data-i18n="admin_th_days_overdue">Days Overdue</th>
-                <th data-i18n="admin_th_status">Status</th>
-                <th data-i18n="admin_th_last_reminder">Last Reminder</th>
-                <th class="center-align" data-i18n="admin_th_actions" style="width: 220px;">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-
-              <!-- Row 1: Overdue -->
-              <tr class="booking-row settlement-row" data-status="overdue">
-                <td>
-                  <div class="settlement-tech-cell">
-                    <div class="settlement-avatar">KM</div>
-                    <div class="settlement-meta-group">
-                      <div class="settlement-meta-title">Khaled Mohamed</div>
-                      <div class="settlement-meta-sub user-id-monospace">#TEC001</div>
-                    </div>
-                  </div>
-                </td>
-                <td class="center-align" style="font-weight: 600;">12</td>
-                <td class="center-align">
-                  <div class="settlement-amount">1,350 <span data-i18n="admin_currency">EGP</span></div>
-                </td>
-                <td class="center-align">
-                  <span class="settlement-days">14</span>
-                </td>
-                <td><span class="bk-badge bk-badge--failed" data-i18n="status_overdue">Overdue</span></td>
-                <td>
-                  <div class="settlement-meta-group">
-                    <div class="settlement-meta-title">05 Mar 2026</div>
-                    <div class="settlement-meta-sub" data-i18n="admin_settlement_reminder_wa">Sent via WhatsApp</div>
-                  </div>
-                </td>
-                <td>
-                  <div class="table-actions" style="justify-content: center;">
-                    <button class="bk-action-btn bk-action-btn--xs" data-action="record-payment" data-i18n="admin_action_record_payment">Record</button>
-                    <button class="bk-action-btn bk-action-btn--xs" data-action="send-reminder" data-i18n="admin_action_send_reminder">Remind</button>
-                    <button class="bk-action-btn bk-action-btn--xs" data-action="view-ledger" data-i18n="admin_action_view_ledger">Ledger</button>
-                  </div>
-                </td>
-              </tr>
-
-              <!-- Row 2: Partially Paid -->
-              <tr class="booking-row settlement-row" data-status="partial">
-                <td>
-                  <div class="settlement-tech-cell">
-                    <div class="settlement-avatar">HA</div>
-                    <div class="settlement-meta-group">
-                      <div class="settlement-meta-title">Hassan Ali</div>
-                      <div class="settlement-meta-sub user-id-monospace">#TEC003</div>
-                    </div>
-                  </div>
-                </td>
-                <td class="center-align" style="font-weight: 600;">8</td>
-                <td class="center-align">
-                  <div class="settlement-amount">870 <span data-i18n="admin_currency">EGP</span></div>
-                </td>
-                <td class="center-align">
-                  <span class="settlement-days">0</span>
-                </td>
-                <td><span class="bk-badge bk-badge--pending" data-i18n="status_not_settled">Not Settled</span></td>
-                <td>
-                  <div class="settlement-meta-sub" data-i18n="admin_settlement_no_reminders">No reminders sent</div>
-                </td>
-                <td>
-                  <div class="table-actions" style="justify-content: center;">
-                    <button class="bk-action-btn bk-action-btn--xs" data-action="record-payment" data-i18n="admin_action_record_payment">Record</button>
-                    <button class="bk-action-btn bk-action-btn--xs" data-action="send-reminder" data-i18n="admin_action_send_reminder">Remind</button>
-                    <button class="bk-action-btn bk-action-btn--xs" data-action="view-ledger" data-i18n="admin_action_view_ledger">Ledger</button>
-                  </div>
-                </td>
-              </tr>
-
-              <!-- Row 3: Pending -->
-              <tr class="booking-row settlement-row" data-status="pending">
-                <td>
-                  <div class="settlement-tech-cell">
-                    <div class="settlement-avatar">AG</div>
-                    <div class="settlement-meta-group">
-                      <div class="settlement-meta-title">Amr Gamal</div>
-                      <div class="settlement-meta-sub user-id-monospace">#TEC005</div>
-                    </div>
-                  </div>
-                </td>
-                <td class="center-align" style="font-weight: 600;">3</td>
-                <td class="center-align">
-                  <div class="settlement-amount">225 <span data-i18n="admin_currency">EGP</span></div>
-                </td>
-                <td class="center-align">
-                  <span class="settlement-days">2</span>
-                </td>
-                <td><span class="bk-badge bk-badge--pending" data-i18n="status_not_settled">Not Settled</span></td>
-                <td>
-                  <div class="settlement-meta-sub" data-i18n="admin_settlement_no_reminders">No reminders sent</div>
-                </td>
-                <td>
-                  <div class="table-actions" style="justify-content: center;">
-                    <button class="bk-action-btn bk-action-btn--xs" data-action="record-payment" data-i18n="admin_action_record_payment">Record</button>
-                    <button class="bk-action-btn bk-action-btn--xs" data-action="send-reminder" data-i18n="admin_action_send_reminder">Remind</button>
-                    <button class="bk-action-btn bk-action-btn--xs" data-action="view-ledger" data-i18n="admin_action_view_ledger">Ledger</button>
-                  </div>
-                </td>
-              </tr>
-
-              <!-- Row 4: Settled -->
-              <tr class="booking-row settlement-row" data-status="settled">
-                <td>
-                  <div class="settlement-tech-cell">
-                    <div class="settlement-avatar">YS</div>
-                    <div class="settlement-meta-group">
-                      <div class="settlement-meta-title">Youssef Samir</div>
-                      <div class="settlement-meta-sub user-id-monospace">#TEC004</div>
-                    </div>
-                  </div>
-                </td>
-                <td class="center-align" style="font-weight: 600;">5</td>
-                <td class="center-align">
-                  <div class="settlement-amount" style="color: var(--color-text-muted);">0 <span data-i18n="admin_currency">EGP</span></div>
-                </td>
-                <td class="center-align">
-                  <span class="settlement-days" style="color: var(--color-text-muted);">—</span>
-                </td>
-                <td><span class="bk-badge bk-badge--settled" data-i18n="status_settled">Settled</span></td>
-                <td>
-                  <div class="settlement-meta-sub">—</div>
-                </td>
-                <td>
-                  <div class="table-actions" style="justify-content: center;">
-                    <button class="bk-action-btn bk-action-btn--xs" data-action="record-payment" data-i18n="admin_action_record_payment" disabled style="opacity: 0.4; cursor: not-allowed;">Record</button>
-                    <button class="bk-action-btn bk-action-btn--xs" data-action="send-reminder" data-i18n="admin_action_send_reminder" disabled style="opacity: 0.4; cursor: not-allowed;">Remind</button>
-                    <button class="bk-action-btn bk-action-btn--xs" data-action="view-ledger" data-i18n="admin_action_view_ledger">Ledger</button>
-                  </div>
-                </td>
-              </tr>
-
-            </tbody>
-          </table>
 
           <div style="padding: 1rem 1.25rem; border-top: 1px solid var(--color-border); background: var(--color-bg-soft); display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
-            <span style="color: var(--color-text-muted); font-weight:500;" data-i18n="admin_pagination_showing" data-i18n-v="4" data-i18n-n="4">Showing 4 of 4 technicians</span>
+            <span style="color: var(--color-text-muted); font-weight:500;" id="servicePaginationInfo" data-i18n="admin_pagination_services" data-i18n-v="4" data-i18n-n="4">Showing 4 of 4 services</span>
             <div style="display: flex; gap: 0.5rem;">
               <button class="bk-action-btn" disabled style="opacity: 0.5; cursor: not-allowed;" data-i18n="admin_pagination_prev">Previous</button>
               <button class="bk-action-btn" disabled style="opacity: 0.5; cursor: not-allowed;" data-i18n="admin_pagination_next">Next</button>
@@ -1731,6 +1008,100 @@
           </div>
         </div>
       </section>
+      
+      <!-- ── Panel: Disputes ────────────────────── -->
+      <section class="admin-panel" data-panel="disputes">
+        <div class="admin-panel__header">
+          <h2 data-i18n="admin_disputes_title">Disputes Management</h2>
+        </div>
+
+        <div class="admin-kpi-grid" style="margin-bottom: 2rem;">
+          <div class="admin-kpi-card">
+            <div class="admin-kpi-card__main">
+              <span class="admin-kpi-card__label" data-i18n="admin_total_disputes">Total Disputes</span>
+              <div class="admin-kpi-card__value">—</div>
+            </div>
+          </div>
+          <div class="admin-kpi-card">
+            <div class="admin-kpi-card__main">
+              <span class="admin-kpi-card__label" data-i18n="admin_open_disputes">Open</span>
+              <div class="admin-kpi-card__value" style="color: var(--color-danger);">—</div>
+            </div>
+          </div>
+          <div class="admin-kpi-card">
+            <div class="admin-kpi-card__main">
+              <span class="admin-kpi-card__label" data-i18n="admin_resolved_disputes">Resolved</span>
+              <div class="admin-kpi-card__value" style="color: var(--color-success);">—</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="admin-table-wrap" style="border:1px solid var(--color-border); border-radius:12px; overflow:hidden; background:var(--color-surface);">
+          <table class="bk-table" id="disputesTable">
+            <thead>
+              <tr>
+                <th data-i18n="admin_th_id">ID</th>
+                <th data-i18n="admin_th_booking">Booking</th>
+                <th data-i18n="admin_th_customer">Customer</th>
+                <th data-i18n="admin_th_tech">Technician</th>
+                <th data-i18n="admin_th_status">Status</th>
+                <th data-i18n="admin_th_date">Date</th>
+                <th data-i18n="admin_th_actions" class="center-align">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="7" class="center-align" style="padding: 3rem; color: var(--color-text-muted);">No active disputes found.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── Panel: Cash Settlements ────────────── -->
+      <section class="admin-panel" data-panel="settlements">
+        <div class="admin-panel__header">
+          <h2 data-i18n="admin_settlements_title">Cash Settlements</h2>
+        </div>
+
+        <div class="admin-kpi-grid" style="margin-bottom: 2rem;">
+          <div class="admin-kpi-card">
+            <div class="admin-kpi-card__main">
+              <span class="admin-kpi-card__label" data-i18n="admin_total_cash">Total Cash Collected</span>
+              <div class="admin-kpi-card__value">—</div>
+            </div>
+          </div>
+          <div class="admin-kpi-card">
+            <div class="admin-kpi-card__main">
+              <span class="admin-kpi-card__label" data-i18n="admin_pending_fees">Pending Fees</span>
+              <div class="admin-kpi-card__value" style="color: var(--color-warning);">—</div>
+            </div>
+          </div>
+          <div class="admin-kpi-card">
+            <div class="admin-kpi-card__main">
+              <span class="admin-kpi-card__label" data-i18n="admin_settled_fees">Settled</span>
+              <div class="admin-kpi-card__value" style="color: var(--color-success);">—</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="admin-table-wrap" style="border:1px solid var(--color-border); border-radius:12px; overflow:hidden; background:var(--color-surface);">
+          <table class="bk-table" id="settlementsTable">
+            <thead>
+              <tr>
+                <th data-i18n="admin_th_tech_id">Tech ID</th>
+                <th data-i18n="admin_th_name">Technician</th>
+                <th class="right-align" data-i18n="admin_th_cash_amount">Cash Collected</th>
+                <th class="right-align" data-i18n="admin_th_fee">Platform Fee</th>
+                <th data-i18n="admin_th_status">Status</th>
+                <th data-i18n="admin_th_actions" class="center-align">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="6" class="center-align" style="padding: 3rem; color: var(--color-text-muted);">No pending cash settlements found.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
 
       <!-- ── Panel: Analytics ───────────────────── -->
       <section class="admin-panel" data-panel="analytics">
@@ -1990,10 +1361,10 @@
               </div>
               <div class="admin-settings-toggle-row">
                 <div class="admin-settings-toggle-info">
-                  <span class="admin-settings-toggle-label" data-i18n="admin_req_trade_license">Require Trade License</span>
-                  <span class="admin-settings-toggle-desc" data-i18n="admin_req_trade_license_hint">Technicians must provide a trade license to be verified.</span>
+                  <span class="admin-settings-toggle-label">Require CV / Resume</span>
+                  <span class="admin-settings-toggle-desc">Technicians can optionally upload a CV or resume for manual review.</span>
                 </div>
-                <button type="button" class="stab-toggle" role="switch" aria-checked="false" id="toggleReqTradeLicense">
+                <button type="button" class="stab-toggle" role="switch" aria-checked="false" id="toggleReqCv">
                   <span class="stab-toggle__track"><span class="stab-toggle__thumb"></span></span>
                 </button>
               </div>
@@ -2600,14 +1971,15 @@
               <option value="user" data-i18n="admin_audit_type_user">User Management</option>
               <option value="settings" data-i18n="admin_audit_type_settings">Settings</option>
               <option value="booking" data-i18n="admin_audit_type_booking">Booking</option>
+              <option value="service" data-i18n="admin_audit_type_service">Service</option>
               <option value="finance" data-i18n="admin_audit_type_finance">Finance</option>
               <option value="system" data-i18n="admin_audit_type_system">System</option>
             </select>
             <select id="auditDateFilter" class="bk-select audit-filter-select" aria-label="Filter by date" data-i18n-aria-label="admin_audit_filter_date_aria">
+              <option value="" data-i18n="admin_filter_all_time">All Time</option>
               <option value="7" data-i18n="admin_filter_last_7">Last 7 Days</option>
               <option value="30" data-i18n="admin_filter_last_30">Last 30 Days</option>
               <option value="90" data-i18n="admin_filter_last_90">Last 90 Days</option>
-              <option value="all" data-i18n="admin_filter_all_time">All Time</option>
             </select>
             <button class="btn btn--secondary btn--sm" id="auditExportBtn">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -2641,7 +2013,7 @@
                 <th data-i18n="admin_audit_col_actor">Actor</th>
                 <th data-i18n="admin_audit_col_action">Action</th>
                 <th data-i18n="admin_audit_col_target">Target</th>
-                <th data-i18n="admin_audit_col_ip">IP Address</th>
+                <th data-i18n="admin_audit_col_actions">Actions</th>
                 <th data-i18n="admin_audit_col_status">Status</th>
               </tr>
             </thead>
@@ -2702,18 +2074,26 @@
           <div class="field">
             <label class="label" for="serviceCategory" data-i18n="admin_label_service_category">Category</label>
             <select id="serviceCategory" class="input" required>
-              <option value="Plumbing" data-i18n="skill_plumbing">Plumbing</option>
-              <option value="Electrical" data-i18n="skill_electrical">Electrical</option>
-              <option value="Cleaning" data-i18n="skill_cleaning">Cleaning</option>
-              <option value="Painting" data-i18n="skill_painting">Painting</option>
-              <option value="Carpentry" data-i18n="skill_carpentry">Carpentry</option>
-              <option value="HVAC" data-i18n="skill_hvac">HVAC</option>
+              <option value="plumbing" data-i18n="skill_plumbing">Plumbing</option>
+              <option value="electrical" data-i18n="skill_electrical">Electrical</option>
+              <option value="cleaning" data-i18n="skill_cleaning">Cleaning</option>
+              <option value="painting" data-i18n="skill_painting">Painting</option>
+              <option value="carpentry" data-i18n="skill_carpentry">Carpentry</option>
+              <option value="hvac" data-i18n="skill_hvac">HVAC</option>
             </select>
           </div>
           <div class="field">
-            <label class="label" for="basePrice" data-i18n="admin_label_base_price">Base Price (EGP)</label>
-            <input type="number" id="basePrice" class="input" required min="0" />
+            <label class="label" for="priceUnit" data-i18n="admin_label_price_unit">Price Unit</label>
+            <select id="priceUnit" class="input" required>
+              <option value="per_hour" data-i18n="unit_per_hour">Per Hour (Avg)</option>
+              <option value="per_sqm" data-i18n="unit_per_sqm">Per Sqm</option>
+              <option value="fixed" data-i18n="unit_fixed">Fixed Price</option>
+            </select>
           </div>
+        </div>
+        <div class="field">
+          <label class="label" for="basePrice" data-i18n="admin_label_base_price">Base Price (EGP)</label>
+          <input type="number" id="basePrice" class="input" required min="0" />
         </div>
         <div class="modal-box__footer" style="margin-top: 1rem;">
           <button type="button" class="btn btn--danger" id="cancelServiceBtn" style="padding: 10px 24px;" data-i18n="common_cancel">Cancel</button>
@@ -2726,6 +2106,503 @@
   <script src="../js/lang.js"></script>
   <script type="module" src="../js/main.js"></script>
   <script type="module" src="../js/html/admin-dashboard.js"></script>
+
+  <!-- ══════════════════════════════════════════════════════
+       ADMIN: Technician Profile Modal
+  ══════════════════════════════════════════════════════ -->
+  <div id="techProfileModal" class="admin-modal-backdrop" hidden aria-modal="true" role="dialog" aria-labelledby="techModalTitle">
+    <div class="admin-modal admin-modal--wide">
+      <div class="admin-modal__header">
+        <h3 class="admin-modal__title" id="techModalTitle" data-i18n="admin_tech_profile_title">Technician Profile</h3>
+        <button class="admin-modal__close" data-modal-close="techProfileModal" aria-label="Close">&times;</button>
+      </div>
+      <div class="admin-modal__body">
+
+        <!-- Hero banner -->
+        <div class="apm-hero">
+          <div class="apm-hero__avatar" id="techModalAvatar">TN</div>
+          <div class="apm-hero__info">
+            <div class="apm-hero__name" id="techModalName">—</div>
+            <div class="apm-hero__email" id="techModalEmail">—</div>
+            <span class="bk-badge apm-hero__badge" id="techModalStatusBadge">—</span>
+          </div>
+          <div class="apm-hero__stats">
+            <div class="apm-stat">
+              <span class="apm-stat__icon">★</span>
+              <span class="apm-stat__val" id="techModalRating">—</span>
+              <span class="apm-stat__lbl">Rating</span>
+            </div>
+            <div class="apm-stat__divider"></div>
+            <div class="apm-stat">
+              <span class="apm-stat__val" id="techModalJobs">—</span>
+              <span class="apm-stat__lbl">Jobs</span>
+            </div>
+            <div class="apm-stat__divider"></div>
+            <div class="apm-stat">
+              <span class="apm-stat__val" id="techModalRate">—</span>
+              <span class="apm-stat__lbl">Rate</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Info grid -->
+        <div class="apm-section-label">Professional Info</div>
+        <div class="apm-grid">
+          <div class="apm-field">
+            <span class="apm-field__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span>
+            <div><span class="apm-label" data-i18n="admin_th_skills">Skills</span><span class="apm-value" id="techModalSkills">—</span></div>
+          </div>
+          <div class="apm-field">
+            <span class="apm-field__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
+            <div><span class="apm-label" data-i18n="admin_th_area">Service Area</span><span class="apm-value" id="techModalArea">—</span></div>
+          </div>
+          <div class="apm-field">
+            <span class="apm-field__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12.4 19.79 19.79 0 0 1 1.59 3.8 2 2 0 0 1 3.56 1.59h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.1a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.5 16.92z"/></svg></span>
+            <div><span class="apm-label">Phone</span><span class="apm-value" id="techModalPhone">—</span></div>
+          </div>
+          <div class="apm-field">
+            <span class="apm-field__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+            <div><span class="apm-label">Member Since</span><span class="apm-value" id="techModalJoined">—</span></div>
+          </div>
+          <div class="apm-field">
+            <span class="apm-field__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg></span>
+            <div><span class="apm-label">Experience</span><span class="apm-value" id="techModalExp">—</span></div>
+          </div>
+        </div>
+
+        <!-- Bio -->
+        <div id="techModalBioWrap" style="display:none;">
+          <div class="apm-section-label">About</div>
+          <p id="techModalBio" class="apm-bio"></p>
+        </div>
+
+        <!-- Audit row -->
+        <div class="apm-audit">
+          <div class="apm-audit__item">
+            <span class="apm-label">Submitted At</span>
+            <span class="apm-value" id="techModalSubmittedAt">—</span>
+          </div>
+          <div class="apm-audit__item">
+            <span class="apm-label">Reviewed By</span>
+            <span class="apm-value" id="techModalReviewedBy">—</span>
+          </div>
+          <div class="apm-audit__item">
+            <span class="apm-label">Reviewed At</span>
+            <span class="apm-value" id="techModalReviewedAt">—</span>
+          </div>
+          <div class="apm-audit__item" id="techModalRejectWrap" hidden>
+            <span class="apm-label">Rejection Reason</span>
+            <span class="apm-value apm-value--reason" id="techModalRejectReason">—</span>
+          </div>
+        </div>
+
+        <!-- Documents -->
+        <div class="apm-section-label" data-i18n="admin_docs_section">Submitted Documents</div>
+        <div class="apm-doc-viewer" id="techModalDocViewer">
+          <div class="apm-doc-card" id="docCardFront">
+            <div class="apm-doc-card__thumb" id="docThumbFront">
+              <span class="apm-doc-card__missing">Not submitted</span>
+            </div>
+            <div class="apm-doc-card__footer">
+              <div class="apm-doc-card__label">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                National ID (Front)
+              </div>
+              <button type="button" class="apm-doc-card__btn" id="docDownloadFront">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Download
+              </button>
+            </div>
+          </div>
+          <div class="apm-doc-card" id="docCardBack">
+            <div class="apm-doc-card__thumb" id="docThumbBack">
+              <span class="apm-doc-card__missing">Not submitted</span>
+            </div>
+            <div class="apm-doc-card__footer">
+              <div class="apm-doc-card__label">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                National ID (Back)
+              </div>
+              <button type="button" class="apm-doc-card__btn" id="docDownloadBack">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Download
+              </button>
+            </div>
+          </div>
+          <div class="apm-doc-card" id="docCardSelfie">
+            <div class="apm-doc-card__thumb" id="docThumbSelfie">
+              <span class="apm-doc-card__missing">Not submitted</span>
+            </div>
+            <div class="apm-doc-card__footer">
+              <div class="apm-doc-card__label">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                ID Selfie
+              </div>
+              <button type="button" class="apm-doc-card__btn" id="docDownloadSelfie">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Download
+              </button>
+            </div>
+          </div>
+          <div class="apm-doc-card" id="docCardCv">
+            <div class="apm-doc-card__thumb apm-doc-card__thumb--file" id="docThumbCv">
+              <span class="apm-doc-card__missing">Not submitted</span>
+            </div>
+            <div class="apm-doc-card__footer">
+              <div class="apm-doc-card__label">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                CV / Resume
+              </div>
+              <button type="button" class="apm-doc-card__btn" id="docDownloadCv">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Download
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div id="techModalPortfolioWrap" hidden>
+          <div class="apm-section-label">Portfolio Photos</div>
+          <div class="apm-doc-viewer" id="techModalPortfolioViewer"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Document lightbox (shared) -->
+  <div id="docLightbox" class="doc-lightbox" hidden>
+    <div class="doc-lightbox__backdrop" id="docLightboxBackdrop"></div>
+    <div class="doc-lightbox__container">
+      <button class="doc-lightbox__close" id="docLightboxClose" aria-label="Close">&times;</button>
+      <img class="doc-lightbox__img" id="docLightboxImg" src="" alt="Document preview" />
+      <div class="doc-lightbox__label" id="docLightboxLabel"></div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════════
+       ADMIN: User View Modal
+  ══════════════════════════════════════════════════════ -->
+  <div id="userViewModal" class="admin-modal-backdrop" hidden aria-modal="true" role="dialog" aria-labelledby="userModalTitle">
+    <div class="admin-modal admin-modal--wide">
+      <div class="admin-modal__header">
+        <h3 class="admin-modal__title" id="userModalTitle" data-i18n="admin_user_profile">User Profile</h3>
+        <button class="admin-modal__close" data-modal-close="userViewModal" aria-label="Close">&times;</button>
+      </div>
+      <div class="admin-modal__body">
+
+        <!-- Hero banner -->
+        <div class="apm-hero">
+          <div class="apm-hero__avatar" id="userModalAvatar">U</div>
+          <div class="apm-hero__info">
+            <div class="apm-hero__name" id="userModalName">—</div>
+            <div class="apm-hero__email" id="userModalEmail">—</div>
+            <span class="bk-badge apm-hero__badge" id="userModalStatusBadge">—</span>
+          </div>
+          <div class="apm-hero__stats">
+            <div class="apm-stat">
+              <span class="apm-stat__icon">📋</span>
+              <span class="apm-stat__val" id="userModalBookings">—</span>
+              <span class="apm-stat__lbl">Bookings</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Account Info -->
+        <div class="apm-section-label">Account Info</div>
+        <div class="apm-grid">
+          <div class="apm-field">
+            <span class="apm-field__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="5"/><path d="M3 21v-1a9 9 0 0 1 18 0v1"/></svg></span>
+            <div><span class="apm-label" data-i18n="admin_th_user_id">User ID</span><span class="apm-value" id="userModalId">—</span></div>
+          </div>
+          <div class="apm-field">
+            <span class="apm-field__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+            <div><span class="apm-label" data-i18n="admin_th_join_date">Join Date</span><span class="apm-value" id="userModalJoinDate">—</span></div>
+          </div>
+          <div class="apm-field">
+            <span class="apm-field__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
+            <div><span class="apm-label" data-i18n="admin_th_status">Account Status</span><span class="apm-value" id="userModalStatus">—</span></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div id="rejectWorkerModal" class="admin-modal-backdrop" hidden aria-modal="true" role="dialog" aria-labelledby="rejectWorkerTitle">
+    <div class="admin-modal">
+      <div class="admin-modal__header">
+        <h3 class="admin-modal__title" id="rejectWorkerTitle">Reject Technician</h3>
+        <button class="admin-modal__close" data-modal-close="rejectWorkerModal" aria-label="Close">&times;</button>
+      </div>
+      <div class="admin-modal__body">
+        <div class="field field--full">
+          <label class="label" for="rejectWorkerReason">Reason</label>
+          <textarea class="input admin-textarea" id="rejectWorkerReason" rows="5" placeholder="Explain why the application is being rejected."></textarea>
+          <p class="error-text" id="rejectWorkerError" hidden></p>
+        </div>
+        <div class="admin-modal__actions">
+          <button class="btn btn--ghost" type="button" data-modal-close="rejectWorkerModal">Cancel</button>
+          <button class="btn btn--danger-outline" type="button" id="rejectWorkerSubmit">Reject Technician</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    /* ── Admin modals ─────────────────────────────────────── */
+    .admin-modal-backdrop {
+      position: fixed; inset: 0; z-index: 10000;
+      background: rgba(0,0,0,0.45);
+      display: flex; align-items: center; justify-content: center;
+      padding: 1rem;
+    }
+    .admin-modal-backdrop[hidden] { display: none; }
+    .admin-modal {
+      background: var(--color-surface, #fff);
+      border: 1px solid var(--color-border, #e8e2dc);
+      border-radius: 16px;
+      width: 100%; max-width: 480px;
+      max-height: 90vh;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+    }
+    .admin-modal__header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--color-border, #e8e2dc);
+    }
+    .admin-modal__title { margin: 0; font-size: 1.05rem; font-weight: 700; }
+    .admin-modal__close {
+      background: none; border: none; cursor: pointer;
+      font-size: 1.5rem; line-height: 1; color: var(--color-text-muted, #888);
+      padding: 0 4px;
+    }
+    .admin-modal__body {
+      padding: 1.5rem;
+      max-height: calc(90vh - 82px);
+      overflow-y: auto;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    .admin-modal__body::-webkit-scrollbar { width: 0; height: 0; }
+    /* ── Tech Profile Modal (APM) redesign ────────── */
+    .admin-modal--wide { max-width: 680px; }
+
+    /* Hero banner */
+    .apm-hero {
+      background: var(--gradient-brand, linear-gradient(135deg,#3C2415,#222831));
+      border-radius: 14px;
+      padding: 1.4rem 1.25rem;
+      display: flex; align-items: center; gap: 1rem;
+      margin-bottom: 1.25rem;
+      position: relative; overflow: hidden;
+    }
+    .apm-hero::after {
+      content: '';
+      position: absolute; top: -40px; right: -40px;
+      width: 160px; height: 160px; border-radius: 50%;
+      background: rgba(255,255,255,0.04);
+      pointer-events: none;
+    }
+    .apm-hero__avatar {
+      width: 62px; height: 62px; border-radius: 50%;
+      background: rgba(255,255,255,0.18);
+      border: 2px solid rgba(255,255,255,0.32);
+      color: #fff; font-weight: 800; font-size: 1.25rem;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; letter-spacing: -0.5px;
+    }
+    .apm-hero__info { flex: 1; min-width: 0; }
+    .apm-hero__name {
+      font-weight: 700; font-size: 1.05rem; color: #fff;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .apm-hero__email {
+      font-size: 0.8rem; color: rgba(255,255,255,0.65);
+      margin: 0.18rem 0 0.45rem;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .apm-hero__stats {
+      display: flex; align-items: center; gap: 0;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 12px; padding: 0.55rem 0.85rem;
+      flex-shrink: 0;
+    }
+    .apm-stat { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 56px; }
+    .apm-stat__icon { font-size: 0.75rem; color: #fbbf24; line-height: 1; }
+    .apm-stat__val { font-size: 0.85rem; font-weight: 700; color: #fff; }
+    .apm-stat__lbl { font-size: 0.63rem; color: rgba(255,255,255,0.55); text-transform: uppercase; letter-spacing: .04em; }
+    .apm-stat__divider { width: 1px; height: 30px; background: rgba(255,255,255,0.18); margin: 0 2px; }
+    .apm-hero .bk-badge { border: 1px solid rgba(255,255,255,0.25); backdrop-filter: blur(4px); }
+
+    /* Section label with line */
+    .apm-section-label {
+      font-size: 0.7rem; text-transform: uppercase; letter-spacing: .08em;
+      color: var(--color-accent, #9A8C73); font-weight: 700;
+      margin-bottom: 0.65rem;
+      display: flex; align-items: center; gap: 0.6rem;
+    }
+    .apm-section-label::after {
+      content: ''; flex: 1; height: 1px;
+      background: var(--color-border, #e8e2dc);
+    }
+
+    /* Info grid */
+    .apm-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 0.55rem; margin-bottom: 1.1rem;
+    }
+    .apm-field {
+      display: flex; align-items: center; gap: 0.6rem;
+      background: var(--color-surface-alt, #F7F3EF);
+      border: 1px solid var(--color-border, #e8e2dc);
+      border-radius: 10px; padding: 0.6rem 0.75rem;
+    }
+    .apm-field__icon {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: var(--color-surface, #fff);
+      border: 1px solid var(--color-border, #e8e2dc);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; color: var(--color-accent, #9A8C73);
+    }
+    .apm-field__icon svg { width: 13px; height: 13px; }
+    .apm-label {
+      font-size: 0.68rem; text-transform: uppercase; letter-spacing: .04em;
+      color: var(--color-text-light, #888); font-weight: 600;
+      display: block; margin-bottom: 1px;
+    }
+    .apm-value {
+      font-size: 0.875rem; font-weight: 600;
+      color: var(--color-text, #1a1a1a); display: block;
+    }
+    .apm-value--reason { line-height: 1.5; white-space: pre-wrap; }
+
+    /* Bio */
+    .apm-bio {
+      font-size: 0.875rem; color: var(--color-text-light, #666);
+      line-height: 1.65; margin: 0 0 1.1rem;
+      background: var(--color-surface-alt, #F7F3EF);
+      border: 1px solid var(--color-border, #e8e2dc);
+      border-radius: 10px; padding: 0.75rem 0.9rem;
+    }
+
+    /* Audit bar */
+    .apm-audit {
+      display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem;
+      background: var(--color-surface-alt, #F7F3EF);
+      border: 1px solid var(--color-border, #e8e2dc);
+      border-radius: 10px; padding: 0.7rem 0.9rem;
+      margin-bottom: 1.1rem;
+    }
+    .apm-audit__item { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 120px; }
+
+    /* Document cards */
+    .apm-doc-viewer {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 10px; margin-bottom: 1rem;
+    }
+    .apm-doc-card { display: flex; flex-direction: column; gap: 6px; }
+    .apm-doc-card__thumb {
+      border-radius: 10px;
+      border: 1.5px solid var(--color-border, #e8e2dc);
+      aspect-ratio: 3/4;
+      overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--color-surface-alt, #F7F3EF);
+      cursor: pointer;
+      transition: border-color .2s, box-shadow .2s, transform .2s;
+      position: relative;
+    }
+    .apm-doc-card__thumb:hover {
+      border-color: var(--color-accent, #9A8C73);
+      box-shadow: 0 6px 18px rgba(0,0,0,.12);
+      transform: translateY(-2px);
+    }
+    .apm-doc-card__thumb img { width: 100%; height: 100%; object-fit: cover; transition: transform .25s; }
+    .apm-doc-card__thumb:hover img { transform: scale(1.05); }
+    .apm-doc-card__missing { font-size: 10px; color: var(--color-text-light, #aaa); text-align: center; padding: 8px; }
+    .apm-doc-card__file {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 6px; padding: 12px; text-align: center;
+      color: var(--color-text-light, #666);
+    }
+    .apm-doc-card__file-name { font-size: 11px; line-height: 1.45; word-break: break-word; }
+    .apm-doc-card__footer {
+      display: flex; align-items: center;
+      justify-content: space-between; gap: 4px;
+    }
+    .apm-doc-card__label {
+      display: flex; align-items: center; gap: 3px;
+      font-size: 10px; font-weight: 600;
+      color: var(--color-text-light, #888);
+    }
+    .apm-doc-card__btn {
+      display: inline-flex; align-items: center; gap: 3px;
+      border: 1.5px solid var(--color-accent, #9A8C73);
+      background: transparent; border-radius: 999px;
+      padding: 3px 8px; font-size: 10px; font-weight: 600;
+      cursor: pointer; color: var(--color-accent, #9A8C73);
+      transition: background .18s, color .18s, border-color .18s;
+      white-space: nowrap;
+    }
+    .apm-doc-card__btn:hover:not(:disabled) {
+      background: var(--color-accent, #9A8C73); color: #fff;
+    }
+    .apm-doc-card__btn:disabled {
+      opacity: 0.35; cursor: not-allowed;
+      border-color: var(--color-border, #e8e2dc);
+      color: var(--color-text-light, #aaa);
+    }
+    .apm-doc-card__thumb--ok { border-color: var(--color-success, #27ae60); }
+    [data-theme="dark"] .apm-doc-card__thumb--ok { border-color: #10b981; }
+    [data-theme="dark"] .apm-field { background: var(--color-surface-alt, #1E2229); }
+    [data-theme="dark"] .apm-field__icon { background: var(--color-surface, #222831); }
+    [data-theme="dark"] .apm-audit { background: var(--color-surface-alt, #1E2229); }
+    [data-theme="dark"] .apm-bio { background: var(--color-surface-alt, #1E2229); }
+    [data-theme="dark"] .apm-doc-card__thumb { background: var(--color-surface-alt, #1E2229); }
+    .admin-modal__actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+    .admin-textarea {
+      min-height: 120px;
+      resize: vertical;
+    }
+
+    /* Lightbox */
+    .doc-lightbox { position: fixed; inset: 0; z-index: 99999; display: flex; align-items: center; justify-content: center; }
+    .doc-lightbox[hidden] { display: none; }
+    .doc-lightbox__backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.85); cursor: zoom-out; }
+    .doc-lightbox__container {
+      position: relative; z-index: 1;
+      display: flex; flex-direction: column; align-items: center; gap: 10px;
+      padding: 10px;
+      animation: lb-in .18s ease;
+    }
+    @keyframes lb-in { from { opacity:0; transform: scale(.92); } to { opacity:1; transform: scale(1); } }
+    .doc-lightbox__img {
+      max-width: 90vw; max-height: 82vh;
+      border-radius: 12px;
+      box-shadow: 0 25px 80px rgba(0,0,0,.6);
+      object-fit: contain;
+    }
+    .doc-lightbox__label { color: #ffffffcc; font-size: 13px; font-weight: 600; }
+    .doc-lightbox__close {
+      position: absolute; top: -18px; right: -18px;
+      width: 36px; height: 36px; border-radius: 50%;
+      background: rgba(255,255,255,.15); border: none; cursor: pointer;
+      color: #fff; font-size: 20px; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+      transition: background .2s;
+    }
+    .doc-lightbox__close:hover { background: rgba(255,255,255,.3); }
+  </style>
+
 </body>
 </html>
 

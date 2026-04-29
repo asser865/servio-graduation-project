@@ -1095,6 +1095,26 @@
   justify-content: center;
   overflow: hidden;
   border: 2px solid var(--color-accent);
+  transition: border-color .2s, outline-color .2s;
+}
+
+/* Photo uploading spinner state */
+.settings-avatar-preview.is-uploading {
+  opacity: .6;
+}
+
+/* Technician mandatory photo — red dashed ring when no photo set */
+.settings-avatar-preview.avatar-required {
+  border-color: var(--color-danger, #ef4444);
+  outline: 2px dashed var(--color-danger, #ef4444);
+  outline-offset: 3px;
+}
+
+/* Hint shown below avatar when photo is required */
+.avatar-required-hint {
+  font-size: .75rem;
+  color: var(--color-danger, #ef4444);
+  margin-top: 6px;
 }
 
 /* Form input base */

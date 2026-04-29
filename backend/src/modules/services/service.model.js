@@ -6,7 +6,7 @@
 
 const mongoose = require('mongoose');
 
-const SERVICE_CATEGORIES = ['plumbing', 'electrical', 'painting', 'flooring', 'carpentry', 'cleaning', 'other'];
+const SERVICE_CATEGORIES = ['plumbing', 'electrical', 'painting', 'flooring', 'carpentry', 'cleaning', 'hvac', 'other'];
 const PRICE_UNITS        = ['per_hour', 'per_sqm', 'fixed'];
 
 const serviceSchema = new mongoose.Schema(
@@ -23,6 +23,20 @@ const serviceSchema = new mongoose.Schema(
       required:  [true, 'Service description is required'],
       trim:      true,
       maxlength: [2000, 'Description cannot exceed 2000 characters'],
+    },
+
+    titleAr: {
+      type:      String,
+      trim:      true,
+      maxlength: [150, 'Arabic title cannot exceed 150 characters'],
+      default:   '',
+    },
+
+    descriptionAr: {
+      type:      String,
+      trim:      true,
+      maxlength: [2000, 'Arabic description cannot exceed 2000 characters'],
+      default:   '',
     },
 
     category: {

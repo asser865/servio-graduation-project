@@ -34,6 +34,13 @@ const userSchema = new mongoose.Schema(
       match: [/^[+]?[\d\s\-().]{7,20}$/, 'Please provide a valid phone number'],
     },
 
+    address: {
+      street: { type: String, trim: true },
+      city:   { type: String, trim: true },
+      state:  { type: String, trim: true },
+      zipCode:{ type: String, trim: true },
+    },
+
     // Never returned in queries by default — use .select('+password') explicitly
     password: {
       type:     String,
@@ -64,11 +71,39 @@ const userSchema = new mongoose.Schema(
       default: false,
     },
 
+    verificationStatus: {
+      type:    String,
+      enum:    ['pending', 'approved', 'rejected'],
+      default: 'approved',
+    },
+
+    verificationSubmittedAt: {
+      type:    Date,
+      default: null,
+    },
+
+    verificationReviewedAt: {
+      type:    Date,
+      default: null,
+    },
+
+    verificationReviewedBy: {
+      type:    String,
+      default: '',
+      trim:    true,
+    },
+
+    verificationRejectionReason: {
+      type:    String,
+      default: '',
+      trim:    true,
+    },
+
     // ── Worker-specific ──────────────────────────────────────────────────────
     // Categories the worker operates in (mirrors Service.category enum)
     categories: {
       type: [String],
-      enum: ['plumbing', 'electrical', 'painting', 'flooring', 'carpentry', 'cleaning', 'other'],
+      enum: ['plumbing', 'electrical', 'painting', 'flooring', 'carpentry', 'cleaning', 'hvac', 'other'],
     },
 
     // GeoJSON Point for location-based worker search
@@ -97,6 +132,54 @@ const userSchema = new mongoose.Schema(
       default: 0,
     },
 
+    // Human-readable area/city label for display (e.g. 'Nasr City')
+    // Separate from location (GeoJSON) which is used for spatial queries.
+    locationLabel: {
+      type:  String,
+      trim:  true,
+      default: '',
+    },
+
+    // ── Additional worker profile fields ─────────────────────────────────────
+    hourlyRate: {
+      type:    Number,
+      default: 0,
+      min:     [0, 'Hourly rate cannot be negative'],
+    },
+
+    // Professional bio / summary
+    bio: {
+      type:    String,
+      trim:    true,
+      default: '',
+    },
+
+    // Years of professional experience
+    yearsExperience: {
+      type:    Number,
+      default: 0,
+      min:     0,
+    },
+
+    // Simple availability label: 'weekdays' | 'weekends' | 'both'
+    availabilityType: {
+      type:    String,
+      enum:    ['weekdays', 'weekends', 'both', ''],
+      default: '',
+    },
+
+    // Specific skills (e.g. ['pipe repair', 'drain cleaning'])
+    skills: {
+      type:    [String],
+      default: [],
+    },
+
+    // Incremented each time a booking is marked completed
+    completedJobs: {
+      type:    Number,
+      default: 0,
+    },
+
     // Weekly availability slots stored as { day: 'monday', from: '08:00', to: '18:00' }
     availability: [
       {
@@ -105,6 +188,40 @@ const userSchema = new mongoose.Schema(
         to:   { type: String },
       },
     ],
+
+    // ── Verification document URLs ────────────────────────────────────────────
+    // Stored as upload URLs and original filenames for admin review/download.
+    idFrontUrl: { type: String, default: '' },
+    idFrontName:{ type: String, default: '' },
+    idBackUrl:  { type: String, default: '' },
+    idBackName: { type: String, default: '' },
+    idSelfieUrl:{ type: String, default: '' },
+    idSelfieName:{ type: String, default: '' },
+    cvUrl:      { type: String, default: '' },
+    cvName:     { type: String, default: '' },
+    portfolioFiles: {
+      type: [
+        new mongoose.Schema(
+          {
+            url:  { type: String, required: true },
+            name: { type: String, default: '' },
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
+    },
+
+    // ── Password reset ────────────────────────────────────────────────────────
+    resetPasswordToken: {
+      type:   String,
+      select: false,
+    },
+    resetPasswordExpires: {
+      type:   Date,
+      select: false,
+    },
+
   },
   {
     timestamps: true, // adds createdAt, updatedAt automatically

@@ -21,7 +21,7 @@ const createValidation = [
 const statusValidation = [
   body('status')
     .notEmpty()
-    .isIn(['pending', 'accepted', 'rejected', 'in_progress', 'completed', 'cancelled'])
+    .isIn(['pending', 'accepted', 'rejected', 'in_progress', 'completed', 'cancelled', 'disputed'])
     .withMessage('Invalid status value'),
 ];
 
@@ -45,5 +45,8 @@ router.patch(
   validate(statusValidation),
   bookingController.updateStatus
 );
+
+// GET /api/v1/bookings/:id — view a single booking (user, worker, or admin)
+router.get('/:id', protect, bookingController.getBookingById);
 
 module.exports = router;

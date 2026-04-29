@@ -4,8 +4,13 @@
 import { revealAll } from '../components/scroll-reveal.js';
 import { showToast } from '../components/toast.js';
 import { getInitials } from '../utils/string.js';
+import { getMe, updateMe } from '../api/users.js';
+import { uploadPublicFile } from '../api/uploads.js';
 
 const TAB_KEY = 'servio_activeTab_technician';
+
+// Holds uploaded avatar URL between file-select and form-save
+let _pendingPhotoUrl = null;
 const DAYS_KEYS = ['avail_day_mon','avail_day_tue','avail_day_wed','avail_day_thu','avail_day_fri','avail_day_sat','avail_day_sun'];
 const SKILLS_KEYS = ['skill_plumbing','skill_electrical','skill_hvac','skill_painting','skill_carpentry',
   'skill_cleaning','skill_roofing','skill_flooring','skill_appliance','skill_landscaping','skill_general'];
@@ -151,15 +156,107 @@ function populateProfile() {
   document.querySelectorAll('[data-dash-firstname]').forEach(el => { el.textContent = name.split(' ')[0]; });
 
   if (account) {
+    // Map `name` → `fullName` for accounts that predate the fullName field
+    if (!account.fullName && account.name) account.fullName = account.name;
+    // Derive specialty from skills array if not explicitly set
+    if (!account.specialty && Array.isArray(account.skills) && account.skills.length) {
+      account.specialty = account.skills.join(', ');
+    }
     document.querySelectorAll('[data-settings-field]').forEach(f => {
       if (account[f.dataset.settingsField] != null) f.value = account[f.dataset.settingsField];
     });
-    const preview = document.querySelector('[data-avatar-preview]');
-    if (preview && preview.children.length === 0) preview.textContent = initials;
-    // Pre-fill service area
     const serviceAreaInput = document.getElementById('service-area');
     if (serviceAreaInput && account.serviceArea) serviceAreaInput.value = account.serviceArea;
   }
+
+  // Render avatar — photo takes priority over initials
+  const imgStyle = 'width:100%;height:100%;object-fit:cover;border-radius:50%;';
+  // Only trust server URL if it's an actual HTTP/HTTPS/relative URL (not a local filesystem path)
+  const serverImg = session.profileImage || '';
+  const serverImgUsable = serverImg && (serverImg.startsWith('http') || serverImg.startsWith('/'));
+  const photoUrl = serverImgUsable ? serverImg : (localStorage.getItem('servio_avatar_cache') || null);
+  const preview  = document.querySelector('[data-avatar-preview]');
+  const topbar   = document.getElementById('topbar-avatar');
+
+  if (preview) {
+    if (photoUrl) {
+      preview.innerHTML = `<img src="${photoUrl}" alt="Profile photo" style="${imgStyle}" />`;
+      preview.classList.remove('avatar-required');
+    } else {
+      preview.innerHTML = `<span>${initials}</span>`;
+      // Mandatory guard — red ring + hint when no photo
+      preview.classList.add('avatar-required');
+      const wrap = preview.closest('.settings-avatar-wrap');
+      if (wrap && !wrap.querySelector('.avatar-required-hint')) {
+        const hint = document.createElement('p');
+        hint.className = 'avatar-required-hint';
+        hint.textContent = typeof window.t === 'function'
+          ? window.t('toast_photo_required')
+          : 'Please add a profile photo before saving.';
+        wrap.insertAdjacentElement('afterend', hint);
+      }
+    }
+  }
+  if (topbar) {
+    topbar.innerHTML = photoUrl
+      ? `<img src="${photoUrl}" alt="Profile photo" style="${imgStyle}" />`
+      : (initials[0] || 'T');
+  }
+
+  // Sync from API — refresh photo and populate form fields with authoritative data
+  getMe().then(user => {
+    if (!user) return;
+
+    // Update profile photo if changed (only use server URL if it's a real HTTP URL)
+    const apiImg = user.profileImage || '';
+    const apiImgUsable = apiImg && (apiImg.startsWith('http') || apiImg.startsWith('/'));
+    const resolvedPhoto = apiImgUsable ? apiImg : (localStorage.getItem('servio_avatar_cache') || null);
+    if (resolvedPhoto && resolvedPhoto !== photoUrl) {
+      if (apiImgUsable) {
+        const s = getSession();
+        if (s) { s.profileImage = apiImg; localStorage.setItem('servio_session', JSON.stringify(s)); }
+      }
+      if (preview) {
+        preview.innerHTML = `<img src="${resolvedPhoto}" alt="Profile photo" style="${imgStyle}" />`;
+        preview.classList.remove('avatar-required');
+        const hint = preview.closest('.settings-avatar-wrap')?.nextElementSibling;
+        if (hint?.classList.contains('avatar-required-hint')) hint.remove();
+      }
+      if (topbar) topbar.innerHTML = `<img src="${resolvedPhoto}" alt="Profile photo" style="${imgStyle}" />`;
+    }
+
+    // Populate settings form fields from live API data
+    const fieldMap = {
+      fullName:  user.name,
+      email:     user.email,
+      phone:     user.phone,
+      specialty: Array.isArray(user.skills) ? user.skills.join(', ') : (user.specialty || ''),
+      hourlyRate: user.hourlyRate,
+    };
+    Object.entries(fieldMap).forEach(([field, val]) => {
+      if (val == null || val === '') return;
+      const el = document.querySelector(`[data-settings-field="${field}"]`);
+      if (el) el.value = val;
+    });
+
+    // Update sidebar name and initials
+    if (user.name) {
+      document.querySelectorAll('[data-dash-name]').forEach(el => { el.textContent = user.name; });
+      const freshInitials = getInitials(user.name);
+      document.querySelectorAll('[data-dash-initials]').forEach(el => { el.textContent = freshInitials; });
+      document.querySelectorAll('[data-dash-firstname]').forEach(el => { el.textContent = user.name.split(' ')[0]; });
+    }
+
+    // Persist updated data locally for offline use
+    try {
+      const acc = getAccount() || {};
+      if (user.name)       { acc.fullName  = user.name; acc.name = user.name; }
+      if (user.phone)      acc.phone      = user.phone;
+      if (user.skills)     { acc.skills   = user.skills; acc.specialty = user.skills.join(', '); }
+      if (user.hourlyRate) acc.hourlyRate  = user.hourlyRate;
+      localStorage.setItem('servio_account', JSON.stringify(acc));
+    } catch (_) {}
+  }).catch(() => {});
 }
 
 function updateWelcomeText() {
@@ -374,54 +471,107 @@ function initSettingsForm() {
   const form = document.querySelector('[data-settings-form]');
   if (!form) return;
 
-  // Fix 5: Change Photo button with FileReader preview
-  const changePhotoBtn = document.getElementById('btn-change-photo');
+  const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
+  const imgStyle = 'width:100%;height:100%;object-fit:cover;border-radius:50%;';
+
+  // ── Photo upload ──────────────────────────────────────────
+  const changePhotoBtn   = document.getElementById('btn-change-photo');
   const photoUploadInput = document.getElementById('photo-upload-input');
-  const preview = document.querySelector('[data-avatar-preview]');
+  const preview          = document.querySelector('[data-avatar-preview]');
 
   if (changePhotoBtn && photoUploadInput) {
     changePhotoBtn.addEventListener('click', () => photoUploadInput.click());
-    photoUploadInput.addEventListener('change', () => {
+
+    photoUploadInput.addEventListener('change', async () => {
       const file = photoUploadInput.files[0];
       if (!file) return;
+
+      if (file.size > 2 * 1024 * 1024) {
+        showToast(_t('toast_photo_error') || 'Image must be under 2 MB.', 'error');
+        photoUploadInput.value = '';
+        return;
+      }
+
+      // Instant local preview
       const reader = new FileReader();
       reader.onload = (e) => {
         if (preview) {
-          preview.innerHTML = `<img src="${e.target.result}" alt="Profile photo" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`;
+          preview.innerHTML = `<img src="${e.target.result}" alt="Profile photo" style="${imgStyle}" />`;
+          preview.classList.remove('avatar-required');
+          const hint = preview.closest('.settings-avatar-wrap')?.nextElementSibling;
+          if (hint?.classList.contains('avatar-required-hint')) hint.remove();
         }
-        // Also update topbar avatar with image
-        const topbarAvatar = document.getElementById('topbar-avatar');
-        if (topbarAvatar) {
-          topbarAvatar.innerHTML = `<img src="${e.target.result}" alt="Profile photo" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`;
-        }
+        const topbar = document.getElementById('topbar-avatar');
+        if (topbar) topbar.innerHTML = `<img src="${e.target.result}" alt="Profile photo" style="${imgStyle}" />`;
+        // Cache locally so photo persists across reloads before save
+        try { localStorage.setItem('servio_avatar_cache', e.target.result); } catch (_) {}
       };
       reader.readAsDataURL(file);
+
+      // Upload to server
+      changePhotoBtn.disabled = true;
+      changePhotoBtn.textContent = _t('toast_photo_uploading') || 'Uploading…';
+      try {
+        const result = await uploadPublicFile(file, 'avatar');
+        _pendingPhotoUrl = result.url;
+        showToast(_t('toast_photo_uploaded') || 'Photo uploaded.', 'success');
+      } catch {
+        showToast(_t('toast_photo_error') || 'Failed to upload photo.', 'error');
+        _pendingPhotoUrl = null;
+      } finally {
+        changePhotoBtn.disabled = false;
+        changePhotoBtn.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg><span data-i18n="cust_change_photo">${_t('cust_change_photo') || 'Change Photo'}</span>`;
+      }
     });
   }
 
-  form.addEventListener('submit', (e) => {
+  // ── Save ──────────────────────────────────────────────────
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
+
+    const currentSession = getSession();
+    const photoUrl = _pendingPhotoUrl || currentSession?.profileImage || null;
+
+    // Mandatory guard — technicians must have a profile photo
+    if (!photoUrl) {
+      showToast(_t('toast_photo_required') || 'Please add a profile photo before saving.', 'error');
+      if (preview) preview.classList.add('avatar-required');
+      return;
+    }
+
     const account = getAccount() || {};
     const passwordFields = new Set(['newPassword', 'confirmPassword']);
     document.querySelectorAll('[data-settings-field]').forEach(f => {
-      if (!passwordFields.has(f.dataset.settingsField)) {
-        account[f.dataset.settingsField] = f.value;
-      }
+      if (!passwordFields.has(f.dataset.settingsField)) account[f.dataset.settingsField] = f.value;
     });
     localStorage.setItem('servio_account', JSON.stringify(account));
-    const session = getSession();
-    if (session && account.fullName) {
-      session.name = account.fullName;
-      localStorage.setItem('servio_session', JSON.stringify(session));
+
+    try {
+      await updateMe({
+        name:         account.fullName || account.name || '',
+        phone:        account.phone || '',
+        profileImage: photoUrl,
+      });
+
+      if (currentSession) {
+        if (account.fullName) currentSession.name = account.fullName;
+        currentSession.profileImage = photoUrl;
+        localStorage.setItem('servio_session', JSON.stringify(currentSession));
+      }
+      if (_pendingPhotoUrl) _pendingPhotoUrl = null;
+      // Keep servio_avatar_cache — server may return a local path that browsers can't load
+
+      showToast(_t('toast_settings_saved') || 'Your changes have been saved.', 'success');
+    } catch (err) {
+      showToast(err.message || 'Failed to save settings.', 'error');
     }
-    showToast(typeof window.t === 'function' ? window.t('toast_settings_saved') : 'Your changes have been saved.', 'success');
   });
 
-  // Delete account button (Fix 3)
+  // Delete account button
   const deleteBtn = document.getElementById('btn-delete-account');
   if (deleteBtn) {
     deleteBtn.addEventListener('click', () => {
-      showToast(typeof window.t === 'function' ? window.t('toast_delete_demo') : 'Account deletion is not available in demo mode.', 'info');
+      showToast(_t('toast_delete_demo') || 'Account deletion is not available in demo mode.', 'info');
     });
   }
 
@@ -658,6 +808,185 @@ function initDashLogout() {
   });
 }
 
+/* ── Pending account guard ──────────────────────────────────
+   Blocks all dashboard tabs except Verification and Settings
+   while the account is pending admin approval.
+─────────────────────────────────────────────────────────── */
+function initPendingGuard() {
+  const account = getAccount();
+  const isPending =
+    account?.status === 'pending' ||
+    account?.verificationStatus === 'pending';
+  if (!isPending) return;
+
+  // Build inline doc status rows
+  const docs = account?.uploadedDocs || {};
+  const DOC_LABELS = {
+    idFront:   'National ID — Front',
+    idBack:    'National ID — Back',
+    idSelfie:  'Selfie with ID',
+    cvFile:    'CV / Resume',
+    portfolio: 'Portfolio',
+  };
+  const docRows = Object.entries(DOC_LABELS).map(([key, label]) => {
+    const doc = docs[key];
+    const uploaded = key === 'portfolio' ? !!(doc?.count) : !!(doc?.uploaded);
+    const badge = uploaded
+      ? '<span style="color:#065f46;font-weight:600;font-size:0.75rem;">&#10003; Uploaded</span>'
+      : '<span style="color:#92400e;font-size:0.75rem;">Pending</span>';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--color-border,#e5e7eb);">
+      <span style="font-size:0.82rem;">${label}</span>${badge}</div>`;
+  }).join('');
+
+  const overlay = document.createElement('div');
+  overlay.id = 'pending-overlay';
+  overlay.setAttribute('role', 'alert');
+  overlay.setAttribute('aria-live', 'polite');
+  overlay.innerHTML = `
+    <div class="pending-overlay__card">
+      <div class="pending-overlay__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+        </svg>
+      </div>
+      <h2 class="pending-overlay__title">Application Under Review</h2>
+      <p class="pending-overlay__desc">Your documents are being reviewed by our team. This typically takes 1–2 business days. You'll have full access once your account is approved.</p>
+      <div style="width:100%;margin-top:12px;margin-bottom:4px;">${docRows}</div>
+      <p style="font-size:0.78rem;color:var(--color-text-light,#6b7280);margin-top:12px;">Questions? Contact us at <strong>support@servio.com</strong></p>
+      <div style="width:100%;height:1px;background:var(--color-border,#e5e7eb);margin:20px 0 16px;"></div>
+      <button type="button" id="pending-overlay-logout" style="display:inline-flex;align-items:center;gap:7px;padding:9px 20px;border:none;border-radius:10px;background:#f3f4f6;color:#6b7280;font-size:0.82rem;font-weight:500;cursor:pointer;letter-spacing:0.01em;transition:background 0.18s,color 0.18s;" onmouseover="this.style.background='#fee2e2';this.style.color='#dc2626';" onmouseout="this.style.background='#f3f4f6';this.style.color='#6b7280';">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Sign Out
+      </button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  // Overlay is permanent — never hidden while account is pending
+  overlay.removeAttribute('hidden');
+
+  document.getElementById('pending-overlay-logout')?.addEventListener('click', () => {
+    localStorage.removeItem('servio_session');
+    window.location.href = './login.html';
+  });
+
+  // Swallow ALL tab navigation so sidebar clicks do nothing while pending
+  document.querySelectorAll('[data-tab]').forEach(tab => {
+    tab.addEventListener('click', e => e.stopImmediatePropagation(), true);
+  });
+}
+
+/* ── Verification tab: sync document statuses from signup data ──
+   Reads account.uploadedDocs written by signup.js and updates
+   each document row's badge and shows uploaded filenames.
+─────────────────────────────────────────────────────────── */
+function initVerificationTab() {
+  const panel = document.getElementById('panel-verification');
+  if (!panel) return;
+
+  const account = getAccount();
+  const docs    = account?.uploadedDocs || {};
+
+  panel.querySelectorAll('[data-verif-doc]').forEach(row => {
+    const key   = row.dataset.verifDoc;
+    const doc   = docs[key];
+    const badge = row.querySelector('[data-verif-badge]');
+    const viewBtn  = row.querySelector('[data-verif-view]');
+    const labelSpan = row.querySelector('[data-verif-upload-label]');
+    const fileInput = row.querySelector('input[type="file"]');
+    const body = row.querySelector('.verif-doc-row-v2__body');
+
+    // Determine upload state
+    const isPortfolio = key === 'portfolio';
+    const uploaded = isPortfolio ? !!(doc?.count) : !!(doc?.uploaded);
+    const url      = isPortfolio ? doc?.files?.[0]?.url : doc?.url;
+    const name     = isPortfolio
+      ? (doc?.count ? doc.count + ' file' + (doc.count > 1 ? 's' : '') + ' uploaded' : '')
+      : (doc?.name || '');
+
+    // Update badge
+    if (badge) {
+      if (uploaded) {
+        badge.className = 'badge badge--confirmed';
+        badge.textContent = 'Uploaded';
+      } else {
+        badge.className = 'badge badge--pending';
+        badge.textContent = 'Pending';
+      }
+    }
+
+    // Show/wire View button
+    if (viewBtn) {
+      if (uploaded && url) {
+        viewBtn.hidden = false;
+        viewBtn.addEventListener('click', () => window.open(url, '_blank'));
+      } else {
+        viewBtn.hidden = true;
+      }
+    }
+
+    // Update upload label
+    if (labelSpan) labelSpan.textContent = uploaded ? 'Replace' : 'Upload';
+
+    // Show filename hint
+    if (name && body && !body.querySelector('.verif-doc-filename')) {
+      const hint = document.createElement('p');
+      hint.className = 'verif-doc-filename';
+      hint.textContent = name;
+      body.appendChild(hint);
+    }
+
+    // Wire re-upload
+    if (fileInput) {
+      fileInput.addEventListener('change', async () => {
+        const files = isPortfolio ? [...fileInput.files] : [fileInput.files[0]];
+        if (!files.length || !files[0]) return;
+
+        if (labelSpan) labelSpan.textContent = 'Uploading…';
+        try {
+          const uploads = await Promise.all(files.map(f => uploadPublicFile(f, key)));
+          const firstUrl = uploads[0]?.url || '';
+
+          // Update badge
+          if (badge) { badge.className = 'badge badge--confirmed'; badge.textContent = 'Uploaded'; }
+          // Update view button
+          if (viewBtn && firstUrl) { viewBtn.hidden = false; viewBtn.onclick = () => window.open(firstUrl, '_blank'); }
+          // Update label
+          if (labelSpan) labelSpan.textContent = 'Replace';
+          // Update filename hint
+          const existingHint = body?.querySelector('.verif-doc-filename');
+          const newName = isPortfolio
+            ? files.length + ' file' + (files.length > 1 ? 's' : '') + ' uploaded'
+            : (files[0].name || '');
+          if (existingHint) {
+            existingHint.textContent = newName;
+          } else if (body && newName) {
+            const hint = document.createElement('p');
+            hint.className = 'verif-doc-filename';
+            hint.textContent = newName;
+            body.appendChild(hint);
+          }
+
+          // Persist to account
+          const acc = getAccount() || {};
+          if (!acc.uploadedDocs) acc.uploadedDocs = {};
+          if (isPortfolio) {
+            acc.uploadedDocs.portfolio = { uploaded: true, count: uploads.length, files: uploads.map(u => ({ url: u.url, name: u.name || '' })) };
+          } else {
+            acc.uploadedDocs[key] = { uploaded: true, url: firstUrl, name: files[0].name || '' };
+          }
+          localStorage.setItem('servio_account', JSON.stringify(acc));
+
+          showToast('Document uploaded successfully.', 'success');
+        } catch {
+          if (labelSpan) labelSpan.textContent = uploaded ? 'Replace' : 'Upload';
+          showToast('Upload failed. Please try again.', 'error');
+        }
+      });
+    }
+  });
+}
+
 /* ── Notification panel ─────────────────────────────────── */
 function initNotifPanel() {
   const btn   = document.getElementById('topbar-notif-btn');
@@ -766,6 +1095,8 @@ initAccountTab();
 initDashLogout();
 initNotifPanel();
 initPhase2();
+initVerificationTab();
+initPendingGuard();
 
 /* Re-render dynamic grids and welcome text on language change */
 document.addEventListener('langchange', () => {

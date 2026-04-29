@@ -32,5 +32,7 @@ export function initScrollReveal() {
   });
 }
 
+window.initScrollReveal = initScrollReveal;
+
 
 // .

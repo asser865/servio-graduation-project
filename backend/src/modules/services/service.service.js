@@ -12,7 +12,7 @@ const ApiError       = require('../../utils/ApiError');
  * WHAT: Returns a paginated list of available services.
  * HOW:  Supports ?category filtering.
  */
-const getAllServices = async ({ category, page = 1, limit = 10 }) => {
+const getAllServices = async ({ category, page = 1, limit = 100 }) => {
   const filter = { isActive: true };
   if (category) filter.category = category;
 
@@ -76,15 +76,12 @@ const updateService = async (id, data) => {
 
 /**
  * DELETE SERVICE (Admin Only)
- * WHAT: Deactivates a service (soft-delete).
- * WHY:  We don't remove it completely to preserve history of old bookings.
+ * WHAT: Permanently removes a service from the catalogue.
+ * NOTE: Uses hard delete so admin actions are reflected immediately in the DB.
+ *       Booking documents will retain the service ID for history purposes.
  */
 const deleteService = async (id) => {
-  const service = await Service.findByIdAndUpdate(
-    id,
-    { isActive: false },
-    { new: true }
-  );
+  const service = await Service.findByIdAndDelete(id);
   if (!service) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Service not found.');
   }

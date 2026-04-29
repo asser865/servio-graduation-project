@@ -4,8 +4,7 @@
  */
 
 import { animate, stagger } from 'https://cdn.jsdelivr.net/npm/motion@12.38.0/+esm';
-import { TECHNICIANS } from '../data/technicians-data.js';
-import { SERVICES } from '../data/services-data.js';
+import { getWorker } from '../api/users.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -35,100 +34,117 @@ const CLOCK_SVG = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" s
 
 // ── Render ─────────────────────────────────────────────────────────────────────
 
-function render(tech, techId, serviceKey, lang) {
+function render(worker, lang) {
   const isAr = lang === 'ar';
+  const name = escapeHtml(worker.name || 'Technician');
+  const categories = (worker.categories || []).join(', ') || '—';
+  const rating = worker.averageRating?.toFixed(1) || '0.0';
+  const reviewCount = worker.totalReviews || 0;
+  const avatarUrl = worker.profileImage || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(worker.name || 'T') + '&background=0d6efd&color=fff&size=256';
+  const memberSince = worker.createdAt
+    ? new Date(worker.createdAt).toLocaleDateString(isAr ? 'ar-EG' : 'en-US', { year: 'numeric', month: 'long' })
+    : '—';
 
-  // Title
-  const name = isAr ? tech.nameAr : tech.name;
-  const title = isAr ? tech.titleAr : tech.title;
-  document.title = `${name} – ${title} | SERVIO`;
+  document.title = `${name} | SERVIO`;
 
-  // Images
   const coverImg = el('cover-img');
-  if (coverImg) { coverImg.src = tech.cover; coverImg.alt = name; }
+  if (coverImg) { coverImg.src = worker.profileImage || avatarUrl; coverImg.alt = name; }
+
   const avatar = el('avatar');
-  if (avatar) { avatar.src = tech.avatar; avatar.alt = name; }
+  if (avatar) { avatar.src = avatarUrl; avatar.alt = name; avatar.onerror = () => { avatar.src = 'https://ui-avatars.com/api/?name=T&background=0d6efd&color=fff&size=256'; }; }
 
-  // Name & title
   setText('name', name);
-  setText('title', title);
+  setText('title', categories.toUpperCase());
+  setText('rating', rating);
+  setText('location', worker.locationLabel || (isAr ? 'القاهرة' : 'Cairo'));
+  setText('member-since', memberSince);
+  setText('bio', worker.bio || '—');
+  setText('flat-rate', (worker.hourlyRate || 0) + ' EGP');
+  setText('booking-rate', worker.hourlyRate || '0');
+  setText('years-exp', (worker.yearsExperience || 0));
+  setText('response-time', '30M'); // Hardcoded as per reference image style
+  setText('job-success', '97%');   // Hardcoded as per reference image style
 
-  // Meta
-  setText('location', isAr
-    ? `${tech.distance} ميل (${tech.areaAr})`
-    : `${tech.distance} mi. (${tech.area})`);
-  setText('rating', String(tech.rating));
   const reviewMeta = el('review-meta');
   if (reviewMeta) {
-    reviewMeta.textContent = isAr
-      ? `(${tech.reviewCount} تقييم)`
-      : `(${tech.reviewCount} Reviews)`;
+    reviewMeta.textContent = isAr ? `(${reviewCount} تقييم)` : `(${reviewCount} Reviews)`;
+  }
+  setText('rating-big', rating);
+  const ratingCount = el('rating-count');
+  if (ratingCount) {
+    ratingCount.textContent = isAr ? `بناءً على ${reviewCount} تقييم` : `Based on ${reviewCount} reviews`;
   }
 
-  // Stats
-  setText('flat-rate', isAr ? tech.flatRateAr : tech.flatRate);
-  setText('years-exp', String(tech.yearsExp));
-  setText('response-time', tech.responseTime);
-  setText('job-success', tech.jobSuccess);
+  // Availability Pills Logic
+  const availType = worker.availabilityType || 'both'; // Default to both if not set
+  const pills = document.querySelectorAll('.avail-pill');
+  pills.forEach(pill => {
+    const dayKey = pill.getAttribute('data-i18n') || '';
+    pill.classList.remove('avail-pill--on', 'avail-pill--off');
+    
+    // Simple logic: Fri is usually 'off' unless 'both' or specific days
+    if (dayKey === 'prof_day_fri') {
+      pill.classList.add(availType === 'both' ? 'avail-pill--on' : 'avail-pill--off');
+    } else {
+      // Sat-Thu are 'on' for weekdays or both, 'off' for weekends (approximate)
+      if (availType === 'weekdays' || availType === 'both') {
+        pill.classList.add('avail-pill--on');
+      } else {
+        pill.classList.add('avail-pill--off');
+      }
+    }
+  });
 
-  // Bio
-  setText('bio', isAr ? tech.bioAr : tech.bioEn);
-
-  // Member since
-  setText('member-since', isAr ? tech.memberSinceAr : tech.memberSince);
-
-  // Services grid
-  const servicesGrid = el('services-grid');
-  if (servicesGrid) {
-    servicesGrid.innerHTML = tech.services.map(svc => {
-      const svcName     = escapeHtml(isAr ? svc.nameAr     : svc.nameEn);
-      const svcPrice    = escapeHtml(isAr ? svc.priceAr    : svc.priceEn);
-      const svcDuration = escapeHtml(isAr ? svc.durationAr : svc.durationEn);
-      return `
-      <div class="service-card${svc.emergency ? ' service-card--emergency' : ''}">
-        <div class="service-card__icon-wrap">
-          <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8">
-            ${svc.emergency
-              ? '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>'
-              : '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>'}
-          </svg>
-        </div>
-        <div class="service-card__body">
-          <div class="service-card__name">
-            ${svcName}
-            ${svc.emergency ? '<span class="emergency-badge">24/7</span>' : ''}
-          </div>
-          <div class="service-card__price">${svcPrice}</div>
-          <div class="service-card__duration">
-            ${CLOCK_SVG}
-            <span>${svcDuration}</span>
-          </div>
-        </div>
-      </div>`;
-    }).join('');
-  }
-
-  // Coverage areas
   const coverageAreas = el('coverage-areas');
   if (coverageAreas) {
-    const areaStr = isAr ? tech.areaAr : tech.area;
-    coverageAreas.innerHTML = areaStr
-      .split(', ')
-      .map(a => `<span class="coverage-tag">${escapeHtml(a)}</span>`)
+    coverageAreas.innerHTML = (worker.categories || ['general'])
+      .map(c => `<span class="coverage-tag">${escapeHtml(c)}</span>`)
       .join('');
   }
 
-  // Reviews overview numbers
-  setText('rating-big', String(tech.rating));
-  const ratingCount = el('rating-count');
-  if (ratingCount) {
-    ratingCount.textContent = isAr
-      ? `بناءً على ${tech.reviewCount} تقييم`
-      : `Based on ${tech.reviewCount} reviews`;
+  const servicesGrid = el('services-grid');
+  if (servicesGrid) {
+    // Show worker skills as service cards
+    const displayList = worker.skills && worker.skills.length ? worker.skills : worker.categories;
+    servicesGrid.innerHTML = displayList.length
+      ? displayList.map(c => `
+        <div class="service-card">
+          <div class="service-card__body">
+            <div class="service-card__name">${escapeHtml(c)}</div>
+            <div class="service-card__price">—</div>
+          </div>
+        </div>`).join('')
+      : '<p>—</p>';
+  }
+}
+
+// ── Render reviews ─────────────────────────────────────────────────────────────
+
+function renderReviews(reviews, lang) {
+  const isAr = lang === 'ar';
+  const container = el('reviews-list');
+  if (!container) return;
+
+  if (!reviews || !reviews.length) {
+    container.innerHTML = `<p style="padding:1rem">${isAr ? 'لا توجد تقييمات بعد.' : 'No reviews yet.'}</p>`;
+    return;
   }
 
-  // Booking rate
-  setText('booking-rate', String(tech.price));
+  container.innerHTML = reviews.map(r => {
+    const reviewer = escapeHtml(r.user?.name || 'Customer');
+    const comment = escapeHtml(r.comment || '');
+    const stars = '★'.repeat(Math.round(r.rating || 0)) + '☆'.repeat(5 - Math.round(r.rating || 0));
+    const date = r.createdAt ? new Date(r.createdAt).toLocaleDateString(isAr ? 'ar-EG' : 'en-US') : '';
+    return `
+      <div class="review-card">
+        <div class="review-card__header">
+          <span class="review-card__name">${reviewer}</span>
+          <span class="review-card__stars">${stars}</span>
+          <span class="review-card__date">${date}</span>
+        </div>
+        <p class="review-card__body">${comment}</p>
+      </div>`;
+  }).join('');
 }
 
 // ── Animations ─────────────────────────────────────────────────────────────────
@@ -254,27 +270,51 @@ function initLightbox() {
 
 // ── Init ───────────────────────────────────────────────────────────────────────
 
-document.addEventListener('DOMContentLoaded', () => {
-  const techId    = getParam('id');
-  const serviceKey = getParam('service');
-  const tech      = techId && TECHNICIANS[techId];
+document.addEventListener('DOMContentLoaded', async () => {
+  const techId = getParam('id');
+  const serviceKey = getParam('service') || '';
 
-  if (!tech) {
-    const fallback = serviceKey
-      ? `./technician-listing.html?service=${serviceKey}`
-      : './technician-listing.html';
-    window.location.replace(fallback);
+  if (!techId) {
+    window.location.replace('./technician-listing.html');
     return;
   }
 
   const getLang = () => window.__lang || document.documentElement.lang || 'en';
 
-  render(tech, techId, serviceKey, getLang());
-  runAnimations();
-  initCounters();
-  initLightbox();
+  try {
+    const res = await getWorker(techId);
+    // api client already unwraps { success, data } → res IS the data object directly
+    const worker = res?.worker || res?.data?.worker;
+    const reviews = res?.reviews || res?.data?.reviews || [];
 
-  document.addEventListener('langchange', e => {
-    render(tech, techId, serviceKey, e.detail?.lang || getLang());
-  });
+    if (!worker) {
+      console.error('Worker not found in response:', res);
+      window.location.replace('./technician-listing.html' + (serviceKey ? `?service=${serviceKey}` : ''));
+      return;
+    }
+
+    render(worker, getLang());
+    renderReviews(reviews, getLang());
+
+    document.addEventListener('langchange', e => {
+      const lang = e.detail?.lang || getLang();
+      render(worker, lang);
+      renderReviews(reviews, lang);
+    });
+
+    // Book Now button — link to booking page
+    const bookBtn = el('book-btn') || document.querySelector('[data-book-btn]') || document.querySelector('.profile-cta__btn');
+    if (bookBtn) {
+      bookBtn.href = `./booking.html?worker=${techId}&service=${serviceKey}`;
+    }
+
+    runAnimations();
+    initCounters();
+    initLightbox();
+
+  } catch (err) {
+    console.error('Failed to load worker profile:', err);
+    const main = document.querySelector('main');
+    if (main) main.innerHTML = '<p style="padding:3rem;text-align:center">Profile not found.</p>';
+  }
 });
