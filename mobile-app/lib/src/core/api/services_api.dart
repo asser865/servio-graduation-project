@@ -1,3 +1,4 @@
+import '../models/backend_service_model.dart';
 import 'api_client.dart';
 
 class ServicesApi {
@@ -5,18 +6,22 @@ class ServicesApi {
 
   final ApiClient _client;
 
-  Future<Map<String, dynamic>> getServices({
-    String? category,
-    int page = 1,
-    int limit = 100,
-  }) async {
+  Future<List<BackendService>> getServices({String? category}) async {
     final qs = Uri(
       queryParameters: <String, String>{
-        'page': '$page',
-        'limit': '$limit',
+        'limit': '100',
         if (category != null && category.isNotEmpty) 'category': category,
       },
     ).query;
-    return _client.unwrapData(await _client.get('/services?$qs'));
+    final data = _client.unwrapData(await _client.get('/services?$qs'));
+    final list = (data['services'] as List<dynamic>?) ??
+        (data['data'] as List<dynamic>?) ??
+        <dynamic>[];
+    return list.whereType<Map<String, dynamic>>().map(BackendService.fromJson).toList();
+  }
+
+  Future<BackendService> getServiceById(String id) async {
+    final data = _client.unwrapData(await _client.get('/services/$id'));
+    return BackendService.fromJson(data);
   }
 }
