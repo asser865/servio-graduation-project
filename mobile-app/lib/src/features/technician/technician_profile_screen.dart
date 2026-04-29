@@ -9,6 +9,15 @@ import '../../design_system/widgets/servio_card.dart';
 import '../auth/role_selection_screen.dart';
 import '../marketing/about_screen.dart';
 import '../marketing/contact_screen.dart';
+import '../marketing/privacy_policy_screen.dart';
+import '../marketing/terms_of_service_screen.dart';
+import 'availability_manager_screen.dart';
+import 'earnings_screen.dart';
+import 'job_queue_screen.dart';
+import 'technician_change_password_screen.dart';
+import 'technician_dashboard_screen.dart';
+import 'technician_edit_profile_screen.dart';
+import 'technician_notification_settings_screen.dart';
 import 'verification_upload_screen.dart';
 
 class TechnicianSettingsProfileScreen extends StatelessWidget {
@@ -34,7 +43,33 @@ class TechnicianSettingsProfileScreen extends StatelessWidget {
           ServioBottomNavItem(icon: Icons.person_rounded, label: 'Profile'),
         ],
         currentIndex: 4,
-        onTap: (_) {},
+        onTap: (int index) {
+          if (index == 0) {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const TechnicianDashboardScreen(),
+              ),
+            );
+          } else if (index == 1) {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const JobQueueScreen(),
+              ),
+            );
+          } else if (index == 2) {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const EarningsScreen(),
+              ),
+            );
+          } else if (index == 3) {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const AvailabilityManagerScreen(),
+              ),
+            );
+          }
+        },
       ),
       appBar: AppBar(
         title: const Text('Profile & Settings'),
@@ -149,14 +184,112 @@ class TechnicianSettingsProfileScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            Text('Settings', style: theme.textTheme.titleMedium),
+            Text('Account', style: theme.textTheme.titleMedium),
             const SizedBox(height: 12),
-            _SettingsCard(
-              isDark: isDark,
-              onToggleDark: (bool v) => themeProvider.setMode(
-                v ? ThemeMode.dark : ThemeMode.light,
+            ServioCard(
+              radius: ServioRadius.lg,
+              child: Column(
+                children: <Widget>[
+                  _SimpleSetting(
+                    label: 'Edit Profile',
+                    onTap: () {
+                      Navigator.of(context).push(MaterialPageRoute<void>(
+                        builder: (_) => const TechnicianEditProfileScreen(),
+                      ));
+                    },
+                  ),
+                  _SimpleSetting(
+                    label: 'Change Password',
+                    onTap: () {
+                      Navigator.of(context).push(MaterialPageRoute<void>(
+                        builder: (_) => const TechnicianChangePasswordScreen(),
+                      ));
+                    },
+                  ),
+                  _SimpleSetting(
+                    label: 'Notification Settings',
+                    onTap: () {
+                      Navigator.of(context).push(MaterialPageRoute<void>(
+                        builder: (_) => const TechnicianNotificationSettingsScreen(),
+                      ));
+                    },
+                  ),
+                ],
               ),
-              onLogout: () async {
+            ),
+            const SizedBox(height: 16),
+            Text('Preferences', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 12),
+            ServioCard(
+              radius: ServioRadius.lg,
+              child: Row(
+                children: <Widget>[
+                  const Expanded(child: Text('Dark Mode')),
+                  Switch(
+                    value: isDark,
+                    onChanged: (bool v) => themeProvider.setMode(
+                      v ? ThemeMode.dark : ThemeMode.light,
+                    ),
+                    activeColor: servio.accent,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text('Support', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 12),
+            ServioCard(
+              radius: ServioRadius.lg,
+              child: Column(
+                children: <Widget>[
+                  _SimpleSetting(
+                    label: 'Contact Us',
+                    onTap: () {
+                      Navigator.of(context).push(MaterialPageRoute<void>(
+                        builder: (_) => const ContactScreen(),
+                      ));
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text('Legal', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 12),
+            ServioCard(
+              radius: ServioRadius.lg,
+              child: Column(
+                children: <Widget>[
+                  _SimpleSetting(
+                    label: 'About SERVIO',
+                    onTap: () {
+                      Navigator.of(context).push(MaterialPageRoute<void>(
+                        builder: (_) => const AboutScreen(),
+                      ));
+                    },
+                  ),
+                  _SimpleSetting(
+                    label: 'Terms of Service',
+                    onTap: () {
+                      Navigator.of(context).push(MaterialPageRoute<void>(
+                        builder: (_) => const TermsOfServiceScreen(),
+                      ));
+                    },
+                  ),
+                  _SimpleSetting(
+                    label: 'Privacy Policy',
+                    onTap: () {
+                      Navigator.of(context).push(MaterialPageRoute<void>(
+                        builder: (_) => const PrivacyPolicyScreen(),
+                      ));
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            GestureDetector(
+              onTap: () async {
                 await context.read<SessionProvider>().logout();
                 if (context.mounted) {
                   Navigator.of(context).pushAndRemoveUntil(
@@ -167,7 +300,16 @@ class TechnicianSettingsProfileScreen extends StatelessWidget {
                   );
                 }
               },
+              child: Text(
+                'Log Out',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                      color: servio.danger,
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
             ),
+            const SizedBox(height: 20),
           ],
         ),
       ),
@@ -280,74 +422,6 @@ class _StatusRow extends StatelessWidget {
   }
 }
 
-class _SettingsCard extends StatelessWidget {
-  const _SettingsCard({
-    required this.isDark,
-    required this.onToggleDark,
-    required this.onLogout,
-  });
-
-  final bool isDark;
-  final ValueChanged<bool> onToggleDark;
-  final VoidCallback onLogout;
-
-  @override
-  Widget build(BuildContext context) {
-    final servio = context.servio;
-    return ServioCard(
-      radius: ServioRadius.lg,
-      child: Column(
-        children: <Widget>[
-          const _SimpleSetting(label: 'Edit Profile'),
-          const _SimpleSetting(label: 'Notification Settings'),
-          Padding(
-            padding: const EdgeInsets.only(bottom: 14),
-            child: Row(
-              children: <Widget>[
-                const Expanded(child: Text('Dark Mode')),
-                Switch(
-                  value: isDark,
-                  onChanged: onToggleDark,
-                  activeColor: servio.accent,
-                ),
-              ],
-            ),
-          ),
-          const _SimpleSetting(label: 'Help Center'),
-          _SimpleSetting(
-            label: 'About Us',
-            onTap: () {
-              Navigator.of(context).push(MaterialPageRoute<void>(
-                builder: (_) => const AboutScreen(),
-              ));
-            },
-          ),
-          _SimpleSetting(
-            label: 'Contact Us',
-            onTap: () {
-              Navigator.of(context).push(MaterialPageRoute<void>(
-                builder: (_) => const ContactScreen(),
-              ));
-            },
-          ),
-          GestureDetector(
-            onTap: onLogout,
-            child: Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: Text(
-                'Log Out',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: servio.danger,
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _SimpleSetting extends StatelessWidget {
   const _SimpleSetting({required this.label, this.onTap});

@@ -8,6 +8,8 @@ import '../../design_system/widgets/servio_card.dart';
 import '../auth/role_selection_screen.dart';
 import '../marketing/about_screen.dart';
 import '../marketing/contact_screen.dart';
+import '../marketing/privacy_policy_screen.dart';
+import '../marketing/terms_of_service_screen.dart';
 import '../messages/messages_screen.dart';
 import 'ai_smart_match_screen.dart';
 import 'my_bookings_screen.dart';
@@ -135,13 +137,32 @@ class CustomerProfileScreen extends StatelessWidget {
             const SizedBox(height: 24),
             Text('Account', style: theme.textTheme.titleMedium),
             const SizedBox(height: 12),
-            const _SettingsCard(
-              items: <String>[
+            _SettingsCard(
+              items: const <String>[
                 'Edit Profile',
                 'My Addresses',
                 'Change Password',
                 'Notification Settings',
               ],
+              onItemTap: (String item) {
+                if (item == 'Edit Profile') {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(builder: (_) => const EditProfileScreen()),
+                  );
+                } else if (item == 'My Addresses') {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(builder: (_) => const MyAddressesScreen()),
+                  );
+                } else if (item == 'Change Password') {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(builder: (_) => const ChangePasswordScreen()),
+                  );
+                } else if (item == 'Notification Settings') {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(builder: (_) => const NotificationSettingsScreen()),
+                  );
+                }
+              },
             ),
             const SizedBox(height: 16),
             Text('Preferences', style: theme.textTheme.titleMedium),
@@ -157,14 +178,6 @@ class CustomerProfileScreen extends StatelessWidget {
                       v ? ThemeMode.dark : ThemeMode.light,
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  _SwitchRow(
-                    label: localeProvider.isArabic
-                        ? 'Language: العربية'
-                        : 'Language: English',
-                    value: localeProvider.isArabic,
-                    onChanged: (_) => localeProvider.toggle(),
-                  ),
                 ],
               ),
             ),
@@ -173,7 +186,6 @@ class CustomerProfileScreen extends StatelessWidget {
             const SizedBox(height: 12),
             _SettingsCard(
               items: const <String>[
-                'Help Center',
                 'Report a Problem',
                 'Contact Us',
               ],
@@ -205,9 +217,15 @@ class CustomerProfileScreen extends StatelessWidget {
               onItemTap: (String item) {
                 if (item == 'About SERVIO') {
                   Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const AboutScreen(),
-                    ),
+                    MaterialPageRoute<void>(builder: (_) => const AboutScreen()),
+                  );
+                } else if (item == 'Terms of Service') {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(builder: (_) => const TermsOfServiceScreen()),
+                  );
+                } else if (item == 'Privacy Policy') {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(builder: (_) => const PrivacyPolicyScreen()),
                   );
                 }
               },

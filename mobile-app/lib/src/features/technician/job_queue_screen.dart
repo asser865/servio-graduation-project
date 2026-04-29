@@ -8,6 +8,7 @@ import '../../design_system/widgets/servio_status_chip.dart';
 import 'availability_manager_screen.dart';
 import 'earnings_screen.dart';
 import 'job_details_screen.dart';
+import 'technician_dashboard_screen.dart';
 import 'technician_profile_screen.dart';
 
 class JobQueueScreen extends StatefulWidget {
@@ -37,7 +38,11 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
         currentIndex: 1,
         onTap: (int index) {
           if (index == 0) {
-            Navigator.of(context).pop();
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const TechnicianDashboardScreen(),
+              ),
+            );
           } else if (index == 2) {
             Navigator.of(context).push(
               MaterialPageRoute<void>(
