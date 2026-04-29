@@ -58,13 +58,14 @@ export function initAuthHeader() {
   const initials = getInitials(session.name);
   const dashHref = getDashboardHref(session.role);
 
+  const safeName = (session.name || 'user').replace(/[<>"'&]/g, '');
   const wrapper = document.createElement('div');
   wrapper.className = 'header-avatar';
   wrapper.setAttribute('data-header-avatar', '');
   wrapper.innerHTML = `
     <button class="header-avatar__btn" type="button"
       aria-haspopup="true" aria-expanded="false"
-      aria-label="Account menu for ${session.name || 'user'}">
+      aria-label="Account menu for ${safeName}">
       <span class="header-avatar__initials" aria-hidden="true">${initials}</span>
     </button>
     <div class="header-avatar__dropdown" hidden role="menu">
@@ -97,6 +98,7 @@ export function initAuthHeader() {
   // Logout
   wrapper.querySelector('[data-logout]').addEventListener('click', () => {
     localStorage.removeItem('servio_session');
+    localStorage.removeItem('servio_token');
     // Home lives in pages/ (same folder as other site pages), not project root
     window.location.href = './index.html';
   });

@@ -1,0 +1,33 @@
+const mongoose = require('mongoose');
+
+const settingsSchema = new mongoose.Schema({
+  commissionRate:       { type: Number, default: 10 },
+  maxCashLiability:     { type: Number, default: 5000 },
+  autoReleaseWindow:    { type: Number, default: 48 },
+  minDepositPct:        { type: Number, default: 20 },
+  minBookingAmount:     { type: Number, default: 100 },
+  cashPaymentsEnabled:  { type: Boolean, default: true },
+  reqNationalId:        { type: Boolean, default: true },
+  reqTradeLicense:      { type: Boolean, default: false },
+  autoSuspendDisputes:  { type: Number, default: 3 },
+  minRatingFlag:        { type: Number, default: 2 },
+  maxCashJobsDay:       { type: Number, default: 5 },
+  notifNewUser:         { type: Boolean, default: true },
+  notifNewTech:         { type: Boolean, default: true },
+  notifNewDispute:      { type: Boolean, default: true },
+  notifOverduePayment:  { type: Boolean, default: true },
+  notifDailySummary:    { type: Boolean, default: false },
+  adminAlertEmail:      { type: String, default: '' },
+  twoFAEnabled:         { type: Boolean, default: false },
+  sessionTimeout:       { type: Number, default: 60 },
+  maintenanceMode:      { type: Boolean, default: false },
+  platformName:         { type: String, default: 'Servio' },
+  supportEmail:         { type: String, default: '' },
+  maxUploadSize:        { type: Number, default: 15 },
+  flagAiMatch:          { type: Boolean, default: true },
+  flagCashPayments:     { type: Boolean, default: true },
+  flagTechSignup:       { type: Boolean, default: true },
+  flagReviews:          { type: Boolean, default: true },
+}, { timestamps: true });
+
+module.exports = mongoose.model('Settings', settingsSchema);

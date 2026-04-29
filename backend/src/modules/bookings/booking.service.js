@@ -14,7 +14,7 @@ const ApiError       = require('../../utils/ApiError');
 const TRANSITION_RULES = {
   worker: ['accepted', 'rejected', 'in_progress', 'completed'],
   user:   ['cancelled'],
-  admin:  ['pending', 'accepted', 'rejected', 'in_progress', 'completed', 'cancelled'],
+  admin:  ['pending', 'accepted', 'rejected', 'in_progress', 'completed', 'cancelled', 'disputed'],
 };
 
 /**
@@ -162,4 +162,20 @@ const updateBookingStatus = async (bookingId, newStatus, actorId, actorRole) => 
   return booking;
 };
 
-module.exports = { createBooking, getUserBookings, getWorkerBookings, getAllBookings, updateBookingStatus };
+const getBookingById = async (bookingId, requestingUser) => {
+  const booking = await Booking.findById(bookingId)
+    .populate('user',    'name email phone profileImage')
+    .populate('worker',  'name email phone profileImage')
+    .populate('service', 'title basePrice category');
+
+  if (!booking) throw new ApiError(StatusCodes.NOT_FOUND, 'Booking not found');
+
+  const isUser   = booking.user._id.toString() === requestingUser.id.toString();
+  const isWorker = booking.worker._id.toString() === requestingUser.id.toString();
+  const isAdmin  = requestingUser.role === 'admin';
+  if (!isUser && !isWorker && !isAdmin) throw new ApiError(StatusCodes.FORBIDDEN, 'Not authorized to view this booking');
+
+  return booking;
+};
+
+module.exports = { createBooking, getUserBookings, getWorkerBookings, getAllBookings, updateBookingStatus, getBookingById };

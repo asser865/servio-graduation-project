@@ -12,6 +12,19 @@ const Payment         = require('../payments/payment.model');
 const Dispute         = require('../payments/dispute.model');
 const ApiError        = require('../../utils/ApiError');
 const ApiResponse     = require('../../utils/ApiResponse');
+const { logEvent }    = require('../admin/audit.service');
+
+function normalizeWorkerDecision(body) {
+  if (body?.decision === 'approved' || body?.isVerified === true) return 'approved';
+  if (body?.decision === 'rejected' || body?.isVerified === false) return 'rejected';
+  return '';
+}
+const getMe = async (req, res) => {
+  const user = await User.findById(req.user.id).select('-password');
+  if (!user) throw new ApiError(StatusCodes.NOT_FOUND, 'User not found.');
+  return ApiResponse.success(res, StatusCodes.OK, 'Profile retrieved.', user);
+};
+
 
 // ── GET WORKERS (Public) ─────────────────────────────────────────────────────
 // WHAT: Returns a list of all active and verified workers.
@@ -27,7 +40,7 @@ const getWorkers = async (req, res) => {
 
   const [workers, total] = await Promise.all([
     User.find(filter)
-      .select('name profileImage categories averageRating totalReviews location')
+      .select('name profileImage categories skills averageRating totalReviews location locationLabel hourlyRate isVerified availability')
       .sort({ averageRating: -1 })
       .skip(skip)
       .limit(Number(limit)),
@@ -65,11 +78,53 @@ const getWorkerProfile = async (req, res) => {
 // HOW:  PATCH /api/v1/users/me
 const updateProfile = async (req, res) => {
   // Prevent users from changing their role via this endpoint
-  const allowedFields = ['name', 'phone', 'profileImage'];
+  const allowedFields = [
+    'name',
+    'email',
+    'bio',
+    'phone',
+    'profileImage',
+    'address',
+    'locationLabel',
+    'hourlyRate',
+    'skills',
+    'idFrontUrl',
+    'idFrontName',
+    'idBackUrl',
+    'idBackName',
+    'idSelfieUrl',
+    'idSelfieName',
+    'cvUrl',
+    'cvName',
+    'portfolioFiles',
+  ];
   const updates = {};
   allowedFields.forEach((field) => {
     if (req.body[field] !== undefined) updates[field] = req.body[field];
   });
+
+  if (req.user?.role === 'worker') {
+    const verificationFields = [
+      'idFrontUrl',
+      'idFrontName',
+      'idBackUrl',
+      'idBackName',
+      'idSelfieUrl',
+      'idSelfieName',
+      'cvUrl',
+      'cvName',
+      'portfolioFiles',
+    ];
+    const touchedVerification = verificationFields.some((field) => req.body[field] !== undefined);
+    if (touchedVerification) {
+      updates.isVerified = false;
+      updates.verificationStatus = 'pending';
+      updates.verificationSubmittedAt = new Date();
+      updates.verificationReviewedAt = null;
+      updates.verificationReviewedBy = '';
+      updates.verificationRejectionReason = '';
+    }
+  }
 
   const user = await User.findByIdAndUpdate(req.user.id, updates, {
     new: true, runValidators: true,
@@ -88,6 +143,38 @@ const updateAvailability = async (req, res) => {
     { new: true, runValidators: true }
   );
   return ApiResponse.success(res, StatusCodes.OK, 'Availability updated.', user);
+};
+
+// ── UPDATE PASSWORD (Authenticated) ──────────────────────────────────────────
+// WHAT: Allows any logged-in user to change their password safely.
+// HOW:  PATCH /api/v1/users/me/password
+const updatePassword = async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Please provide both current and new passwords.');
+  }
+
+  const user = await User.findById(req.user.id).select('+password');
+  if (!user) throw new ApiError(StatusCodes.NOT_FOUND, 'User not found.');
+
+  const isMatch = await user.comparePassword(currentPassword);
+  if (!isMatch) {
+    throw new ApiError(StatusCodes.UNAUTHORIZED, 'Incorrect current password.');
+  }
+
+  user.password = newPassword; // the pre-save hook handles hashing (if not temporarily disabled)
+  await user.save();
+
+  return ApiResponse.success(res, StatusCodes.OK, 'Password updated successfully.', undefined);
+};
+
+// ── DELETE OWN ACCOUNT (Authenticated) ───────────────────────────────────────
+// WHAT: Permanently removes a user's own account from the system.
+// HOW:  DELETE /api/v1/users/me
+const deleteMe = async (req, res) => {
+  const user = await User.findByIdAndDelete(req.user.id);
+  if (!user) throw new ApiError(StatusCodes.NOT_FOUND, 'User not found.');
+  return ApiResponse.success(res, StatusCodes.OK, 'Your account has been successfully deleted.');
 };
 
 // ── GET ALL USERS (Admin Only) ───────────────────────────────────────────────
@@ -126,6 +213,8 @@ const updateUserStatus = async (req, res) => {
   );
   if (!user) throw new ApiError(StatusCodes.NOT_FOUND, 'User not found.');
 
+  logEvent({ req, type: 'user', action: isActive ? 'User activated' : 'User suspended', target: user.email });
+
   return ApiResponse.success(res, StatusCodes.OK, `User ${isActive ? 'activated' : 'deactivated'}.`, user);
 };
 
@@ -133,19 +222,49 @@ const updateUserStatus = async (req, res) => {
 // WHAT: Approves a worker so they can appear in search and receive bookings.
 // HOW:  PATCH /api/v1/users/workers/:id/verify { "isVerified": true }
 const verifyWorker = async (req, res) => {
-  const { isVerified } = req.body;
-  if (typeof isVerified !== 'boolean') {
-    throw new ApiError(StatusCodes.BAD_REQUEST, 'isVerified must be a boolean.');
+  const decision = normalizeWorkerDecision(req.body);
+  const rejectionReason = String(req.body?.rejectionReason || '').trim();
+  if (!decision) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'A review decision is required.');
+  }
+  if (decision === 'rejected' && !rejectionReason) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'A rejection reason is required.');
   }
 
   const worker = await User.findOneAndUpdate(
     { _id: req.params.id, role: 'worker' },
-    { isVerified },
+    {
+      isVerified: decision === 'approved',
+      verificationStatus: decision,
+      verificationReviewedAt: new Date(),
+      verificationReviewedBy: req.user?.email || '',
+      verificationRejectionReason: decision === 'rejected' ? rejectionReason : '',
+    },
     { new: true }
   );
   if (!worker) throw new ApiError(StatusCodes.NOT_FOUND, 'Worker not found.');
 
-  return ApiResponse.success(res, StatusCodes.OK, `Worker ${isVerified ? 'approved' : 'rejected'}.`, worker);
+  logEvent({
+    req,
+    type: 'user',
+    action: decision === 'approved' ? 'Technician approved' : `Technician rejected: ${rejectionReason}`,
+    target: worker.email,
+    status: decision === 'approved' ? 'ok' : 'warn',
+  });
+
+  return ApiResponse.success(res, StatusCodes.OK, `Worker ${decision}.`, worker);
+};
+
+// ── DELETE USER (Admin Only) ──────────────────────────────────────────────────
+// WHAT: Permanently removes a user from the system.
+// HOW:  DELETE /api/v1/users/:id
+const deleteUser = async (req, res) => {
+  const user = await User.findByIdAndDelete(req.params.id);
+  if (!user) throw new ApiError(StatusCodes.NOT_FOUND, 'User not found.');
+
+  logEvent({ req, type: 'user', action: 'User account deleted', target: user.email, status: 'warn' });
+
+  return ApiResponse.success(res, StatusCodes.OK, 'User deleted successfully.');
 };
 
 // ── GET ANALYTICS (Admin Only) ────────────────────────────────────────────────
@@ -236,7 +355,6 @@ const getPaymentAnalytics = async (req, res) => {
     acc[item._id] = item.count;
     return acc;
   }, {});
-
   return ApiResponse.success(res, StatusCodes.OK, 'Payment analytics retrieved.', {
     totalRevenue:    revenueResult[0]?.total  || 0,
     totalEscrow:     totalEscrow[0]?.total    || 0,
@@ -251,11 +369,15 @@ const getPaymentAnalytics = async (req, res) => {
 module.exports = {
   getWorkers,
   getWorkerProfile,
+  getMe,
+  deleteMe,
   updateProfile,
   updateAvailability,
+  updatePassword,
   getAllUsers,
   updateUserStatus,
   verifyWorker,
+  deleteUser,
   getAnalytics,
   getPaymentAnalytics,
 };

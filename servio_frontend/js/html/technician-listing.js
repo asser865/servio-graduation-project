@@ -4,8 +4,11 @@
  */
 
 import { initScrollReveal } from '../components/scroll-reveal.js';
-import { SERVICES, getTechsForService } from '../data/services-data.js';
-import { TECHNICIANS } from '../data/technicians-data.js';
+import { SERVICES } from '../data/services-data.js';
+import { getWorkers } from '../api/users.js';
+
+// Module-level cache so langchange re-renders without re-fetching
+let _cachedWorkers = [];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -49,47 +52,43 @@ function renderHero(svc, serviceKey, lang) {
 
 // ── Build card HTML ───────────────────────────────────────────────────────────
 
-function buildCard(id, tech, serviceKey, lang, delay) {
+function buildCardFromAPI(worker, serviceKey, lang, delay) {
   const isAr = lang === 'ar';
-  const name = isAr ? tech.nameAr : tech.name;
-  const desc = isAr ? tech.descAr : tech.descEn;
-  const avail = isAr ? tech.availabilityAr : tech.availability;
-  const ratingLabel = isAr ? `${tech.rating} تقييم` : `${tech.rating} Avg`;
-  const distanceLabel = isAr ? `${tech.distance} ميل` : `${tech.distance} mi.`;
-  const currencyLabel = isAr ? 'جنيه' : 'EGP';
-  const priceUnit = isAr ? '/ساعة' : '/hr';
+  const id = worker._id;
+  const name = escapeHtml(worker.name || 'Technician');
+  const rating = worker.averageRating?.toFixed(1) || '0.0';
+  const reviewCount = worker.totalReviews || 0;
+  const ratingLabel = isAr ? `${rating} تقييم` : `${rating} Avg`;
+  const avatar = worker.profileImage || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(worker.name || 'T') + '&background=0d6efd&color=fff&size=128';
   const profileHref = `./technician-profile.html?id=${id}&service=${serviceKey}`;
   const viewLabel = isAr ? 'عرض الملف الشخصي' : 'View Profile';
-  const startingLabel = isAr ? 'ابتداءً من' : 'Starting';
+  const availLabel = worker.availability?.length
+    ? (isAr ? 'متاح' : 'Available')
+    : (isAr ? 'حدد الوقت' : 'By Appointment');
 
-  const safeName  = escapeHtml(name);
-  const safeDesc  = escapeHtml(desc);
-  const safeAvail = escapeHtml(avail);
+  const categories = (worker.categories || [])
+    .map(c => `<span class="tech-card__category-tag">${escapeHtml(c)}</span>`)
+    .join('');
 
   return `
-    <article class="tech-card" data-reveal data-reveal-delay="${delay}" data-distance="${tech.distance}" data-price="${tech.price}" data-avail="${tech.availability.toLowerCase()}" data-tech-id="${id}">
+    <article class="tech-card" data-reveal data-reveal-delay="${delay}" data-avail="${availLabel.toLowerCase()}" data-tech-id="${id}">
       <div class="tech-card__top">
-        <img class="tech-card__avatar" src="${tech.avatar}" alt="${safeName}">
+        <img class="tech-card__avatar" src="${avatar}" alt="${name}" onerror="this.src='https://ui-avatars.com/api/?name=T&background=0d6efd&color=fff&size=128'">
         <div class="tech-card__info">
           <h3 class="tech-card__name">
-            ${safeName}
-            ${tech.verified ? BADGE_VERIFIED_SVG : ''}
+            ${name}
+            ${worker.isVerified ? BADGE_VERIFIED_SVG : ''}
           </h3>
           <div class="tech-card__trust">
             <span class="tech-card__rating">${ratingLabel}</span>
-            <span>(${tech.reviewCount})</span>
-            <span class="tech-card__location">${LOC_SVG} ${distanceLabel}</span>
+            <span>(${reviewCount})</span>
           </div>
+          <div class="tech-card__categories">${categories}</div>
         </div>
       </div>
-      <p class="tech-card__desc">${safeDesc}</p>
       <div class="tech-card__footer">
-        <div class="tech-card__price-blurb">
-          <span class="tech-card__price-label">${startingLabel}</span>
-          <div class="tech-card__price">${tech.price} ${currencyLabel}<span>${priceUnit}</span></div>
-        </div>
         <div>
-          <div class="tech-card__availability">${safeAvail}</div>
+          <div class="tech-card__availability">${availLabel}</div>
           <a class="tech-card__action" href="${profileHref}">${viewLabel}</a>
         </div>
       </div>
@@ -98,16 +97,33 @@ function buildCard(id, tech, serviceKey, lang, delay) {
 
 // ── Render cards ──────────────────────────────────────────────────────────────
 
-function renderCards(serviceKey, lang) {
+async function renderCards(serviceKey, lang) {
   const techGrid = document.getElementById('tech-grid');
   if (!techGrid) return;
 
-  const ids = getTechsForService(serviceKey);
-  techGrid.innerHTML = ids
-    .map((id, i) => buildCard(id, TECHNICIANS[id], serviceKey, lang, i * 50))
-    .join('');
+  techGrid.innerHTML = '<p style="padding:2rem;text-align:center">Loading...</p>';
 
-  // Wire card-click (navigate to profile on row click, skip anchor clicks)
+  let workers = [];
+  try {
+    const res = await getWorkers({ category: serviceKey });
+    // api client already unwraps { success, data } → res IS the data object directly
+    workers = res?.workers || res?.data?.workers || [];
+  } catch (err) {
+    console.error('getWorkers error:', err);
+    techGrid.innerHTML = '<p style="padding:2rem;text-align:center">Could not load technicians. Please try again.</p>';
+    return;
+  }
+
+  if (!workers.length) {
+    techGrid.innerHTML = '<p style="padding:2rem;text-align:center">No technicians available for this service yet.</p>';
+    const resultCount = document.getElementById('result-count');
+    if (resultCount) resultCount.textContent = '0';
+    return;
+  }
+
+  _cachedWorkers = workers;
+  techGrid.innerHTML = workers.map((worker, i) => buildCardFromAPI(worker, serviceKey, lang, i * 50)).join('');
+
   techGrid.querySelectorAll('.tech-card').forEach(card => {
     card.style.cursor = 'pointer';
     card.addEventListener('click', e => {
@@ -119,9 +135,8 @@ function renderCards(serviceKey, lang) {
 
   initScrollReveal();
 
-  // Update result count immediately
   const resultCount = document.getElementById('result-count');
-  if (resultCount) resultCount.textContent = ids.length;
+  if (resultCount) resultCount.textContent = workers.length;
 }
 
 // ── Filter / sort (existing logic, preserved) ──────────────────────────────────
@@ -140,10 +155,25 @@ document.addEventListener('DOMContentLoaded', () => {
   renderHero(svc, serviceKey, getLang());
   renderCards(serviceKey, getLang());
 
-  document.addEventListener('langchange', e => {
+  document.addEventListener('langchange', async e => {
     const lang = e.detail?.lang || getLang();
     renderHero(svc, serviceKey, lang);
-    renderCards(serviceKey, lang);
+    if (_cachedWorkers.length) {
+      const techGrid = document.getElementById('tech-grid');
+      if (techGrid) {
+        techGrid.innerHTML = _cachedWorkers.map((w, i) => buildCardFromAPI(w, serviceKey, lang, i * 50)).join('');
+        techGrid.querySelectorAll('.tech-card').forEach(card => {
+          card.style.cursor = 'pointer';
+          card.addEventListener('click', ev => {
+            if (ev.target.closest('a')) return;
+            window.location.href = `./technician-profile.html?id=${card.getAttribute('data-tech-id')}&service=${serviceKey}`;
+          });
+        });
+        initScrollReveal();
+      }
+    } else {
+      await renderCards(serviceKey, lang);
+    }
     applyFilters();
   });
 
