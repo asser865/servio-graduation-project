@@ -9,7 +9,9 @@ import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
 import '../../design_system/widgets/servio_card.dart';
 import 'ai_smart_match_screen.dart';
+import 'customer_home_screen.dart';
 import 'customer_profile_screen.dart';
+import 'my_bookings_screen.dart';
 import 'service_detail_screen.dart';
 import '../shared/search_results_screen.dart';
 
@@ -70,10 +72,18 @@ class _ServicesMarketplaceScreenState extends State<ServicesMarketplaceScreen> {
         ],
         currentIndex: 1,
         onTap: (int index) {
-          if (index == 2) {
+          if (index == 0) {
+            Navigator.of(context).popUntil((route) => route.isFirst);
+          } else if (index == 2) {
             Navigator.of(context).push(
               MaterialPageRoute<void>(
                 builder: (_) => const AiSmartMatchScreen(),
+              ),
+            );
+          } else if (index == 3) {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const MyBookingsScreen(),
               ),
             );
           } else if (index == 4) {
