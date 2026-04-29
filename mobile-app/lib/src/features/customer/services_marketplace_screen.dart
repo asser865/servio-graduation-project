@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/data/demo_services.dart';
-import '../../core/models/service_model.dart';
-import '../../core/state/app_state.dart';
+import '../../core/models/backend_service_model.dart';
+import '../../core/state/services_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
 import '../../design_system/widgets/servio_card.dart';
 import 'ai_smart_match_screen.dart';
-import 'customer_home_screen.dart';
 import 'customer_profile_screen.dart';
 import 'my_bookings_screen.dart';
 import 'service_detail_screen.dart';
@@ -35,27 +33,25 @@ class _ServicesMarketplaceScreenState extends State<ServicesMarketplaceScreen> {
     'Carpentry',
   ];
 
-  // Map category label → service id for filtering
-  static const Map<String, String> _categoryToId = <String, String>{
-    'Plumbing': 'plumbing',
-    'Electrical': 'electrical',
-    'Painting': 'painting',
-    'HVAC': 'ac-maintenance',
-    'Carpentry': 'carpentry',
-  };
-
-  List<ServiceModel> get _filteredServices {
-    if (_selectedCategory == 0) return kDemoServices;
-    final id = _categoryToId[_categories[_selectedCategory]];
-    return kDemoServices.where((s) => s.id == id).toList();
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<ServicesProvider>().fetchAll();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
-    final locale = context.watch<LocaleProvider>().languageCode;
-    final services = _filteredServices;
+    final provider = context.watch<ServicesProvider>();
+    final allServices = provider.services;
+    final services = _selectedCategory == 0
+        ? allServices
+        : allServices
+            .where((s) => s.category.toLowerCase() == _categories[_selectedCategory].toLowerCase())
+            .toList();
 
     return Scaffold(
       bottomNavigationBar: ServioBottomNavigationBar(
@@ -235,31 +231,39 @@ class _ServicesMarketplaceScreenState extends State<ServicesMarketplaceScreen> {
                 ),
               ),
             ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (BuildContext context, int index) {
-                    final service = services[index];
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: _MarketplaceServiceCard(
-                        service: service,
-                        locale: locale,
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => ServiceDetailScreen(serviceId: service.id),
-                            ),
-                          );
-                        },
-                      ),
-                    );
-                  },
-                  childCount: services.length,
+            if (provider.loading)
+              const SliverFillRemaining(
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (provider.error != null)
+              SliverFillRemaining(
+                child: Center(child: Text(provider.error!)),
+              )
+            else
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (BuildContext context, int index) {
+                      final service = services[index];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: _MarketplaceServiceCard(
+                          service: service,
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => ServiceDetailScreen(serviceId: service.id),
+                              ),
+                            );
+                          },
+                        ),
+                      );
+                    },
+                    childCount: services.length,
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       ),
@@ -301,30 +305,25 @@ class _ToggleIcon extends StatelessWidget {
 class _MarketplaceServiceCard extends StatelessWidget {
   const _MarketplaceServiceCard({
     required this.service,
-    required this.locale,
     required this.onTap,
   });
 
-  final ServiceModel service;
-  final String locale;
+  final BackendService service;
   final VoidCallback onTap;
 
-  static const Map<String, IconData> _icons = <String, IconData>{
-    'drop': Icons.water_drop_outlined,
-    'bolt': Icons.electrical_services_rounded,
-    'temp': Icons.ac_unit_rounded,
-    'wrench': Icons.handyman_rounded,
-    'paint': Icons.format_paint_rounded,
-    'gear': Icons.settings_rounded,
-    'home': Icons.home_repair_service_rounded,
-    'shield': Icons.shield_outlined,
+  static const Map<String, IconData> _categoryIcons = <String, IconData>{
+    'plumbing': Icons.water_drop_outlined,
+    'electrical': Icons.electrical_services_rounded,
+    'hvac': Icons.ac_unit_rounded,
+    'carpentry': Icons.handyman_rounded,
+    'painting': Icons.format_paint_rounded,
   };
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
-    final icon = _icons[service.icon] ?? Icons.home_repair_service_rounded;
+    final icon = _categoryIcons[service.category.toLowerCase()] ?? Icons.home_repair_service_rounded;
 
     return GestureDetector(
       onTap: onTap,
@@ -362,15 +361,15 @@ class _MarketplaceServiceCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(ServioRadius.sm),
                     ),
                     child: Text(
-                      service.id.toUpperCase(),
+                      service.category.toUpperCase(),
                       style: theme.textTheme.labelSmall?.copyWith(color: servio.accent),
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Text(service.title.of(locale), style: theme.textTheme.titleMedium),
+                  Text(service.name, style: theme.textTheme.titleMedium),
                   const SizedBox(height: 8),
                   Text(
-                    service.lead.of(locale),
+                    service.description,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
@@ -380,7 +379,7 @@ class _MarketplaceServiceCard extends StatelessWidget {
                     children: <Widget>[
                       Expanded(
                         child: Text(
-                          service.priceBadge.of(locale),
+                          'EGP ${service.basePrice.toStringAsFixed(0)}',
                           style: theme.textTheme.titleMedium?.copyWith(color: servio.accent),
                         ),
                       ),
