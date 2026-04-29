@@ -9,6 +9,7 @@ import '../../design_system/widgets/servio_primary_button.dart';
 import '../customer/customer_home_screen.dart';
 import '../technician/technician_dashboard_screen.dart';
 import 'auth_role.dart';
+import 'forgot_password_screen.dart';
 import 'sign_up_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -63,9 +64,6 @@ class _LoginScreenState extends State<LoginScreen> {
       _loading = true;
       _errorMsg = null;
     });
-
-    // Small artificial delay for demo realism
-    await Future<void>.delayed(const Duration(milliseconds: 600));
 
     if (!mounted) return;
     final error = await context.read<SessionProvider>().login(
@@ -249,7 +247,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                   ),
                   TextButton(
-                    onPressed: () {},
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute<void>(
+                        builder: (_) => const ForgotPasswordScreen(),
+                      ),
+                    ),
                     child: const Text('Forgot password?'),
                   ),
                 ],
