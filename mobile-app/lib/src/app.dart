@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
+import 'core/api/api_client.dart';
 import 'core/models/user_account.dart';
 import 'core/services/storage_service.dart';
 import 'core/state/app_state.dart';
@@ -19,10 +20,13 @@ class ServioApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final apiClient = ApiClient(storage: storage);
+
     return MultiProvider(
-      providers: <ChangeNotifierProvider<ChangeNotifier>>[
+      providers: [
+        Provider<ApiClient>.value(value: apiClient),
         ChangeNotifierProvider<SessionProvider>(
-          create: (_) => SessionProvider.load(storage),
+          create: (_) => SessionProvider.load(storage, apiClient),
         ),
         ChangeNotifierProvider<ThemeProvider>(
           create: (_) => ThemeProvider(storage),
@@ -73,7 +77,6 @@ class _AppView extends StatelessWidget {
   }
 }
 
-/// Shows the home screen for the logged-in user's role, or [RoleSelectionScreen].
 class _AuthGate extends StatelessWidget {
   const _AuthGate();
 
