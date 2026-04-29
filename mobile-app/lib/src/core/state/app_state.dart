@@ -68,7 +68,7 @@ class SessionProvider extends ChangeNotifier {
   Future<String?> registerCustomer({
     required String name,
     required String email,
-    String password = '',
+    required String password,
     required String phone,
     required String city,
   }) async {

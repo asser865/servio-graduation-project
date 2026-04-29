@@ -10,6 +10,7 @@ import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
 import '../customer/customer_home_screen.dart';
+import '../technician/technician_dashboard_screen.dart';
 import '../technician/verification_upload_screen.dart';
 import 'auth_role.dart';
 import 'role_selection_screen.dart';
@@ -119,7 +120,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
       return;
     }
 
-    await _createCustomerAccount();
+    if (_isTechnician) {
+      await _createTechnicianAccount();
+    } else {
+      await _createCustomerAccount();
+    }
   }
 
   bool _validateStep() {
@@ -166,21 +171,55 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 
   Future<void> _createCustomerAccount() async {
-    setState(() => _submitting = true);
-    await Future<void>.delayed(const Duration(milliseconds: 450));
-    if (!mounted) return;
-
-    await context.read<SessionProvider>().registerCustomer(
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    final error = await context.read<SessionProvider>().registerCustomer(
           name: _nameCtrl.text.trim(),
           email: _emailCtrl.text.trim(),
+          password: _passwordCtrl.text,
           phone: _phoneCtrl.text.trim(),
           city: _cityCtrl.text.trim().isEmpty ? 'Cairo' : _cityCtrl.text.trim(),
         );
-
     if (!mounted) return;
-    Navigator.of(context).pushAndRemoveUntil(
+    setState(() => _submitting = false);
+    if (error != null) {
+      setState(() => _error = error);
+      return;
+    }
+    Navigator.pushAndRemoveUntil(
+      context,
       MaterialPageRoute<void>(builder: (_) => const CustomerHomeScreen()),
-      (Route<dynamic> route) => false,
+      (_) => false,
+    );
+  }
+
+  Future<void> _createTechnicianAccount() async {
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    final error = await context.read<SessionProvider>().registerTechnician(
+          name: _nameCtrl.text.trim(),
+          email: _emailCtrl.text.trim(),
+          password: _passwordCtrl.text,
+          phone: _phoneCtrl.text.trim(),
+          skills: _specialties.toList(),
+          serviceArea: _serviceAreaCtrl.text.trim(),
+          hourlyRate: int.tryParse(_rateCtrl.text) ?? 350,
+          availabilityType: _availability,
+        );
+    if (!mounted) return;
+    setState(() => _submitting = false);
+    if (error != null) {
+      setState(() => _error = error);
+      return;
+    }
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute<void>(builder: (_) => const TechnicianDashboardScreen()),
+      (_) => false,
     );
   }
 
