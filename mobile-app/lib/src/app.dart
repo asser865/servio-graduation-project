@@ -6,6 +6,8 @@ import 'core/api/api_client.dart';
 import 'core/models/user_account.dart';
 import 'core/services/storage_service.dart';
 import 'core/state/app_state.dart';
+import 'core/state/services_state.dart';
+import 'core/state/workers_state.dart';
 import 'design_system/servio_theme.dart';
 import 'design_system/servio_tokens.dart';
 import 'features/auth/role_selection_screen.dart';
@@ -39,6 +41,12 @@ class ServioApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<MessagesProvider>(
           create: (_) => MessagesProvider(),
+        ),
+        ChangeNotifierProvider<ServicesProvider>(
+          create: (_) => ServicesProvider(apiClient),
+        ),
+        ChangeNotifierProvider<WorkersProvider>(
+          create: (_) => WorkersProvider(apiClient),
         ),
       ],
       child: const _AppView(),
