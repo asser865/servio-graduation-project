@@ -212,19 +212,19 @@ class _ServicesMarketplaceScreenState extends State<ServicesMarketplaceScreen> {
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(ServioRadius.lg),
-                    border: Border.all(color: servio.accent, width: 1.5),
-                    color: theme.colorScheme.surface,
-                  ),
+                      border: Border.all(color: servio.accent, width: 1.5),
+                      color: theme.colorScheme.surface,
+                    ),
                     child: Row(
                       children: <Widget>[
                         Icon(Icons.auto_awesome_rounded, color: servio.accent),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Not sure what you need? Try Smart Match ->',
-                          style: theme.textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Not sure what you need? Try Smart Match ->',
+                            style: theme.textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
+                          ),
                         ),
-                      ),
                       ],
                     ),
                   ),
