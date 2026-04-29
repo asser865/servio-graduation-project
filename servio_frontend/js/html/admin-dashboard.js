@@ -1,8 +1,12 @@
-/* ═══════════════════════════════════════════════
+/* ───────────────────────────────────────────────
    Admin Dashboard — SERVIO
-   ═══════════════════════════════════════════════ */
+   ─────────────────────────────────────────────── */
 
 import { showToast } from '../components/toast.js';
+import { getAllUsers, deleteUser, updateUserStatus, updatePassword, reviewWorker } from '../api/users.js';
+import { getServices, createService, updateService, deleteService as apiDeleteService } from '../api/services.js';
+import { getAllBookings } from '../api/bookings.js';
+import { getAuditLogs, deleteAuditLog, getAdminSettings, updateAdminSettings, getAnalytics } from '../api/admin.js';
 
 // Auth guard
 const session = JSON.parse(localStorage.getItem('servio_session') || 'null');
@@ -27,6 +31,103 @@ function _adminDateStr() {
 function _updateOverviewDate() {
   const el = document.getElementById('overviewDate');
   if (el) el.textContent = _adminDateStr();
+}
+
+// Module-level bridges so loadAdminData() (defined outside initAdminDashboard) can call modal helpers
+let _openProfileModal, _openTechProfileModal;
+let _currentRejectWorkerId = '';
+
+function getVerificationStatus(user) {
+  return user?.verificationStatus || (user?.isVerified ? 'approved' : 'pending');
+}
+
+function getTechStatusLabel(user) {
+  if (!user?.isActive) return 'Suspended';
+  const status = getVerificationStatus(user);
+  if (status === 'approved') return 'Verified';
+  if (status === 'rejected') return 'Rejected';
+  return 'Pending';
+}
+
+function getTechStatusBadgeClass(user) {
+  const label = getTechStatusLabel(user);
+  if (label === 'Verified') return 'bk-badge--completed';
+  if (label === 'Rejected') return 'bk-badge--disputed';
+  if (label === 'Suspended') return 'bk-badge--cancelled';
+  return 'bk-badge--active';
+}
+
+function formatAdminDate(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString();
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+async function downloadRemoteFile(url, filename) {
+  if (!url) return;
+  try {
+    const response = await fetch(url, { mode: 'cors' });
+    if (!response.ok) throw new Error('Download failed.');
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = filename || 'download';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(objectUrl);
+  } catch (_) {
+    // Fallback for cross-origin URLs that block blob fetch
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename || 'download';
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+}
+
+function buildTechProfileData(user) {
+  return {
+    id: user._id,
+    name: user.name || '—',
+    email: user.email || '—',
+    skills: (user.skills || []).join(', ') || (user.categories || []).join(', ') || 'General',
+    area: user.locationLabel || '—',
+    phone: user.phone || '—',
+    rate: user.hourlyRate ? `${user.hourlyRate} EGP/hr` : '—',
+    rating: user.averageRating ?? '—',
+    jobs: user.completedJobs ?? '—',
+    joined: formatAdminDate(user.createdAt),
+    experience: user.yearsExperience ? `${user.yearsExperience} yrs` : '—',
+    bio: user.bio || '',
+    status: getTechStatusLabel(user),
+    submittedAt: formatAdminDate(user.verificationSubmittedAt || user.createdAt),
+    reviewedBy: user.verificationReviewedBy || '—',
+    reviewedAt: formatAdminDate(user.verificationReviewedAt),
+    rejectionReason: user.verificationRejectionReason || '',
+    idFrontUrl: user.idFrontUrl || '',
+    idFrontName: user.idFrontName || '',
+    idBackUrl: user.idBackUrl || '',
+    idBackName: user.idBackName || '',
+    idSelfieUrl: user.idSelfieUrl || '',
+    idSelfieName: user.idSelfieName || '',
+    cvUrl: user.cvUrl || '',
+    cvName: user.cvName || '',
+    portfolioFiles: Array.isArray(user.portfolioFiles) ? user.portfolioFiles : [],
+  };
 }
 
 function initAdminDashboard() {
@@ -70,7 +171,7 @@ function initAdminDashboard() {
     if (visible === total) {
       countEl.textContent = t('admin_users_count').replace('{n}', total);
     } else {
-      countEl.textContent = t('admin_users_count_filtered').replace('{v}', visible).replace('{n}', total);
+      countEl.textContent = t('admin_pagination_users').replace('{v}', visible).replace('{n}', total);
     }
   }
 
@@ -141,117 +242,70 @@ function initAdminDashboard() {
   });
   _updateUserCount();
 
-  // ── Users: view (no-op) ───────────────────
+  // ── Profile-modal helpers ─────────────────
+  function openProfileModal(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.removeAttribute('hidden');
+    el.style.display = 'flex';
+  }
+  function closeProfileModal(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.display = 'none';
+  }
+  document.querySelectorAll('[data-modal-close]').forEach(btn => {
+    btn.addEventListener('click', () => closeProfileModal(btn.dataset.modalClose));
+  });
+  document.querySelectorAll('.admin-modal-backdrop').forEach(backdrop => {
+    backdrop.addEventListener('click', e => {
+      if (e.target === backdrop) closeProfileModal(backdrop.id);
+    });
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.admin-modal-backdrop:not([hidden])').forEach(m => closeProfileModal(m.id));
+    }
+  });
+
+  // ── Users: View modal ─────────────────────
   document.querySelectorAll('[data-action="view"]').forEach(btn => {
-    btn.addEventListener('click', () => showToast(typeof window.t === 'function' ? window.t('toast_feature_soon') : 'Feature coming soon', 'info'));
-  });
-
-  // ── Users: suspend/unsuspend ──────────────
-  document.querySelectorAll('[data-action="suspend"]').forEach(btn => {
     btn.addEventListener('click', () => {
-      const row   = btn.closest('tr');
-      const badge = row.querySelector('.status-badge');
-      const isActive = badge.classList.contains('badge--active');
-      const t = typeof window.t === 'function' ? window.t : (k) => k;
-      badge.textContent = isActive ? t('status_suspended') : t('status_active');
-      badge.className = isActive ? 'badge badge--suspended status-badge' : 'badge badge--active status-badge';
-      badge.setAttribute('data-i18n', isActive ? 'status_suspended' : 'status_active');
-      btn.textContent  = isActive ? t('admin_action_unsuspend') : t('admin_action_suspend');
-      btn.setAttribute('data-i18n', isActive ? 'admin_action_unsuspend' : 'admin_action_suspend');
-      row.dataset.status = isActive ? 'suspended' : 'active';
-      showToast(typeof window.t === 'function'
-        ? (isActive ? window.t('toast_user_suspended') : window.t('toast_user_unsuspended'))
-        : (isActive ? 'User suspended' : 'User unsuspended'), isActive ? 'error' : 'success');
+      const row = btn.closest('tr');
+      if (!row) return;
+      const cells = row.querySelectorAll('td');
+      const id        = cells[0]?.textContent?.trim() || '—';
+      const name      = cells[1]?.textContent?.trim() || '—';
+      const email     = cells[2]?.textContent?.trim() || '—';
+      const joinDate  = cells[3]?.textContent?.trim() || '—';
+      const bookings  = cells[4]?.textContent?.trim() || '—';
+      const statusBadge = cells[5]?.querySelector('.status-badge');
+      const statusText  = statusBadge?.textContent?.trim() || '—';
+      const isActive  = row.dataset.status === 'active';
+
+      const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+      document.getElementById('userModalAvatar').textContent = initials;
+      document.getElementById('userModalName').textContent   = name;
+      document.getElementById('userModalEmail').textContent  = email;
+      document.getElementById('userModalId').textContent     = id;
+      document.getElementById('userModalJoinDate').textContent = joinDate;
+      document.getElementById('userModalBookings').textContent = bookings;
+      document.getElementById('userModalStatus').textContent = statusText;
+
+      const badge = document.getElementById('userModalStatusBadge');
+      badge.textContent = statusText;
+      badge.className = isActive
+        ? 'bk-badge bk-badge--completed'
+        : 'bk-badge bk-badge--pending';
+
+      openProfileModal('userViewModal');
     });
   });
 
-  // ── Users: delete ─────────────────────────
-  document.querySelectorAll('[data-action="delete"]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const confirmMsg = typeof window.t === 'function' ? window.t('confirm_delete_user') : 'Delete this user? This action cannot be undone.';
-      if (confirm(confirmMsg)) {
-        btn.closest('tr').remove();
-        _updateUserCount();
-        showToast(typeof window.t === 'function' ? window.t('toast_user_deleted') : 'User deleted', 'info');
-      }
-    });
-  });
 
   // ── Technicians: approve / reject helpers ─
-  function doApprove(btn) {
-    const card  = btn.closest('.pending-card');
-    const email = card?.dataset.email || btn.dataset.email || '';
-    if (email) {
-      try {
-        const raw = localStorage.getItem('servio_account');
-        if (raw) {
-          const acct = JSON.parse(raw);
-          if (acct?.role === 'technician' && acct?.email?.toLowerCase() === email.toLowerCase()) {
-            acct.status = 'approved';
-            localStorage.setItem('servio_account', JSON.stringify(acct));
-          }
-        }
-      } catch {}
-    }
-    card?.remove();
-    showToast(typeof window.t === 'function' ? window.t('toast_tech_approved') : 'Technician approved', 'success');
-  }
 
-  function doReject(btn) {
-    btn.closest('.pending-card')?.remove();
-    showToast(typeof window.t === 'function' ? window.t('toast_app_rejected') : 'Application rejected', 'error');
-  }
 
-  document.querySelectorAll('[data-action="approve"]').forEach(btn => {
-    btn.addEventListener('click', () => doApprove(btn));
-  });
-
-  document.querySelectorAll('[data-action="reject"]').forEach(btn => {
-    btn.addEventListener('click', () => doReject(btn));
-  });
-
-  // ── Inject pending technician from localStorage ──
-  (function injectDynamicPendingTechnician() {
-    let acct = null;
-    try { acct = JSON.parse(localStorage.getItem('servio_account') || 'null'); } catch {}
-    if (!acct || acct.role !== 'technician' || acct.status !== 'pending') return;
-
-    const list = document.querySelector('.pending-cards-list');
-    if (!list) return;
-    if (list.querySelector(`[data-email="${CSS.escape(acct.email)}"]`)) return;
-
-    const initials = (acct.fullName || 'TN')
-      .split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-    const skillsText = (acct.skills || []).join(', ') || '—';
-
-    const card = document.createElement('div');
-    card.className = 'pending-card';
-    card.dataset.email = acct.email;
-    card.innerHTML = `
-      <div class="pending-card__info">
-        <div class="pending-card__avatar">${initials}</div>
-        <div>
-          <strong>${acct.fullName || acct.email}</strong>
-          <div class="pending-card__skills">${skillsText}</div>
-        </div>
-      </div>
-      <div class="pending-card__docs">
-        <div class="doc-item doc-item--ok" data-i18n="doc_national_id">National ID</div>
-        <div class="doc-item doc-item--ok" data-i18n="doc_selfie">Selfie</div>
-      </div>
-      <div class="pending-card__actions">
-        <button class="btn btn--primary btn--sm" data-action="approve" data-i18n="admin_action_approve">Approve</button>
-        <button class="btn btn--danger-outline btn--sm" data-action="reject" data-i18n="admin_action_reject">Reject</button>
-      </div>
-    `;
-
-    const approveBtn = card.querySelector('[data-action="approve"]');
-    const rejectBtn  = card.querySelector('[data-action="reject"]');
-    approveBtn.addEventListener('click', () => doApprove(approveBtn));
-    rejectBtn.addEventListener('click',  () => doReject(rejectBtn));
-
-    list.prepend(card);
-  })();
 
   // ── Technicians: Table Filters & Actions ───────────────
   const techSearch = document.getElementById('techSearch');
@@ -286,7 +340,7 @@ function initAdminDashboard() {
     const total = document.querySelectorAll('#allTechsTable tbody tr').length;
     if (infoEl) {
       const t = (typeof window.t === 'function') ? window.t : (k) => k;
-      infoEl.textContent = t('admin_tech_count_filtered')
+      infoEl.textContent = t('admin_pagination_techs')
         .replace('{v}', visibleCount)
         .replace('{n}', total);
     }
@@ -294,16 +348,249 @@ function initAdminDashboard() {
 
   techSearch?.addEventListener('input', _applyTechFilters);
   techStatusFilter?.addEventListener('change', _applyTechFilters);
+  _applyTechFilters(); // run on init to set correct count
 
   document.getElementById('exportTechsBtn')?.addEventListener('click', () => {
     showToast(typeof window.t === 'function' ? window.t('toast_tech_exported') : 'Technician data exported', 'success');
   });
 
+  // ── Technicians: Profile modal ────────────
+  function renderModalDocument({ thumbId, downloadId, url, label, fileName, isImage = true }) {
+    const thumbEl = document.getElementById(thumbId);
+    const downloadBtn = document.getElementById(downloadId);
+    if (!thumbEl || !downloadBtn) return;
+
+    thumbEl.innerHTML = '';
+    thumbEl.classList.remove('apm-doc-card__thumb--ok');
+    thumbEl.classList.toggle('apm-doc-card__thumb--file', !isImage);
+    thumbEl.onclick = null;
+    downloadBtn.disabled = !url;
+
+    if (!url) {
+      const span = document.createElement('span');
+      span.className = 'apm-doc-card__missing';
+      span.textContent = 'Not submitted';
+      thumbEl.appendChild(span);
+      downloadBtn.onclick = null;
+      return;
+    }
+
+    if (isImage) {
+      const img = document.createElement('img');
+      img.alt = label;
+      img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+
+      img.onerror = () => {
+        // Image URL is inaccessible — show a fallback with an open-in-new-tab link
+        thumbEl.innerHTML = '';
+        thumbEl.classList.remove('apm-doc-card__thumb--ok');
+        thumbEl.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:12px;cursor:default;';
+        thumbEl.onclick = null;
+
+        const iconWrap = document.createElement('div');
+        iconWrap.innerHTML = `<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#aaa" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`;
+
+        const msg = document.createElement('span');
+        msg.textContent = 'Preview unavailable';
+        msg.style.cssText = 'font-size:10px;color:#aaa;text-align:center;';
+
+        const link = document.createElement('a');
+        link.href = url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = 'Open file ↗';
+        link.style.cssText = 'font-size:10px;color:#9A8C73;text-decoration:underline;';
+        link.onclick = e => e.stopPropagation();
+
+        thumbEl.appendChild(iconWrap);
+        thumbEl.appendChild(msg);
+        thumbEl.appendChild(link);
+      };
+
+      img.src = url;
+      thumbEl.appendChild(img);
+      thumbEl.classList.add('apm-doc-card__thumb--ok');
+      thumbEl.onclick = () => _openDocLightbox(url, label);
+    } else {
+      const fileInfo = document.createElement('div');
+      fileInfo.className = 'apm-doc-card__file';
+      fileInfo.innerHTML = `<strong>${escapeHtml(fileName || label)}</strong><span>Ready to download</span>`;
+      thumbEl.appendChild(fileInfo);
+    }
+
+    downloadBtn.onclick = async () => {
+      try {
+        await downloadRemoteFile(url, fileName || label);
+      } catch (err) {
+        showToast(err.message || 'Download failed.', 'error');
+      }
+    };
+  }
+
+  function renderPortfolioItems(items) {
+    const wrap = document.getElementById('techModalPortfolioWrap');
+    const viewer = document.getElementById('techModalPortfolioViewer');
+    if (!wrap || !viewer) return;
+
+    const files = Array.isArray(items) ? items.filter((item) => item?.url) : [];
+    viewer.innerHTML = '';
+    wrap.hidden = files.length === 0;
+    if (!files.length) return;
+
+    files.forEach((file, index) => {
+      const card = document.createElement('div');
+      card.className = 'apm-doc-card';
+      card.innerHTML = `
+        <div class="apm-doc-card__thumb apm-doc-card__thumb--ok"></div>
+        <div class="apm-doc-card__footer">
+          <div class="apm-doc-card__label">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            Portfolio ${index + 1}
+          </div>
+          <button type="button" class="apm-doc-card__btn">Download</button>
+        </div>
+      `;
+      const thumb = card.querySelector('.apm-doc-card__thumb');
+      const button = card.querySelector('.apm-doc-card__btn');
+      const img = document.createElement('img');
+      img.alt = file.name || `Portfolio ${index + 1}`;
+      img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+      img.onerror = () => {
+        thumb.innerHTML = '';
+        thumb.classList.remove('apm-doc-card__thumb--ok');
+        thumb.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:12px;cursor:default;';
+        thumb.onclick = null;
+        thumb.innerHTML = `<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#aaa" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span style="font-size:10px;color:#aaa;text-align:center;">Preview unavailable</span><a href="${file.url}" target="_blank" rel="noopener noreferrer" style="font-size:10px;color:#9A8C73;text-decoration:underline;" onclick="event.stopPropagation()">Open file ↗</a>`;
+      };
+      img.src = file.url;
+      thumb.appendChild(img);
+      thumb.onclick = () => _openDocLightbox(file.url, file.name || `Portfolio ${index + 1}`);
+      button.onclick = async () => {
+        try {
+          await downloadRemoteFile(file.url, file.name || `portfolio-${index + 1}.jpg`);
+        } catch (err) {
+          showToast(err.message || 'Download failed.', 'error');
+        }
+      };
+      viewer.appendChild(card);
+    });
+  }
+
+  function openTechProfileModal(data) {
+    const initials = (data.name || 'TN').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    document.getElementById('techModalAvatar').textContent = initials;
+    document.getElementById('techModalName').textContent = data.name || '—';
+    document.getElementById('techModalEmail').textContent = data.email || '—';
+    document.getElementById('techModalSkills').textContent = data.skills || '—';
+    document.getElementById('techModalArea').textContent = data.area || '—';
+    document.getElementById('techModalPhone').textContent = data.phone || '—';
+    document.getElementById('techModalRate').textContent = data.rate || '—';
+    document.getElementById('techModalRating').textContent = data.rating || '—';
+    document.getElementById('techModalJobs').textContent = data.jobs || '—';
+    document.getElementById('techModalJoined').textContent = data.joined || '—';
+    document.getElementById('techModalExp').textContent = data.experience || '—';
+    document.getElementById('techModalSubmittedAt').textContent = data.submittedAt || '—';
+    document.getElementById('techModalReviewedBy').textContent = data.reviewedBy || '—';
+    document.getElementById('techModalReviewedAt').textContent = data.reviewedAt || '—';
+
+    const bioWrap = document.getElementById('techModalBioWrap');
+    const bioEl = document.getElementById('techModalBio');
+    if (data.bio) {
+      bioEl.textContent = data.bio;
+      bioWrap.style.display = 'block';
+    } else {
+      bioWrap.style.display = 'none';
+    }
+
+    const badge = document.getElementById('techModalStatusBadge');
+    badge.textContent = data.status || '—';
+    const statusClass = data.status === 'Verified' ? 'bk-badge--completed'
+      : data.status === 'Pending' ? 'bk-badge--active'
+      : data.status === 'Rejected' ? 'bk-badge--disputed'
+      : 'bk-badge--pending';
+    badge.className = 'bk-badge ' + statusClass;
+
+    const rejectWrap = document.getElementById('techModalRejectWrap');
+    const rejectEl = document.getElementById('techModalRejectReason');
+    const hasRejectReason = !!data.rejectionReason;
+    if (rejectWrap) rejectWrap.hidden = !hasRejectReason;
+    if (rejectEl) rejectEl.textContent = data.rejectionReason || '—';
+
+    renderModalDocument({
+      thumbId: 'docThumbFront',
+      downloadId: 'docDownloadFront',
+      url: data.idFrontUrl,
+      label: 'National ID (Front)',
+      fileName: data.idFrontName,
+      isImage: true,
+    });
+    renderModalDocument({
+      thumbId: 'docThumbBack',
+      downloadId: 'docDownloadBack',
+      url: data.idBackUrl,
+      label: 'National ID (Back)',
+      fileName: data.idBackName,
+      isImage: true,
+    });
+    renderModalDocument({
+      thumbId: 'docThumbSelfie',
+      downloadId: 'docDownloadSelfie',
+      url: data.idSelfieUrl,
+      label: 'ID Selfie',
+      fileName: data.idSelfieName,
+      isImage: true,
+    });
+    renderModalDocument({
+      thumbId: 'docThumbCv',
+      downloadId: 'docDownloadCv',
+      url: data.cvUrl,
+      label: 'CV / Resume',
+      fileName: data.cvName,
+      isImage: false,
+    });
+    renderPortfolioItems(data.portfolioFiles);
+
+    openProfileModal('techProfileModal');
+  }
+
+  // Lightbox helpers
+  function _openDocLightbox(url, label) {
+    const lb    = document.getElementById('docLightbox');
+    const img   = document.getElementById('docLightboxImg');
+    const lbl   = document.getElementById('docLightboxLabel');
+    if (!lb || !img) return;
+    img.src = url;
+    if (lbl) lbl.textContent = label || '';
+    lb.hidden = false;
+  }
+  function _closeDocLightbox() {
+    const lb = document.getElementById('docLightbox');
+    if (lb) { lb.hidden = true; document.getElementById('docLightboxImg').src = ''; }
+  }
+  document.getElementById('docLightboxClose')?.addEventListener('click', _closeDocLightbox);
+  document.getElementById('docLightboxBackdrop')?.addEventListener('click', _closeDocLightbox);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') _closeDocLightbox(); });
+
+
+
   document.querySelectorAll('.view-tech-link').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
-      const id = btn.dataset.id;
-      showToast(typeof window.t === 'function' ? window.t('toast_view_tech') : `Viewing ${id} profile — feature coming soon`, 'info');
+      const row = btn.closest('tr');
+      if (!row) return;
+      const cells = row.querySelectorAll('td');
+      openTechProfileModal({
+        name:    cells[1]?.textContent?.trim() || '—',
+        email:   '—',
+        skills:  cells[2]?.textContent?.trim() || '—',
+        area:    cells[3]?.textContent?.trim() || '—',
+        phone:   '—',
+        rate:    '—',
+        rating:  cells[4]?.textContent?.trim() || '—',
+        jobs:    cells[5]?.textContent?.trim() || '—',
+        status:  row.dataset.status || '—',
+        isPendingDynamic: false,
+      });
     });
   });
 
@@ -343,7 +630,18 @@ function initAdminDashboard() {
       const matchStatus = status === '' || rowStatus === status;
 
       row.classList.toggle('is-hidden', !matchQ || !matchStatus);
+      row.style.display = (matchQ && matchStatus) ? '' : 'none';
     });
+
+    const infoEl = document.getElementById('bookingPaginationInfo');
+    const visibleCount = document.querySelectorAll('.booking-row:not(.is-hidden)').length;
+    const total = document.querySelectorAll('.booking-row').length;
+    if (infoEl) {
+      const t = (typeof window.t === 'function') ? window.t : (k) => k;
+      infoEl.textContent = t('admin_pagination_bookings')
+        .replace('{v}', visibleCount)
+        .replace('{n}', total);
+    }
   }
 
   bookingSearch?.addEventListener('input', _applyBookingFilters);
@@ -370,20 +668,6 @@ function initAdminDashboard() {
     });
   });
 
-  // ── Disputes: resolve ─────────────────────
-  document.querySelectorAll('[data-action="resolve"]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const card = btn.closest('.dispute-card');
-      card.remove();
-      // Update badge count
-      const countEl = document.getElementById('disputeCount');
-      if (countEl) {
-        const curr = parseInt(countEl.textContent) - 1;
-        countEl.textContent = curr;
-      }
-      showToast(typeof window.t === 'function' ? window.t('toast_dispute_resolved') : 'Dispute resolved', 'success');
-    });
-  });
 
   // ── Disputes: more info ───────────────────
   document.querySelectorAll('[data-action="more-info"]').forEach(btn => {
@@ -459,76 +743,90 @@ function initAdminDashboard() {
   });
 
   // ── Services Management ────────────────────
-  const defaultServices = [
-    { id: 1, name: 'Standard Cleaning', category: 'Cleaning', price: 250, desc: 'Complete house cleaning service', status: 'Active' },
-    { id: 2, name: 'Deep Cleaning', category: 'Cleaning', price: 500, desc: 'Thorough deep cleaning including windows', status: 'Active' },
-    { id: 3, name: 'Leak Repair', category: 'Plumbing', price: 150, desc: 'Fixing water leaks and pipe issues', status: 'Active' },
-    { id: 4, name: 'AC Maintenance', category: 'HVAC', price: 300, desc: 'Regular AC servicing and cleaning', status: 'Active' },
-    { id: 5, name: 'Circuit Fix', category: 'Electrical', price: 200, desc: 'Repairing short circuits and wiring', status: 'Active' },
-    { id: 6, name: 'Interior Painting', category: 'Painting', price: 1000, desc: 'Single room wall painting', status: 'Active' },
-  ];
-
-  let services = JSON.parse(localStorage.getItem('servio_services_data') || JSON.stringify(defaultServices));
-
-  function saveServices() {
-    localStorage.setItem('servio_services_data', JSON.stringify(services));
-  }
-
-  function renderServicesList() {
+  async function renderServicesList() {
     const list = document.getElementById('servicesList');
     if (!list) return;
 
-    list.innerHTML = '';
-    services.forEach(svc => {
-      const tr = document.createElement('tr');
-      tr.className = 'booking-row'; // Use same row class for hover styles
-      tr.dataset.category = svc.category;
-      tr.dataset.status = svc.status;
+    try {
+      const response = await getServices();
+      const apiServices = response.services || [];
+      
+      list.innerHTML = '';
+      if (apiServices.length === 0) {
+        list.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:2rem; color:var(--color-text-muted);">No services found in database. Add your first service to get started.</td></tr>';
+        _updateServiceKPIs([]);
+        return;
+      }
 
-      const nameKey = 'svc_' + svc.name.toLowerCase().replace(/ /g, '_');
-      const catKey = 'skill_' + svc.category.toLowerCase();
+      apiServices.forEach(svc => {
+        const tr = document.createElement('tr');
+        tr.className = 'booking-row service-row'; 
+        tr.dataset.category = svc.category;
+        tr.dataset.status = svc.isActive !== false ? 'Active' : 'Inactive';
 
-      tr.innerHTML = `
-        <td style="font-weight:600;" data-i18n="${nameKey}">${svc.name}</td>
-        <td>
-          <span class="bk-badge" style="background:rgba(154,140,115,0.1); color:var(--color-accent);" data-i18n="${catKey}">
-            ${svc.category}
-          </span>
-        </td>
-        <td class="bk-amount center-align" style="font-family: monospace;">
-          ${svc.price} <span data-i18n="admin_currency">${typeof window.t === 'function' ? window.t('admin_currency') : 'EGP'}</span>
-        </td>
-        <td style="text-align:center;">
-          <span class="bk-badge bk-badge--completed status-badge" data-i18n="status_active">Active</span>
-        </td>
-        <td>
-          <div class="table-actions" style="justify-content:center;">
-            <button class="bk-action-btn bk-action-btn--xs" data-id="${svc.id}" data-action="edit-service" title="Edit">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 113 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            </button>
-            <button class="bk-action-btn bk-action-btn--xs bk-action-btn--delete" data-id="${svc.id}" data-action="delete-service" title="Delete">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
-            </button>
-          </div>
-        </td>
-      `;
-      list.appendChild(tr);
-    });
+        const nameKey = 'svc_' + (svc.title || '').toLowerCase().replace(/ /g, '_');
+        const catKey = 'skill_' + svc.category.toLowerCase();
 
+        const priceText = svc.basePrice !== undefined 
+          ? `${svc.basePrice} <span data-i18n="admin_currency">${typeof window.t === 'function' ? window.t('admin_currency') : 'EGP'}</span>${svc.priceUnit === 'per_hour' ? ' /hr' : (svc.priceUnit === 'per_sqm' ? ' /sqm' : '')}`
+          : '—';
 
-    // Re-attach listeners
-    list.querySelectorAll('[data-action="edit-service"]').forEach(btn => {
-      btn.addEventListener('click', () => editService(parseInt(btn.dataset.id)));
-    });
-    list.querySelectorAll('[data-action="delete-service"]').forEach(btn => {
-      btn.addEventListener('click', () => deleteService(parseInt(btn.dataset.id)));
-    });
+        tr.innerHTML = `
+          <td style="font-weight:600;" data-i18n="${nameKey}">${svc.title}</td>
+          <td>
+            <span class="bk-badge" style="background:rgba(154,140,115,0.1); color:var(--color-accent);" data-i18n="${catKey}">
+              ${svc.category}
+            </span>
+          </td>
+          <td class="bk-amount center-align" style="font-family: monospace;">
+            ${priceText}
+          </td>
+          <td style="text-align:center;">
+            <span class="bk-badge ${svc.isActive === false ? 'bk-badge--cancelled' : 'bk-badge--completed'} status-badge" data-i18n="status_${svc.isActive !== false ? 'active' : 'inactive'}">${svc.isActive !== false ? 'Active' : 'Inactive'}</span>
+          </td>
+          <td>
+            <div class="table-actions" style="justify-content:center;">
+              <button class="bk-action-btn bk-action-btn--xs" data-id="${svc._id}" data-action="edit-service" title="Edit">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 113 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              </button>
+              <button class="bk-action-btn bk-action-btn--xs bk-action-btn--delete" data-id="${svc._id}" data-action="delete-service" title="Delete">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+              </button>
+            </div>
+          </td>
+        `;
+        list.appendChild(tr);
+      });
 
-    _updateServiceKPIs();
-    _applyServiceFilters();
+      // Re-attach listeners with Mongo _id
+      list.querySelectorAll('[data-action="edit-service"]').forEach(btn => {
+        btn.addEventListener('click', () => editService(btn.dataset.id, apiServices));
+      });
+      list.querySelectorAll('[data-action="delete-service"]').forEach(btn => {
+        btn.addEventListener('click', () => deleteService(btn.dataset.id));
+      });
+
+      _updateServiceKPIs(apiServices);
+      _applyServiceFilters();
+
+      // Update pagination footer with actual count
+      const svcInfoEl = document.getElementById('servicePaginationInfo');
+      if (svcInfoEl) {
+        const t = (typeof window.t === 'function') ? window.t : (k) => k;
+        svcInfoEl.setAttribute('data-i18n-v', apiServices.length);
+        svcInfoEl.setAttribute('data-i18n-n', apiServices.length);
+        svcInfoEl.textContent = t('admin_pagination_services').replace('{v}', apiServices.length).replace('{n}', apiServices.length);
+      }
+      
+      if (typeof window.translatePage === 'function') window.translatePage();
+      
+    } catch (err) {
+      console.error('Failed to fetch services:', err);
+      showToast('Error loading services list', 'error');
+    }
   }
 
-  function _updateServiceKPIs() {
+  function _updateServiceKPIs(services = []) {
     const totalEl = document.getElementById('totalServicesCount');
     const categoriesEl = document.getElementById('activeCategoriesCount');
     const topCatEl = document.getElementById('topServiceCategory');
@@ -564,24 +862,38 @@ function initAdminDashboard() {
       row.classList.toggle('is-hidden', !matchQ || !matchCat);
       row.style.display = (matchQ && matchCat) ? '' : 'none';
     });
+
+    const infoEl = document.getElementById('servicePaginationInfo');
+    const visibleCount = document.querySelectorAll('.service-row:not(.is-hidden)').length;
+    const total = document.querySelectorAll('.service-row').length;
+    if (infoEl) {
+      const t = (typeof window.t === 'function') ? window.t : (k) => k;
+      infoEl.textContent = t('admin_pagination_services')
+        .replace('{v}', visibleCount)
+        .replace('{n}', total);
+    }
   }
 
   // Modal logic
   const serviceModal = document.getElementById('serviceModal');
   const serviceForm = document.getElementById('serviceForm');
 
-  function openModal(svc = null) {
+  async function openModal(id = null, serviceList = []) {
     const title = document.getElementById('serviceModalTitle');
     const saveBtnText = document.getElementById('saveServiceBtn');
     
-    if (svc) {
+    if (id) {
+      const svc = serviceList.find(s => s._id === id);
+      if (!svc) return;
+
       title.textContent = typeof window.t === 'function' ? window.t('admin_modal_edit_service_title') : 'Edit Service';
       title.setAttribute('data-i18n', 'admin_modal_edit_service_title');
-      document.getElementById('serviceId').value = svc.id;
-      document.getElementById('serviceName').value = svc.name;
-      document.getElementById('serviceDesc').value = svc.desc;
-      document.getElementById('serviceCategory').value = svc.category;
-      document.getElementById('basePrice').value = svc.price;
+      document.getElementById('serviceId').value = svc._id;
+      document.getElementById('serviceName').value = svc.title || '';
+      document.getElementById('serviceDesc').value = svc.description || svc.desc || '';
+      document.getElementById('serviceCategory').value = svc.category || '';
+      document.getElementById('priceUnit').value = svc.priceUnit || 'per_hour';
+      document.getElementById('basePrice').value = svc.basePrice || '';
       saveBtnText.textContent = typeof window.t === 'function' ? window.t('admin_btn_save_changes') : 'Save Changes';
       saveBtnText.setAttribute('data-i18n', 'admin_btn_save_changes');
     } else {
@@ -607,51 +919,48 @@ function initAdminDashboard() {
   document.getElementById('serviceSearch')?.addEventListener('input', _applyServiceFilters);
   document.getElementById('serviceCategoryFilter')?.addEventListener('change', _applyServiceFilters);
 
-  serviceForm?.addEventListener('submit', (e) => {
+  serviceForm?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const id = document.getElementById('serviceId').value;
-    const name = document.getElementById('serviceName').value;
-    const desc = document.getElementById('serviceDesc').value;
-    const category = document.getElementById('serviceCategory').value;
-    const price = parseInt(document.getElementById('basePrice').value);
+    const data = { 
+      title: document.getElementById('serviceName').value.trim(), 
+      description: document.getElementById('serviceDesc').value.trim(), 
+      category: document.getElementById('serviceCategory').value.toLowerCase(), 
+      basePrice: parseInt(document.getElementById('basePrice').value) || 0,
+      priceUnit: document.getElementById('priceUnit').value
+    };
 
-    if (id) {
-      // Edit
-      const idx = services.findIndex(s => s.id === parseInt(id));
-      if (idx !== -1) {
-        services[idx] = { ...services[idx], name, desc, category, price };
+    try {
+      if (id) {
+        await updateService(id, data);
+        showToast('Service updated', 'success');
+      } else {
+        await createService(data);
+        showToast('New service added', 'success');
       }
-      showToast('Service updated', 'success');
-    } else {
-      // Add
-      const newSvc = {
-        id: Date.now(),
-        name,
-        desc,
-        category,
-        price,
-        status: 'Active'
-      };
-      services.push(newSvc);
-      showToast('New service added', 'success');
+      
+      closeModal();
+      renderServicesList();
+    } catch (err) {
+      console.error('Failed to save service:', err);
+      showToast('Error saving service data', 'error');
     }
-    
-    saveServices();
-    closeModal();
-    renderServicesList();
   });
 
-  function editService(id) {
-    const svc = services.find(s => s.id === id);
-    if (svc) openModal(svc);
+  function editService(id, serviceList) {
+    openModal(id, serviceList);
   }
 
-  function deleteService(id) {
+  async function deleteService(id) {
     if (confirm('Are you sure you want to delete this service?')) {
-      services = services.filter(s => s.id !== id);
-      saveServices();
-      renderServicesList();
-      showToast('Service deleted', 'error');
+      try {
+        await apiDeleteService(id);
+        renderServicesList();
+        showToast('Service deleted', 'error');
+      } catch (err) {
+        console.error('Failed to delete service:', err);
+        showToast('Error deleting service', 'error');
+      }
     }
   }
 
@@ -659,9 +968,9 @@ function initAdminDashboard() {
   renderServicesList();
 
 
-  // ══════════════════════════════════════════════════════════
+  // ──────────────────────────────────────────────────────────
   //  SETTINGS — STAB TAB SWITCHING
-  // ══════════════════════════════════════════════════════════
+  // ──────────────────────────────────────────────────────────
   function initSettingsStabs() {
     const bar   = document.getElementById('adminSettingsTabBar');
     if (!bar) return;
@@ -685,9 +994,9 @@ function initAdminDashboard() {
   }
   initSettingsStabs();
 
-  // ══════════════════════════════════════════════════════════
+  // ──────────────────────────────────────────────────────────
   //  SETTINGS — TOGGLE SWITCH HANDLER
-  // ══════════════════════════════════════════════════════════
+  // ──────────────────────────────────────────────────────────
   document.querySelectorAll('.stab-toggle').forEach(btn => {
     btn.addEventListener('click', () => {
       const on = btn.getAttribute('aria-checked') !== 'true';
@@ -696,9 +1005,9 @@ function initAdminDashboard() {
     });
   });
 
-  // ══════════════════════════════════════════════════════════
+  // ──────────────────────────────────────────────────────────
   //  SETTINGS — LOAD / SAVE (localStorage)
-  // ══════════════════════════════════════════════════════════
+  // ──────────────────────────────────────────────────────────
   const _T = k => (typeof window.t === 'function' ? window.t(k) : k);
 
   function _setToggle(id, value) {
@@ -714,23 +1023,19 @@ function initAdminDashboard() {
     return el ? el.getAttribute('aria-checked') === 'true' : false;
   }
 
-  // Load all settings
-  const saved = JSON.parse(localStorage.getItem('servio_admin_config') || 'null');
-  if (saved) {
-    // Platform
+  function _applySettings(saved) {
+    if (!saved) return;
     if (saved.commissionRate    != null) document.getElementById('commissionRate').value    = saved.commissionRate;
     if (saved.maxCashLiability  != null) document.getElementById('maxCashLiability').value  = saved.maxCashLiability;
     if (saved.autoReleaseWindow != null) document.getElementById('autoReleaseWindow').value = saved.autoReleaseWindow;
     if (saved.minDepositPct     != null) document.getElementById('minDepositPct').value     = saved.minDepositPct;
     if (saved.minBookingAmount  != null) document.getElementById('minBookingAmount').value  = saved.minBookingAmount;
     if (saved.cashPaymentsEnabled != null) _setToggle('toggleCashPayments', saved.cashPaymentsEnabled);
-    // Moderation
     if (saved.reqNationalId   != null) _setToggle('toggleReqNationalId', saved.reqNationalId);
     if (saved.reqTradeLicense != null) _setToggle('toggleReqTradeLicense', saved.reqTradeLicense);
     if (saved.autoSuspendDisputes != null) document.getElementById('autoSuspendDisputes').value = saved.autoSuspendDisputes;
     if (saved.minRatingFlag   != null) document.getElementById('minRatingFlag').value   = saved.minRatingFlag;
     if (saved.maxCashJobsDay  != null) document.getElementById('maxCashJobsDay').value  = saved.maxCashJobsDay;
-    // Notifications
     if (saved.notifNewUser       != null) _setToggle('notifNewUser', saved.notifNewUser);
     if (saved.notifNewTech       != null) _setToggle('notifNewTech', saved.notifNewTech);
     if (saved.notifNewDispute    != null) _setToggle('notifNewDispute', saved.notifNewDispute);
@@ -738,10 +1043,8 @@ function initAdminDashboard() {
     if (saved.notifDailySummary  != null) _setToggle('notifDailySummary', saved.notifDailySummary);
     if (saved.adminAlertEmail    != null && document.getElementById('adminAlertEmail'))
       document.getElementById('adminAlertEmail').value = saved.adminAlertEmail;
-    // Security
     if (saved.twoFAEnabled    != null) _setToggle('toggle2FA', saved.twoFAEnabled);
     if (saved.sessionTimeout  != null) document.getElementById('sessionTimeout').value = saved.sessionTimeout;
-    // System
     if (saved.maintenanceMode != null) _setToggle('toggleMaintenance', saved.maintenanceMode);
     if (saved.platformName    != null) document.getElementById('platformName').value    = saved.platformName;
     if (saved.supportEmail    != null) document.getElementById('supportEmail').value    = saved.supportEmail;
@@ -752,15 +1055,25 @@ function initAdminDashboard() {
     if (saved.flagReviews     != null) _setToggle('flagReviews',     saved.flagReviews);
   }
 
-  function _saveConfig(patch) {
-    const current = JSON.parse(localStorage.getItem('servio_admin_config') || '{}');
-    localStorage.setItem('servio_admin_config', JSON.stringify({ ...current, ...patch }));
+  // Load settings from API, fall back to localStorage
+  getAdminSettings().then(data => _applySettings(data)).catch(() => {
+    const saved = JSON.parse(localStorage.getItem('servio_admin_config') || 'null');
+    _applySettings(saved);
+  });
+
+  async function _saveConfig(patch) {
+    try {
+      await updateAdminSettings(patch);
+    } catch {
+      const current = JSON.parse(localStorage.getItem('servio_admin_config') || '{}');
+      localStorage.setItem('servio_admin_config', JSON.stringify({ ...current, ...patch }));
+    }
   }
 
   // Platform form
-  document.getElementById('adminSettingsForm')?.addEventListener('submit', e => {
+  document.getElementById('adminSettingsForm')?.addEventListener('submit', async e => {
     e.preventDefault();
-    _saveConfig({
+    await _saveConfig({
       commissionRate:       document.getElementById('commissionRate')?.value,
       maxCashLiability:     document.getElementById('maxCashLiability')?.value,
       autoReleaseWindow:    document.getElementById('autoReleaseWindow')?.value,
@@ -772,9 +1085,9 @@ function initAdminDashboard() {
   });
 
   // Moderation form
-  document.getElementById('adminModerationForm')?.addEventListener('submit', e => {
+  document.getElementById('adminModerationForm')?.addEventListener('submit', async e => {
     e.preventDefault();
-    _saveConfig({
+    await _saveConfig({
       reqNationalId:        _getToggle('toggleReqNationalId'),
       reqTradeLicense:      _getToggle('toggleReqTradeLicense'),
       autoSuspendDisputes:  document.getElementById('autoSuspendDisputes')?.value,
@@ -785,9 +1098,9 @@ function initAdminDashboard() {
   });
 
   // Notifications form
-  document.getElementById('adminNotifForm')?.addEventListener('submit', e => {
+  document.getElementById('adminNotifForm')?.addEventListener('submit', async e => {
     e.preventDefault();
-    _saveConfig({
+    await _saveConfig({
       notifNewUser:         _getToggle('notifNewUser'),
       notifNewTech:         _getToggle('notifNewTech'),
       notifNewDispute:      _getToggle('notifNewDispute'),
@@ -799,10 +1112,11 @@ function initAdminDashboard() {
   });
 
   // System form
-  document.getElementById('adminSystemForm')?.addEventListener('submit', e => {
+  document.getElementById('adminSystemForm')?.addEventListener('submit', async e => {
     e.preventDefault();
-    _saveConfig({
-      maintenanceMode:  _getToggle('toggleMaintenance'),
+    const isMaint = _getToggle('toggleMaintenance');
+    await _saveConfig({
+      maintenanceMode:  isMaint,
       platformName:     document.getElementById('platformName')?.value,
       supportEmail:     document.getElementById('supportEmail')?.value,
       maxUploadSize:    document.getElementById('maxUploadSize')?.value,
@@ -811,13 +1125,12 @@ function initAdminDashboard() {
       flagTechSignup:   _getToggle('flagTechSignup'),
       flagReviews:      _getToggle('flagReviews'),
     });
-    const isMaint = _getToggle('toggleMaintenance');
     showToast(isMaint ? _T('toast_maintenance_on') : _T('toast_admin_settings_saved'), isMaint ? 'warn' : 'success');
   });
 
-  // ══════════════════════════════════════════════════════════
+  // ──────────────────────────────────────────────────────────
   //  SETTINGS — PASSWORD STRENGTH METER
-  // ══════════════════════════════════════════════════════════
+  // ──────────────────────────────────────────────────────────
   const newPwdInput     = document.getElementById('newPwd');
   const pwStrengthFill  = document.getElementById('adminPwStrengthFill');
   const pwStrengthLabel = document.getElementById('adminPwStrengthLabel');
@@ -852,31 +1165,37 @@ function initAdminDashboard() {
     }
   });
 
-  document.getElementById('adminPwdForm')?.addEventListener('submit', e => {
+  document.getElementById('adminPwdForm')?.addEventListener('submit', async e => {
     e.preventDefault();
+    const currentPw = document.getElementById('currentPwd')?.value;
     const newPw  = document.getElementById('newPwd')?.value;
     const confPw = document.getElementById('confirmPwd')?.value;
     const errEl  = document.getElementById('adminPwdError');
     if (newPw !== confPw) {
-      if (errEl) errEl.hidden = false;
+      if (errEl) { errEl.textContent = 'Passwords do not match'; errEl.hidden = false; }
       return;
     }
     if (errEl) errEl.hidden = true;
-    showToast(_T('toast_password_changed') || 'Password updated', 'success');
-    ['currentPwd','newPwd','confirmPwd'].forEach(id => {
-      const el = document.getElementById(id); if (el) el.value = '';
-    });
-    if (pwStrengthFill)  pwStrengthFill.style.width = '0%';
-    if (pwStrengthLabel) pwStrengthLabel.textContent = '';
+    try {
+      await updatePassword({ currentPassword: currentPw, newPassword: newPw });
+      showToast(_T('toast_password_changed') || 'Password updated', 'success');
+      ['currentPwd','newPwd','confirmPwd'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.value = '';
+      });
+      if (pwStrengthFill)  pwStrengthFill.style.width = '0%';
+      if (pwStrengthLabel) pwStrengthLabel.textContent = '';
+    } catch (err) {
+      if (errEl) { errEl.textContent = err.message || 'Failed to update password'; errEl.hidden = false; }
+    }
   });
 
   document.getElementById('terminateOtherSessionsBtn')?.addEventListener('click', () => {
     showToast(_T('toast_sessions_terminated') || 'Other sessions terminated', 'success');
   });
 
-  // ══════════════════════════════════════════════════════════
+  // ──────────────────────────────────────────────────────────
   //  SETTINGS — ROLE ASSIGNMENT
-  // ══════════════════════════════════════════════════════════
+  // ──────────────────────────────────────────────────────────
   const _roleAssignments = JSON.parse(localStorage.getItem('servio_role_assignments') || '[]');
 
   function _saveRoleAssignments() {
@@ -959,40 +1278,49 @@ function initAdminDashboard() {
   const btnApplyAnalyticFilters = document.getElementById('applyAnalyticsFilters');
   const btnResetAnalyticFilters = document.getElementById('resetAnalyticsFilters');
   
-  function applyAnalyticsChartChanges(srvVal) {
-      // Update horizontal bar chart visibility (service demand)
-      const chartItems = document.querySelectorAll('#analyticsServicesChart .analytics-hbar-item');
-      chartItems.forEach(item => {
-        const itemSvc = item.dataset.service || '';
-        if (srvVal === '' || itemSvc === srvVal) {
-          item.style.display = 'flex';
-          // Simulate data shifting
-          const randomPct = Math.floor(Math.random() * 60) + 30; // 30 to 90
-          const fill = item.querySelector('.analytics-hbar-fill');
-          const pct = item.querySelector('.analytics-hbar-pct');
-          if (fill) fill.style.setProperty('--bar-width', randomPct + '%');
-          if (pct) pct.textContent = randomPct + '%';
-        } else {
-          item.style.display = 'none';
-        }
-      });
+  async function applyAnalyticsChartChanges(srvVal) {
+    let stats = {};
+    try {
+      const res = await getAnalytics();
+      stats = res || {};
+    } catch {}
 
-      // Also randomize vertical bar chart to simulate data update
-      const randomBars = document.querySelectorAll('.analytics-bar');
-      randomBars.forEach(bar => {
-         const newH = Math.floor(Math.random() * 70) + 30; 
-         bar.style.setProperty('--bar-height', newH + '%');
-         bar.textContent = Math.floor(newH / 1.5);
-      });
+    const bookings = stats.bookings || {};
+    const bCompleted = bookings.completed || 0;
+    const bCancelled = bookings.cancelled || 0;
+    const bPending   = bookings.pending   || 0;
+    const bProgress  = bookings.in_progress || 0;
+    const totalUsers = stats.users || 0;
+
+    // Update vertical bar chart with real booking counts
+    const barValues = [bPending, bProgress, bCompleted, bCancelled, totalUsers];
+    const maxVal = Math.max(...barValues, 1);
+    const vertBars = document.querySelectorAll('.analytics-bar');
+    vertBars.forEach((bar, i) => {
+      const val = barValues[i] != null ? barValues[i] : 0;
+      const pct = Math.round((val / maxVal) * 100);
+      bar.style.setProperty('--bar-height', pct + '%');
+      bar.textContent = val;
+    });
+
+    // Update horizontal bar chart visibility
+    const chartItems = document.querySelectorAll('#analyticsServicesChart .analytics-hbar-item');
+    chartItems.forEach(item => {
+      const itemSvc = item.dataset.service || '';
+      if (srvVal === '' || itemSvc === srvVal) {
+        item.style.display = 'flex';
+      } else {
+        item.style.display = 'none';
+      }
+    });
   }
 
   if (btnApplyAnalyticFilters) {
-    btnApplyAnalyticFilters.addEventListener('click', () => {
+    btnApplyAnalyticFilters.addEventListener('click', async () => {
       const srvFilter = document.getElementById('analyticsServiceFilter');
       const srvVal = srvFilter ? srvFilter.value : '';
-      
-      applyAnalyticsChartChanges(srvVal);
-      showToast(window.__lang === 'ar' ? 'تم تطبيق الفلاتر والتحليلات' : 'Analytics filters applied', 'success');
+      await applyAnalyticsChartChanges(srvVal);
+      showToast(window.__lang === 'ar' ? 'ØªÙ… ØªØ·Ø¨ÙŠÙ‚ Ø§Ù„ÙÙ„Ø§ØªØ± ÙˆØ§Ù„ØªØ­Ù„ÙŠÙ„Ø§Øª' : 'Analytics filters applied', 'success');
     });
   }
 
@@ -1007,7 +1335,7 @@ function initAdminDashboard() {
        if (dFilter) dFilter.value = '30'; // Default is usually Last 30 Days
 
        applyAnalyticsChartChanges('');
-       showToast(window.__lang === 'ar' ? 'تم إعادة ضبط الفلاتر' : 'Filters reset successfully', 'info');
+       showToast(window.__lang === 'ar' ? 'ØªÙ… Ø¥Ø¹Ø§Ø¯Ø© Ø¶Ø¨Ø· Ø§Ù„ÙÙ„Ø§ØªØ±' : 'Filters reset successfully', 'info');
     });
   }
 
@@ -1016,7 +1344,7 @@ function initAdminDashboard() {
   document.addEventListener('langchange', () => {
     _updateOverviewDate();
     _updateUserCount();
-    _renderAuditTable();
+    _loadAuditPage();
   });
 
   // ── Mobile sidebar toggle ──────────────────────────────
@@ -1037,163 +1365,145 @@ function initAdminDashboard() {
     if (window.innerWidth <= 768) closeSidebar();
   }));
 
-  // ══════════════════════════════════════════════════════════
-  //  AUDIT LOG
-  // ══════════════════════════════════════════════════════════
-  const AUDIT_ROWS_PER_PAGE = 15;
+  // ──────────────────────────────────────────────────────────
+  //  AUDIT LOG — API-driven
+  // ──────────────────────────────────────────────────────────
   let _auditPage = 1;
-  let _auditFiltered = [];
+  let _auditTotalPages = 1;
+  let _lastAuditLogs = [];
 
   const _auditTypeLabel = type => {
     const map = {
-      auth: _T('admin_audit_type_auth') || 'Authentication',
-      user: _T('admin_audit_type_user') || 'User Management',
+      auth:     _T('admin_audit_type_auth')     || 'Authentication',
+      user:     _T('admin_audit_type_user')     || 'User Management',
       settings: _T('admin_audit_type_settings') || 'Settings',
-      booking: _T('admin_audit_type_booking') || 'Booking',
-      finance: _T('admin_audit_type_finance') || 'Finance',
-      system: _T('admin_audit_type_system') || 'System',
+      booking:  _T('admin_audit_type_booking')  || 'Booking',
+      finance:  _T('admin_audit_type_finance')  || 'Finance',
+      system:   _T('admin_audit_type_system')   || 'System',
     };
     return map[type] || type;
   };
 
-  const _auditStatusLabel = status => {
-    const map = {
-      ok: _T('admin_audit_status_ok') || 'OK',
-      warn: _T('admin_audit_status_warn') || 'Warn',
-      fail: _T('admin_audit_status_fail') || 'Fail',
-    };
-    return map[status] || status;
-  };
+  const _auditStatusLabel = s =>
+    ({ ok: _T('admin_audit_status_ok') || 'OK', warn: _T('admin_audit_status_warn') || 'Warn', fail: _T('admin_audit_status_fail') || 'Fail' }[s] || s);
 
-  const _auditLabel = row => {
-    const action = row.actionKey ? (_T(row.actionKey) || row.action) : row.action;
-    const target = row.targetKey ? (_T(row.targetKey) || row.target) : row.target;
-    const actor = row.actorKey ? (_T(row.actorKey) || row.actor) : row.actor;
-    return { action, target, actor };
-  };
-
-  // Mock data
-  const _auditData = [
-    { ts: '2026-04-14 11:42:03', actor: 'admin@servio.eg', type: 'settings', actionKey: 'admin_audit_evt_commission_12',           targetKey: 'admin_audit_target_platform_settings', ip: '196.158.4.21', status: 'ok' },
-    { ts: '2026-04-14 11:30:17', actor: 'admin@servio.eg', type: 'user',     actionKey: 'admin_audit_evt_suspend_user',            target: 'U-1080 Ahmed Yasser',                       ip: '196.158.4.21', status: 'ok' },
-    { ts: '2026-04-14 10:58:44', actor: 'sara.m@servio.eg',type: 'booking',  actionKey: 'admin_audit_evt_resolved_dispute_4412',   target: 'Booking #BK-9920',                          ip: '41.72.100.5',  status: 'ok' },
-    { ts: '2026-04-14 10:45:11', actor: 'admin@servio.eg', type: 'auth',     actionKey: 'admin_audit_evt_admin_login',             targetKey: 'admin_audit_target_admin_dashboard',   ip: '196.158.4.21', status: 'ok' },
-    { ts: '2026-04-14 09:22:30', actorKey: 'admin_audit_actor_unknown', type: 'auth', actionKey: 'admin_audit_evt_failed_login',   targetKey: 'admin_audit_target_admin_dashboard',   ip: '185.220.101.3',status: 'fail' },
-    { ts: '2026-04-14 09:18:55', actor: 'omar.t@servio.eg',type: 'finance',  actionKey: 'admin_audit_evt_settlement_4200',         target: 'T-0042 Fady Naguib',                        ip: '102.33.9.8',   status: 'ok' },
-    { ts: '2026-04-13 17:05:22', actor: 'admin@servio.eg', type: 'settings', actionKey: 'admin_audit_evt_maintenance_on',          targetKey: 'admin_audit_target_system_settings',   ip: '196.158.4.21', status: 'warn' },
-    { ts: '2026-04-13 16:48:09', actor: 'admin@servio.eg', type: 'settings', actionKey: 'admin_audit_evt_maintenance_off',         targetKey: 'admin_audit_target_system_settings',   ip: '196.158.4.21', status: 'ok' },
-    { ts: '2026-04-13 14:33:47', actor: 'nour.h@servio.eg',type: 'user',     actionKey: 'admin_audit_evt_assign_finance_role',     target: 'U-1083 Nour Hassan',                        ip: '41.65.200.14', status: 'ok' },
-    { ts: '2026-04-13 13:11:00', actor: 'admin@servio.eg', type: 'user',     actionKey: 'admin_audit_evt_approved_technician',     target: 'T-0061 Khaled Saber',                       ip: '196.158.4.21', status: 'ok' },
-    { ts: '2026-04-13 11:27:38', actor: 'sara.m@servio.eg',type: 'user',     actionKey: 'admin_audit_evt_rejected_technician',     target: 'T-0062 Tarek Mahmoud',                      ip: '41.72.100.5',  status: 'ok' },
-    { ts: '2026-04-12 16:55:12', actor: 'admin@servio.eg', type: 'system',   actionKey: 'admin_audit_evt_exported_bookings_csv',   targetKey: 'admin_audit_target_reports',           ip: '196.158.4.21', status: 'ok' },
-    { ts: '2026-04-12 15:00:00', actorKey: 'admin_audit_actor_unknown', type: 'auth', actionKey: 'admin_audit_evt_failed_login',   targetKey: 'admin_audit_target_admin_dashboard',   ip: '91.108.4.55',  status: 'fail' },
-    { ts: '2026-04-12 09:14:29', actor: 'omar.t@servio.eg',type: 'booking',  actionKey: 'admin_audit_evt_cancelled_booking_admin', target: 'Booking #BK-9911',                          ip: '102.33.9.8',   status: 'ok' },
-    { ts: '2026-04-11 18:30:01', actor: 'admin@servio.eg', type: 'settings', actionKey: 'admin_audit_evt_cash_debt_ceiling',       targetKey: 'admin_audit_target_platform_settings', ip: '196.158.4.21', status: 'ok' },
-    { ts: '2026-04-11 14:22:17', actor: 'admin@servio.eg', type: 'user',     actionKey: 'admin_audit_evt_reset_password',          target: 'U-1081 Sara Mohamed',                       ip: '196.158.4.21', status: 'ok' },
-    { ts: '2026-04-10 11:45:00', actor: 'nour.h@servio.eg',type: 'finance',  actionKey: 'admin_audit_evt_settlement_2800',         target: 'T-0038 Youssef Ali',                        ip: '41.65.200.14', status: 'ok' },
-    { ts: '2026-04-10 09:03:55', actor: 'admin@servio.eg', type: 'auth',     actionKey: 'admin_audit_evt_admin_login',             targetKey: 'admin_audit_target_admin_dashboard',   ip: '196.158.4.21', status: 'ok' },
-    { ts: '2026-04-09 17:12:44', actor: 'admin@servio.eg', type: 'system',   actionKey: 'admin_audit_evt_changed_support_email',   targetKey: 'admin_audit_target_system_settings',   ip: '196.158.4.21', status: 'ok' },
-    { ts: '2026-04-09 10:58:11', actor: 'sara.m@servio.eg',type: 'user',     actionKey: 'admin_audit_evt_suspend_user_fraud',      target: 'U-1085 Hana Mostafa',                       ip: '41.72.100.5',  status: 'warn' },
-  ];
-
-  function _renderAuditTable() {
-    const tbody    = document.getElementById('auditLogBody');
-    const emptyEl  = document.getElementById('auditTableEmpty');
-    const pageInfo = document.getElementById('auditPageInfo');
-    const prevBtn  = document.getElementById('auditPrevBtn');
-    const nextBtn  = document.getElementById('auditNextBtn');
+  function _renderAuditRows(logs) {
+    const tbody   = document.getElementById('auditLogBody');
+    const emptyEl = document.getElementById('auditTableEmpty');
     if (!tbody) return;
 
-    const totalPages = Math.max(1, Math.ceil(_auditFiltered.length / AUDIT_ROWS_PER_PAGE));
-    _auditPage = Math.max(1, Math.min(_auditPage, totalPages));
-
-    const start = (_auditPage - 1) * AUDIT_ROWS_PER_PAGE;
-    const slice = _auditFiltered.slice(start, start + AUDIT_ROWS_PER_PAGE);
-
-    if (_auditFiltered.length === 0) {
+    if (!logs.length) {
       tbody.innerHTML = '';
       if (emptyEl) emptyEl.hidden = false;
-    } else {
-      if (emptyEl) emptyEl.hidden = true;
-      tbody.innerHTML = slice.map(r => {
-        const label = _auditLabel(r);
-        return `
-        <tr>
-          <td class="audit-ts">${r.ts}</td>
-          <td class="audit-actor">${label.actor}</td>
-          <td class="audit-action">
-            <span class="audit-type-pill">${_auditTypeLabel(r.type)}</span><br>${label.action}
-          </td>
-          <td class="audit-target">${label.target}</td>
-          <td class="audit-ip">${r.ip}</td>
-          <td>
-            <span class="audit-badge audit-badge--${r.status}">
-              ${r.status === 'ok' ? '✓ OK' : r.status === 'warn' ? '⚠ Warn' : '✕ Fail'}
-            </span>
-          </td>
-        </tr>`;
-      }).join('');
-      tbody.querySelectorAll('.audit-badge').forEach(badge => {
-        if (badge.classList.contains('audit-badge--ok')) badge.textContent = `✓ ${_auditStatusLabel('ok')}`;
-        else if (badge.classList.contains('audit-badge--warn')) badge.textContent = `⚠ ${_auditStatusLabel('warn')}`;
-        else if (badge.classList.contains('audit-badge--fail')) badge.textContent = `✕ ${_auditStatusLabel('fail')}`;
-      });
+      return;
     }
+    if (emptyEl) emptyEl.hidden = true;
 
-    if (pageInfo) pageInfo.textContent = `${_auditPage} / ${totalPages}`;
-    if (prevBtn)  prevBtn.disabled = _auditPage <= 1;
-    if (nextBtn)  nextBtn.disabled = _auditPage >= totalPages;
+    tbody.innerHTML = logs.map(r => {
+      const ts     = r.createdAt ? new Date(r.createdAt).toLocaleString('en-GB') : '—';
+      const actor  = r.actor?.email || 'unknown';
+      const icon   = r.status === 'ok' ? '✓' : r.status === 'warn' ? '⚠' : '✕';
+      return `<tr>
+        <td class="audit-ts">${ts}</td>
+        <td class="audit-actor">${actor}</td>
+        <td class="audit-action"><span class="audit-type-pill">${_auditTypeLabel(r.type)}</span><br>${r.action}</td>
+        <td class="audit-target">${r.target || '—'}</td>
+        <td class="audit-actions">
+          <button class="bk-action-btn bk-action-btn--xs bk-action-btn--delete" data-audit-delete="${r._id}">
+            ${_T('admin_audit_remove_btn') || 'Remove'}
+          </button>
+        </td>
+        <td><span class="audit-badge audit-badge--${r.status}">${icon} ${_auditStatusLabel(r.status)}</span></td>
+      </tr>`;
+    }).join('');
+  }
 
-    // Update stat pills
-    const today = new Date().toISOString().slice(0, 10);
-    document.getElementById('auditTotalCount').textContent = _auditData.length;
-    document.getElementById('auditTodayCount').textContent = _auditData.filter(r => r.ts.startsWith(today)).length;
-    document.getElementById('auditFailedCount').textContent= _auditData.filter(r => r.status === 'fail').length;
+  async function _loadAuditPage() {
+    const q    = document.getElementById('auditSearchInput')?.value || '';
+    const type = document.getElementById('auditTypeFilter')?.value  || '';
+    const days = document.getElementById('auditDateFilter')?.value  || '';
+
+    try {
+      const res = await getAuditLogs({ q, type, days, page: _auditPage, limit: 15 });
+      const logs      = res.logs || [];
+      const pagination = res.pagination || {};
+      const stats     = res.stats || {};
+
+      _lastAuditLogs  = logs;
+      _auditTotalPages = pagination.totalPages || 1;
+
+      _renderAuditRows(logs);
+
+      const pageInfo = document.getElementById('auditPageInfo');
+      const prevBtn  = document.getElementById('auditPrevBtn');
+      const nextBtn  = document.getElementById('auditNextBtn');
+      if (pageInfo) pageInfo.textContent = `${_auditPage} / ${_auditTotalPages}`;
+      if (prevBtn)  prevBtn.disabled = _auditPage <= 1;
+      if (nextBtn)  nextBtn.disabled = _auditPage >= _auditTotalPages;
+
+      const totalEl = document.getElementById('auditTotalCount');
+      const todayEl = document.getElementById('auditTodayCount');
+      const failEl  = document.getElementById('auditFailedCount');
+      if (totalEl) totalEl.textContent = stats.total  ?? pagination.total ?? '—';
+      if (todayEl) todayEl.textContent = stats.todayCount ?? '—';
+      if (failEl)  failEl.textContent  = stats.failCount  ?? '—';
+    } catch (err) {
+      console.error('Audit log fetch failed:', err);
+    }
   }
 
   function _applyAuditFilters() {
-    const q    = (document.getElementById('auditSearchInput')?.value || '').toLowerCase();
-    const type = document.getElementById('auditTypeFilter')?.value || '';
-    const days = parseInt(document.getElementById('auditDateFilter')?.value) || 0;
-    const cutoff = days ? new Date(Date.now() - days * 86400000).toISOString().slice(0, 10) : '';
-
-    _auditFiltered = _auditData.filter(r => {
-      if (type && r.type !== type) return false;
-      if (cutoff && r.ts.slice(0, 10) < cutoff) return false;
-      const label = _auditLabel(r);
-      if (q && !label.actor.toLowerCase().includes(q) && !label.action.toLowerCase().includes(q) && !label.target.toLowerCase().includes(q) && !r.ip.includes(q)) return false;
-      return true;
-    });
     _auditPage = 1;
-    _renderAuditTable();
+    _loadAuditPage();
   }
-
-  // Init audit
-  _auditFiltered = [..._auditData];
-  _renderAuditTable();
 
   document.getElementById('auditSearchInput')?.addEventListener('input', _applyAuditFilters);
   document.getElementById('auditTypeFilter')?.addEventListener('change', _applyAuditFilters);
   document.getElementById('auditDateFilter')?.addEventListener('change', _applyAuditFilters);
 
-  document.getElementById('auditPrevBtn')?.addEventListener('click', () => { _auditPage--; _renderAuditTable(); });
-  document.getElementById('auditNextBtn')?.addEventListener('click', () => { _auditPage++; _renderAuditTable(); });
+  document.getElementById('auditPrevBtn')?.addEventListener('click', () => { _auditPage = Math.max(1, _auditPage - 1); _loadAuditPage(); });
+  document.getElementById('auditNextBtn')?.addEventListener('click', () => { _auditPage = Math.min(_auditTotalPages, _auditPage + 1); _loadAuditPage(); });
+
+  document.getElementById('auditLogBody')?.addEventListener('click', async (e) => {
+    const delBtn = e.target.closest('[data-audit-delete]');
+    if (!delBtn) return;
+    
+    const id = delBtn.dataset.auditDelete;
+    const confirmMsg = _T('admin_audit_delete_confirm') || 'Are you sure you want to remove this log entry?';
+    if (!confirm(confirmMsg)) return;
+
+    try {
+      await deleteAuditLog(id);
+      showToast(_T('toast_audit_deleted') || 'Audit log entry removed', 'success');
+      _loadAuditPage(); // reload current page
+    } catch (err) {
+      console.error('Failed to delete audit log:', err);
+      showToast(err.message || 'Failed to remove log', 'error');
+    }
+  });
 
   document.getElementById('auditExportBtn')?.addEventListener('click', () => {
     const rows = [[
-      _T('admin_audit_col_time') || 'Timestamp',
-      _T('admin_audit_col_actor') || 'Actor',
-      _T('admin_audit_type_col') || 'Type',
+      _T('admin_audit_col_time')   || 'Timestamp',
+      _T('admin_audit_col_actor')  || 'Actor',
+      _T('admin_audit_type_col')   || 'Type',
       _T('admin_audit_col_action') || 'Action',
       _T('admin_audit_col_target') || 'Target',
-      _T('admin_audit_col_ip') || 'IP Address',
-      _T('admin_audit_col_status') || 'Status'
+      _T('admin_audit_col_ip')     || 'IP Address',
+      _T('admin_audit_col_status') || 'Status',
     ]];
-    _auditFiltered.forEach(r => {
-      const label = _auditLabel(r);
-      rows.push([r.ts, label.actor, _auditTypeLabel(r.type), label.action, label.target, r.ip, _auditStatusLabel(r.status)]);
+    _lastAuditLogs.forEach(r => {
+      rows.push([
+        r.createdAt ? new Date(r.createdAt).toLocaleString('en-GB') : '—',
+        r.actor?.email || 'unknown',
+        _auditTypeLabel(r.type),
+        r.action,
+        r.target || '—',
+        r.ip || '—',
+        _auditStatusLabel(r.status),
+      ]);
     });
-    const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+    const csv  = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
@@ -1202,11 +1512,387 @@ function initAdminDashboard() {
     showToast(_T('toast_audit_exported') || 'Audit log exported', 'success');
   });
 
-  // Re-render audit table when switching to the audit panel (for stat refresh)
+  // Refresh when switching to audit panel
   navBtns.forEach(btn => {
     if (btn.dataset.tab === 'audit') {
-      btn.addEventListener('click', () => { _auditPage = 1; _renderAuditTable(); });
+      btn.addEventListener('click', () => { _auditPage = 1; _loadAuditPage(); });
     }
+  });
+
+  // Initial load
+  _loadAuditPage();
+
+  // Expose local modal helpers to loadAdminData (defined at module scope)
+  _openProfileModal     = openProfileModal;
+  _openTechProfileModal = openTechProfileModal;
+
+  loadAdminData();
+  let _adminPollInterval = null;
+  const startAdminPolling = () => {
+    if (_adminPollInterval) clearInterval(_adminPollInterval);
+    _adminPollInterval = setInterval(() => loadAdminData(), 30000);
+  };
+  const stopAdminPolling = () => { if (_adminPollInterval) clearInterval(_adminPollInterval); _adminPollInterval = null; };
+  startAdminPolling();
+  document.addEventListener('visibilitychange', () => { document.hidden ? stopAdminPolling() : startAdminPolling(); });
+}
+
+async function loadAdminData() {
+  const _set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = String(val); };
+
+  // ── Users (Customers) ──────────────────────────────────────────────────────
+  try {
+    const res = await getAllUsers({ role: 'user', limit: 100 });
+    const users = res.users || [];
+    const total = res.pagination?.total ?? users.length;
+    const active = users.filter(u => u.isActive).length;
+    const suspended = users.filter(u => !u.isActive).length;
+    const now = new Date();
+    const newThisMonth = users.filter(u => {
+      const d = new Date(u.createdAt);
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    }).length;
+
+    const usersRoot = document.querySelector('#usersTable tbody');
+    if (usersRoot) {
+      if (users.length === 0) {
+        usersRoot.innerHTML = '<tr><td colspan="7" class="center-align" style="padding: 2rem;">No customers found.</td></tr>';
+      } else {
+        usersRoot.innerHTML = users.map(u => {
+          const status = u.isActive ? 'active' : 'suspended';
+          const badgeClass = u.isActive ? 'bk-badge--completed' : 'bk-badge--overdue';
+          const date = u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '—';
+          return `<tr class="user-row" data-user-id="${u._id}" data-status="${status}">
+            <td><span style="font-family:monospace;font-weight:600;color:var(--color-text);">#U-${u._id.slice(-4)}</span></td>
+            <td><div class="user-name" style="font-weight:600;">${u.name || '—'}</div></td>
+            <td><div class="user-email" style="color:var(--color-text-muted);">${u.email || '—'}</div></td>
+            <td>${date}</td>
+            <td class="center-align" style="font-weight:600;color:var(--color-text);">—</td>
+            <td><span class="bk-badge ${badgeClass} status-badge">${status === 'active' ? 'Active' : 'Suspended'}</span></td>
+            <td>
+              <div class="table-actions">
+                <button class="bk-action-btn bk-action-btn--xs" data-view-user="${u._id}">View</button>
+                <button class="bk-action-btn bk-action-btn--xs bk-action-btn--suspend" data-admin-toggle-user="${u._id}" data-active="${u.isActive}">
+                  ${u.isActive ? 'Suspend' : 'Activate'}
+                </button>
+                <button class="bk-action-btn bk-action-btn--xs bk-action-btn--delete" data-admin-delete-user="${u._id}">Delete</button>
+              </div>
+            </td>
+          </tr>`;
+        }).join('');
+
+        // Attach View modal listeners now that rows exist
+        usersRoot.querySelectorAll('[data-view-user]').forEach(btn => {
+          const u = users.find(usr => usr._id === btn.dataset.viewUser);
+          if (!u) return;
+          btn.addEventListener('click', () => {
+            const date = u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '—';
+            const statusText = u.isActive ? 'Active' : 'Suspended';
+            const initials = (u.name || 'U').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+            document.getElementById('userModalAvatar').textContent    = initials;
+            document.getElementById('userModalName').textContent      = u.name || '—';
+            document.getElementById('userModalEmail').textContent     = u.email || '—';
+            document.getElementById('userModalId').textContent        = `#U-${u._id.slice(-4)}`;
+            document.getElementById('userModalJoinDate').textContent  = date;
+            document.getElementById('userModalBookings').textContent  = '—';
+            document.getElementById('userModalStatus').textContent    = statusText;
+            const badge = document.getElementById('userModalStatusBadge');
+            badge.textContent = statusText;
+            badge.className = u.isActive ? 'bk-badge bk-badge--completed' : 'bk-badge bk-badge--overdue';
+            _openProfileModal('userViewModal');
+          });
+        });
+      }
+    }
+
+    _set('kpi-overview-users', total.toLocaleString());
+    _set('kpi-users-total', total.toLocaleString());
+    _set('kpi-users-active', active.toLocaleString());
+    _set('kpi-users-suspended', suspended.toLocaleString());
+    _set('kpi-users-new', newThisMonth.toLocaleString());
+
+    // Update pagination footer with actual count
+    const userInfoEl = document.getElementById('userPaginationInfo');
+    if (userInfoEl) {
+      const t = (typeof window.t === 'function') ? window.t : (k) => k;
+      userInfoEl.setAttribute('data-i18n-v', users.length);
+      userInfoEl.setAttribute('data-i18n-n', users.length);
+      userInfoEl.textContent = t('admin_pagination_users').replace('{v}', users.length).replace('{n}', users.length);
+    }
+  } catch (err) { console.error('Error loading users:', err); }
+
+  // ── Technicians (Workers) ───────────────────────────────────────────────────
+  try {
+    const res = await getAllUsers({ role: 'worker', limit: 100 });
+    const techs = res.users || [];
+    const techTotal = res.pagination?.total ?? techs.length;
+    const pendingTechs = techs.filter(t => getVerificationStatus(t) === 'pending');
+    const verifiedTechs = techs.filter(t => getVerificationStatus(t) === 'approved');
+    const suspendedTechs = techs.filter(t => !t.isActive);
+
+    const techsRoot = document.querySelector('#allTechsTable tbody');
+    if (techsRoot) {
+      if (techs.length === 0) {
+        techsRoot.innerHTML = '<tr><td colspan="9" class="center-align" style="padding: 2rem;">No technicians found.</td></tr>';
+      } else {
+        techsRoot.innerHTML = techs.map((u) => {
+          const status = getTechStatusLabel(u);
+          const badgeClass = getTechStatusBadgeClass(u);
+          return `
+          <tr class="booking-row" data-status="${status}">
+            <td style="white-space:nowrap;"><span style="font-family:monospace;font-weight:700;color:var(--color-text);">#T-${u._id.slice(-4)}</span></td>
+            <td><div class="t-name" style="font-weight:600;">${escapeHtml(u.name || '—')}</div></td>
+            <td class="t-specialty">${escapeHtml((u.skills || []).join(', ') || (u.categories || []).join(', ') || 'General')}</td>
+            <td><div style="color:var(--color-text-muted);text-transform:capitalize;">${escapeHtml(u.locationLabel || '—')}</div></td>
+            <td><div class="th-rating">★ ${u.averageRating ?? '—'}</div></td>
+            <td class="center-align" style="font-weight:700;color:var(--color-text);">${u.completedJobs ?? '—'}</td>
+            <td class="bk-amount">— EGP</td>
+            <td style="white-space:nowrap;"><span class="bk-badge ${badgeClass} status-badge">${status}</span></td>
+            <td>
+              <div class="table-actions">
+                <button class="bk-action-btn bk-action-btn--xs view-tech-link" data-id="${u._id}">Profile</button>
+                <button class="bk-action-btn bk-action-btn--xs bk-action-btn--suspend" data-admin-toggle-user="${u._id}" data-active="${u.isActive}">
+                  ${u.isActive ? 'Suspend' : 'Activate'}
+                </button>
+                <button class="bk-action-btn bk-action-btn--xs bk-action-btn--delete" data-admin-delete-user="${u._id}">Delete</button>
+              </div>
+            </td>
+          </tr>`;
+        }).join('');
+
+        techsRoot.querySelectorAll('.view-tech-link[data-id]').forEach((btn) => {
+          const user = techs.find((item) => item._id === btn.dataset.id);
+          if (!user) return;
+          btn.addEventListener('click', () => {
+            _openTechProfileModal(buildTechProfileData(user));
+          });
+        });
+      }
+
+      const pendingGrid = document.querySelector('.pending-cards-grid');
+      if (pendingGrid) {
+        if (pendingTechs.length === 0) {
+          pendingGrid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--color-text-muted);padding:1rem;">No pending approvals.</div>';
+        } else {
+          pendingGrid.innerHTML = pendingTechs.map((pt) => {
+            const initials = pt.name ? pt.name.split(' ').map(n => n[0]).join('').toUpperCase() : '??';
+            const docTags = [
+              pt.idFrontUrl && pt.idBackUrl ? 'National ID' : '',
+              pt.idSelfieUrl ? 'ID Selfie' : '',
+              pt.cvUrl ? 'CV / Resume' : '',
+              Array.isArray(pt.portfolioFiles) && pt.portfolioFiles.length ? 'Portfolio (' + pt.portfolioFiles.length + ')' : '',
+            ].filter(Boolean).map((label) => '<div class="th-doc th-doc--ok"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg> ' + escapeHtml(label) + '</div>').join('');
+
+            return `
+            <div class="th-verify-card" data-user-id="${pt._id}">
+              <div class="th-verify-identity">
+                <div class="th-avatar">${escapeHtml(initials)}</div>
+                <div class="th-identity-text"><strong>${escapeHtml(pt.name || '—')}</strong><span>${escapeHtml((pt.skills || []).join(', ') || (pt.categories || []).join(', ') || 'General')}</span></div>
+              </div>
+              <div class="th-verify-docs">${docTags || '<div class="th-doc">No documents uploaded</div>'}</div>
+              <div class="th-verify-actions">
+                <button class="bk-action-btn th-btn-approve" data-approve-tech="${pt._id}">Approve</button>
+                <button class="bk-action-btn th-btn-reject" data-reject-tech="${pt._id}">Reject</button>
+                <button class="bk-action-btn bk-action-btn--xs" data-view-pending="${pt._id}">Profile</button>
+              </div>
+            </div>`;
+          }).join('');
+
+          pendingGrid.querySelectorAll('[data-view-pending]').forEach((btn) => {
+            const user = pendingTechs.find((item) => item._id === btn.dataset.viewPending);
+            if (!user) return;
+            btn.addEventListener('click', () => {
+              _openTechProfileModal(buildTechProfileData(user));
+            });
+          });
+        }
+      }
+    }
+
+    _set('kpi-overview-techs', techTotal.toLocaleString());
+    _set('kpi-techs-total', techTotal.toLocaleString());
+    _set('kpi-techs-pending', pendingTechs.length.toLocaleString());
+    _set('kpi-techs-verified', verifiedTechs.length.toLocaleString());
+    _set('kpi-techs-suspended', suspendedTechs.length.toLocaleString());
+    _set('kpi-techs-pending-badge', pendingTechs.length);
+
+    const techInfoEl = document.getElementById('techPaginationInfo');
+    if (techInfoEl) {
+      const t = (typeof window.t === 'function') ? window.t : (k) => k;
+      techInfoEl.setAttribute('data-i18n-v', techs.length);
+      techInfoEl.setAttribute('data-i18n-n', techs.length);
+      techInfoEl.textContent = t('admin_pagination_techs').replace('{v}', techs.length).replace('{n}', techs.length);
+    }
+  } catch (err) { console.error('Error loading technicians:', err); }
+
+  // ── Bookings ────────────────────────────────────────────────────────────────
+  try {
+    const res = await getAllBookings({ limit: 100 });
+    const bookings = res.bookings || [];
+    const bTotal = res.pagination?.total ?? bookings.length;
+    const bActive = bookings.filter(b => ['pending','accepted','in_progress'].includes(b.status)).length;
+    const bCompleted = bookings.filter(b => b.status === 'completed').length;
+    const bDisputed = bookings.filter(b => b.status === 'disputed').length;
+    const bCancelled = bookings.filter(b => b.status === 'cancelled').length;
+
+    const bkRoot = document.querySelector('[data-panel="bookings"] tbody');
+    if (bkRoot) {
+      if (bookings.length === 0) {
+        bkRoot.innerHTML = '<tr><td colspan="7" class="center-align" style="padding: 2rem;">No bookings found.</td></tr>';
+      } else {
+        bkRoot.innerHTML = bookings.slice(0, 50).map(b => {
+          const sc = { pending:'bk-badge--active', accepted:'bk-badge--active', in_progress:'bk-badge--active', completed:'bk-badge--completed', cancelled:'bk-badge--cancelled', disputed:'bk-badge--overdue' }[b.status] || '';
+          const date = b.scheduledDate ? new Date(b.scheduledDate).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '—';
+          return `<tr class="booking-row" data-status="${b.status}">
+            <td class="bk-id"><span style="font-family:monospace;font-weight:600;">#BK-${b._id.slice(-4)}</span></td>
+            <td class="bk-cust">${b.user?.name || '—'}</td>
+            <td class="bk-tech">${b.worker?.name || '—'}</td>
+            <td>${b.service?.title || b.serviceKey || '—'}</td>
+            <td>${date}</td>
+            <td><span class="bk-badge ${sc}">${b.status}</span></td>
+            <td class="bk-amount">${b.totalPrice != null ? b.totalPrice + ' EGP' : '—'}</td>
+          </tr>`;
+        }).join('');
+      }
+    }
+
+    const bkTotalVal = document.querySelector('.booking-status-total-val');
+    if (bkTotalVal) bkTotalVal.textContent = bTotal.toLocaleString();
+
+    _set('kpi-bookings-total', bTotal.toLocaleString());
+    _set('kpi-bookings-active', bActive.toLocaleString());
+    _set('kpi-bookings-completed', bCompleted.toLocaleString());
+    _set('kpi-bookings-disputed', bDisputed.toLocaleString());
+
+    if (bTotal > 0) {
+      const pct = n => Math.round((n / bTotal) * 100) + '%';
+      _set('bk-pct-completed', pct(bCompleted));
+      _set('bk-pct-inprogress', pct(bActive));
+      _set('bk-pct-scheduled', pct(bookings.filter(b => b.status === 'pending').length));
+      _set('bk-pct-cancelled', pct(bCancelled));
+      _set('bk-stat-successrate', pct(bCompleted));
+    }
+
+    _set('kpi-overview-disputes', bDisputed.toLocaleString());
+    _set('kpi-disputes-total', (bDisputed + bCompleted).toLocaleString());
+    _set('kpi-disputes-open', bDisputed.toLocaleString());
+    _set('kpi-disputes-review', '0');
+    _set('kpi-disputes-resolved', bCompleted.toLocaleString());
+    _set('disputeCount', bDisputed);
+    _set('qa-dispute-badge', bDisputed);
+
+    // Update pagination footer with actual count
+    const bkInfoEl = document.getElementById('bookingPaginationInfo');
+    if (bkInfoEl) {
+      const t = (typeof window.t === 'function') ? window.t : (k) => k;
+      bkInfoEl.setAttribute('data-i18n-v', bookings.length);
+      bkInfoEl.setAttribute('data-i18n-n', bookings.length);
+      bkInfoEl.textContent = t('admin_pagination_bookings').replace('{v}', bookings.length).replace('{n}', bookings.length);
+    }
+  } catch (err) { console.error('Error loading bookings:', err); }
+
+  bindAdminActions();
+}
+
+function bindAdminActions() {
+  document.querySelectorAll('[data-admin-toggle-user]').forEach((btn) => {
+    btn.onclick = async () => {
+      const id = btn.dataset.adminToggleUser;
+      const currentActive = btn.dataset.active === 'true';
+      if (!confirm(`Are you sure you want to ${currentActive ? 'suspend' : 'activate'} this user?`)) return;
+      try {
+        await updateUserStatus(id, !currentActive);
+        showToast(`User ${currentActive ? 'suspended' : 'activated'} successfully.`, 'success');
+        loadAdminData();
+      } catch (err) {
+        showToast(err.message || 'Error occurred.', 'error');
+      }
+    };
+  });
+
+  document.querySelectorAll('[data-approve-tech]').forEach((btn) => {
+    btn.onclick = async () => {
+      const id = btn.dataset.approveTech;
+      if (!confirm('Approve this technician for the platform?')) return;
+      try {
+        await reviewWorker(id, { decision: 'approved' });
+        showToast('Technician approved and verified!', 'success');
+        loadAdminData();
+      } catch (err) {
+        showToast(err.data?.message || err.message || 'Failed to verify technician.', 'error');
+      }
+    };
+  });
+
+  document.querySelectorAll('[data-reject-tech]').forEach((btn) => {
+    btn.onclick = () => {
+      _currentRejectWorkerId = btn.dataset.rejectTech || '';
+      const reasonInput = document.getElementById('rejectWorkerReason');
+      const errorEl = document.getElementById('rejectWorkerError');
+      if (reasonInput) reasonInput.value = '';
+      if (errorEl) {
+        errorEl.hidden = true;
+        errorEl.textContent = '';
+      }
+      _openProfileModal('rejectWorkerModal');
+    };
+  });
+
+  const rejectSubmit = document.getElementById('rejectWorkerSubmit');
+  if (rejectSubmit) {
+    rejectSubmit.onclick = async () => {
+      const reasonInput = document.getElementById('rejectWorkerReason');
+      const errorEl = document.getElementById('rejectWorkerError');
+      const reason = String(reasonInput?.value || '').trim();
+      if (!reason) {
+        if (errorEl) {
+          errorEl.textContent = 'A rejection reason is required.';
+          errorEl.hidden = false;
+        }
+        return;
+      }
+      try {
+        await reviewWorker(_currentRejectWorkerId, { decision: 'rejected', rejectionReason: reason });
+        const modal = document.getElementById('rejectWorkerModal');
+        if (modal) modal.style.display = 'none';
+        showToast('Technician rejected.', 'success');
+        _currentRejectWorkerId = '';
+        loadAdminData();
+      } catch (err) {
+        if (errorEl) {
+          errorEl.textContent = err.data?.message || err.message || 'Failed to reject technician.';
+          errorEl.hidden = false;
+        }
+      }
+    };
+  }
+
+  document.querySelectorAll('[data-admin-delete-user]').forEach((btn) => {
+    btn.onclick = async () => {
+      const id = btn.dataset.adminDeleteUser;
+      if (!confirm('Delete this user permanently?')) return;
+      try {
+        await deleteUser(id);
+        showToast('User deleted.', 'success');
+        loadAdminData();
+      } catch (err) {
+        showToast(err.data?.message || 'Failed to delete user.', 'error');
+      }
+    };
+  });
+
+  document.querySelectorAll('[data-admin-delete-service]').forEach((btn) => {
+    btn.onclick = async () => {
+      const id = btn.dataset.adminDeleteService;
+      if (!confirm('Delete this service permanently?')) return;
+      try {
+        await apiDeleteService(id);
+        showToast('Service deleted.', 'success');
+        loadAdminData();
+      } catch (err) {
+        showToast(err.data?.message || 'Failed to delete service.', 'error');
+      }
+    };
   });
 }
 
@@ -1263,4 +1949,5 @@ document.getElementById('viewSiteAsCustomer')?.addEventListener('click', () => {
   });
 })();
 
-// .
+
+

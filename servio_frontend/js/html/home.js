@@ -258,55 +258,87 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
 
-  // ── Live Booking Toast ─────────────────────────────────────────────────
-  const toastEl    = document.getElementById('booking-toast');
-  const toastTitle = document.getElementById('toast-title');
-  const toastSub   = document.getElementById('toast-sub');
-  const toastClose = document.getElementById('toast-close');
+  // ── FOMO: Fake Live Booking Toasts ─────────────────────────────────────
+  const bookingToast = document.getElementById('booking-toast');
+  const toastTitle   = document.getElementById('toast-title');
+  const toastSub     = document.getElementById('toast-sub');
+  const toastClose   = document.getElementById('toast-close');
 
-  const BOOKINGS = [
-    { name: 'Ahmed S.',  service: 'AC Maintenance',        ago: '2 min ago', nameAr: 'أحمد س.', serviceAr: 'صيانة تكييف', agoAr: 'منذ دقيقتين' },
-    { name: 'Layla M.',  service: 'Professional Cleaning', ago: '4 min ago', nameAr: 'ليلى م.', serviceAr: 'تنظيف احترافي', agoAr: 'منذ ٤ دقائق' },
-    { name: 'Omar K.',   service: 'Plumbing',              ago: '1 min ago', nameAr: 'عمر ك.', serviceAr: 'سباكة', agoAr: 'منذ دقيقة واحدة' },
-    { name: 'Dina R.',   service: 'Electrical',            ago: '6 min ago', nameAr: 'دينا ر.', serviceAr: 'كهرباء', agoAr: 'منذ ٦ دقائق' },
-    { name: 'Karim W.',  service: 'Carpentry',             ago: '3 min ago', nameAr: 'كريم و.', serviceAr: 'نجارة', agoAr: 'منذ ٣ دقائق' },
-    { name: 'Farah N.',  service: 'Painting',              ago: '5 min ago', nameAr: 'فرح ن.', serviceAr: 'دهانات', agoAr: 'منذ ٥ دقائق' },
-  ];
+  if (bookingToast && toastTitle && toastSub) {
+    const isArabic = (document.documentElement.getAttribute('lang') || '').toLowerCase().startsWith('ar');
 
-  let toastIndex    = 0;
-  let toastTimer    = null;
-  let dismissTimer  = null;
+    const FOMO_DATA_EN = [
+      { name: 'Khaled',  city: 'Maadi',        service: 'Plumbing',      time: '2 min ago' },
+      { name: 'Sara',    city: 'New Cairo',    service: 'AC Maintenance',time: '5 min ago' },
+      { name: 'Mohamed', city: 'Heliopolis',   service: 'Electrical',    time: '1 min ago' },
+      { name: 'Nour',    city: 'Zamalek',      service: 'Cleaning',      time: '8 min ago' },
+      { name: 'Ahmed',   city: '6th October',  service: 'Painting',      time: '3 min ago' },
+      { name: 'Laila',   city: 'Dokki',        service: 'Carpentry',     time: '10 min ago' }
+    ];
 
-  function showToast() {
-    if (!toastEl || !toastTitle || !toastSub) return;
-    const booking      = BOOKINGS[toastIndex % BOOKINGS.length];
-    toastIndex++;
+    const FOMO_DATA_AR = [
+      { name: 'خالد',   city: 'المعادي',        service: 'سباكة',         time: 'منذ دقيقتين' },
+      { name: 'سارة',   city: 'القاهرة الجديدة', service: 'صيانة تكييف',     time: 'منذ 5 دقائق' },
+      { name: 'محمد',   city: 'مصر الجديدة',    service: 'كهرباء',        time: 'منذ دقيقة' },
+      { name: 'نور',    city: 'الزمالك',        service: 'تنظيف',         time: 'منذ 8 دقائق' },
+      { name: 'أحمد',   city: '6 أكتوبر',       service: 'نقاشة',         time: 'منذ 3 دقائق' },
+      { name: 'ليلى',   city: 'الدقي',         service: 'نجارة',         time: 'منذ 10 دقائق' }
+    ];
 
-    const isAr = document.documentElement.getAttribute('lang') === 'ar';
-    toastTitle.textContent = isAr ? `قام ${booking.nameAr} للتو بالحجز` : `${booking.name} just booked`;
-    toastSub.textContent   = `${isAr ? booking.serviceAr : booking.service} \u00b7 ${isAr ? booking.agoAr : booking.ago}`;
+    const FOMO_DATA = isArabic ? FOMO_DATA_AR : FOMO_DATA_EN;
+    const titleTemplate = isArabic ? '{name} قام بالحجز للتو' : '{name} just booked';
 
-    toastEl.hidden = false;
-    requestAnimationFrame(() => requestAnimationFrame(() => toastEl.classList.add('is-visible')));
+    let fomoIndex = 0;
+    let fomoTimer = null;
+    
+    function showFomo() {
+      // Don't show if window is hidden (save resources)
+      if (document.hidden) return;
 
-    clearTimeout(dismissTimer);
-    dismissTimer = setTimeout(hideToast, 5500);
-  }
+      const data = FOMO_DATA[fomoIndex];
+      toastTitle.textContent = titleTemplate.replace('{name}', data.name);
+      toastSub.textContent   = `${data.service} · ${data.time}`;
+      
+      bookingToast.hidden = false;
+      // Allow a frame for 'hidden' removal, then animate
+      requestAnimationFrame(() => {
+        bookingToast.classList.add('is-visible');
+      });
 
-  function hideToast() {
-    if (!toastEl) return;
-    toastEl.classList.remove('is-visible');
-    setTimeout(() => { toastEl.hidden = true; }, 460);
-  }
+      // Show for 3s
+      fomoTimer = setTimeout(hideFomo, 3000);
+      fomoIndex = (fomoIndex + 1) % FOMO_DATA.length;
+    }
 
-  function scheduleNextToast() {
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { showToast(); scheduleNextToast(); }, 9000);
-  }
+    function hideFomo() {
+      bookingToast.classList.remove('is-visible');
+      // Wait for CSS transition (500ms) before hitting 'hidden'
+      setTimeout(() => {
+        if (!bookingToast.classList.contains('is-visible')) {
+          bookingToast.hidden = true;
+        }
+      }, 600);
+    }
 
-  if (toastEl) {
-    setTimeout(() => { showToast(); scheduleNextToast(); }, 4000);
-    if (toastClose) toastClose.addEventListener('click', () => { clearTimeout(dismissTimer); hideToast(); });
+    if (toastClose) {
+      toastClose.addEventListener('click', () => {
+        clearTimeout(fomoTimer);
+        hideFomo();
+      });
+    }
+
+    // Initial delay 4s, then every 4s
+    setTimeout(() => {
+      showFomo();
+      const scheduleNext = () => {
+        const delay = 5000; // Fixed 4 second interval
+        setTimeout(() => {
+          showFomo();
+          scheduleNext();
+        }, delay);
+      };
+      scheduleNext();
+    }, 4000);
   }
 });
 

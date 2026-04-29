@@ -30,12 +30,12 @@ const registerValidation = [
     .matches(/\d/).withMessage('Password must contain at least one number'),
 
   body('phone')
-    .optional()
-    .isMobilePhone().withMessage('Please provide a valid phone number'),
+    .optional({ checkFalsy: true })
+    .isMobilePhone('any').withMessage('Please provide a valid phone number'),
 
   body('role')
     .optional()
-    .isIn(['user', 'worker']).withMessage('Role must be either user or worker'),
+    .isIn(['user', 'worker', 'customer', 'technician']).withMessage('Role must be either user or worker'),
 ];
 
 const loginValidation = [
@@ -49,11 +49,32 @@ const loginValidation = [
     .notEmpty().withMessage('Password is required'),
 ];
 
+const forgotValidation = [
+  body('email')
+    .trim()
+    .notEmpty().withMessage('Email is required')
+    .isEmail().withMessage('Please provide a valid email address')
+    .normalizeEmail(),
+];
+
+const resetValidation = [
+  body('password')
+    .notEmpty().withMessage('Password is required')
+    .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
+    .matches(/\d/).withMessage('Password must contain at least one number'),
+];
+
 // ── Routes ────────────────────────────────────────────────────────────────────
 // POST /api/v1/auth/register
 router.post('/register', validate(registerValidation), authController.register);
 
 // POST /api/v1/auth/login
 router.post('/login', validate(loginValidation), authController.login);
+
+// POST /api/v1/auth/forgot-password
+router.post('/forgot-password', validate(forgotValidation), authController.forgotPassword);
+
+// POST /api/v1/auth/reset-password/:token
+router.post('/reset-password/:token', validate(resetValidation), authController.resetPassword);
 
 module.exports = router;

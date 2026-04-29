@@ -17,6 +17,8 @@
   }
 })();
 
+import { getBooking, cancelBooking } from '../api/bookings.js';
+
 // ─── Service name → i18n key map ─────────────────────────────────────────────
 const SERVICE_KEY_MAP = {
   'pipe repair & leak fix':      'booking_svc_pipe_repair',
@@ -58,7 +60,7 @@ const DEFAULT_BOOKING = {
   paymentMethod: 'Online Payment',
   paymentAmount: 'EGP 450',
   paymentStatus: 'Paid',
-  pin: '7364',
+  pin: '—',
   technician: {
     name: 'Hassan Ali',
     initials: 'HA',
@@ -80,7 +82,6 @@ function getSteps() {
     { key: 'Complete',    labelKey: 'bkd_step_complete',    subKey: 'bkd_step_complete_sub' }
   ].map(s => ({ ...s, label: t(s.labelKey), sub: t(s.subKey) }));
 }
-const TIMELINE_STEPS = null; // kept for compatibility — use getSteps() instead
 
 // Status → badge CSS modifier
 const STATUS_CLASS = {
@@ -148,6 +149,48 @@ try {
   const raw = localStorage.getItem('servio_active_booking');
   if (raw) { const parsed = JSON.parse(raw); if (parsed?.id) booking = parsed; }
 } catch (_) {}
+
+// If URL has ?id=..., load from API and override local data
+const _bookingIdFromUrl = new URLSearchParams(window.location.search).get('id');
+if (_bookingIdFromUrl) {
+  getBooking(_bookingIdFromUrl).then(res => {
+    const b = res;
+    if (!b?._id) return;
+    // Map API booking to the shape renderBooking expects
+    booking = {
+      id:            b._id,
+      _id:           b._id,
+      service:       b.service?.title || b.serviceId || 'Service',
+      category:      b.service?.category || '',
+      status:        mapApiStatus(b.status),
+      date:          b.scheduledDate ? new Date(b.scheduledDate).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : '—',
+      scheduledDate: b.scheduledDate ? new Date(b.scheduledDate).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : '—',
+      time:          b.scheduledTime || '—',
+      scheduledTime: b.scheduledTime || '—',
+      location:      b.address || '—',
+      paymentMethod: b.paymentMethod === 'cash' ? 'Cash' : 'Online Payment',
+      paymentAmount: b.amount ? `EGP ${(b.amount / 100).toFixed(2)}` : '—',
+      paymentStatus: b.paymentStatus || '—',
+      pin:           b.pin || '—',
+      technician: {
+        name:      b.worker?.name || '—',
+        initials:  (b.worker?.name || 'T')[0].toUpperCase(),
+        specialty: (b.worker?.categories || [])[0] || '—',
+        rating:    b.worker?.averageRating?.toFixed(1) || '—',
+        phone:     b.worker?.phone || '',
+      },
+    };
+    renderPage(booking);
+  }).catch(() => {
+    showToast('Could not load booking from server — showing cached data', 'info');
+  });
+}
+
+function mapApiStatus(s) {
+  const map = { pending: 'Booked', accepted: 'Confirmed', in_progress: 'In Progress', completed: 'Complete', cancelled: 'Cancelled', rejected: 'Cancelled' };
+  return map[s] || s || 'Booked';
+}
+
 if (booking === DEFAULT_BOOKING) {
   try {
     const rawList = localStorage.getItem('servio_bookings');
@@ -248,8 +291,8 @@ function renderPage(bk) {
   bkPaymentMethodDetail.textContent  = t(payMethKey) || bk.paymentMethod || '—';
 
   // PIN — space out digits for readability
-  const pin = String(bk.pin || '7429');
-  bkPin.textContent = pin.split('').join(' ');
+  const pin = bk.pin && bk.pin !== '—' ? String(bk.pin) : null;
+  bkPin.textContent = pin ? pin.split('').join(' ') : 'PIN not available';
 
   // Payment summary
   bkPaySummaryMethod.setAttribute('data-i18n', payMethKey);
@@ -357,6 +400,10 @@ bkDialogConfirm.addEventListener('click', () => {
   bkCancelBtn.disabled = true;
   bkCancelBtn.style.opacity = '0.45';
   bkCancelBtn.style.pointerEvents = 'none';
+
+  if (booking._id) {
+    cancelBooking(booking._id).catch(() => {}); // Best-effort API cancel
+  }
 
   showToast((window.getLang || function(k){return k;})('bkd_toast_cancelled'), 'danger');
 });

@@ -311,10 +311,9 @@ function renderResults() {
   document.getElementById('results-total-range').textContent =
     formatCurrencyRange(costs.low, costs.high);
 
-  // Market badge
-  const savings = Math.round(Math.random() * 8 + 3);
-  document.getElementById('results-market-text').textContent =
-    t('est_savings_market', { n: savings });
+  // Market badge — savings data not available, hide element
+  const marketEl = document.getElementById('results-market-text');
+  if (marketEl) marketEl.parentElement.style.display = 'none';
 
   // Meta pills
   document.getElementById('results-room-label').textContent =
@@ -333,6 +332,9 @@ function renderResults() {
   // Vendors
   renderVendors(costs.materials);
 
+  // ADDED: Technicians
+  renderRecommendedTechnicians();
+
   // Animate in
   const resultsEl = document.getElementById('estimator-results');
   animate(resultsEl, { opacity: [0, 1], y: [20, 0] }, { duration: 0.5, easing: 'ease-out' });
@@ -345,6 +347,41 @@ function renderResults() {
     });
   }, 300);
 }
+
+async function renderRecommendedTechnicians() {
+  const container = document.getElementById('recommended-techs');
+  if (!container) return;
+
+  try {
+    const { recommendService } = await import('../api/ai.js');
+    const description = `Finishing a ${state.roomType} room with ${state.level} level quality at ${state.floorArea} sqm`;
+    const res = await recommendService({ description });
+    const matches = res.matches || res.workers || [];
+
+    if (matches.length > 0) {
+      container.parentElement.hidden = false;
+      container.innerHTML = matches.slice(0, 3).map(w => `
+        <div class="tech-card tech-card--horizontal" style="cursor:pointer" onclick="window.location.href='./technician-profile.html?id=${w._id}'">
+          <img class="tech-card__avatar" src="${w.profileImage || 'https://ui-avatars.com/api/?name='+encodeURIComponent(w.name||'T')}" alt="">
+          <div class="tech-card__info">
+            <h4 class="tech-card__name">${w.name}</h4>
+            <div class="tech-card__trust">
+               <span>${(w.averageRating || 4.5).toFixed(1)} ★</span>
+               <span class="tech-card__price">${w.hourlyRate || 50} EGP/hr</span>
+            </div>
+          </div>
+          <button class="btn btn--sm btn--outline">View</button>
+        </div>
+      `).join('');
+    } else {
+       container.parentElement.hidden = true;
+    }
+  } catch (err) {
+    console.warn('Failed to fetch recommended techs:', err);
+    container.parentElement.hidden = true;
+  }
+}
+
 
 function renderBreakdown(costs) {
   const total = costs.labor + costs.materials + costs.logistics;

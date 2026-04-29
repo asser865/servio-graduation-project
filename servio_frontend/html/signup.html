@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>SERVIO | Sign Up</title>
     <meta name="description" content="Join SERVIO as a customer or technician — the trusted marketplace for home services." />
+  <script src="../js/config.js"></script>
   <script src="../js/theme-init.js"></script>
   <script src="../js/lang-init.js"></script>
     <link rel="stylesheet" href="../css/main.css" />
@@ -373,11 +374,30 @@
                     <p class="auth-step__desc" data-i18n="signup_finish_desc">One optional detail to personalize your experience.</p>
                   </div>
 
-                  <div class="field">
-                    <label class="label" for="address">Address / location <span class="label__opt">(optional)</span></label>
-                    <div class="input-icon-wrap">
-                      <input class="input" id="address" name="address" autocomplete="street-address" placeholder="e.g., Nasr City, Cairo" data-i18n-placeholder="signup_address_ph" />
-                      <button class="input-reset" type="button" aria-label="Clear input"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                  <div class="auth-grid">
+                    <div class="field field--full">
+                      <label class="label" for="address-street">Street Address <span class="label__opt">(optional)</span></label>
+                      <div class="input-icon-wrap">
+                        <input class="input" id="address-street" name="addressStreet" autocomplete="street-address" placeholder="e.g., 123 Main St" />
+                      </div>
+                    </div>
+                    <div class="field">
+                      <label class="label" for="address-city">City</label>
+                      <div class="input-icon-wrap">
+                        <input class="input" id="address-city" name="addressCity" autocomplete="address-level2" placeholder="e.g., Cairo" />
+                      </div>
+                    </div>
+                    <div class="field">
+                      <label class="label" for="address-state">State / Province</label>
+                      <div class="input-icon-wrap">
+                        <input class="input" id="address-state" name="addressState" autocomplete="address-level1" placeholder="e.g., Cairo Governorate" />
+                      </div>
+                    </div>
+                    <div class="field">
+                      <label class="label" for="address-zip">ZIP / Postal Code</label>
+                      <div class="input-icon-wrap">
+                        <input class="input" id="address-zip" name="addressZip" autocomplete="postal-code" placeholder="e.g., 11765" />
+                      </div>
                     </div>
                   </div>
 
@@ -584,46 +604,116 @@
                     <p class="auth-verify-strip__text" data-i18n="signup_verify_strip">Verified technicians get a trust badge and priority in search — approval usually within 24 hours.</p>
                   </div>
 
-                  <div class="auth-verify-grid">
-                    <div class="field">
-                      <label class="label" for="idFront"><span data-i18n="signup_verify_label_id_front">National ID — Front photo</span> <span class="field__required">*</span></label>
-                      <div class="input-icon-wrap">
-                        <input class="input input--file" id="idFront" name="idFront" type="file" accept="image/*" />
+                  <!-- ── Profile Photo hero card ───────────────── -->
+                  <div class="vphoto-card" id="signup-avatar-field">
+                    <div class="vphoto-card__circle-wrap">
+                      <div class="signup-avatar-preview" id="signup-avatar-preview" aria-label="Profile photo preview">
+                        <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                       </div>
+                      <button type="button" class="vphoto-card__camera-btn" id="btn-signup-photo" aria-label="Upload profile photo">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                      </button>
+                    </div>
+                    <div class="vphoto-card__text">
+                      <p class="vphoto-card__label" data-i18n="signup_photo_label">Profile Photo <span class="vbadge vbadge--required">Required</span></p>
+                      <p class="vphoto-card__hint" data-i18n="signup_photo_hint">Clear headshot · JPG or PNG · Max 2 MB</p>
+                    </div>
+                    <input type="file" id="signup-photo-input" name="profilePhoto" accept="image/jpeg,image/png,image/webp" hidden />
+                    <p class="error-text" data-error-for="doc-avatar" hidden></p>
+                  </div>
+
+                  <!-- ── Document upload cards ──────────────────── -->
+                  <div class="vdoc-grid">
+
+                    <!-- National ID Front -->
+                    <div class="vdoc-card" data-vdoc="idFront">
+                      <div class="vdoc-card__thumb" id="vthumb-idFront">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                      </div>
+                      <div class="vdoc-card__body">
+                        <p class="vdoc-card__title"><span data-i18n="signup_verify_label_id_front">National ID — Front</span> <span class="vbadge vbadge--required">Required</span></p>
+                        <p class="vdoc-card__hint">Front face of your national ID card</p>
+                        <button type="button" class="vdoc-card__btn" data-vdoc-trigger="idFront">
+                          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                          Upload photo
+                        </button>
+                      </div>
+                      <input type="file" id="idFront" name="idFront" accept="image/*" hidden />
                       <p class="error-text" data-error-for="doc-idfront" hidden></p>
                     </div>
 
-                    <div class="field">
-                      <label class="label" for="idBack"><span data-i18n="signup_verify_label_id_back">National ID — Back photo</span> <span class="field__required">*</span></label>
-                      <div class="input-icon-wrap">
-                        <input class="input input--file" id="idBack" name="idBack" type="file" accept="image/*" />
+                    <!-- National ID Back -->
+                    <div class="vdoc-card" data-vdoc="idBack">
+                      <div class="vdoc-card__thumb" id="vthumb-idBack">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="6" y1="14" x2="10" y2="14"/><line x1="6" y1="17" x2="14" y2="17"/></svg>
                       </div>
+                      <div class="vdoc-card__body">
+                        <p class="vdoc-card__title"><span data-i18n="signup_verify_label_id_back">National ID — Back</span> <span class="vbadge vbadge--required">Required</span></p>
+                        <p class="vdoc-card__hint">Back face of your national ID card</p>
+                        <button type="button" class="vdoc-card__btn" data-vdoc-trigger="idBack">
+                          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                          Upload photo
+                        </button>
+                      </div>
+                      <input type="file" id="idBack" name="idBack" accept="image/*" hidden />
                       <p class="error-text" data-error-for="doc-idback" hidden></p>
                     </div>
 
-                    <div class="field field--full">
-                      <label class="label" for="idSelfie"><span data-i18n="signup_verify_label_id_selfie">Selfie holding your ID</span> <span class="field__required">*</span></label>
-                      <div class="input-icon-wrap">
-                        <input class="input input--file" id="idSelfie" name="idSelfie" type="file" accept="image/*" />
+                    <!-- Selfie -->
+                    <div class="vdoc-card" data-vdoc="idSelfie">
+                      <div class="vdoc-card__thumb" id="vthumb-idSelfie">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                       </div>
+                      <div class="vdoc-card__body">
+                        <p class="vdoc-card__title"><span data-i18n="signup_verify_label_id_selfie">Selfie with ID</span> <span class="vbadge vbadge--required">Required</span></p>
+                        <p class="vdoc-card__hint">Photo of you holding your ID card</p>
+                        <button type="button" class="vdoc-card__btn" data-vdoc-trigger="idSelfie">
+                          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                          Upload photo
+                        </button>
+                      </div>
+                      <input type="file" id="idSelfie" name="idSelfie" accept="image/*" hidden />
                       <p class="error-text" data-error-for="doc-selfie" hidden></p>
                     </div>
 
-                    <div class="field field--full">
-                      <label class="label" for="tradeCert"><span data-i18n="signup_verify_label_trade">Trade certificate or license</span> <span class="muted u-font-weight-400" data-i18n="signup_verify_optional">(optional)</span></label>
-                      <div class="input-icon-wrap">
-                        <input class="input input--file" id="tradeCert" name="tradeCert" type="file" accept="image/*,.pdf" />
+                    <!-- CV -->
+                    <div class="vdoc-card" data-vdoc="cvFile">
+                      <div class="vdoc-card__thumb" id="vthumb-cvFile">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
                       </div>
+                      <div class="vdoc-card__body">
+                        <p class="vdoc-card__title">CV / Resume <span class="vbadge vbadge--optional">Optional</span></p>
+                        <p class="vdoc-card__hint">PDF, DOC or DOCX · Max 15 MB</p>
+                        <button type="button" class="vdoc-card__btn" data-vdoc-trigger="cvFile">
+                          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                          Upload file
+                        </button>
+                      </div>
+                      <input type="file" id="cvFile" name="cvFile" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden />
+                      <p class="error-text" data-error-for="doc-cv" hidden></p>
                     </div>
 
-                    <div class="field field--full">
-                      <label class="label" for="portfolio"><span data-i18n="signup_verify_label_portfolio">Portfolio photos</span> <span class="muted u-font-weight-400" data-i18n="signup_verify_portfolio_hint">(optional, up to 5)</span></label>
-                      <div class="input-icon-wrap">
-                        <input class="input input--file" id="portfolio" name="portfolio" type="file" accept="image/*" multiple data-portfolio-input />
+                    <!-- Portfolio -->
+                    <div class="vdoc-card vdoc-card--portfolio" data-vdoc="portfolio">
+                      <div class="vdoc-card__thumb" id="vthumb-portfolio">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                       </div>
-                      <div class="portfolio-thumbs" data-portfolio-thumbs aria-label="Portfolio previews" hidden></div>
+                      <div class="vdoc-card__body">
+                        <p class="vdoc-card__title"><span data-i18n="signup_verify_label_portfolio">Portfolio photos</span> <span class="vbadge vbadge--optional">Optional</span></p>
+                        <p class="vdoc-card__hint">Up to 5 photos of your past work</p>
+                        <button type="button" class="vdoc-card__btn" data-vdoc-trigger="portfolio">
+                          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                          Choose photos
+                        </button>
+                      </div>
+                      <input type="file" id="portfolio" name="portfolio" accept="image/*" multiple data-portfolio-input hidden />
+                      <p class="error-text" data-error-for="doc-portfolio" hidden></p>
                     </div>
-                  </div>
+
+                  </div><!-- /vdoc-grid -->
+
+                  <div class="portfolio-thumbs" data-portfolio-thumbs aria-label="Portfolio previews" hidden></div>
+                  <p class="error-text" data-error-for="tech-verification" hidden></p>
 
                   <div class="auth-actions">
                     <div class="auth-actions__left">
@@ -673,9 +763,12 @@
                     <p class="auth-step__desc u-max-width-48ch u-margin-top-4">
                       Questions? Contact us at <a href="mailto:support@servio.eg" class="auth-support-link">support@servio.eg</a>
                     </p>
+                    <p class="auth-step__desc u-max-width-48ch" style="font-size:.8rem;opacity:.7;margin-top:4px" id="review-redirect-hint">
+                      Redirecting to your dashboard in <strong id="review-countdown">4</strong> seconds…
+                    </p>
                     <div class="auth-actions u-border-top-0 u-padding-top-0 u-justify-center">
                       <div class="auth-actions__right">
-                        <button class="btn btn--primary" type="button" data-got-it data-i18n="err_back">Back to Home</button>
+                        <button class="btn btn--primary" type="button" data-got-it>Go to Dashboard</button>
                       </div>
                     </div>
                   </div>

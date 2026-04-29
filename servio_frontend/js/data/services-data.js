@@ -90,7 +90,7 @@ export const SERVICES = {
     ],
   },
 
-  'ac-maintenance': {
+  hvac: {
     en: { title: 'A/C Maintenance & HVAC', lead: 'Professional air conditioning installation, servicing, and repair by certified HVAC technicians.', priceBadge: 'avg. 400 – 2,500 EGP', findBtn: 'Find an HVAC Technician →', ctaTitle: 'Ready to book AC service?', ctaSub: 'Browse our certified HVAC specialists available today.', ctaBtn: 'Browse Available Technicians →' },
     ar: { title: 'صيانة التكييف والتبريد', lead: 'تركيب وصيانة وإصلاح أجهزة التكييف من قبل فنيين مخصصين معتمدين.', priceBadge: 'متوسط 400 – 2,500 جنيه', findBtn: 'ابحث عن فني تكييف →', ctaTitle: 'جاهز لحجز صيانة تكييف؟', ctaSub: 'تصفح متخصصي التكييف المعتمدين المتاحين اليوم.', ctaBtn: 'تصفح الفنيين المتاحين →' },
     heroImage: 'https://images.unsplash.com/photo-1631545806609-5a1e3d9d5ff4?auto=format&fit=crop&w=1600&q=80',
@@ -421,7 +421,7 @@ export const SERVICES = {
 export const SERVICE_TECHNICIANS = {
   plumbing:         [1],
   electrical:       [2],
-  'ac-maintenance': [3],
+  hvac:             [3],
   cleaning:         [3],
   painting:         [4],
   carpentry:        [5],

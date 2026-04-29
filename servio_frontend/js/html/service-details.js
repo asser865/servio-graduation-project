@@ -1,5 +1,6 @@
 import { initScrollReveal } from '../components/scroll-reveal.js';
-import { SERVICES, getTechsForService } from '../data/services-data.js';
+import { SERVICES } from '../data/services-data.js';
+import { getServices } from '../api/services.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -154,6 +155,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
   render(svc, serviceKey, getLang());
   initScrollReveal();
+
+  // Enrich with real API ratings
+  getServices({ category: serviceKey, limit: 1 })
+    .then(res => {
+      const apiSvc = res?.services?.[0];
+      if (!apiSvc) return;
+      const ratingEl = el('average-rating') || document.querySelector('[data-svc-target="average-rating"]');
+      if (ratingEl && apiSvc.averageRating) ratingEl.textContent = apiSvc.averageRating.toFixed(1);
+      const reviewCountEl = el('review-count') || document.querySelector('[data-svc-target="review-count"]');
+      if (reviewCountEl && apiSvc.totalReviews) reviewCountEl.textContent = apiSvc.totalReviews;
+    })
+    .catch(() => {}); // Silent fail — static rating from data file stays
 
   document.addEventListener('langchange', e => {
     render(svc, serviceKey, e.detail?.lang || getLang());

@@ -11,8 +11,18 @@ import { initBackToTop } from "./components/back-to-top.js";
 
 // ── Role Boundary Enforcement ──────────────────────────────
 (function enforceRoleBoundaries() {
-  const session = JSON.parse(localStorage.getItem('servio_session') || 'null');
-  if (!session) return;
+  let session;
+  try {
+    session = JSON.parse(localStorage.getItem('servio_session') || 'null');
+  } catch {
+    localStorage.removeItem('servio_session');
+    localStorage.removeItem('servio_token');
+    return;
+  }
+  if (!session) {
+    localStorage.removeItem('servio_token');
+    return;
+  }
 
   // Allow Admins to bypass guards if they explicitly requested Preview Mode
   if (session.role === 'admin' && localStorage.getItem('servio_preview_mode') === 'true') return;

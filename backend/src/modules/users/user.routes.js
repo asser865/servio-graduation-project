@@ -37,8 +37,17 @@ router.get('/workers', userController.getWorkers);
 router.get('/workers/:id', userController.getWorkerProfile);
 
 // ── Authenticated user routes ─────────────────────────────────────────────────
+// GET /api/v1/users/me — get own profile
+router.get('/me', protect, userController.getMe);
+
 // PATCH /api/v1/users/me — update own profile
 router.patch('/me', protect, validate(profileUpdateValidation), userController.updateProfile);
+
+// PATCH /api/v1/users/me/password — update own password
+router.patch('/me/password', protect, userController.updatePassword);
+
+// DELETE /api/v1/users/me — delete own profile
+router.delete('/me', protect, userController.deleteMe);
 
 // PATCH /api/v1/users/me/availability — worker updates availability
 router.patch(
@@ -58,6 +67,9 @@ router.patch('/:id/status', protect, authorize('admin'), userController.updateUs
 
 // PATCH /api/v1/users/workers/:id/verify — admin: approve/reject worker
 router.patch('/workers/:id/verify', protect, authorize('admin'), userController.verifyWorker);
+
+// DELETE /api/v1/users/:id — admin: permanent delete
+router.delete('/:id', protect, authorize('admin'), userController.deleteUser);
 
 // GET /api/v1/users/analytics — admin: counts and stats
 router.get('/analytics', protect, authorize('admin'), userController.getAnalytics);

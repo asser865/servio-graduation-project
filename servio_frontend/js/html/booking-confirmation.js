@@ -9,6 +9,12 @@ document.getElementById('trackStatusBtn')?.addEventListener('click', () => {
 
 const booking = JSON.parse(localStorage.getItem('servio_active_booking') || 'null');
 
+// Wire "View Details" button to real booking if available
+const viewDetailsBtn = document.getElementById('viewDetailsBtn') || document.querySelector('[data-view-details]');
+if (viewDetailsBtn && booking?._id) {
+  viewDetailsBtn.href = `./booking-details.html?id=${booking._id}`;
+}
+
 // Populate booking reference elements
 const refEls = document.querySelectorAll('[data-booking-ref]');
 refEls.forEach(el => { el.textContent = 'Booking #' + (booking?.id || '—'); });
@@ -22,7 +28,7 @@ const pinEl = document.getElementById('confirmationPin');
 if (pinEl && booking?.pin) {
   pinEl.textContent = String(booking.pin).split('').join(' ');
 } else if (pinEl) {
-  pinEl.textContent = '4 8 2 1'; // fallback for direct page visits
+  pinEl.textContent = 'PIN not available';
 }
 
 // Populate payment summary
@@ -105,4 +111,4 @@ window.addEventListener('DOMContentLoaded', () => {
   );
 });
 
-// .
+

@@ -15,7 +15,7 @@ const serviceValidation = [
   body('title').trim().notEmpty().withMessage('Title is required'),
   body('description').trim().notEmpty().withMessage('Description is required'),
   body('category')
-    .isIn(['plumbing', 'electrical', 'painting', 'flooring', 'carpentry', 'cleaning', 'other'])
+    .isIn(['plumbing', 'electrical', 'painting', 'flooring', 'carpentry', 'cleaning', 'hvac', 'other'])
     .withMessage('Invalid category'),
   body('basePrice').isFloat({ min: 0 }).withMessage('Base price must be a positive number'),
   body('priceUnit')

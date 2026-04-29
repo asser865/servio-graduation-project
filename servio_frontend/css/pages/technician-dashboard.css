@@ -2,6 +2,77 @@
    technician-dashboard.css — Technician-specific styles
    ═══════════════════════════════════════════════════════════ */
 
+/* ── Pending-review overlay ──────────────────────────────── */
+.pending-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: var(--color-bg, #f8f5f1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+.pending-overlay[hidden] { display: none; }
+body.is-pending-review main { visibility: hidden; }
+
+.pending-overlay__card {
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border, #e8e2dc);
+  border-radius: 20px;
+  padding: 2.5rem 2rem;
+  max-width: 440px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+}
+.pending-overlay__icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: var(--color-accent-subtle, #fef3c7);
+  color: #d97706;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1.25rem;
+}
+.pending-overlay__title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--color-text, #1a1a1a);
+  margin: 0 0 0.75rem;
+}
+.pending-overlay__body {
+  font-size: 0.925rem;
+  color: var(--color-text-muted, #666);
+  line-height: 1.6;
+  margin: 0 0 1.25rem;
+}
+.pending-overlay__docs {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.pending-overlay__doc {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.825rem;
+  font-weight: 600;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+}
+.pending-overlay__doc--ok {
+  background: #d1fae5;
+  color: #065f46;
+}
+[data-theme="dark"] .pending-overlay__doc--ok {
+  background: rgba(16,185,129,0.15);
+  color: #6ee7b7;
+}
+
 /* ── Shared dash tokens (mirrors customer-dashboard.css) ── */
 /* Only define if not already set by customer CSS on same page.
    These are on :root so both dashboards share the warm palette. */
@@ -2462,4 +2533,72 @@
 }
 [dir="rtl"] .tech-stat-card__value--currency {
   direction: rtl;
+}
+
+/* ── Pending account overlay ────────────────────────────────
+   Shown when account.status === 'pending' (not yet verified).
+   Covers all content; Verification & Settings tabs dismiss it.
+─────────────────────────────────────────────────────────── */
+#pending-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--color-bg-rgb, 245 243 240) / 0.92);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  padding: 24px;
+}
+#pending-overlay[hidden] { display: none; }
+
+.pending-overlay__card {
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border, #e5e1d8);
+  border-radius: 16px;
+  padding: 48px 40px;
+  max-width: 480px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0 0 0 / 0.10);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.pending-overlay__icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: var(--color-brand-light, #fef3cd);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-brand, #C8973A);
+  flex-shrink: 0;
+}
+
+.pending-overlay__title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--color-text, #1a1a1a);
+  margin: 0;
+}
+
+.pending-overlay__desc {
+  font-size: 0.92rem;
+  color: var(--color-text-light, #6b6152);
+  line-height: 1.6;
+  margin: 0;
+  max-width: 380px;
+}
+
+/* ── Verification tab: uploaded filename hint ─────────────── */
+.verif-doc-filename {
+  font-size: 0.75rem;
+  color: var(--color-text-light, #6b6152);
+  margin: 2px 0 0;
+  word-break: break-all;
 }

@@ -1,15 +1,13 @@
-/**
- * services-marketplace.js
- * Search, category filter, sort, result count, empty state — fully interactive
- */
+import { getServices } from '../api/services.js';
+import { initScrollReveal } from '../components/scroll-reveal.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   // ── DOM refs ──────────────────────────────────────────────────────────────
   const searchInput      = document.getElementById('service-search');
   const searchClear      = document.getElementById('serviceSearchClear');
   const filterBtns       = document.querySelectorAll('.filter-chip[data-filter]');
-  const productCards     = document.querySelectorAll('.product-card');
-  const categoryGroups   = document.querySelectorAll('.category-group');
+  // productCards and categoryGroups will be dynamically managed now
+  const resultsContainer = document.querySelector('.marketplace-results');
   const featuredSection  = document.querySelector('.featured-section');
   const marketplaceSection = document.querySelector('.marketplace-section');
   const resultCount      = document.getElementById('service-result-count');
@@ -43,12 +41,12 @@ document.addEventListener('DOMContentLoaded', () => {
     view: 'grid',
     page: 1,
     advanced: {
-      availability: [],
-      rating: null,
-      badges: [],
-      price: { min: null, max: null },
-      details: []
-    }
+      category: [],
+      scope: [],
+      cert: [],
+      price: { min: null, max: null }
+    },
+    apiServices: [] // Full list from API
   };
   const PAGE_SIZE = 6;
 
@@ -138,20 +136,163 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // ── Sorting Logic ─────────────────────────────────────────────────────────
-  function sortCards(cards) {
-    const list = [...cards];
+  // ── API & Rendering ───────────────────────────────────────────────────────
+  async function fetchServices() {
+    try {
+      // api client already unwraps 'data', so response = { services, pagination }
+      const response = await getServices({ limit: 50 });
+      state.apiServices = response.services || [];
+      console.log('[marketplace] fetched services:', state.apiServices.length, state.apiServices);
+      applyFilters();
+    } catch (err) {
+      console.error('Failed to fetch services:', err);
+      state.apiServices = [];
+      applyFilters();
+    }
+  }
+
+  // ── Dynamic badge logic ───────────────────────────────────────────────────
+  function resolveServiceBadges(svc) {
+    const category = (svc.category || 'other').toLowerCase();
+    const rating   = parseFloat(svc.averageRating) || 0;
+    const reviews  = parseInt(svc.totalReviews)    || 0;
+    const price    = parseFloat(svc.basePrice)      || 0;
+    const isNew    = svc.createdAt
+      ? (Date.now() - new Date(svc.createdAt).getTime()) < 30 * 24 * 60 * 60 * 1000
+      : false;
+
+    // Primary: professional category label (always shown)
+    const categoryMeta = {
+      plumbing:   { label: 'Emergency Ready', labelAr: 'جاهز للطوارئ',  cls: 'tag--danger',    i18n: 'badge_emergency_ready' },
+      electrical: { label: 'Licensed Pro',    labelAr: 'محترف مرخّص',    cls: 'tag--secondary', i18n: 'badge_licensed_pro'    },
+      hvac:       { label: 'Climate Expert',  labelAr: 'خبير مناخي',     cls: 'tag--secondary', i18n: 'badge_climate_expert'  },
+      cleaning:   { label: 'Deep Clean Pro',  labelAr: 'تنظيف عميق',     cls: 'tag--success',   i18n: 'badge_deep_clean'      },
+      painting:   { label: 'Master Finish',   labelAr: 'دهان محترف',     cls: 'tag--paint',     i18n: 'badge_master_finish'   },
+      carpentry:  { label: 'Custom Craft',    labelAr: 'نجارة مخصصة',    cls: 'tag--wood',      i18n: 'badge_custom_craft'    },
+      flooring:   { label: 'Floor Expert',    labelAr: 'خبير أرضيات',    cls: 'tag--outline',   i18n: 'badge_floor_expert'    },
+      other:      { label: 'Specialist',      labelAr: 'متخصص',          cls: 'tag--outline',   i18n: 'badge_specialist'      },
+    };
+    const primary = categoryMeta[category] || categoryMeta.other;
+
+    // Secondary: quality/price badge (dynamic, shown only when meaningful)
+    let secondary = null;
+    if (rating >= 4.8 && reviews > 0) {
+      secondary = { label: 'Top Rated', labelAr: 'الأعلى تقييماً', cls: 'tag--gold',    i18n: 'badge_top_rated'       };
+    } else if (reviews >= 10) {
+      secondary = { label: 'Popular',   labelAr: 'الأكثر طلباً',  cls: 'tag--popular', i18n: 'badge_popular'         };
+    } else if (isNew) {
+      secondary = { label: 'New',       labelAr: 'جديد',           cls: 'tag--new',     i18n: 'badge_new'             };
+    } else if (svc.priceUnit === 'fixed') {
+      secondary = { label: 'Fixed Price', labelAr: 'سعر ثابت',     cls: 'tag--outline', i18n: 'badge_fixed_price'     };
+    } else if (price > 0 && price <= 80) {
+      secondary = { label: 'Budget Friendly', labelAr: 'اقتصادي',  cls: 'tag--outline', i18n: 'badge_budget_friendly' };
+    } else if (price > 300) {
+      secondary = { label: 'Premium',  labelAr: 'بريميوم',         cls: 'tag--secondary',i18n: 'badge_premium'        };
+    }
+
+    return { primary, secondary };
+  }
+
+  function generateServiceCard(svc) {
+    const title    = svc.title || 'Untitled Service';
+    const category = (svc.category || 'other').toLowerCase();
+    const isAr     = (window.__lang || document.documentElement.lang) === 'ar';
+
+    const displayTitle = title.charAt(0).toUpperCase() + title.slice(1);
+    const nameKey      = 'svc_' + title.toLowerCase().replace(/ /g, '_');
+    const descKey      = nameKey + '_desc';
+
+    const icons = {
+      plumbing:   `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"/><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"/></svg>`,
+      electrical: `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>`,
+      hvac:       `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20"/><path d="M12 2v20"/><path d="m20 16-4-4 4-4"/><path d="m4 8 4 4-4 4"/><path d="m16 4-4 4-4-4"/><path d="m8 20 4-4 4 4"/></svg>`,
+      cleaning:   `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4.5 8-11.8A8 8 0 0 0 12 2a8 8 0 0 0-8 8.2c0 7.3 8 11.8 8 11.8z"/><circle cx="12" cy="10" r="3"/></svg>`,
+      painting:   `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>`,
+      carpentry:  `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 12-8.373 8.373a1 1 0 1 1-3-3L12 9"/><path d="m18 15 4-4"/><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172V7l-2.26-2.26a6 6 0 0 0-4.202-1.756L9 2.96l.92.82A6.18 6.18 0 0 1 12 8.4V10l2 2h1.172a2 2 0 0 1 1.414.586L18 14"/></svg>`,
+      flooring:   `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>`,
+      other:      `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`,
+    };
+
+    const iconClass = ['plumbing','hvac','electrical'].includes(category)
+      ? 'product-card__icon--primary'
+      : 'product-card__icon--secondary';
+
+    const { primary, secondary } = resolveServiceBadges(svc);
+    const primaryLabel    = isAr ? primary.labelAr    : primary.label;
+    const secondaryLabel  = secondary ? (isAr ? secondary.labelAr : secondary.label) : null;
+
+    const priceUnitMeta = {
+      per_hour: { en: '/hr',  ar: '/ساعة', prefixEn: 'From ', prefixAr: 'من ' },
+      per_sqm:  { en: '/m²',  ar: '/م²',   prefixEn: 'From ', prefixAr: 'من ' },
+      fixed:    { en: 'flat', ar: 'ثابت',  prefixEn: '',      prefixAr: ''    },
+    };
+    const priceMeta = priceUnitMeta[svc.priceUnit] || priceUnitMeta.fixed;
+    const priceText = isAr
+      ? `<span class="price-amount">${priceMeta.prefixAr}${svc.basePrice || 0} ج.م</span><span class="price-unit">${priceMeta.ar}</span>`
+      : `<span class="price-amount">${priceMeta.prefixEn}${svc.basePrice || 0} EGP</span><span class="price-unit">${priceMeta.en}</span>`;
+
+    const rating  = parseFloat(svc.averageRating) || 0;
+    const reviews = parseInt(svc.totalReviews)    || 0;
+    const ratingBubble = rating > 0
+      ? `<span class="metric-bubble metric-bubble--rating" aria-label="Rating ${rating.toFixed(1)}">
+           <svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+           <strong>${rating.toFixed(1)}</strong>${reviews > 0 ? `<span class="rating-count">(${reviews})</span>` : ''}
+         </span>`
+      : '';
+
+    const article = document.createElement('article');
+    article.className = 'product-card';
+    article.dataset.id       = svc._id;
+    article.dataset.category = category;
+    article.dataset.rating   = svc.averageRating || '0';
+    article.dataset.price    = svc.basePrice || 0;
+    article.style.cursor     = 'pointer';
+    article.dataset.reveal   = '';
+
+    article.innerHTML = `
+      <div class="product-card__header">
+        <div class="product-card__icon ${iconClass}">${icons[category] || icons.other}</div>
+        <div class="product-card__tags">
+          <span class="product-card__tag ${primary.cls}" data-i18n="${primary.i18n}">${primaryLabel}</span>
+          ${secondaryLabel ? `<span class="product-card__tag ${secondary.cls}" data-i18n="${secondary.i18n}">${secondaryLabel}</span>` : ''}
+        </div>
+      </div>
+      <h4 class="product-card__title" data-i18n="${nameKey}">${displayTitle}</h4>
+      <p class="product-card__desc" data-i18n="${descKey}">${svc.description || ''}</p>
+      <div class="product-card__metrics">
+        <span class="metric-bubble" aria-label="Instant Booking">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <strong data-i18n="smp_instant">Instant</strong>
+        </span>
+        ${ratingBubble}
+        <span class="metric-bubble" aria-label="Price" style="flex: 1; justify-content: center;">
+          ${priceText}
+        </span>
+      </div>
+      <div class="product-card__footer">
+        <a class="product-card__action" href="./service-details.html?service=${category}">
+          <span data-i18n="smp_view_techs">View Technicians →</span>
+        </a>
+      </div>
+    `;
+
+    article.addEventListener('click', e => {
+      if (e.target.closest('a')) return;
+      window.location.href = `./service-details.html?service=${category}`;
+    });
+
+    return article;
+  }
+
+  function sortServices(services) {
+    const list = [...services];
     if (state.sort === 'featured') return list;
     
     return list.sort((a, b) => {
-      const titleA = (a.querySelector('.product-card__title')?.textContent || '').toLowerCase();
-      const titleB = (b.querySelector('.product-card__title')?.textContent || '').toLowerCase();
-      
       switch(state.sort) {
-        case 'price_low': return 100 - 200; // Mock price logic
-        case 'price_high': return 200 - 100;
-        case 'top_rated': return -1; // Mock rating logic
-        default: return titleA.localeCompare(titleB);
+        case 'price_low': return (a.basePrice || 0) - (b.basePrice || 0);
+        case 'price_high': return (b.basePrice || 0) - (a.basePrice || 0);
+        default: return (a.title || '').localeCompare(b.title || '');
       }
     });
   }
@@ -162,7 +303,6 @@ document.addEventListener('DOMContentLoaded', () => {
     activeFiltersContainer.innerHTML = '';
     let count = 0;
 
-    // Helper to add token
     const addToken = (label, type, value) => {
       count++;
       const token = document.createElement('div');
@@ -176,13 +316,9 @@ document.addEventListener('DOMContentLoaded', () => {
       activeFiltersContainer.appendChild(token);
     };
 
-    // Availability
-    state.advanced.availability.forEach(v => addToken(`Availability: ${v}`, 'availability', v));
-    // Badges
-    state.advanced.badges.forEach(v => addToken(v.charAt(0).toUpperCase() + v.slice(1), 'badge', v));
-    // Rating
-    if (state.advanced.rating) addToken(`${state.advanced.rating}+ Stars`, 'rating', state.advanced.rating);
-    // Price
+    (state.advanced.category || []).forEach(v => addToken(`Category: ${v}`, 'category', v));
+    (state.advanced.scope || []).forEach(v => addToken(`Scope: ${v}`, 'scope', v));
+    (state.advanced.cert || []).forEach(v => addToken(v.charAt(0).toUpperCase() + v.slice(1), 'cert', v));
     if (state.advanced.price.min !== null || state.advanced.price.max !== null) {
       let priceLabel = 'Price: ';
       if (state.advanced.price.min && state.advanced.price.max) priceLabel += `${state.advanced.price.min} - ${state.advanced.price.max} EGP`;
@@ -190,14 +326,12 @@ document.addEventListener('DOMContentLoaded', () => {
       else priceLabel += `<${state.advanced.price.max} EGP`;
       addToken(priceLabel, 'price', 'range');
     }
-    
-    // Update badge
+
     if (filterCountBadge) {
       filterCountBadge.textContent = count;
       filterCountBadge.hidden = count === 0;
     }
 
-    // Token removal listeners
     activeFiltersContainer.querySelectorAll('.filter-token__remove').forEach(btn => {
       btn.addEventListener('click', () => {
         removeSpecificFilter(btn.dataset.type, btn.dataset.value);
@@ -206,12 +340,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function removeSpecificFilter(type, value) {
-    if (type === 'availability') state.advanced.availability = state.advanced.availability.filter(v => v !== value);
-    if (type === 'badge') state.advanced.badges = state.advanced.badges.filter(v => v !== value);
-    if (type === 'rating') state.advanced.rating = null;
+    if (type === 'category') state.advanced.category = (state.advanced.category || []).filter(v => v !== value);
+    if (type === 'scope') state.advanced.scope = (state.advanced.scope || []).filter(v => v !== value);
+    if (type === 'cert') state.advanced.cert = (state.advanced.cert || []).filter(v => v !== value);
     if (type === 'price') { state.advanced.price.min = null; state.advanced.price.max = null; }
-    
-    // Sync UI elements back
+
     syncFilterPanelToState();
     state.page = 1;
     applyFilters();
@@ -219,18 +352,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function syncFilterPanelToState() {
     if (!filterPanel) return;
-    // Checks
     filterPanel.querySelectorAll('input[type="checkbox"]').forEach(cb => {
       const name = cb.name;
       const val = cb.value;
-      if (name === 'availability') cb.checked = state.advanced.availability.includes(val);
-      if (name === 'badge') cb.checked = state.advanced.badges.includes(val);
+      if (name === 'category') cb.checked = (state.advanced.category || []).includes(val);
+      if (name === 'scope') cb.checked = (state.advanced.scope || []).includes(val);
+      if (name === 'cert') cb.checked = (state.advanced.cert || []).includes(val);
     });
-    // Radios
-    filterPanel.querySelectorAll('.filter-radio-btn').forEach(btn => {
-      btn.classList.toggle('is-active', btn.dataset.value === state.advanced.rating);
-    });
-    // Price inputs
     const minInput = document.getElementById('price-min');
     const maxInput = document.getElementById('price-max');
     if (minInput) minInput.value = state.advanced.price.min || '';
@@ -239,103 +367,136 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ── Main Filter Application ────────────────────────────────────────────────
   function applyFilters() {
-    const hasAdvancedFilters = state.advanced.availability.length > 0
-      || state.advanced.badges.length > 0
-      || !!state.advanced.rating
-      || state.advanced.details.length > 0
+    const hasAdvancedFilters = (state.advanced.category && state.advanced.category.length > 0)
+      || (state.advanced.scope && state.advanced.scope.length > 0)
+      || (state.advanced.cert && state.advanced.cert.length > 0)
       || state.advanced.price.min !== null
       || state.advanced.price.max !== null;
     const isFiltering = state.query !== '' || state.filter !== 'all' || hasAdvancedFilters;
 
     if (featuredSection) featuredSection.style.display = isFiltering ? 'none' : '';
 
-    const filteredCards = [];
-
-    productCards.forEach(card => {
-      const title = (card.querySelector('.product-card__title')?.textContent || '').toLowerCase();
-      const desc = (card.querySelector('.product-card__desc')?.textContent || '').toLowerCase();
-      const category = card.getAttribute('data-category') || '';
+    const filtered = (state.apiServices || []).filter(svc => {
+      const title = (svc.title || '').toLowerCase();
+      const desc = (svc.description || svc.desc || '').toLowerCase();
+      const category = (svc.category || '').toLowerCase();
 
       const matchesSearch = !state.query || title.includes(state.query) || desc.includes(state.query);
-      const matchesFilter = state.filter === 'all' || category === state.filter;
+      
+      // Map frontend filter chips to backend categories
+      let matchesFilter = state.filter === 'all';
+      if (!matchesFilter) {
+        if (state.filter === 'maintenance') {
+          matchesFilter = ['plumbing', 'electrical', 'cleaning', 'hvac'].includes(category);
+        } else if (state.filter === 'improvement') {
+          matchesFilter = ['painting', 'flooring', 'carpentry'].includes(category);
+        } else if (state.filter === 'specialty') {
+          matchesFilter = ['other'].includes(category);
+        } else {
+          matchesFilter = category === state.filter;
+        }
+      }
 
-      // Advanced Filter Logic
       let matchesAdvanced = true;
+      if (state.advanced.category && state.advanced.category.length > 0 && !state.advanced.category.includes(category)) matchesAdvanced = false;
+      if (matchesAdvanced && state.advanced.scope && state.advanced.scope.length > 0 && svc.scope && !state.advanced.scope.includes(svc.scope)) matchesAdvanced = false;
+      if (matchesAdvanced && state.advanced.cert && state.advanced.cert.length > 0 && svc.cert && !state.advanced.cert.includes(svc.cert)) matchesAdvanced = false;
+      if (matchesAdvanced && state.advanced.price.min !== null && svc.basePrice < state.advanced.price.min) matchesAdvanced = false;
+      if (matchesAdvanced && state.advanced.price.max !== null && svc.basePrice > state.advanced.price.max) matchesAdvanced = false;
 
-      // 1. Availability
-      if (state.advanced.availability.length > 0) {
-        const cardAvail = (card.getAttribute('data-availability') || '').split(',');
-        const hasMatch = state.advanced.availability.some(v => cardAvail.includes(v));
-        if (!hasMatch) matchesAdvanced = false;
-      }
-
-      // 2. Badges
-      if (matchesAdvanced && state.advanced.badges.length > 0) {
-        const cardBadges = (card.getAttribute('data-badges') || '').split(',');
-        const hasMatch = state.advanced.badges.some(v => cardBadges.includes(v));
-        if (!hasMatch) matchesAdvanced = false;
-      }
-
-      // 3. Rating
-      if (matchesAdvanced && state.advanced.rating) {
-        const cardRating = parseFloat(card.getAttribute('data-rating') || '0');
-        if (cardRating < parseFloat(state.advanced.rating)) matchesAdvanced = false;
-      }
-
-      // 4. Price Range
-      if (matchesAdvanced && (state.advanced.price.min !== null || state.advanced.price.max !== null)) {
-        const cardPrice = parseFloat(card.getAttribute('data-price') || '0');
-        if (state.advanced.price.min !== null && cardPrice < state.advanced.price.min) matchesAdvanced = false;
-        if (state.advanced.price.max !== null && cardPrice > state.advanced.price.max) matchesAdvanced = false;
-      }
-
-      if (matchesSearch && matchesFilter && matchesAdvanced) filteredCards.push(card);
+      return matchesSearch && matchesFilter && matchesAdvanced;
     });
 
-    const orderedCards = state.sort !== 'featured' ? sortCards(filteredCards) : filteredCards;
-
-    if (state.sort !== 'featured') {
-      orderedCards.forEach(card => card.parentElement?.appendChild(card));
-    }
-
-    const total = orderedCards.length;
-    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-    state.page = Math.min(state.page, totalPages);
+    const ordered = sortServices(filtered);
+    const total = ordered.length;
+    const totalPages = Math.ceil(total / PAGE_SIZE);
+    state.page = totalPages > 0 ? Math.min(state.page, totalPages) : 1;
 
     const pageStart = (state.page - 1) * PAGE_SIZE;
-    const pageCards = orderedCards.slice(pageStart, pageStart + PAGE_SIZE);
-    const pageCardSet = new Set(pageCards);
-    const groupVisible = {};
-    categoryGroups.forEach(group => {
-      groupVisible[group.getAttribute('data-group')] = false;
-    });
+    const pageItems = ordered.slice(pageStart, pageStart + PAGE_SIZE);
 
-    productCards.forEach(card => {
-      const category = card.getAttribute('data-category') || '';
-      const visible = pageCardSet.has(card);
-      card.style.display = visible ? '' : 'none';
-      if (visible && Object.prototype.hasOwnProperty.call(groupVisible, category)) {
-        groupVisible[category] = true;
+    // Clear and render groups
+    if (resultsContainer) {
+      resultsContainer.innerHTML = '';
+      
+      if (pageItems.length === 0) {
+        resultsContainer.appendChild(emptyState);
+        emptyState.classList.add('is-visible');
+      } else {
+        emptyState.classList.remove('is-visible');
+        
+        // Group by category for visual grouping
+        const groups = {};
+        const masterGroupMap = {
+          plumbing: 'maintenance',
+          electrical: 'maintenance',
+          hvac: 'maintenance',
+          cleaning: 'maintenance',
+          painting: 'improvement',
+          flooring: 'improvement',
+          carpentry: 'improvement',
+          specialty: 'specialty',
+          other: 'specialty'
+        };
+
+        pageItems.forEach(svc => {
+          const master = masterGroupMap[svc.category.toLowerCase()] || 'specialty';
+          if (!groups[master]) groups[master] = { label: master, services: [] };
+          groups[master].services.push(svc);
+        });
+
+        Object.keys(groups).forEach(master => {
+          const groupDiv = document.createElement('div');
+          groupDiv.className = 'category-group';
+          groupDiv.dataset.group = master;
+          
+          const heading = document.createElement('h3');
+          heading.className = 'category-heading';
+          heading.dataset.i18n = `smp_heading_${master}`;
+          
+          // Better labeling
+          const labels = {
+            maintenance: 'Home Maintenance & Repair',
+            improvement: 'Home Improvement & Restoration',
+            specialty: 'Specialized Property Services'
+          };
+          heading.textContent = labels[master] || master.toUpperCase();
+          
+          const grid = document.createElement('div');
+          grid.className = 'product-grid';
+          if (state.view === 'list') grid.classList.add('is-list-view');
+          
+          groups[master].services.forEach(svc => {
+            grid.appendChild(generateServiceCard(svc));
+          });
+          
+          groupDiv.appendChild(heading);
+          groupDiv.appendChild(grid);
+          resultsContainer.appendChild(groupDiv);
+        });
       }
-    });
-
-    categoryGroups.forEach(group => {
-      const key = group.getAttribute('data-group');
-      group.style.display = groupVisible[key] ? '' : 'none';
-    });
-
-    const hasVisibleCards = pageCards.length > 0;
+    }
 
     if (resultCount) animateCount(resultCount, total);
     if (resultLabel) {
       resultLabel.textContent = isFiltering ? `service${total === 1 ? '' : 's'} found` : `service${total === 1 ? '' : 's'} available`;
     }
 
-    if (emptyState) emptyState.classList.toggle('is-visible', isFiltering && !hasVisibleCards);
     renderPagination(total);
-
     updateFilterTokens();
+    
+    // Re-trigger animations and translations for new cards with a slight delay
+    setTimeout(() => {
+      if (typeof window.initScrollReveal === 'function') {
+        window.initScrollReveal();
+      } else {
+        document.querySelectorAll('[data-reveal]').forEach(el => el.classList.add('is-visible'));
+      }
+    }, 50);
+    
+    if (typeof window.translatePage === 'function') window.translatePage();
   }
+
 
   // ── Event Handlers ────────────────────────────────────────────────────────
   
@@ -392,8 +553,9 @@ document.addEventListener('DOMContentLoaded', () => {
   if (applyFiltersBtn) {
     applyFiltersBtn.addEventListener('click', () => {
       // Capture checkbox states
-      state.advanced.availability = Array.from(filterPanel.querySelectorAll('input[name="availability"]:checked')).map(cb => cb.value);
-      state.advanced.badges = Array.from(filterPanel.querySelectorAll('input[name="badge"]:checked')).map(cb => cb.value);
+      state.advanced.category = Array.from(filterPanel.querySelectorAll('input[name="category"]:checked')).map(cb => cb.value);
+      state.advanced.scope = Array.from(filterPanel.querySelectorAll('input[name="scope"]:checked')).map(cb => cb.value);
+      state.advanced.cert = Array.from(filterPanel.querySelectorAll('input[name="cert"]:checked')).map(cb => cb.value);
       
       // Capture price range
       const minVal = document.getElementById('price-min')?.value;
@@ -410,7 +572,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (resetFiltersBtn) {
     resetFiltersBtn.addEventListener('click', () => {
-      state.advanced = { availability: [], rating: null, badges: [], price: { min: null, max: null }, details: [] };
+      state.advanced = { category: [], scope: [], cert: [], price: { min: null, max: null } };
       syncFilterPanelToState();
       state.page = 1;
       applyFilters();
@@ -468,7 +630,7 @@ document.addEventListener('DOMContentLoaded', () => {
       state.filter = 'all';
       state.sort = 'featured';
       state.page = 1;
-      state.advanced = { availability: [], rating: null, badges: [], price: { min: null, max: null }, details: [] };
+      state.advanced = { category: [], scope: [], cert: [], price: { min: null, max: null } };
       
       filterBtns.forEach(b => b.classList.remove('filter-chip--active'));
       document.querySelector('.filter-chip[data-filter="all"]')?.classList.add('filter-chip--active');
@@ -512,18 +674,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Init
-  applyFilters();
-
-  // ── Card click → service details page ────
-  productCards.forEach(card => {
-    card.style.cursor = 'pointer';
-    card.addEventListener('click', e => {
-      if (e.target.closest('a')) return; // let anchor handle navigation
-      const link = card.querySelector('.product-card__action');
-      if (link) window.location.href = link.href;
-    });
-  });
-
+  fetchServices();
 });
 
-// .
+
