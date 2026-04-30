@@ -4,10 +4,8 @@ import 'package:provider/provider.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/api/bookings_api.dart';
-import '../../core/data/demo_technicians.dart';
 import '../../core/models/backend_booking_model.dart';
 import '../../core/models/booking_model.dart';
-import '../../core/models/technician_model.dart';
 import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
@@ -190,9 +188,8 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                             onFilterChanged: (value) =>
                                 setState(() => _historyFilter = value),
                           ),
-                        _DashboardSection.favourites => _FavouritesSection(
-                            key: const ValueKey<String>('favourites'),
-                            onBook: _openBookingForTechnician,
+                        _DashboardSection.favourites => const _FavouritesSection(
+                            key: ValueKey<String>('favourites'),
                           ),
                       },
                     ),
@@ -209,22 +206,6 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
   void _openBooking() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => const BookingStepOneScreen()),
-    );
-  }
-
-  void _openBookingForTechnician(TechnicianModel technician) {
-    final locale = context.read<LocaleProvider>().languageCode;
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => BookingStepOneScreen(
-          data: BookingFlowData(
-            technicianName: technician.name.of(locale),
-            specialty: technician.title.of(locale),
-            hourlyRate: '${technician.pricePerHour} EGP / hour',
-            amount: '${technician.pricePerHour * 3} EGP',
-          ),
-        ),
-      ),
     );
   }
 
@@ -344,7 +325,7 @@ class _OverviewSection extends StatelessWidget {
         _StatsGrid(
           totalBookings: bookings.length,
           activeCount: active.length,
-          savedTechnicians: kDemoTechnicians.length,
+          savedTechnicians: 0,
           totalSpent: totalSpent,
         ),
         const SizedBox(height: ServioSpacing.sectionGap),
@@ -523,32 +504,16 @@ class _HistorySection extends StatelessWidget {
 }
 
 class _FavouritesSection extends StatelessWidget {
-  const _FavouritesSection({
-    required this.onBook,
-    super.key,
-  });
-
-  final ValueChanged<TechnicianModel> onBook;
+  const _FavouritesSection({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final locale = context.watch<LocaleProvider>().languageCode;
-
-    return Column(
+    return const Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        const ServioSectionHeading(title: 'Saved Technicians'),
-        const SizedBox(height: 12),
-        ...kDemoTechnicians.take(4).map(
-              (technician) => Padding(
-                padding: const EdgeInsets.only(bottom: 14),
-                child: _SavedTechnicianCard(
-                  technician: technician,
-                  locale: locale,
-                  onBook: () => onBook(technician),
-                ),
-              ),
-            ),
+        ServioSectionHeading(title: 'Saved Technicians'),
+        SizedBox(height: 24),
+        _EmptyDashboardState(message: 'Save technicians from their profile to see them here.'),
       ],
     );
   }
@@ -1197,75 +1162,6 @@ class _HistoryBookingTileState extends State<_HistoryBookingTile>
                     ),
                   )
                 : const SizedBox.shrink(),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SavedTechnicianCard extends StatelessWidget {
-  const _SavedTechnicianCard({
-    required this.technician,
-    required this.locale,
-    required this.onBook,
-  });
-
-  final TechnicianModel technician;
-  final String locale;
-  final VoidCallback onBook;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final servio = context.servio;
-    final name = technician.name.of(locale);
-
-    return ServioCard(
-      radius: ServioRadius.lg,
-      child: Row(
-        children: <Widget>[
-          _Avatar(initials: technician.avatarInitials, size: 54),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(name, style: theme.textTheme.titleMedium),
-                const SizedBox(height: 4),
-                Text(
-                  technician.title.of(locale),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: servio.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: <Widget>[
-                    Icon(Icons.star_rounded, size: 16, color: servio.warning),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${technician.rating.toStringAsFixed(1)} (${technician.reviewCount})',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: servio.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          SizedBox(
-            width: 92,
-            child: OutlinedButton(
-              onPressed: onBook,
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size(0, 42),
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-              ),
-              child: const Text('Book'),
-            ),
           ),
         ],
       ),
