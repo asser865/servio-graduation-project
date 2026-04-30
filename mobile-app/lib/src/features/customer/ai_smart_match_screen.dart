@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/api/api_client.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
 import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
 import '../../design_system/widgets/servio_status_chip.dart';
-import 'customer_home_screen.dart';
 import 'customer_profile_screen.dart';
 import 'my_bookings_screen.dart';
 import 'service_detail_screen.dart';
@@ -23,6 +24,9 @@ class AiSmartMatchScreen extends StatefulWidget {
 class _AiSmartMatchScreenState extends State<AiSmartMatchScreen> {
   final TextEditingController _controller = TextEditingController();
   bool _showResults = false;
+  bool _loading = false;
+  String? _error;
+  Map<String, dynamic>? _results;
 
   static const List<String> _suggestions = <String>[
     'Leaky Faucet',
@@ -44,10 +48,31 @@ class _AiSmartMatchScreenState extends State<AiSmartMatchScreen> {
     });
   }
 
-  void _analyze() {
+  Future<void> _analyze() async {
+    final query = _controller.text.trim();
+    if (query.isEmpty) return;
     setState(() {
-      _showResults = true;
+      _loading = true;
+      _showResults = false;
+      _error = null;
     });
+    try {
+      final client = context.read<ApiClient>();
+      final response = await client.post('/ai/recommend', <String, dynamic>{
+        'query': query,
+      });
+      final data = client.unwrapData(response);
+      if (!mounted) return;
+      setState(() {
+        _results = data;
+        _showResults = true;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = 'AI service unavailable. Try again later.');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
@@ -191,9 +216,20 @@ class _AiSmartMatchScreenState extends State<AiSmartMatchScreen> {
               ),
               const SizedBox(height: 20),
               ServioPrimaryButton(
-                label: 'Analyze Request',
-                onPressed: _analyze,
+                label: _loading ? 'Analyzing…' : 'Analyze Request',
+                onPressed: _loading ? null : _analyze,
+                isLoading: _loading,
               ),
+              if (_error != null) ...<Widget>[
+                const SizedBox(height: 16),
+                Text(
+                  _error!,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
               if (_showResults) ...<Widget>[
                 const SizedBox(height: 32),
                 Text('Recommended Service', style: theme.textTheme.headlineMedium),
@@ -204,20 +240,25 @@ class _AiSmartMatchScreenState extends State<AiSmartMatchScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       Row(
-                        children: const <Widget>[
-                          ServioStatusChip(label: 'Plumbing'),
-                          SizedBox(width: 10),
+                        children: <Widget>[
                           ServioStatusChip(
-                            label: '94% Match',
+                            label: (_results?['category'] as String?) ?? 'Plumbing',
+                          ),
+                          const SizedBox(width: 10),
+                          ServioStatusChip(
+                            label: (_results?['matchScore'] as String?) ?? '94% Match',
                             type: ServioStatusChipType.success,
                           ),
                         ],
                       ),
                       const SizedBox(height: 12),
-                      Text('Plumbing Repair Visit', style: theme.textTheme.titleMedium),
+                      Text(
+                        (_results?['serviceName'] as String?) ?? 'Plumbing Repair Visit',
+                        style: theme.textTheme.titleMedium,
+                      ),
                       const SizedBox(height: 6),
                       Text(
-                        '850 EGP - 1,200 EGP / session',
+                        (_results?['priceRange'] as String?) ?? '850 EGP - 1,200 EGP / session',
                         style: theme.textTheme.bodyMedium?.copyWith(color: servio.accent),
                       ),
                     ],
