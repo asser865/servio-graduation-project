@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/data/demo_technicians.dart';
 import '../../core/models/booking_model.dart';
 import '../../core/state/app_state.dart';
+import '../../core/state/workers_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
@@ -33,7 +33,7 @@ class CustomerHomeScreen extends StatelessWidget {
     final unreadMessages = context.watch<MessagesProvider>().totalUnread;
     final locale = context.watch<LocaleProvider>().locale.languageCode;
     final recentBookings = context.watch<BookingsProvider>().upcoming;
-    final featuredTechs = kDemoTechnicians.take(3).toList();
+    final featuredTechs = context.watch<WorkersProvider>().workers.take(3).toList();
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -408,8 +408,8 @@ class CustomerHomeScreen extends StatelessWidget {
                         itemBuilder: (BuildContext context, int index) {
                           final tech = featuredTechs[index];
                           return _TechnicianCard(
-                            name: tech.name.of(locale),
-                            specialty: tech.title.of(locale),
+                            name: tech.name,
+                            specialty: tech.skills.isNotEmpty ? tech.skills.first : 'Technician',
                             rating: tech.rating.toStringAsFixed(1),
                             reviews: '${tech.reviewCount}',
                             onTap: () => Navigator.of(context).push(

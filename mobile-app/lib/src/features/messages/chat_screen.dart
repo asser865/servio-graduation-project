@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/api/api_client.dart';
+import '../../core/api/messages_api.dart';
 import '../../core/models/message_model.dart';
 import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
@@ -10,11 +12,13 @@ class ChatScreen extends StatefulWidget {
   const ChatScreen({
     required this.contactName,
     this.conversationId,
+    this.bookingId,
     super.key,
   });
 
   final String contactName;
   final String? conversationId;
+  final String? bookingId;
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -22,6 +26,8 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
+  List<ApiMessage> _apiMessages = <ApiMessage>[];
+  String? _currentUserId;
 
   ConversationModel? get _conversation {
     final provider = context.read<MessagesProvider>();
@@ -30,6 +36,25 @@ class _ChatScreenState extends State<ChatScreen> {
     return provider.conversations.where((c) => c.id == id).firstOrNull;
   }
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _currentUserId = context.read<SessionProvider>().account?.id;
+      _fetchMessages();
+    });
+  }
+
+  Future<void> _fetchMessages() async {
+    final id = widget.bookingId;
+    if (id == null) return;
+    try {
+      final client = context.read<ApiClient>();
+      final msgs = await MessagesApi(client).getMessages(id);
+      if (!mounted) return;
+      setState(() => _apiMessages = msgs);
+    } catch (_) {}
+  }
 
   @override
   void dispose() {
@@ -37,13 +62,27 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
-  void _sendMessage() {
+  Future<void> _sendMessage() async {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
     _controller.clear();
-    final id = widget.conversationId;
-    if (id != null) {
-      context.read<MessagesProvider>().sendMessage(id, text);
+    final bId = widget.bookingId;
+    if (bId != null) {
+      try {
+        final client = context.read<ApiClient>();
+        await MessagesApi(client).sendMessage(bId, text);
+        await _fetchMessages();
+      } catch (_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to send message.')),
+        );
+      }
+    } else {
+      final id = widget.conversationId;
+      if (id != null) {
+        context.read<MessagesProvider>().sendMessage(id, text);
+      }
     }
   }
 
@@ -54,6 +93,7 @@ class _ChatScreenState extends State<ChatScreen> {
     // Watch so the list rebuilds when new messages arrive.
     context.watch<MessagesProvider>();
     final messages = _conversation?.messages ?? <ChatMessage>[];
+    final useApi = widget.bookingId != null && _apiMessages.isNotEmpty;
 
     return Scaffold(
       body: SafeArea(
@@ -101,41 +141,54 @@ class _ChatScreenState extends State<ChatScreen> {
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: messages.length,
+                itemCount: useApi ? _apiMessages.length : messages.length,
                 itemBuilder: (BuildContext context, int index) {
-                  final message = messages[index];
+                  final bool isMe;
+                  final String text;
+                  final String time;
+                  if (useApi) {
+                    final msg = _apiMessages[index];
+                    isMe = msg.senderId == _currentUserId;
+                    text = msg.text;
+                    time = '${msg.createdAt.hour}:${msg.createdAt.minute.toString().padLeft(2, '0')}';
+                  } else {
+                    final message = messages[index];
+                    isMe = message.isMe;
+                    text = message.text;
+                    time = message.time;
+                  }
 
                   return Align(
-                    alignment: !message.isMe ? Alignment.centerLeft : Alignment.centerRight,
+                    alignment: !isMe ? Alignment.centerLeft : Alignment.centerRight,
                     child: Padding(
                       padding: const EdgeInsets.only(bottom: 14),
                       child: Column(
                         crossAxisAlignment:
-                            !message.isMe ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+                            !isMe ? CrossAxisAlignment.start : CrossAxisAlignment.end,
                         children: <Widget>[
                           Container(
                             constraints: const BoxConstraints(maxWidth: 280),
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                             decoration: BoxDecoration(
-                              gradient: !message.isMe ? null : ServioGradients.brand,
-                              color: !message.isMe ? servio.surfaceRaised : null,
+                              gradient: !isMe ? null : ServioGradients.brand,
+                              color: !isMe ? servio.surfaceRaised : null,
                               borderRadius: BorderRadius.only(
                                 topLeft: const Radius.circular(ServioRadius.xl),
                                 topRight: const Radius.circular(ServioRadius.xl),
-                                bottomLeft: Radius.circular(!message.isMe ? 8 : ServioRadius.xl),
-                                bottomRight: Radius.circular(!message.isMe ? ServioRadius.xl : 8),
+                                bottomLeft: Radius.circular(!isMe ? 8 : ServioRadius.xl),
+                                bottomRight: Radius.circular(!isMe ? ServioRadius.xl : 8),
                               ),
                             ),
                             child: Text(
-                              message.text,
+                              text,
                               style: theme.textTheme.bodyMedium?.copyWith(
-                                color: !message.isMe ? theme.colorScheme.onSurface : Colors.white,
+                                color: !isMe ? theme.colorScheme.onSurface : Colors.white,
                               ),
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            message.time,
+                            time,
                             style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary),
                           ),
                         ],
@@ -175,7 +228,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                     const SizedBox(width: 10),
                     GestureDetector(
-                      onTap: _sendMessage,
+                      onTap: () => _sendMessage(),
                       child: Container(
                         width: 40,
                         height: 40,

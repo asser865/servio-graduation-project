@@ -8,6 +8,8 @@ const { Router }        = require('express');
 const { body }          = require('express-validator');
 const authController    = require('./auth.controller');
 const { validate }      = require('../../middleware/validate.middleware');
+const { protect }       = require('../../middleware/auth.middleware');
+const userController    = require('../users/user.controller');
 
 const router = Router();
 
@@ -76,5 +78,8 @@ router.post('/forgot-password', validate(forgotValidation), authController.forgo
 
 // POST /api/v1/auth/reset-password/:token
 router.post('/reset-password/:token', validate(resetValidation), authController.resetPassword);
+
+// GET /api/v1/auth/me — return current user (session restore)
+router.get('/me', protect, userController.getMe);
 
 module.exports = router;

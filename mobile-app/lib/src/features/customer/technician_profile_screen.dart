@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/data/demo_technicians.dart';
-import '../../core/models/technician_model.dart';
+import '../../core/api/api_client.dart';
+import '../../core/api/reviews_api.dart';
+import '../../core/api/users_api.dart';
+import '../../core/models/backend_worker_model.dart';
 import '../../core/state/app_state.dart';
+import '../../core/state/workers_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
@@ -25,13 +28,10 @@ class TechnicianProfileScreen extends StatefulWidget {
 class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
   final Set<int> _expandedSections = <int>{0, 1, 2, 3, 4, 6};
 
-  TechnicianModel get _technician {
-    if (widget.technicianId == null) return kDemoTechnicians.first;
-    return kDemoTechnicians.firstWhere(
-      (TechnicianModel t) => t.id == widget.technicianId,
-      orElse: () => kDemoTechnicians.first,
-    );
-  }
+  BackendWorker? _worker;
+  List<ReviewResult> _reviews = <ReviewResult>[];
+  bool _loading = true;
+  String? _error;
 
   void _toggleSection(int index) {
     setState(() {
@@ -44,6 +44,37 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    if (widget.technicianId == null) {
+      setState(() => _loading = false);
+      return;
+    }
+    final workersProvider = context.read<WorkersProvider>();
+    final client = context.read<ApiClient>();
+    try {
+      final cached = workersProvider.findById(widget.technicianId!);
+      if (cached != null) {
+        setState(() => _worker = cached);
+      } else {
+        final worker = await UsersApi(client).getWorkerById(widget.technicianId!);
+        if (mounted) setState(() => _worker = worker);
+      }
+      if (!mounted) return;
+      final reviews = await ReviewsApi(client).getWorkerReviews(widget.technicianId!);
+      if (mounted) setState(() => _reviews = reviews);
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Could not load technician profile.');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
@@ -51,6 +82,17 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
     final tech = _technician;
     final techName = tech.name.of(locale);
     final techTitle = tech.title.of(locale);
+    final locale = context.watch<LocaleProvider>().locale.languageCode;
+
+    if (_loading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (_error != null || _worker == null) {
+      return Scaffold(body: Center(child: Text(_error ?? 'Technician not found.')));
+    }
+
+    final worker = _worker!;
+    final techName = worker.name;
 
     return Scaffold(
       body: Stack(
@@ -76,6 +118,54 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
                     tooltip:
                         MaterialLocalizations.of(context).backButtonTooltip,
                     onPressed: () => Navigator.of(context).pop(),
+                backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                flexibleSpace: FlexibleSpaceBar(
+                  titlePadding: const EdgeInsetsDirectional.only(start: 72, bottom: 16),
+                  title: Text(techName, style: theme.textTheme.titleMedium),
+                  background: Stack(
+                    fit: StackFit.expand,
+                    children: <Widget>[
+                      Container(decoration: const BoxDecoration(gradient: ServioGradients.brand)),
+                      Positioned(
+                        right: 20,
+                        top: 80,
+                        child: Icon(
+                          Icons.handyman_rounded,
+                          size: 110,
+                          color: Colors.white.withValues(alpha: 0.14),
+                        ),
+                      ),
+                      Positioned(
+                        left: 20,
+                        bottom: 16,
+                        child: Container(
+                          width: 72,
+                          height: 72,
+                          decoration: BoxDecoration(
+                            gradient: ServioGradients.warm,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                            boxShadow: ServioShadows.rest,
+                          ),
+                          child: Center(
+                            child: Container(
+                              width: 68,
+                              height: 68,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(color: servio.accent, width: 2),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  worker.initials,
+                                  style: theme.textTheme.titleMedium?.copyWith(color: ServioColors.deepBrown),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 flexibleSpace: FlexibleSpaceBar(
@@ -98,6 +188,40 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
                         locale: locale,
                       ),
                       const SizedBox(height: 14),
+                      Text(
+                        worker.skills.join(', '),
+                        style: theme.textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        children: <Widget>[
+                          Expanded(
+                            child: _StatTile(
+                              value: worker.rating.toStringAsFixed(1),
+                              label: locale == 'ar' ? 'التقييم' : 'Rating',
+                            ),
+                          ),
+                          Expanded(
+                            child: _StatTile(
+                              value: '${worker.reviewCount}',
+                              label: locale == 'ar' ? 'تقييم' : 'Reviews',
+                            ),
+                          ),
+                          Expanded(
+                            child: _StatTile(
+                              value: worker.availabilityType,
+                              label: locale == 'ar' ? 'استجابة' : 'Response',
+                            ),
+                          ),
+                          Expanded(
+                            child: _StatTile(
+                              value: '${worker.hourlyRate}',
+                              label: locale == 'ar' ? 'جنيه/ساعة' : 'EGP/hr',
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
                       _AccordionSection(
                         icon: Icons.person_search_rounded,
                         title: _copy(
@@ -117,46 +241,18 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
                                 color: servio.textSecondary,
                                 height: 1.45,
                               ),
+                              worker.skills.join(' · '),
+                              style: theme.textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
                             ),
                             const SizedBox(height: 16),
                             Wrap(
                               spacing: 8,
                               runSpacing: 8,
                               children: <Widget>[
-                                _MiniChip(
-                                  label: _copy(
-                                    locale,
-                                    en: 'Arabic',
-                                    ar: 'عربي',
-                                  ),
-                                  icon: Icons.translate_rounded,
-                                ),
-                                _MiniChip(
-                                  label: _copy(
-                                    locale,
-                                    en: 'English',
-                                    ar: 'إنجليزي',
-                                  ),
-                                  icon: Icons.language_rounded,
-                                ),
-                                if (tech.verified)
-                                  _MiniChip(
-                                    label: _copy(
-                                      locale,
-                                      en: 'Verified',
-                                      ar: 'موثّق',
-                                    ),
-                                    icon: Icons.verified_user_rounded,
-                                    tone: _ChipTone.success,
-                                  ),
-                                _MiniChip(
-                                  label: _copy(
-                                    locale,
-                                    en: '${tech.yearsExp} yrs experience',
-                                    ar: '${tech.yearsExp} سنة خبرة',
-                                  ),
-                                  icon: Icons.workspace_premium_rounded,
-                                ),
+                                _MiniChip(label: locale == 'ar' ? 'عربي' : 'AR'),
+                                _MiniChip(label: locale == 'ar' ? 'إنجليزي' : 'EN'),
+                                if (worker.isVerified)
+                                  _MiniChip(label: locale == 'ar' ? 'موثّق' : 'Verified'),
                               ],
                             ),
                           ],
@@ -177,19 +273,10 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
                         ),
                         expanded: _expandedSections.contains(1),
                         onTap: () => _toggleSection(1),
-                        child: Column(
-                          children: <Widget>[
-                            for (var index = 0;
-                                index < tech.services.length;
-                                index++) ...<Widget>[
-                              _ServiceOfferCard(
-                                service: tech.services[index],
-                                locale: locale,
-                              ),
-                              if (index != tech.services.length - 1)
-                                const SizedBox(height: 10),
-                            ],
-                          ],
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: worker.skills.map((String s) => _MiniChip(label: s)).toList(),
                         ),
                       ),
                       const SizedBox(height: 14),
@@ -219,10 +306,14 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
                         ),
                         expanded: _expandedSections.contains(3),
                         onTap: () => _toggleSection(3),
-                        child: _ExperienceGrid(
-                          technician: tech,
-                          locale: locale,
-                        ),
+                        child: _reviews.isEmpty
+                            ? Text('No reviews yet.', style: theme.textTheme.bodyMedium?.copyWith(color: servio.textSecondary))
+                            : Column(
+                                children: _reviews.take(3).map((ReviewResult r) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: _MiniReviewCard(name: r.reviewerName, body: r.comment),
+                                )).toList(),
+                              ),
                       ),
                       const SizedBox(height: 14),
                       _AccordionSection(
@@ -239,10 +330,7 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
                         ),
                         expanded: _expandedSections.contains(4),
                         onTap: () => _toggleSection(4),
-                        child: _ReviewsPreview(
-                          technician: tech,
-                          locale: locale,
-                        ),
+                        child: _CoverageCard(area: worker.locationLabel),
                       ),
                       const SizedBox(height: 14),
                       _AccordionSection(
@@ -542,6 +630,8 @@ class _ProfileHero extends StatelessWidget {
                                 height: 1.08,
                                 fontWeight: FontWeight.w800,
                               ),
+                              worker.availabilityType,
+                              style: theme.textTheme.bodyMedium?.copyWith(color: servio.success),
                             ),
                             const SizedBox(height: 8),
                             Text(
@@ -1127,14 +1217,49 @@ class _ServiceOfferCard extends StatelessWidget {
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: 5),
-                Text(
-                  '${service.price.of(locale)} · ${service.duration.of(locale)}',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: servio.textSecondary,
-                  ),
+                child: Row(
+                  children: <Widget>[
+                    Container(
+                      width: 12,
+                      height: 12,
+                      decoration: const BoxDecoration(
+                        color: ServioColors.success,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ServioPrimaryButton(
+                        label: locale == 'ar' ? 'احجز الآن' : 'Book Now',
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => BookingStepOneScreen(
+                                data: BookingFlowData(
+                                  technicianName: worker.name,
+                                  technicianId: worker.id,
+                                  specialty: worker.skills.isNotEmpty ? worker.skills.first : '',
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => ChatScreen(contactName: techName),
+                            ),
+                          );
+                        },
+                        child: Text(locale == 'ar' ? 'مراسلة' : 'Message'),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -1351,145 +1476,8 @@ class _ExperienceTile extends StatelessWidget {
   }
 }
 
-class _ReviewsPreview extends StatelessWidget {
-  const _ReviewsPreview({
-    required this.technician,
-    required this.locale,
-  });
-
-  final TechnicianModel technician;
-  final String locale;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final servio = context.servio;
-
-    return Column(
-      children: <Widget>[
-        Row(
-          children: <Widget>[
-            Container(
-              padding: const EdgeInsetsDirectional.fromSTEB(10, 7, 12, 7),
-              decoration: BoxDecoration(
-                color: ServioColors.tint(servio.warning),
-                borderRadius: BorderRadius.circular(ServioRadius.full),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  Icon(Icons.star_rounded, color: servio.warning, size: 17),
-                  const SizedBox(width: 5),
-                  Text(
-                    technician.rating.toStringAsFixed(1),
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: servio.warning,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                _copy(
-                  locale,
-                  en: 'Based on ${technician.reviewCount} customer reviews',
-                  ar: 'بناءً على ${technician.reviewCount} تقييم من العملاء',
-                ),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: servio.textSecondary,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 14),
-        _MiniReviewCard(
-          name: _copy(locale, en: 'Nour Hany', ar: 'نور هاني'),
-          body: _copy(
-            locale,
-            en: 'Professional and very clear on pricing.',
-            ar: 'محترف وواضح جداً في التسعير.',
-          ),
-        ),
-        const SizedBox(height: 10),
-        _MiniReviewCard(
-          name: _copy(locale, en: 'Karim Adel', ar: 'كريم عادل'),
-          body: _copy(
-            locale,
-            en: 'Fast response and neat work.',
-            ar: 'استجابة سريعة وعمل أنيق.',
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _MiniReviewCard extends StatelessWidget {
   const _MiniReviewCard({required this.name, required this.body});
-
-  final String name;
-  final String body;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final servio = context.servio;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: servio.backgroundSoft,
-        borderRadius: BorderRadius.circular(ServioRadius.md),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: ServioColors.tint(servio.accent),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.format_quote_rounded,
-              color: servio.accent,
-              size: 18,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(name, style: theme.textTheme.labelLarge),
-                const SizedBox(height: 5),
-                Text(
-                  body,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: servio.textSecondary,
-                    height: 1.35,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PortfolioStrip extends StatelessWidget {
-  const _PortfolioStrip({
-    required this.technician,
-    required this.locale,
-  });
 
   final TechnicianModel technician;
   final String locale;

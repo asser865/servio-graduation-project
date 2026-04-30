@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/api/api_client.dart';
+import '../../core/api/users_api.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
@@ -27,6 +30,28 @@ class _AvailabilityManagerScreenState extends State<AvailabilityManagerScreen> {
     'Sat': false,
     'Sun': true,
   };
+
+  Future<void> _saveAvailability() async {
+    final activeDays = _days.entries
+        .where((e) => e.value)
+        .map((e) => e.key)
+        .toList();
+    try {
+      final client = context.read<ApiClient>();
+      await UsersApi(client).updateAvailability(<String, dynamic>{
+        'days': activeDays,
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Availability updated.')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to update availability.')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -137,7 +162,7 @@ class _AvailabilityManagerScreenState extends State<AvailabilityManagerScreen> {
               );
             }),
             const SizedBox(height: 8),
-            const ServioPrimaryButton(label: 'Save Availability'),
+            ServioPrimaryButton(label: 'Save Availability', onPressed: _saveAvailability),
           ],
         ),
       ),

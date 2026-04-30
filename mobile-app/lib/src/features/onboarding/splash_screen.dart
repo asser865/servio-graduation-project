@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/state/app_state.dart';
-import '../../design_system/servio_tokens.dart';
 import '../../features/auth/role_selection_screen.dart';
 import '../../features/customer/customer_dashboard_screen.dart';
 import '../../features/technician/technician_dashboard_screen.dart';

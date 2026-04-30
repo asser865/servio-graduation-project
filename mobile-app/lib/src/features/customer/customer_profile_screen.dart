@@ -29,7 +29,7 @@ class CustomerProfileScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final account = context.watch<SessionProvider>().account;
     final themeProvider = context.watch<ThemeProvider>();
-    final localeProvider = context.watch<LocaleProvider>();
+    context.watch<LocaleProvider>();
     final isDark = themeProvider.mode == ThemeMode.dark ||
         (themeProvider.mode == ThemeMode.system &&
             MediaQuery.platformBrightnessOf(context) == Brightness.dark);
