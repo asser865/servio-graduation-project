@@ -375,8 +375,12 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
                           Navigator.of(context).push(
                             MaterialPageRoute<void>(
                               builder: (_) => BookingStepOneScreen(
-                              data: BookingFlowData(technicianName: worker.name),
-                            ),
+                                data: BookingFlowData(
+                                  technicianName: worker.name,
+                                  technicianId: worker.id,
+                                  specialty: worker.skills.isNotEmpty ? worker.skills.first : '',
+                                ),
+                              ),
                             ),
                           );
                         },
