@@ -162,6 +162,7 @@ class SessionProvider extends ChangeNotifier {
   Future<void> logout() async {
     _account = null;
     await _storage.remove(_kKeySession);
+    await _storage.remove(_kKeyAccount);
     await _storage.removeSecureString(StorageService.keyAuthToken);
     notifyListeners();
   }
