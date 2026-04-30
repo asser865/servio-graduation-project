@@ -19,7 +19,7 @@ class UserAccount {
   final UserRole role;
   final String city;
   final String avatarInitials;
-  final String status; // active | pending
+  final String status; // pending | approved | rejected
 
   String get initials {
     if (avatarInitials.isNotEmpty) return avatarInitials;
@@ -64,7 +64,8 @@ class UserAccount {
       phone: (json['phone'] as String?) ?? '',
       role: rawRole == 'worker' ? UserRole.technician : UserRole.customer,
       city: (address?['city'] as String?) ?? 'Cairo',
-      status: (json['status'] as String?) ?? 'active',
+      status: (json['verificationStatus'] as String?) ??
+              (json['status'] as String?) ?? 'active',
     );
   }
 }
