@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/api/api_client.dart';
+import '../../core/api/payments_api.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
@@ -20,10 +23,31 @@ class _EarningsScreenState extends State<EarningsScreen> {
   int _periodIndex = 0;
   static const List<String> _periods = <String>['This Week', 'This Month', 'All Time'];
 
+  EarningsSummary? _summary;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _fetchEarnings());
+  }
+
+  Future<void> _fetchEarnings() async {
+    try {
+      final client = context.read<ApiClient>();
+      _summary = await PaymentsApi(client).getEarnings();
+    } catch (_) {
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final servio = context.servio;
     final theme = Theme.of(context);
+    final earnings = _summary?.totalEarnings ?? 0.0;
+    final pending = _summary?.pendingPayout ?? 0.0;
 
     return Scaffold(
       bottomNavigationBar: ServioBottomNavigationBar(
@@ -111,13 +135,15 @@ class _EarningsScreenState extends State<EarningsScreen> {
                     style: theme.textTheme.labelLarge?.copyWith(color: Colors.white.withValues(alpha: 0.8)),
                   ),
                   const SizedBox(height: 10),
-                  Text(
-                    '12,850 EGP',
-                    style: theme.textTheme.displayLarge?.copyWith(color: Colors.white),
-                  ),
+                  _loading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : Text(
+                          '${earnings.toStringAsFixed(0)} EGP',
+                          style: theme.textTheme.displayLarge?.copyWith(color: Colors.white),
+                        ),
                   const SizedBox(height: 8),
                   Text(
-                    'Pending: 1,200 EGP',
+                    'Pending: ${pending.toStringAsFixed(0)} EGP',
                     style: theme.textTheme.bodyMedium?.copyWith(color: ServioColors.accentLight),
                   ),
                   const SizedBox(height: 16),
