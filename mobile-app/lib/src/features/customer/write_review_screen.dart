@@ -12,7 +12,7 @@ class WriteReviewScreen extends StatefulWidget {
   const WriteReviewScreen({
     required this.technicianName,
     required this.jobSummary,
-    required this.bookingId,
+    this.bookingId = '',
     super.key,
   });
 
