@@ -67,8 +67,11 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
 
   Future<void> _updateJobStatus(String jobId, String status) async {
     final client = context.read<ApiClient>();
-    await BookingsApi(client).updateStatus(jobId, status);
-    await _fetchJobs();
+    try {
+      await BookingsApi(client).updateStatus(jobId, status);
+      if (!mounted) return;
+      await _fetchJobs();
+    } catch (_) {}
   }
 
   @override
