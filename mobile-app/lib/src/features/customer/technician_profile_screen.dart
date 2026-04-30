@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/data/demo_technicians.dart';
-import '../../core/models/technician_model.dart';
+import '../../core/api/api_client.dart';
+import '../../core/api/reviews_api.dart';
+import '../../core/api/users_api.dart';
+import '../../core/models/backend_worker_model.dart';
 import '../../core/state/app_state.dart';
+import '../../core/state/workers_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
@@ -24,13 +27,10 @@ class TechnicianProfileScreen extends StatefulWidget {
 class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
   final Set<int> _expandedSections = <int>{0, 1, 2, 5, 6};
 
-  TechnicianModel get _technician {
-    if (widget.technicianId == null) return kDemoTechnicians.first;
-    return kDemoTechnicians.firstWhere(
-      (TechnicianModel t) => t.id == widget.technicianId,
-      orElse: () => kDemoTechnicians.first,
-    );
-  }
+  BackendWorker? _worker;
+  List<ReviewResult> _reviews = <ReviewResult>[];
+  bool _loading = true;
+  String? _error;
 
   void _toggleSection(int index) {
     setState(() {
@@ -43,13 +43,51 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    if (widget.technicianId == null) {
+      setState(() => _loading = false);
+      return;
+    }
+    final workersProvider = context.read<WorkersProvider>();
+    final client = context.read<ApiClient>();
+    try {
+      final cached = workersProvider.findById(widget.technicianId!);
+      if (cached != null) {
+        setState(() => _worker = cached);
+      } else {
+        final worker = await UsersApi(client).getWorkerById(widget.technicianId!);
+        if (mounted) setState(() => _worker = worker);
+      }
+      if (!mounted) return;
+      final reviews = await ReviewsApi(client).getWorkerReviews(widget.technicianId!);
+      if (mounted) setState(() => _reviews = reviews);
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Could not load technician profile.');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
     final locale = context.watch<LocaleProvider>().locale.languageCode;
-    final tech = _technician;
-    final techName = tech.name.of(locale);
-    final techTitle = tech.title.of(locale);
+
+    if (_loading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (_error != null || _worker == null) {
+      return Scaffold(body: Center(child: Text(_error ?? 'Technician not found.')));
+    }
+
+    final worker = _worker!;
+    final techName = worker.name;
 
     return Scaffold(
       body: Stack(
@@ -98,7 +136,7 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
                               ),
                               child: Center(
                                 child: Text(
-                                  tech.avatarInitials,
+                                  worker.initials,
                                   style: theme.textTheme.titleMedium?.copyWith(color: ServioColors.deepBrown),
                                 ),
                               ),
@@ -120,7 +158,7 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
                   delegate: SliverChildListDelegate(
                     <Widget>[
                       Text(
-                        techTitle,
+                        worker.skills.join(', '),
                         style: theme.textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
                       ),
                       const SizedBox(height: 20),
@@ -128,25 +166,25 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
                         children: <Widget>[
                           Expanded(
                             child: _StatTile(
-                              value: tech.rating.toStringAsFixed(1),
+                              value: worker.rating.toStringAsFixed(1),
                               label: locale == 'ar' ? 'التقييم' : 'Rating',
                             ),
                           ),
                           Expanded(
                             child: _StatTile(
-                              value: '${tech.reviewCount}',
+                              value: '${worker.reviewCount}',
                               label: locale == 'ar' ? 'تقييم' : 'Reviews',
                             ),
                           ),
                           Expanded(
                             child: _StatTile(
-                              value: tech.responseTime,
+                              value: worker.availabilityType,
                               label: locale == 'ar' ? 'استجابة' : 'Response',
                             ),
                           ),
                           Expanded(
                             child: _StatTile(
-                              value: '${tech.pricePerHour}',
+                              value: '${worker.hourlyRate}',
                               label: locale == 'ar' ? 'جنيه/ساعة' : 'EGP/hr',
                             ),
                           ),
@@ -161,7 +199,7 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
                             Text(
-                              tech.bio.of(locale),
+                              worker.skills.join(' · '),
                               style: theme.textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
                             ),
                             const SizedBox(height: 12),
@@ -170,9 +208,8 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
                               children: <Widget>[
                                 _MiniChip(label: locale == 'ar' ? 'عربي' : 'AR'),
                                 _MiniChip(label: locale == 'ar' ? 'إنجليزي' : 'EN'),
-                                if (tech.verified)
+                                if (worker.isVerified)
                                   _MiniChip(label: locale == 'ar' ? 'موثّق' : 'Verified'),
-                                _MiniChip(label: '${tech.yearsExp}${locale == 'ar' ? ' سنة خبرة' : ' yrs exp'}'),
                               ],
                             ),
                           ],
@@ -183,21 +220,10 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
                         title: locale == 'ar' ? 'الخدمات المقدمة' : 'Services Offered',
                         expanded: _expandedSections.contains(1),
                         onTap: () => _toggleSection(1),
-                        child: GridView.count(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
-                          childAspectRatio: 1.4,
-                          children: tech.services
-                              .map(
-                                (TechnicianService s) => _ServiceOfferCard(
-                                  label: s.name.of(locale),
-                                  meta: '${s.price.of(locale)} · ${s.duration.of(locale)}',
-                                ),
-                              )
-                              .toList(),
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: worker.skills.map((String s) => _MiniChip(label: s)).toList(),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -243,26 +269,21 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
                         title: locale == 'ar' ? 'آراء العملاء' : 'Reviews',
                         expanded: _expandedSections.contains(3),
                         onTap: () => _toggleSection(3),
-                        child: Column(
-                          children: <Widget>[
-                            _MiniReviewCard(
-                              name: locale == 'ar' ? 'نور هاني' : 'Nour Hany',
-                              body: locale == 'ar' ? 'محترف وواضح جداً في التسعير.' : 'Professional and very clear on pricing.',
-                            ),
-                            const SizedBox(height: 10),
-                            _MiniReviewCard(
-                              name: locale == 'ar' ? 'كريم عادل' : 'Karim Adel',
-                              body: locale == 'ar' ? 'استجابة سريعة وعمل أنيق.' : 'Fast response and neat work.',
-                            ),
-                          ],
-                        ),
+                        child: _reviews.isEmpty
+                            ? Text('No reviews yet.', style: theme.textTheme.bodyMedium?.copyWith(color: servio.textSecondary))
+                            : Column(
+                                children: _reviews.take(3).map((ReviewResult r) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: _MiniReviewCard(name: r.reviewerName, body: r.comment),
+                                )).toList(),
+                              ),
                       ),
                       const SizedBox(height: 12),
                       _AccordionSection(
                         title: locale == 'ar' ? 'نطاق الخدمة' : 'Service Coverage',
                         expanded: _expandedSections.contains(4),
                         onTap: () => _toggleSection(4),
-                        child: _CoverageCard(area: tech.area.of(locale)),
+                        child: _CoverageCard(area: worker.locationLabel),
                       ),
                       const SizedBox(height: 12),
                       _AccordionSection(
@@ -300,7 +321,7 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
                             Text(
-                              tech.availability.of(locale),
+                              worker.availabilityType,
                               style: theme.textTheme.bodyMedium?.copyWith(color: servio.success),
                             ),
                             const SizedBox(height: 12),
@@ -354,8 +375,12 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
                           Navigator.of(context).push(
                             MaterialPageRoute<void>(
                               builder: (_) => BookingStepOneScreen(
-                              data: BookingFlowData(technicianName: techName),
-                            ),
+                                data: BookingFlowData(
+                                  technicianName: worker.name,
+                                  technicianId: worker.id,
+                                  specialty: worker.skills.isNotEmpty ? worker.skills.first : '',
+                                ),
+                              ),
                             ),
                           );
                         },
@@ -472,42 +497,6 @@ class _MiniChip extends StatelessWidget {
       child: Text(
         label,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(color: servio.accent),
-      ),
-    );
-  }
-}
-
-class _ServiceOfferCard extends StatelessWidget {
-  const _ServiceOfferCard({required this.label, required this.meta});
-
-  final String label;
-  final String meta;
-
-  @override
-  Widget build(BuildContext context) {
-    final servio = context.servio;
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: servio.backgroundSoft,
-        borderRadius: BorderRadius.circular(ServioRadius.md),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: <Widget>[
-          Icon(Icons.build_circle_outlined, color: servio.accent),
-          const SizedBox(height: 8),
-          Text(label, style: Theme.of(context).textTheme.labelLarge),
-          const SizedBox(height: 4),
-          Text(
-            meta,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: servio.textSecondary),
-          ),
-        ],
       ),
     );
   }

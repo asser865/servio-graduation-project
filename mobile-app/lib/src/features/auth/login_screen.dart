@@ -9,6 +9,7 @@ import '../../design_system/widgets/servio_primary_button.dart';
 import '../customer/customer_home_screen.dart';
 import '../technician/technician_dashboard_screen.dart';
 import 'auth_role.dart';
+import 'forgot_password_screen.dart';
 import 'sign_up_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -63,9 +64,6 @@ class _LoginScreenState extends State<LoginScreen> {
       _loading = true;
       _errorMsg = null;
     });
-
-    // Small artificial delay for demo realism
-    await Future<void>.delayed(const Duration(milliseconds: 600));
 
     if (!mounted) return;
     final error = await context.read<SessionProvider>().login(
@@ -154,29 +152,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 style: theme.textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
               ),
               const SizedBox(height: 24),
-              // Demo credentials hint
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: ServioColors.tint(servio.accent),
-                  borderRadius: BorderRadius.circular(ServioRadius.md),
-                ),
-                child: Row(
-                  children: <Widget>[
-                    Icon(Icons.info_outline_rounded, size: 16, color: servio.accent),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        widget.role == AuthRole.customer
-                            ? 'Demo: ahmed@test.com / test1234'
-                            : 'Demo: khaled@test.com / test1234',
-                        style: theme.textTheme.bodySmall?.copyWith(color: servio.accent),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
               if (_errorMsg != null) ...<Widget>[
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -249,7 +224,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                   ),
                   TextButton(
-                    onPressed: () {},
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute<void>(
+                        builder: (_) => const ForgotPasswordScreen(),
+                      ),
+                    ),
                     child: const Text('Forgot password?'),
                   ),
                 ],

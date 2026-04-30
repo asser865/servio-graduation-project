@@ -2,14 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
-import 'core/models/user_account.dart';
+import 'core/api/api_client.dart';
 import 'core/services/storage_service.dart';
 import 'core/state/app_state.dart';
+import 'core/state/services_state.dart';
+import 'core/state/workers_state.dart';
 import 'design_system/servio_theme.dart';
 import 'design_system/servio_tokens.dart';
-import 'features/auth/role_selection_screen.dart';
-import 'features/customer/customer_dashboard_screen.dart';
-import 'features/technician/technician_dashboard_screen.dart';
 import 'features/onboarding/splash_screen.dart';
 
 class ServioApp extends StatelessWidget {
@@ -20,9 +19,10 @@ class ServioApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
-      providers: <ChangeNotifierProvider<ChangeNotifier>>[
+      providers: [
+        Provider<ApiClient>(create: (_) => ApiClient(storage: storage)),
         ChangeNotifierProvider<SessionProvider>(
-          create: (_) => SessionProvider.load(storage),
+          create: (ctx) => SessionProvider.load(storage, ctx.read<ApiClient>()),
         ),
         ChangeNotifierProvider<ThemeProvider>(
           create: (_) => ThemeProvider(storage),
@@ -35,6 +35,12 @@ class ServioApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<MessagesProvider>(
           create: (_) => MessagesProvider(),
+        ),
+        ChangeNotifierProvider<ServicesProvider>(
+          create: (ctx) => ServicesProvider(ctx.read<ApiClient>()),
+        ),
+        ChangeNotifierProvider<WorkersProvider>(
+          create: (ctx) => WorkersProvider(ctx.read<ApiClient>()),
         ),
       ],
       child: const _AppView(),
@@ -70,19 +76,5 @@ class _AppView extends StatelessWidget {
       ],
       home: const SplashScreen(),
     );
-  }
-}
-
-/// Shows the home screen for the logged-in user's role, or [RoleSelectionScreen].
-class _AuthGate extends StatelessWidget {
-  const _AuthGate();
-
-  @override
-  Widget build(BuildContext context) {
-    final session = context.watch<SessionProvider>();
-    if (!session.isLoggedIn) return const RoleSelectionScreen();
-    return session.account!.role == UserRole.technician
-        ? const TechnicianDashboardScreen()
-        : const CustomerDashboardScreen();
   }
 }

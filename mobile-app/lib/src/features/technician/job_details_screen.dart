@@ -1,28 +1,115 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/api/api_client.dart';
+import '../../core/api/bookings_api.dart';
+import '../../core/models/backend_booking_model.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
 import '../messages/chat_screen.dart';
 
-class JobDetailsScreen extends StatelessWidget {
+class JobDetailsScreen extends StatefulWidget {
   const JobDetailsScreen({
-    required this.statusIndex,
+    required this.jobId,
     super.key,
   });
 
-  final int statusIndex;
+  final String jobId;
+
+  @override
+  State<JobDetailsScreen> createState() => _JobDetailsScreenState();
+}
+
+class _JobDetailsScreenState extends State<JobDetailsScreen> {
+  BackendBooking? _job;
+  bool _loading = true;
+  String? _error;
+  bool _updating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  Future<void> _load() async {
+    final client = context.read<ApiClient>();
+    try {
+      final jobs = await BookingsApi(client).getWorkerBookings();
+      if (!mounted) return;
+      final job = jobs.where((j) => j.id == widget.jobId).firstOrNull;
+      setState(() {
+        _job = job;
+        _loading = false;
+        _updating = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+        _updating = false;
+      });
+    }
+  }
+
+  Future<void> _updateStatus(String status) async {
+    final client = context.read<ApiClient>();
+    setState(() => _updating = true);
+    try {
+      await BookingsApi(client).updateStatus(widget.jobId, status);
+      if (!mounted) return;
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _updating = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Job Details')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_error != null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Job Details')),
+        body: Center(child: Text(_error!)),
+      );
+    }
+
+    final job = _job!;
     final servio = context.servio;
     final theme = Theme.of(context);
-    final actionLabel = statusIndex <= 1
-        ? 'Start Job - Mark In Progress'
-        : statusIndex == 2
-            ? 'Complete Job - Mark as Done'
-            : 'Job Completed';
+
+    final String actionLabel;
+    final VoidCallback? onPressed;
+
+    if (_updating) {
+      actionLabel = 'Updating...';
+      onPressed = null;
+    } else {
+      switch (job.status) {
+        case 'pending':
+          actionLabel = 'Accept Job';
+          onPressed = () => _updateStatus('confirmed');
+        case 'confirmed':
+          actionLabel = 'Start Job - Mark In Progress';
+          onPressed = () => _updateStatus('in_progress');
+        case 'in_progress':
+          actionLabel = 'Complete Job - Mark as Done';
+          onPressed = () => _updateStatus('completed');
+        default:
+          actionLabel = 'Job Completed';
+          onPressed = null;
+      }
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -46,14 +133,18 @@ class JobDetailsScreen extends StatelessWidget {
                       shape: BoxShape.circle,
                       border: Border.all(color: servio.accent, width: 2),
                     ),
-                    child: const Center(child: Text('M')),
+                    child: Center(
+                      child: Text(
+                        job.serviceName.isNotEmpty ? job.serviceName[0].toUpperCase() : '?',
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        Text('Mostafa Abdelaal', style: theme.textTheme.titleMedium),
+                        Text(job.serviceName, style: theme.textTheme.titleMedium),
                         const SizedBox(height: 4),
                         Text(
                           'Previous rating: 5.0',
@@ -66,7 +157,7 @@ class JobDetailsScreen extends StatelessWidget {
                     onPressed: () {
                       Navigator.of(context).push(
                         MaterialPageRoute<void>(
-                          builder: (_) => const ChatScreen(contactName: 'Mostafa Abdelaal'),
+                          builder: (_) => ChatScreen(contactName: job.serviceName),
                         ),
                       );
                     },
@@ -82,10 +173,10 @@ class JobDetailsScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Text('Kitchen faucet leak repair', style: theme.textTheme.titleMedium),
+                  Text(job.serviceName, style: theme.textTheme.titleMedium),
                   const SizedBox(height: 8),
                   Text(
-                    'Customer reports constant dripping under the sink and reduced pressure at the faucet head.',
+                    job.notes.isNotEmpty ? job.notes : 'No additional notes.',
                     style: theme.textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
                   ),
                   const SizedBox(height: 16),
@@ -108,7 +199,7 @@ class JobDetailsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'New Cairo, Cairo, Egypt',
+                    job.addressCity,
                     style: theme.textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
                   ),
                   const SizedBox(height: 12),
@@ -127,12 +218,12 @@ class JobDetailsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Scheduled: 26/03/2026 • 10:00 AM',
+                    'Scheduled: ${job.scheduledDate.day}/${job.scheduledDate.month}/${job.scheduledDate.year}',
                     style: theme.textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Offered: 850 EGP',
+                    'Offered: EGP ${job.totalAmount.toStringAsFixed(0)}',
                     style: theme.textTheme.headlineMedium?.copyWith(color: servio.accent),
                   ),
                 ],
@@ -141,7 +232,7 @@ class JobDetailsScreen extends StatelessWidget {
             const SizedBox(height: 20),
             ServioPrimaryButton(
               label: actionLabel,
-              onPressed: statusIndex == 3 ? null : () {},
+              onPressed: onPressed,
             ),
           ],
         ),

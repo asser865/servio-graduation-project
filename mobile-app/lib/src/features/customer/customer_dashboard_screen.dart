@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/api/api_client.dart';
+import '../../core/api/bookings_api.dart';
 import '../../core/data/demo_technicians.dart';
+import '../../core/models/backend_booking_model.dart';
 import '../../core/models/booking_model.dart';
 import '../../core/models/technician_model.dart';
 import '../../core/state/app_state.dart';
@@ -35,14 +39,28 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
   _DashboardSection _section = _DashboardSection.overview;
   String _bookingFilter = 'All';
   String _historyFilter = 'All';
+  List<BookingModel> _bookings = <BookingModel>[];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _fetchBookings());
+  }
+
+  Future<void> _fetchBookings() async {
+    try {
+      final client = context.read<ApiClient>();
+      final raw = await BookingsApi(client).getMyBookings();
+      if (mounted) setState(() => _bookings = raw.map(_toBookingModel).toList());
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
     final unreadMessages = context.watch<MessagesProvider>().totalUnread;
-    final storedBookings = context.watch<BookingsProvider>().all;
-    final bookings = storedBookings.isEmpty ? _demoBookings : storedBookings;
+    final bookings = _bookings;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -275,14 +293,16 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
     );
 
     if (!mounted || confirmed != true) return;
-    final provider = context.read<BookingsProvider>();
-    final exists = provider.all.any((item) => item.id == booking.id);
-    if (exists) {
-      await provider.updateStatus(booking.id, BookingStatus.cancelled);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Demo booking cancellation previewed.')),
-      );
+    try {
+      final client = context.read<ApiClient>();
+      await BookingsApi(client).updateStatus(booking.id, 'cancelled');
+      if (mounted) await _fetchBookings();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not cancel booking.')),
+        );
+      }
     }
   }
 }
@@ -2019,57 +2039,32 @@ int _amountValue(String amount) {
   return int.tryParse(numeric) ?? 0;
 }
 
-final List<BookingModel> _demoBookings = <BookingModel>[
-  BookingModel(
-    id: 'demo_1',
-    reference: '#SRV-2026-8823',
-    serviceName: 'Plumbing Repair',
-    technicianName: 'Khaled Mohamed',
-    technicianId: 'tech_khaled',
-    date: '28/04/2026',
-    time: '10:00 AM - 11:00 AM',
-    location: 'New Cairo, Cairo, Egypt',
-    amount: '1,050 EGP',
-    status: BookingStatus.inProgress,
-    pin: '4821',
-  ),
-  BookingModel(
-    id: 'demo_2',
-    reference: '#SRV-2026-8910',
-    serviceName: 'Electrical Inspection',
-    technicianName: 'Mahmoud Ibrahim',
-    technicianId: 'tech_mahmoud',
-    date: '30/04/2026',
-    time: '02:00 PM - 03:00 PM',
-    location: 'Heliopolis, Cairo, Egypt',
-    amount: '850 EGP',
-    status: BookingStatus.upcoming,
-    pin: '7394',
-  ),
-  BookingModel(
-    id: 'demo_3',
-    reference: '#SRV-2026-8042',
-    serviceName: 'AC Service',
-    technicianName: 'Hassan Ali',
-    technicianId: 'tech_hassan',
-    date: '18/04/2026',
-    time: '12:00 PM - 01:00 PM',
-    location: 'Maadi, Cairo, Egypt',
-    amount: '700 EGP',
-    status: BookingStatus.completed,
-    pin: '2190',
-  ),
-  BookingModel(
-    id: 'demo_4',
-    reference: '#SRV-2026-7724',
-    serviceName: 'Room Painting',
-    technicianName: 'Youssef Samir',
-    technicianId: 'tech_youssef',
-    date: '05/04/2026',
-    time: '09:00 AM - 01:00 PM',
-    location: 'Zamalek, Cairo, Egypt',
-    amount: '1,400 EGP',
-    status: BookingStatus.completed,
-    pin: '6641',
-  ),
-];
+BookingModel _toBookingModel(BackendBooking b) {
+  final date = DateFormat('dd/MM/yyyy').format(b.scheduledDate);
+  final time = DateFormat('hh:mm a').format(b.scheduledDate);
+  final shortId = b.id.length >= 6 ? b.id.substring(b.id.length - 6).toUpperCase() : b.id.toUpperCase();
+  final location = [b.addressStreet, b.addressCity].where((s) => s.isNotEmpty).join(', ');
+  return BookingModel(
+    id: b.id,
+    reference: '#SRV-$shortId',
+    serviceName: b.serviceName.isNotEmpty ? b.serviceName : 'Service',
+    technicianName: b.workerName.isNotEmpty ? b.workerName : 'Technician',
+    technicianId: b.workerId,
+    date: date,
+    time: time,
+    location: location.isNotEmpty ? location : 'N/A',
+    amount: '${b.totalAmount.toStringAsFixed(0)} EGP',
+    status: _parseBookingStatus(b.status),
+    pin: b.id.length >= 4 ? b.id.substring(b.id.length - 4) : b.id,
+    notes: b.notes,
+  );
+}
+
+BookingStatus _parseBookingStatus(String status) {
+  return switch (status.toLowerCase()) {
+    'in_progress' || 'inprogress' || 'active' => BookingStatus.inProgress,
+    'completed' || 'done' => BookingStatus.completed,
+    'cancelled' || 'canceled' => BookingStatus.cancelled,
+    _ => BookingStatus.upcoming,
+  };
+}

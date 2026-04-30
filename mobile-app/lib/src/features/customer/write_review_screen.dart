@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/api/api_client.dart';
+import '../../core/api/reviews_api.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
@@ -9,11 +12,13 @@ class WriteReviewScreen extends StatefulWidget {
   const WriteReviewScreen({
     required this.technicianName,
     required this.jobSummary,
+    this.bookingId = '',
     super.key,
   });
 
   final String technicianName;
   final String jobSummary;
+  final String bookingId;
 
   @override
   State<WriteReviewScreen> createState() => _WriteReviewScreenState();
@@ -24,6 +29,7 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
   final Set<String> _selectedTags = <String>{};
   final TextEditingController _controller = TextEditingController();
   int _photoCount = 0;
+  bool _loading = false;
 
   static const List<String> _tags = <String>[
     'Professional',
@@ -42,12 +48,31 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
 
   bool get _canSubmit => _rating > 0 && _controller.text.trim().isNotEmpty;
 
-  void _submit() {
-    if (!_canSubmit) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Review submitted. Thank you.')),
-    );
-    Navigator.of(context).pop(true);
+  Future<void> _submit() async {
+    if (_rating == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a star rating.')),
+      );
+      return;
+    }
+    setState(() => _loading = true);
+    try {
+      final client = context.read<ApiClient>();
+      await ReviewsApi(client).submitReview(
+        bookingId: widget.bookingId,
+        rating: _rating,
+        comment: _controller.text.trim(),
+      );
+      if (!mounted) return;
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to submit review. Try again.')),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   void _skip() {
@@ -247,8 +272,8 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
             ),
             const SizedBox(height: 24),
             ServioPrimaryButton(
-              label: 'Submit Review',
-              onPressed: _canSubmit ? _submit : null,
+              label: _loading ? 'Submitting…' : 'Submit Review',
+              onPressed: (_canSubmit && !_loading) ? _submit : null,
             ),
             const SizedBox(height: 12),
             TextButton(

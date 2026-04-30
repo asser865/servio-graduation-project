@@ -19,7 +19,7 @@ class UserAccount {
   final UserRole role;
   final String city;
   final String avatarInitials;
-  final String status; // active | pending
+  final String status; // pending | approved | rejected
 
   String get initials {
     if (avatarInitials.isNotEmpty) return avatarInitials;
@@ -52,4 +52,20 @@ class UserAccount {
         avatarInitials: (json['avatarInitials'] as String?) ?? '',
         status: (json['status'] as String?) ?? 'active',
       );
+
+  // Maps backend API response (uses _id, role: 'user'|'worker', nested address)
+  factory UserAccount.fromBackend(Map<String, dynamic> json) {
+    final address = json['address'] as Map<String, dynamic>?;
+    final rawRole = (json['role'] as String?) ?? 'user';
+    return UserAccount(
+      id: (json['_id'] as String?) ?? (json['id'] as String?) ?? '',
+      name: (json['name'] as String?) ?? '',
+      email: (json['email'] as String?) ?? '',
+      phone: (json['phone'] as String?) ?? '',
+      role: rawRole == 'worker' ? UserRole.technician : UserRole.customer,
+      city: (address?['city'] as String?) ?? 'Cairo',
+      status: (json['verificationStatus'] as String?) ??
+              (json['status'] as String?) ?? 'active',
+    );
+  }
 }

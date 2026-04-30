@@ -1,3 +1,4 @@
+import '../models/backend_worker_model.dart';
 import 'api_client.dart';
 
 class UsersApi {
@@ -5,18 +6,26 @@ class UsersApi {
 
   final ApiClient _client;
 
-  Future<Map<String, dynamic>> getWorkers({
-    String? category,
-    int page = 1,
-    int limit = 50,
-  }) async {
+  Future<List<BackendWorker>> getWorkers({String? category}) async {
     final qs = Uri(
       queryParameters: <String, String>{
-        'page': '$page',
-        'limit': '$limit',
+        'limit': '50',
         if (category != null && category.isNotEmpty) 'category': category,
       },
     ).query;
-    return _client.unwrapData(await _client.get('/users/workers?$qs'));
+    final data = _client.unwrapData(await _client.get('/users/workers?$qs'));
+    final list = (data['workers'] as List<dynamic>?) ??
+        (data['data'] as List<dynamic>?) ??
+        <dynamic>[];
+    return list.whereType<Map<String, dynamic>>().map(BackendWorker.fromJson).toList();
+  }
+
+  Future<BackendWorker> getWorkerById(String id) async {
+    final data = _client.unwrapData(await _client.get('/users/workers/$id'));
+    return BackendWorker.fromJson(data);
+  }
+
+  Future<void> updateAvailability(Map<String, dynamic> availability) async {
+    await _client.patch('/users/me/availability', availability);
   }
 }
