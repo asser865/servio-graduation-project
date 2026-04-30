@@ -18,6 +18,15 @@ const profileUpdateValidation = [
   body('name').optional().trim().notEmpty().withMessage('Name cannot be empty'),
   body('phone').optional().isMobilePhone().withMessage('Invalid phone number'),
   body('profileImage').optional().isURL().withMessage('Profile image must be a valid URL'),
+  body('bio').optional().trim().isLength({ max: 1000 }).withMessage('Bio cannot exceed 1000 characters'),
+  body('hourlyRate').optional().isFloat({ min: 0 }).withMessage('Hourly rate must be a non-negative number'),
+  body('locationLabel').optional().trim().isLength({ max: 200 }).withMessage('Location label too long'),
+  body('yearsExperience').optional().isInt({ min: 0 }).withMessage('Years of experience must be a non-negative integer'),
+  body('availabilityType').optional().isIn(['weekdays', 'weekends', 'both', '']).withMessage('Invalid availability type'),
+  body('skills').optional().isArray().withMessage('Skills must be an array'),
+  body('skills.*').optional().isString().trim().notEmpty().withMessage('Each skill must be a non-empty string'),
+  body('categories').optional().isArray().withMessage('Categories must be an array'),
+  body('categories.*').optional().isIn(['plumbing','electrical','painting','flooring','carpentry','cleaning','hvac','other']).withMessage('Invalid category'),
 ];
 
 const availabilityValidation = [
