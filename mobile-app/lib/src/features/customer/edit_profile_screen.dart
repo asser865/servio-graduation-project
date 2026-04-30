@@ -18,6 +18,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _emailCtrl;
   late TextEditingController _phoneCtrl;
   late TextEditingController _bioCtrl;
+  bool _saving = false;
 
   @override
   void initState() {
@@ -25,8 +26,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final account = context.read<SessionProvider>().account;
     _nameCtrl = TextEditingController(text: account?.name ?? '');
     _emailCtrl = TextEditingController(text: account?.email ?? '');
-    _phoneCtrl = TextEditingController(text: '');
-    _bioCtrl = TextEditingController(text: '');
+    _phoneCtrl = TextEditingController(text: account?.phone ?? '');
+    _bioCtrl = TextEditingController(text: account?.bio ?? '');
   }
 
   @override
@@ -36,6 +37,37 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _phoneCtrl.dispose();
     _bioCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    final fields = <String, dynamic>{};
+    final account = context.read<SessionProvider>().account;
+    if (_nameCtrl.text.trim() != (account?.name ?? '')) {
+      fields['name'] = _nameCtrl.text.trim();
+    }
+    if (_phoneCtrl.text.trim() != (account?.phone ?? '')) {
+      fields['phone'] = _phoneCtrl.text.trim();
+    }
+    if (_bioCtrl.text.trim() != (account?.bio ?? '')) {
+      fields['bio'] = _bioCtrl.text.trim();
+    }
+    if (fields.isEmpty) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      Navigator.pop(context);
+      return;
+    }
+    final error = await context.read<SessionProvider>().updateProfile(fields);
+    if (!mounted) return;
+    setState(() => _saving = false);
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error), backgroundColor: Colors.red),
+      );
+    } else {
+      Navigator.pop(context);
+    }
   }
 
   @override
@@ -81,9 +113,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     decoration: BoxDecoration(
                       color: servio.accent,
                       shape: BoxShape.circle,
-                      border: Border.all(color: theme.scaffoldBackgroundColor, width: 2),
+                      border: Border.all(
+                          color: theme.scaffoldBackgroundColor, width: 2),
                     ),
-                    child: const Icon(Icons.camera_alt_outlined, color: Colors.white, size: 18),
+                    child: const Icon(Icons.camera_alt_outlined,
+                        color: Colors.white, size: 18),
                   ),
                 ),
               ],
@@ -99,6 +133,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             const SizedBox(height: 16),
             TextField(
               controller: _emailCtrl,
+              enabled: false,
               keyboardType: TextInputType.emailAddress,
               decoration: const InputDecoration(
                 labelText: 'Email Address',
@@ -125,14 +160,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ),
             const SizedBox(height: 32),
             ServioPrimaryButton(
-              label: 'Save Changes',
-              onPressed: () {
-                Navigator.pop(context);
-              },
+              label: _saving ? 'Saving…' : 'Save Changes',
+              onPressed: _saving ? null : _save,
             ),
             const SizedBox(height: 12),
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: _saving ? null : () => Navigator.pop(context),
               child: Text(
                 'Cancel',
                 style: TextStyle(color: servio.textSecondary),
