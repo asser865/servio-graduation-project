@@ -18,6 +18,7 @@ const profileUpdateValidation = [
   body('name').optional().trim().notEmpty().withMessage('Name cannot be empty'),
   body('phone').optional().isMobilePhone().withMessage('Invalid phone number'),
   body('profileImage').optional().isURL().withMessage('Profile image must be a valid URL'),
+  body('email').optional().isEmail().normalizeEmail().withMessage('Invalid email address'),
   body('bio').optional().trim().isLength({ max: 1000 }).withMessage('Bio cannot exceed 1000 characters'),
   body('hourlyRate').optional().isFloat({ min: 0 }).withMessage('Hourly rate must be a non-negative number'),
   body('locationLabel').optional().trim().isLength({ max: 200 }).withMessage('Location label too long'),
