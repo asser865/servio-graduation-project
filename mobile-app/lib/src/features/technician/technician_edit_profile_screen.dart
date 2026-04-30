@@ -106,8 +106,9 @@ class _TechnicianEditProfileScreenState
     }
 
     if (fields.isEmpty) {
+      if (!mounted) return;
       setState(() => _saving = false);
-      if (mounted) Navigator.pop(context);
+      Navigator.pop(context);
       return;
     }
 

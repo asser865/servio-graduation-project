@@ -53,8 +53,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       fields['bio'] = _bioCtrl.text.trim();
     }
     if (fields.isEmpty) {
+      if (!mounted) return;
       setState(() => _saving = false);
-      if (mounted) Navigator.pop(context);
+      Navigator.pop(context);
       return;
     }
     final error = await context.read<SessionProvider>().updateProfile(fields);
