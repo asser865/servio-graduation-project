@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/api/api_client.dart';
+import '../../core/api/bookings_api.dart';
+import '../../core/models/backend_booking_model.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
@@ -21,6 +25,51 @@ class JobQueueScreen extends StatefulWidget {
 class _JobQueueScreenState extends State<JobQueueScreen> {
   int _tabIndex = 0;
   static const List<String> _tabs = <String>['Pending', 'Confirmed', 'In Progress', 'Completed'];
+
+  List<BackendBooking> _jobs = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _fetchJobs());
+  }
+
+  Future<void> _fetchJobs() async {
+    final client = context.read<ApiClient>();
+    try {
+      final jobs = await BookingsApi(client).getWorkerBookings();
+      if (!mounted) return;
+      setState(() {
+        _jobs = jobs;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  List<BackendBooking> _jobsForTab(int tab) {
+    const statusMap = <int, String>{
+      0: 'pending',
+      1: 'confirmed',
+      2: 'in_progress',
+      3: 'completed',
+    };
+    final status = statusMap[tab] ?? '';
+    return _jobs.where((j) => j.status == status).toList();
+  }
+
+  Future<void> _updateJobStatus(String jobId, String status) async {
+    final client = context.read<ApiClient>();
+    await BookingsApi(client).updateStatus(jobId, status);
+    await _fetchJobs();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -81,7 +130,7 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
               child: Row(
                 children: List<Widget>.generate(_tabs.length, (int index) {
                   final active = index == _tabIndex;
-                  final counts = <String>['3', '2', '1', '11'];
+                  final count = _jobsForTab(index).length.toString();
 
                   return Expanded(
                     child: GestureDetector(
@@ -117,7 +166,7 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
                                 borderRadius: BorderRadius.circular(ServioRadius.full),
                               ),
                               child: Text(
-                                counts[index],
+                                count,
                                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                                       color: index == 0
                                           ? servio.warning
@@ -137,22 +186,39 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
             ),
             const SizedBox(height: 20),
             Expanded(
-              child: ListView.separated(
-                itemCount: 4,
-                separatorBuilder: (BuildContext context, int index) => const SizedBox(height: 12),
-                itemBuilder: (BuildContext context, int index) {
-                  return _JobCard(
-                    tabIndex: _tabIndex,
-                    onOpen: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => JobDetailsScreen(statusIndex: _tabIndex),
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _error != null
+                      ? Center(child: Text(_error!))
+                      : Builder(
+                          builder: (context) {
+                            final filteredJobs = _jobsForTab(_tabIndex);
+                            return ListView.separated(
+                              itemCount: filteredJobs.length,
+                              separatorBuilder: (BuildContext context, int index) =>
+                                  const SizedBox(height: 12),
+                              itemBuilder: (BuildContext context, int index) {
+                                final job = filteredJobs[index];
+                                return _JobCard(
+                                  job: job,
+                                  onOpen: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute<void>(
+                                        builder: (_) => JobDetailsScreen(jobId: job.id),
+                                      ),
+                                    );
+                                  },
+                                  onAccept: _tabIndex == 0
+                                      ? () => _updateJobStatus(job.id, 'confirmed')
+                                      : null,
+                                  onDecline: _tabIndex == 0
+                                      ? () => _updateJobStatus(job.id, 'cancelled')
+                                      : null,
+                                );
+                              },
+                            );
+                          },
                         ),
-                      );
-                    },
-                  );
-                },
-              ),
             ),
           ],
         ),
@@ -163,23 +229,52 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
 
 class _JobCard extends StatelessWidget {
   const _JobCard({
-    required this.tabIndex,
+    required this.job,
     required this.onOpen,
+    this.onAccept,
+    this.onDecline,
   });
 
-  final int tabIndex;
+  final BackendBooking job;
   final VoidCallback onOpen;
+  final VoidCallback? onAccept;
+  final VoidCallback? onDecline;
+
+  ServioStatusChipType _chipType(String status) {
+    switch (status) {
+      case 'pending':
+        return ServioStatusChipType.warning;
+      case 'confirmed':
+        return ServioStatusChipType.info;
+      case 'in_progress':
+        return ServioStatusChipType.info;
+      case 'completed':
+        return ServioStatusChipType.success;
+      default:
+        return ServioStatusChipType.warning;
+    }
+  }
+
+  String _chipLabel(String status) {
+    switch (status) {
+      case 'pending':
+        return 'Pending';
+      case 'confirmed':
+        return 'Confirmed';
+      case 'in_progress':
+        return 'In Progress';
+      case 'completed':
+        return 'Completed';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return status;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final servio = context.servio;
-    final labels = <String>['Pending', 'Confirmed', 'In Progress', 'Completed'];
-    final types = <ServioStatusChipType>[
-      ServioStatusChipType.warning,
-      ServioStatusChipType.info,
-      ServioStatusChipType.info,
-      ServioStatusChipType.success,
-    ];
 
     return ServioCard(
       radius: ServioRadius.lg,
@@ -196,40 +291,44 @@ class _JobCard extends StatelessWidget {
                   shape: BoxShape.circle,
                   border: Border.all(color: servio.accent, width: 2),
                 ),
-                child: const Center(child: Text('M')),
+                child: Center(
+                  child: Text(
+                    job.serviceName.isNotEmpty ? job.serviceName[0].toUpperCase() : '?',
+                  ),
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text('Mostafa Abdelaal', style: Theme.of(context).textTheme.titleMedium),
+                    Text(job.serviceName, style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: 4),
                     Text(
-                      'Kitchen faucet leak repair',
+                      job.addressCity,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(color: servio.textSecondary),
                     ),
                   ],
                 ),
               ),
               ServioStatusChip(
-                label: labels[tabIndex],
-                type: types[tabIndex],
+                label: _chipLabel(job.status),
+                type: _chipType(job.status),
               ),
             ],
           ),
           const SizedBox(height: 12),
           Text(
-            'New Cairo • 10:00 AM • 850 EGP',
+            '${job.addressCity} • EGP ${job.totalAmount.toStringAsFixed(0)}',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(color: servio.textSecondary),
           ),
           const SizedBox(height: 14),
-          if (tabIndex == 0)
+          if (onAccept != null || onDecline != null)
             Row(
               children: <Widget>[
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () {},
+                    onPressed: onAccept,
                     style: OutlinedButton.styleFrom(
                       side: BorderSide(color: servio.success),
                       foregroundColor: servio.success,
@@ -240,7 +339,7 @@ class _JobCard extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () {},
+                    onPressed: onDecline,
                     style: OutlinedButton.styleFrom(
                       side: BorderSide(color: servio.danger),
                       foregroundColor: servio.danger,
