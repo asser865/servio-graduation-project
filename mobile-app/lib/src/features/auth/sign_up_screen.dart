@@ -10,7 +10,6 @@ import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
 import '../customer/customer_home_screen.dart';
-import '../technician/technician_dashboard_screen.dart';
 import '../technician/verification_upload_screen.dart';
 import 'auth_role.dart';
 import 'role_selection_screen.dart';
@@ -111,7 +110,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     if (!_validateStep()) return;
 
     if (_isTechnician && _step == 5) {
-      setState(() => _step = 6);
+      await _createTechnicianAccount();
       return;
     }
 
@@ -120,9 +119,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       return;
     }
 
-    if (_isTechnician) {
-      await _createTechnicianAccount();
-    } else {
+    if (!_isTechnician) {
       await _createCustomerAccount();
     }
   }
@@ -216,11 +213,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       setState(() => _error = error);
       return;
     }
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute<void>(builder: (_) => const TechnicianDashboardScreen()),
-      (_) => false,
-    );
+    setState(() => _step = 6);
   }
 
   Future<void> _finishTechnicianSubmitted() async {
