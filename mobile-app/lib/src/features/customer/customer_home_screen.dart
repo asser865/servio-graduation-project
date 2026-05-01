@@ -8,6 +8,7 @@ import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
 import '../../design_system/widgets/servio_card.dart';
+import '../../design_system/widgets/servio_primary_button.dart';
 import '../../design_system/widgets/servio_section_heading.dart';
 import '../../design_system/widgets/servio_status_chip.dart';
 import 'ai_smart_match_screen.dart';
@@ -33,14 +34,16 @@ class CustomerHomeScreen extends StatelessWidget {
     final unreadMessages = context.watch<MessagesProvider>().totalUnread;
     final locale = context.watch<LocaleProvider>().locale.languageCode;
     final recentBookings = context.watch<BookingsProvider>().upcoming;
-    final featuredTechs = context.watch<WorkersProvider>().workers.take(3).toList();
+    final featuredTechs =
+        context.watch<WorkersProvider>().workers.take(3).toList();
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       bottomNavigationBar: ServioBottomNavigationBar(
         items: <ServioBottomNavItem>[
           const ServioBottomNavItem(icon: Icons.home_rounded, label: 'Home'),
-          const ServioBottomNavItem(icon: Icons.grid_view_rounded, label: 'Services'),
+          const ServioBottomNavItem(
+              icon: Icons.grid_view_rounded, label: 'Services'),
           const ServioBottomNavItem(
             icon: Icons.auto_awesome_rounded,
             label: 'Smart Match',
@@ -51,7 +54,8 @@ class CustomerHomeScreen extends StatelessWidget {
             label: 'Messages',
             badgeCount: unreadMessages,
           ),
-          const ServioBottomNavItem(icon: Icons.person_rounded, label: 'Profile'),
+          const ServioBottomNavItem(
+              icon: Icons.person_rounded, label: 'Profile'),
         ],
         currentIndex: 0,
         onTap: (int index) {
@@ -103,16 +107,19 @@ class CustomerHomeScreen extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: theme.colorScheme.surface,
                             border: Border.all(color: servio.accent),
-                            borderRadius: BorderRadius.circular(ServioRadius.full),
+                            borderRadius:
+                                BorderRadius.circular(ServioRadius.full),
                             boxShadow: ServioShadows.rest,
                           ),
                           child: Row(
                             children: <Widget>[
-                              Icon(Icons.location_on_outlined, color: servio.accent, size: 18),
+                              Icon(Icons.location_on_outlined,
+                                  color: servio.accent, size: 18),
                               const SizedBox(width: 8),
                               Text(
                                 'Cairo, Egypt',
-                                style: theme.textTheme.labelLarge?.copyWith(color: servio.accent),
+                                style: theme.textTheme.labelLarge
+                                    ?.copyWith(color: servio.accent),
                               ),
                             ],
                           ),
@@ -136,7 +143,8 @@ class CustomerHomeScreen extends StatelessWidget {
               ),
             ),
             SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: ServioSpacing.screenPadding),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: ServioSpacing.screenPadding),
               sliver: SliverList(
                 delegate: SliverChildListDelegate(
                   <Widget>[
@@ -149,14 +157,16 @@ class CustomerHomeScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Text(userName.split(' ').first, style: theme.textTheme.headlineMedium),
+                    Text(userName.split(' ').first,
+                        style: theme.textTheme.headlineMedium),
                     const SizedBox(height: 20),
                     TextField(
                       readOnly: true,
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute<void>(
-                            builder: (_) => const SearchResultsScreen(query: 'service'),
+                            builder: (_) =>
+                                const SearchResultsScreen(query: 'service'),
                           ),
                         );
                       },
@@ -166,13 +176,32 @@ class CustomerHomeScreen extends StatelessWidget {
                         filled: true,
                         fillColor: servio.surfaceAlt,
                         enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(ServioRadius.full),
+                          borderRadius:
+                              BorderRadius.circular(ServioRadius.full),
                           borderSide: BorderSide(color: servio.border),
                         ),
                         focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(ServioRadius.full),
-                          borderSide: BorderSide(color: servio.accent, width: 2),
+                          borderRadius:
+                              BorderRadius.circular(ServioRadius.full),
+                          borderSide:
+                              BorderSide(color: servio.accent, width: 2),
                         ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Semantics(
+                      button: true,
+                      enabled: true,
+                      label: 'Book a Service',
+                      child: ServioPrimaryButton(
+                        label: 'Book a Service',
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const ServicesMarketplaceScreen(),
+                            ),
+                          );
+                        },
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -193,7 +222,8 @@ class CustomerHomeScreen extends StatelessWidget {
                     const SizedBox(height: 16),
                     _HeroBannerCard(
                       title: 'Instant Finishing Estimates',
-                      body: 'Estimate room projects with calm, transparent pricing.',
+                      body:
+                          'Estimate room projects with calm, transparent pricing.',
                       ctaLabel: 'Calculate Cost',
                       icon: Icons.calculate_rounded,
                       useWarmGradient: true,
@@ -235,7 +265,8 @@ class CustomerHomeScreen extends StatelessWidget {
                           label: locale == 'ar' ? 'سباكة' : 'Plumbing',
                           onTap: () => Navigator.of(context).push(
                             MaterialPageRoute<void>(
-                              builder: (_) => const ServiceDetailScreen(serviceId: 'plumbing'),
+                              builder: (_) => const ServiceDetailScreen(
+                                  serviceId: 'plumbing'),
                             ),
                           ),
                         ),
@@ -244,7 +275,8 @@ class CustomerHomeScreen extends StatelessWidget {
                           label: locale == 'ar' ? 'كهرباء' : 'Electrical',
                           onTap: () => Navigator.of(context).push(
                             MaterialPageRoute<void>(
-                              builder: (_) => const ServiceDetailScreen(serviceId: 'electrical'),
+                              builder: (_) => const ServiceDetailScreen(
+                                  serviceId: 'electrical'),
                             ),
                           ),
                         ),
@@ -253,7 +285,8 @@ class CustomerHomeScreen extends StatelessWidget {
                           label: locale == 'ar' ? 'دهان' : 'Painting',
                           onTap: () => Navigator.of(context).push(
                             MaterialPageRoute<void>(
-                              builder: (_) => const ServiceDetailScreen(serviceId: 'painting'),
+                              builder: (_) => const ServiceDetailScreen(
+                                  serviceId: 'painting'),
                             ),
                           ),
                         ),
@@ -262,7 +295,8 @@ class CustomerHomeScreen extends StatelessWidget {
                           label: locale == 'ar' ? 'تكييف' : 'HVAC',
                           onTap: () => Navigator.of(context).push(
                             MaterialPageRoute<void>(
-                              builder: (_) => const ServiceDetailScreen(serviceId: 'ac-maintenance'),
+                              builder: (_) => const ServiceDetailScreen(
+                                  serviceId: 'ac-maintenance'),
                             ),
                           ),
                         ),
@@ -271,11 +305,14 @@ class CustomerHomeScreen extends StatelessWidget {
                           label: locale == 'ar' ? 'نجارة' : 'Carpentry',
                           onTap: () => Navigator.of(context).push(
                             MaterialPageRoute<void>(
-                              builder: (_) => const ServiceDetailScreen(serviceId: 'carpentry'),
+                              builder: (_) => const ServiceDetailScreen(
+                                  serviceId: 'carpentry'),
                             ),
                           ),
                         ),
-                        _ServiceItem(icon: Icons.local_shipping_rounded, label: locale == 'ar' ? 'نقل' : 'Moving'),
+                        _ServiceItem(
+                            icon: Icons.local_shipping_rounded,
+                            label: locale == 'ar' ? 'نقل' : 'Moving'),
                         _ServiceItem(
                           icon: Icons.more_horiz_rounded,
                           label: locale == 'ar' ? 'المزيد' : 'More',
@@ -289,7 +326,8 @@ class CustomerHomeScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: ServioSpacing.sectionGap),
                     ServioSectionHeading(
-                      title: locale == 'ar' ? 'النشاط الأخير' : 'Recent Activity',
+                      title:
+                          locale == 'ar' ? 'النشاط الأخير' : 'Recent Activity',
                       actionLabel: locale == 'ar' ? 'عرض الكل' : 'See All',
                       onActionTap: () => Navigator.of(context).push(
                         MaterialPageRoute<void>(
@@ -300,14 +338,19 @@ class CustomerHomeScreen extends StatelessWidget {
                     const SizedBox(height: 14),
                     if (recentBookings.isEmpty)
                       Padding(
-                        padding: const EdgeInsets.only(bottom: ServioSpacing.sectionGap),
+                        padding: const EdgeInsets.only(
+                            bottom: ServioSpacing.sectionGap),
                         child: Text(
-                          locale == 'ar' ? 'لا توجد حجوزات نشطة.' : 'No active bookings yet.',
-                          style: theme.textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
+                          locale == 'ar'
+                              ? 'لا توجد حجوزات نشطة.'
+                              : 'No active bookings yet.',
+                          style: theme.textTheme.bodyMedium
+                              ?.copyWith(color: servio.textSecondary),
                         ),
                       )
                     else
-                      ...recentBookings.take(2).map((BookingModel booking) => Padding(
+                      ...recentBookings.take(2).map((BookingModel booking) =>
+                          Padding(
                             padding: const EdgeInsets.only(bottom: 12),
                             child: ServioCard(
                               radius: ServioRadius.md,
@@ -318,28 +361,33 @@ class CustomerHomeScreen extends StatelessWidget {
                                     width: 4,
                                     height: 108,
                                     decoration: BoxDecoration(
-                                      color: booking.status == BookingStatus.inProgress
+                                      color: booking.status ==
+                                              BookingStatus.inProgress
                                           ? servio.info
                                           : servio.warning,
-                                      borderRadius: BorderRadius.circular(ServioRadius.full),
+                                      borderRadius: BorderRadius.circular(
+                                          ServioRadius.full),
                                     ),
                                   ),
                                   const SizedBox(width: 14),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: <Widget>[
                                         Row(
                                           children: <Widget>[
                                             Expanded(
                                               child: Text(
                                                 booking.serviceName,
-                                                style: theme.textTheme.titleMedium,
+                                                style:
+                                                    theme.textTheme.titleMedium,
                                               ),
                                             ),
                                             Text(
                                               booking.amount,
-                                              style: theme.textTheme.titleMedium?.copyWith(
+                                              style: theme.textTheme.titleMedium
+                                                  ?.copyWith(
                                                 color: servio.accent,
                                               ),
                                             ),
@@ -349,17 +397,25 @@ class CustomerHomeScreen extends StatelessWidget {
                                         Row(
                                           children: <Widget>[
                                             ServioStatusChip(
-                                              label: booking.status == BookingStatus.inProgress
-                                                  ? (locale == 'ar' ? 'قيد التنفيذ' : 'In Progress')
-                                                  : (locale == 'ar' ? 'قادم' : 'Upcoming'),
-                                              type: booking.status == BookingStatus.inProgress
+                                              label: booking.status ==
+                                                      BookingStatus.inProgress
+                                                  ? (locale == 'ar'
+                                                      ? 'قيد التنفيذ'
+                                                      : 'In Progress')
+                                                  : (locale == 'ar'
+                                                      ? 'قادم'
+                                                      : 'Upcoming'),
+                                              type: booking.status ==
+                                                      BookingStatus.inProgress
                                                   ? ServioStatusChipType.info
-                                                  : ServioStatusChipType.warning,
+                                                  : ServioStatusChipType
+                                                      .warning,
                                             ),
                                             const SizedBox(width: 10),
                                             Text(
                                               booking.date,
-                                              style: theme.textTheme.bodySmall?.copyWith(
+                                              style: theme.textTheme.bodySmall
+                                                  ?.copyWith(
                                                 color: servio.textSecondary,
                                               ),
                                             ),
@@ -371,13 +427,17 @@ class CustomerHomeScreen extends StatelessWidget {
                                             Expanded(
                                               child: OutlinedButton(
                                                 onPressed: () {},
-                                                child: Text(locale == 'ar' ? 'احجز مجدداً' : 'Book Again'),
+                                                child: Text(locale == 'ar'
+                                                    ? 'احجز مجدداً'
+                                                    : 'Book Again'),
                                               ),
                                             ),
                                             const SizedBox(width: 12),
                                             TextButton(
                                               onPressed: () {},
-                                              child: Text(locale == 'ar' ? 'التفاصيل' : 'View Details'),
+                                              child: Text(locale == 'ar'
+                                                  ? 'التفاصيل'
+                                                  : 'View Details'),
                                             ),
                                           ],
                                         ),
@@ -390,7 +450,9 @@ class CustomerHomeScreen extends StatelessWidget {
                           )),
                     const SizedBox(height: ServioSpacing.sectionGap),
                     ServioSectionHeading(
-                      title: locale == 'ar' ? 'موصى بهم لك' : 'Recommended For You',
+                      title: locale == 'ar'
+                          ? 'موصى بهم لك'
+                          : 'Recommended For You',
                       actionLabel: locale == 'ar' ? 'عرض الكل' : 'See All',
                       onActionTap: () => Navigator.of(context).push(
                         MaterialPageRoute<void>(
@@ -409,12 +471,15 @@ class CustomerHomeScreen extends StatelessWidget {
                           final tech = featuredTechs[index];
                           return _TechnicianCard(
                             name: tech.name,
-                            specialty: tech.skills.isNotEmpty ? tech.skills.first : 'Technician',
+                            specialty: tech.skills.isNotEmpty
+                                ? tech.skills.first
+                                : 'Technician',
                             rating: tech.rating.toStringAsFixed(1),
                             reviews: '${tech.reviewCount}',
                             onTap: () => Navigator.of(context).push(
                               MaterialPageRoute<void>(
-                                builder: (_) => TechnicianProfileScreen(technicianId: tech.id),
+                                builder: (_) => TechnicianProfileScreen(
+                                    technicianId: tech.id),
                               ),
                             ),
                           );
@@ -451,7 +516,8 @@ class _FloatingHeaderDelegate extends SliverPersistentHeaderDelegate {
   double get maxExtent => maxExtentValue;
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
     return child;
   }
 
@@ -531,7 +597,8 @@ class _HeroBannerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final gradient = useWarmGradient ? ServioGradients.warm : ServioGradients.brand;
+    final gradient =
+        useWarmGradient ? ServioGradients.warm : ServioGradients.brand;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -548,7 +615,8 @@ class _HeroBannerCard extends StatelessWidget {
               children: <Widget>[
                 if (badgeLabel != null) ...<Widget>[
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
                       gradient: ServioGradients.accent,
                       borderRadius: BorderRadius.circular(ServioRadius.full),
@@ -566,7 +634,9 @@ class _HeroBannerCard extends StatelessWidget {
                 Text(
                   title,
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        color: useWarmGradient ? ServioColors.textPrimaryLight : Colors.white,
+                        color: useWarmGradient
+                            ? ServioColors.textPrimaryLight
+                            : Colors.white,
                       ),
                 ),
                 const SizedBox(height: 10),
@@ -582,9 +652,11 @@ class _HeroBannerCard extends StatelessWidget {
                 OutlinedButton(
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(
-                      color: useWarmGradient ? ServioColors.accent : Colors.white,
+                      color:
+                          useWarmGradient ? ServioColors.accent : Colors.white,
                     ),
-                    foregroundColor: useWarmGradient ? ServioColors.accent : Colors.white,
+                    foregroundColor:
+                        useWarmGradient ? ServioColors.accent : Colors.white,
                   ),
                   onPressed: onTap,
                   child: Text('$ctaLabel ->'),
@@ -597,7 +669,8 @@ class _HeroBannerCard extends StatelessWidget {
             width: 82,
             height: 82,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: useWarmGradient ? 0.45 : 0.12),
+              color:
+                  Colors.white.withValues(alpha: useWarmGradient ? 0.45 : 0.12),
               borderRadius: BorderRadius.circular(24),
             ),
             child: Icon(
@@ -692,20 +765,23 @@ class _TechnicianCard extends StatelessWidget {
                   child: Center(
                     child: Text(
                       name.split(' ').take(2).map((String e) => e[0]).join(),
-                      style: theme.textTheme.labelLarge?.copyWith(color: ServioColors.deepBrown),
+                      style: theme.textTheme.labelLarge
+                          ?.copyWith(color: ServioColors.deepBrown),
                     ),
                   ),
                 ),
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     gradient: ServioGradients.accent,
                     borderRadius: BorderRadius.circular(ServioRadius.full),
                   ),
                   child: Text(
                     'Verified',
-                    style: theme.textTheme.labelSmall?.copyWith(color: Colors.white),
+                    style: theme.textTheme.labelSmall
+                        ?.copyWith(color: Colors.white),
                   ),
                 ),
               ],
@@ -718,14 +794,16 @@ class _TechnicianCard extends StatelessWidget {
               runSpacing: 8,
               children: <Widget>[
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     color: servio.backgroundSoft,
                     borderRadius: BorderRadius.circular(ServioRadius.sm),
                   ),
                   child: Text(
                     specialty,
-                    style: theme.textTheme.labelSmall?.copyWith(color: servio.accent),
+                    style: theme.textTheme.labelSmall
+                        ?.copyWith(color: servio.accent),
                   ),
                 ),
               ],
@@ -733,7 +811,8 @@ class _TechnicianCard extends StatelessWidget {
             const SizedBox(height: 10),
             Text(
               '$rating rating  •  $reviews reviews',
-              style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: servio.textSecondary),
             ),
             const Spacer(),
             TextButton(

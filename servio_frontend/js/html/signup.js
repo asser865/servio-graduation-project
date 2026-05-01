@@ -4,6 +4,7 @@
 
 import { initShowcaseAtmosphere } from '../components/showcase-atmosphere.js';
 import { register } from '../api/auth.js';
+import { mapRoleFromBackend } from '../api/client.js';
 import { uploadPublicFile } from '../api/uploads.js';
 
 initShowcaseAtmosphere();
