@@ -8,11 +8,11 @@ import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
 import '../../design_system/widgets/servio_card.dart';
-import '../../design_system/widgets/servio_primary_button.dart';
+
 import '../../design_system/widgets/servio_section_heading.dart';
 import '../../design_system/widgets/servio_status_chip.dart';
 import 'ai_smart_match_screen.dart';
-import 'ai_finishing_estimator_screen.dart';
+
 import 'customer_profile_screen.dart';
 import 'my_bookings_screen.dart';
 import 'service_detail_screen.dart';
@@ -28,14 +28,7 @@ class CustomerHomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final servio = context.servio;
-    final userName = context.watch<SessionProvider>().account?.name ?? 'there';
     final unreadMessages = context.watch<MessagesProvider>().totalUnread;
-    final locale = context.watch<LocaleProvider>().locale.languageCode;
-    final recentBookings = context.watch<BookingsProvider>().upcoming;
-    final featuredTechs =
-        context.watch<WorkersProvider>().workers.take(3).toList();
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -86,409 +79,576 @@ class CustomerHomeScreen extends StatelessWidget {
           }
         },
       ),
-      body: SafeArea(
-        child: CustomScrollView(
-          slivers: <Widget>[
-            SliverPersistentHeader(
-              pinned: true,
-              delegate: _FloatingHeaderDelegate(
-                minExtentValue: 84,
-                maxExtentValue: 84,
-                child: Container(
-                  height: 84,
-                  color: Theme.of(context).scaffoldBackgroundColor,
-                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
-                  child: Row(
-                    children: <Widget>[
-                      Expanded(
-                        child: Container(
-                          height: 44,
-                          padding: const EdgeInsets.symmetric(horizontal: 14),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.surface,
-                            border: Border.all(color: servio.accent),
-                            borderRadius:
-                                BorderRadius.circular(ServioRadius.full),
-                            boxShadow: ServioShadows.rest,
-                          ),
-                          child: Row(
-                            children: <Widget>[
-                              Icon(Icons.location_on_outlined,
-                                  color: servio.accent, size: 18),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Cairo, Egypt',
-                                style: theme.textTheme.labelLarge
-                                    ?.copyWith(color: servio.accent),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      _CircleIconButton(
-                        icon: Icons.notifications_none_rounded,
-                        showUnreadDot: true,
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => const NotificationsScreen(),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+      body: const _HomeBody(),
+    );
+  }
+}
+
+class _HomeBody extends StatelessWidget {
+  const _HomeBody();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final servio = context.servio;
+    
+    final userName = context.watch<SessionProvider>().account?.name ?? 'there';
+    final firstName = userName.split(' ').first;
+    final recentBookings = context.watch<BookingsProvider>().upcoming;
+    final featuredTechs = context.watch<WorkersProvider>().workers.take(4).toList();
+    final locale = context.watch<LocaleProvider>().locale.languageCode;
+
+    // Greeting logic
+    final hour = DateTime.now().hour;
+    String greeting = 'Good evening';
+    if (hour < 12) {
+      greeting = 'Good morning';
+    } else if (hour < 17) {
+      greeting = 'Good afternoon';
+    }
+
+    return Stack(
+      children: <Widget>[
+        // Background Hero Gradient
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          height: MediaQuery.of(context).padding.top + 280,
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: isDark ? ServioGradients.brandDark : ServioGradients.brand,
             ),
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: ServioSpacing.screenPadding),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate(
-                  <Widget>[
-                    const SizedBox(height: 8),
-                    Text(
-                      'WELCOME BACK',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: servio.textSecondary,
-                        letterSpacing: 1.1,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(userName.split(' ').first,
-                        style: theme.textTheme.headlineMedium),
-                    const SizedBox(height: 20),
-                    TextField(
-                      readOnly: true,
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) =>
-                                const SearchResultsScreen(query: 'service'),
-                          ),
-                        );
-                      },
-                      decoration: InputDecoration(
-                        hintText: 'What service do you need?',
-                        prefixIcon: const Icon(Icons.search_rounded),
-                        filled: true,
-                        fillColor: servio.surfaceAlt,
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius:
-                              BorderRadius.circular(ServioRadius.full),
-                          borderSide: BorderSide(color: servio.border),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius:
-                              BorderRadius.circular(ServioRadius.full),
-                          borderSide:
-                              BorderSide(color: servio.accent, width: 2),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Semantics(
-                      button: true,
-                      enabled: true,
-                      label: 'Book a Service',
-                      child: ServioPrimaryButton(
-                        label: 'Book a Service',
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => const ServicesMarketplaceScreen(),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    _HeroBannerCard(
-                      badgeLabel: 'NEW FEATURE',
-                      title: 'AI Diagnosis for Repairs',
-                      body: 'Snap a photo or describe your issue.',
-                      ctaLabel: 'Ask AI Assistant',
-                      icon: Icons.auto_awesome_rounded,
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => const AiSmartMatchScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    _HeroBannerCard(
-                      title: 'Instant Finishing Estimates',
-                      body:
-                          'Estimate room projects with calm, transparent pricing.',
-                      ctaLabel: 'Calculate Cost',
-                      icon: Icons.calculate_rounded,
-                      useWarmGradient: true,
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => const AiFinishingEstimatorScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: ServioSpacing.sectionGap),
-                    ServioSectionHeading(
-                      title: 'Services',
-                      actionLabel: 'See All',
-                      onActionTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => const ServicesMarketplaceScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 14),
-                    GridView.count(
-                      crossAxisCount: 4,
-                      childAspectRatio: 0.9,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 16,
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
+          ),
+        ),
+        // Scrollable Content
+        RefreshIndicator(
+          color: servio.accent,
+          onRefresh: () async => Future<void>.delayed(const Duration(seconds: 1)),
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
+              children: <Widget>[
+                // Top Header inside SafeArea
+                SafeArea(
+                  bottom: false,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: ServioSpacing.screenPadding, vertical: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        _ServiceItem(
-                          icon: Icons.cleaning_services_rounded,
-                          label: locale == 'ar' ? 'تنظيف' : 'Cleaning',
-                        ),
-                        _ServiceItem(
-                          icon: Icons.plumbing_rounded,
-                          label: locale == 'ar' ? 'سباكة' : 'Plumbing',
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => const ServiceDetailScreen(
-                                  serviceId: 'plumbing'),
-                            ),
-                          ),
-                        ),
-                        _ServiceItem(
-                          icon: Icons.electrical_services_rounded,
-                          label: locale == 'ar' ? 'كهرباء' : 'Electrical',
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => const ServiceDetailScreen(
-                                  serviceId: 'electrical'),
-                            ),
-                          ),
-                        ),
-                        _ServiceItem(
-                          icon: Icons.format_paint_rounded,
-                          label: locale == 'ar' ? 'دهان' : 'Painting',
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => const ServiceDetailScreen(
-                                  serviceId: 'painting'),
-                            ),
-                          ),
-                        ),
-                        _ServiceItem(
-                          icon: Icons.ac_unit_rounded,
-                          label: locale == 'ar' ? 'تكييف' : 'HVAC',
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => const ServiceDetailScreen(
-                                  serviceId: 'ac-maintenance'),
-                            ),
-                          ),
-                        ),
-                        _ServiceItem(
-                          icon: Icons.handyman_rounded,
-                          label: locale == 'ar' ? 'نجارة' : 'Carpentry',
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => const ServiceDetailScreen(
-                                  serviceId: 'carpentry'),
-                            ),
-                          ),
-                        ),
-                        _ServiceItem(
-                            icon: Icons.local_shipping_rounded,
-                            label: locale == 'ar' ? 'نقل' : 'Moving'),
-                        _ServiceItem(
-                          icon: Icons.more_horiz_rounded,
-                          label: locale == 'ar' ? 'المزيد' : 'More',
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => const ServicesMarketplaceScreen(),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: ServioSpacing.sectionGap),
-                    ServioSectionHeading(
-                      title:
-                          locale == 'ar' ? 'النشاط الأخير' : 'Recent Activity',
-                      actionLabel: locale == 'ar' ? 'عرض الكل' : 'See All',
-                      onActionTap: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const MyBookingsScreen(),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    if (recentBookings.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(
-                            bottom: ServioSpacing.sectionGap),
-                        child: Text(
-                          locale == 'ar'
-                              ? 'لا توجد حجوزات نشطة.'
-                              : 'No active bookings yet.',
-                          style: theme.textTheme.bodyMedium
-                              ?.copyWith(color: servio.textSecondary),
-                        ),
-                      )
-                    else
-                      ...recentBookings.take(2).map((BookingModel booking) =>
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: ServioCard(
-                              radius: ServioRadius.md,
-                              child: Row(
+                        // Top Row: Greeting, Location, Notification
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: <Widget>[
+                            Expanded(
+                              child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: <Widget>[
-                                  Container(
-                                    width: 4,
-                                    height: 108,
-                                    decoration: BoxDecoration(
-                                      color: booking.status ==
-                                              BookingStatus.inProgress
-                                          ? servio.info
-                                          : servio.warning,
-                                      borderRadius: BorderRadius.circular(
-                                          ServioRadius.full),
+                                  Text(
+                                    greeting,
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: isDark ? ServioColors.navyDark.withValues(alpha: 0.7) : Colors.white70,
                                     ),
                                   ),
-                                  const SizedBox(width: 14),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: <Widget>[
-                                        Row(
-                                          children: <Widget>[
-                                            Expanded(
-                                              child: Text(
-                                                booking.serviceName,
-                                                style:
-                                                    theme.textTheme.titleMedium,
-                                              ),
-                                            ),
-                                            Text(
-                                              booking.amount,
-                                              style: theme.textTheme.titleMedium
-                                                  ?.copyWith(
-                                                color: servio.accent,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 10),
-                                        Row(
-                                          children: <Widget>[
-                                            ServioStatusChip(
-                                              label: booking.status ==
-                                                      BookingStatus.inProgress
-                                                  ? (locale == 'ar'
-                                                      ? 'قيد التنفيذ'
-                                                      : 'In Progress')
-                                                  : (locale == 'ar'
-                                                      ? 'قادم'
-                                                      : 'Upcoming'),
-                                              type: booking.status ==
-                                                      BookingStatus.inProgress
-                                                  ? ServioStatusChipType.info
-                                                  : ServioStatusChipType
-                                                      .warning,
-                                            ),
-                                            const SizedBox(width: 10),
-                                            Text(
-                                              booking.date,
-                                              style: theme.textTheme.bodySmall
-                                                  ?.copyWith(
-                                                color: servio.textSecondary,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 14),
-                                        Row(
-                                          children: <Widget>[
-                                            Expanded(
-                                              child: OutlinedButton(
-                                                onPressed: () {},
-                                                child: Text(locale == 'ar'
-                                                    ? 'احجز مجدداً'
-                                                    : 'Book Again'),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 12),
-                                            TextButton(
-                                              onPressed: () {},
-                                              child: Text(locale == 'ar'
-                                                  ? 'التفاصيل'
-                                                  : 'View Details'),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    firstName,
+                                    style: theme.textTheme.headlineLarge?.copyWith(
+                                      color: isDark ? ServioColors.navyDark : Colors.white,
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                          )),
-                    const SizedBox(height: ServioSpacing.sectionGap),
-                    ServioSectionHeading(
-                      title: locale == 'ar'
-                          ? 'موصى بهم لك'
-                          : 'Recommended For You',
-                      actionLabel: locale == 'ar' ? 'عرض الكل' : 'See All',
-                      onActionTap: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const TechnicianListingScreen(),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    SizedBox(
-                      height: 230,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: featuredTechs.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 16),
-                        itemBuilder: (BuildContext context, int index) {
-                          final tech = featuredTechs[index];
-                          return _TechnicianCard(
-                            name: tech.name,
-                            specialty: tech.skills.isNotEmpty
-                                ? tech.skills.first
-                                : 'Technician',
-                            rating: tech.rating.toStringAsFixed(1),
-                            reviews: '${tech.reviewCount}',
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => TechnicianProfileScreen(
-                                    technicianId: tech.id),
+                            // Location Selector
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: (isDark ? ServioColors.navyDark : Colors.white).withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(ServioRadius.full),
+                              ),
+                              child: Row(
+                                children: <Widget>[
+                                  Icon(
+                                    Icons.location_on_rounded, 
+                                    size: 16, 
+                                    color: isDark ? ServioColors.navyDark : Colors.white,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Cairo',
+                                    style: theme.textTheme.labelMedium?.copyWith(
+                                      color: isDark ? ServioColors.navyDark : Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Icon(
+                                    Icons.keyboard_arrow_down_rounded, 
+                                    size: 16, 
+                                    color: isDark ? ServioColors.navyDark : Colors.white,
+                                  ),
+                                ],
                               ),
                             ),
-                          );
-                        },
-                      ),
+                            const SizedBox(width: 12),
+                            // Notification Bell
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute<void>(builder: (_) => const NotificationsScreen()),
+                                );
+                              },
+                              child: Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: (isDark ? ServioColors.navyDark : Colors.white).withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(ServioRadius.full),
+                                ),
+                                child: Stack(
+                                  alignment: Alignment.center,
+                                  children: <Widget>[
+                                    Icon(
+                                      Icons.notifications_none_rounded,
+                                      color: isDark ? ServioColors.navyDark : Colors.white,
+                                    ),
+                                    Positioned(
+                                      top: 10,
+                                      right: 10,
+                                      child: Container(
+                                        width: 8,
+                                        height: 8,
+                                        decoration: const BoxDecoration(
+                                          color: ServioColors.danger,
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 32),
+                        // Search Bar embedded in hero
+                        _HeroSearchBar(isDark: isDark),
+                        const SizedBox(height: 60), // Space for overlap
+                      ],
                     ),
-                    const SizedBox(height: 24),
+                  ),
+                ),
+                // Overlapping Content
+                Transform.translate(
+                  offset: const Offset(0, -42),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: ServioSpacing.screenPadding),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        // Floating Active Booking Card
+                        if (recentBookings.isNotEmpty)
+                          _FloatingBookingCard(booking: recentBookings.first, locale: locale)
+                        else
+                          const _FloatingEmptyBookingCard(),
+                        
+                        const SizedBox(height: ServioSpacing.sectionGap),
+                        
+                        // Categories Grid
+                        ServioSectionHeading(
+                          title: locale == 'ar' ? 'الخدمات' : 'Services',
+                          actionLabel: locale == 'ar' ? 'عرض الكل' : 'See All',
+                          onActionTap: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(builder: (_) => const ServicesMarketplaceScreen()),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        _CategoriesGrid(locale: locale),
+                        
+                        const SizedBox(height: ServioSpacing.sectionGap),
+
+                        // AI Features Banner
+                        _HeroBannerCard(
+                          badgeLabel: 'NEW FEATURE',
+                          title: 'AI Smart Match',
+                          body: 'Snap a photo and let AI find the perfect pro.',
+                          ctaLabel: 'Try AI Assistant',
+                          icon: Icons.auto_awesome_rounded,
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute<void>(builder: (_) => const AiSmartMatchScreen()),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: ServioSpacing.sectionGap),
+
+                        // Featured Professionals
+                        ServioSectionHeading(
+                          title: locale == 'ar' ? 'موصى بهم لك' : 'Recommended For You',
+                          actionLabel: locale == 'ar' ? 'عرض الكل' : 'See All',
+                          onActionTap: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(builder: (_) => const TechnicianListingScreen()),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        _FeaturedProfessionals(featuredTechs: featuredTechs),
+                        
+                        const SizedBox(height: 40),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _HeroSearchBar extends StatelessWidget {
+  const _HeroSearchBar({required this.isDark});
+
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+    
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const SearchResultsScreen(query: '')),
+        );
+      },
+      child: Container(
+        height: 56,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(ServioRadius.full),
+          boxShadow: isDark ? ServioShadows.elevatedDark : ServioShadows.elevated,
+        ),
+        child: Row(
+          children: <Widget>[
+            Icon(Icons.search_rounded, color: servio.textSecondary, size: 24),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'What do you need help with?',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: servio.textSecondary,
+                ),
+              ),
+            ),
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                gradient: ServioGradients.accent,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 18),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FloatingBookingCard extends StatelessWidget {
+  const _FloatingBookingCard({
+    required this.booking,
+    required this.locale,
+  });
+
+  final BookingModel booking;
+  final String locale;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+
+    final isInProgress = booking.status == BookingStatus.inProgress;
+    final statusType = isInProgress ? ServioStatusChipType.info : ServioStatusChipType.warning;
+    final statusLabel = isInProgress 
+      ? (locale == 'ar' ? 'قيد التنفيذ' : 'En Route') 
+      : (locale == 'ar' ? 'قادم' : 'Upcoming');
+
+    return ServioCard(
+      radius: ServioRadius.xl,
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: ServioColors.tint(servio.accent),
+                  borderRadius: BorderRadius.circular(ServioRadius.md),
+                ),
+                child: Icon(Icons.build_circle_outlined, color: servio.accent, size: 24),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      booking.serviceName,
+                      style: theme.textTheme.titleMedium,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      booking.date,
+                      style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+                    ),
                   ],
                 ),
+              ),
+              ServioStatusChip(label: statusLabel, type: statusType),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Divider(height: 1, color: servio.border),
+          const SizedBox(height: 16),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(builder: (_) => const MyBookingsScreen()),
+                    );
+                  },
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(ServioRadius.full)),
+                  ),
+                  child: Text(locale == 'ar' ? 'التفاصيل' : 'View Details'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {},
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: servio.accent,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(ServioRadius.full)),
+                  ),
+                  child: Text(locale == 'ar' ? 'تتبع الطلب' : 'Track Status'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FloatingEmptyBookingCard extends StatelessWidget {
+  const _FloatingEmptyBookingCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+
+    return ServioCard(
+      radius: ServioRadius.xl,
+      padding: const EdgeInsets.all(20),
+      child: Row(
+        children: <Widget>[
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: servio.backgroundSoft,
+              borderRadius: BorderRadius.circular(ServioRadius.md),
+            ),
+            child: Icon(Icons.check_circle_outline_rounded, color: servio.textSecondary, size: 24),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text('No active bookings', style: theme.textTheme.titleMedium),
+                const SizedBox(height: 4),
+                Text(
+                  'Ready to tackle your next project?',
+                  style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CategoriesGrid extends StatelessWidget {
+  const _CategoriesGrid({required this.locale});
+  
+  final String locale;
+
+  @override
+  Widget build(BuildContext context) {
+    return GridView.count(
+      crossAxisCount: 4,
+      childAspectRatio: 0.85,
+      crossAxisSpacing: 12,
+      mainAxisSpacing: 16,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.zero,
+      children: <Widget>[
+        _CategoryItem(
+          icon: Icons.cleaning_services_rounded,
+          label: locale == 'ar' ? 'تنظيف' : 'Cleaning',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => const ServiceDetailScreen(serviceId: 'cleaning')),
+          ),
+        ),
+        _CategoryItem(
+          icon: Icons.plumbing_rounded,
+          label: locale == 'ar' ? 'سباكة' : 'Plumbing',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => const ServiceDetailScreen(serviceId: 'plumbing')),
+          ),
+        ),
+        _CategoryItem(
+          icon: Icons.electrical_services_rounded,
+          label: locale == 'ar' ? 'كهرباء' : 'Electrical',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => const ServiceDetailScreen(serviceId: 'electrical')),
+          ),
+        ),
+        _CategoryItem(
+          icon: Icons.format_paint_rounded,
+          label: locale == 'ar' ? 'دهان' : 'Painting',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => const ServiceDetailScreen(serviceId: 'painting')),
+          ),
+        ),
+        _CategoryItem(
+          icon: Icons.ac_unit_rounded,
+          label: locale == 'ar' ? 'تكييف' : 'HVAC',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => const ServiceDetailScreen(serviceId: 'ac-maintenance')),
+          ),
+        ),
+        _CategoryItem(
+          icon: Icons.handyman_rounded,
+          label: locale == 'ar' ? 'نجارة' : 'Carpentry',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => const ServiceDetailScreen(serviceId: 'carpentry')),
+          ),
+        ),
+        _CategoryItem(
+          icon: Icons.local_shipping_rounded,
+          label: locale == 'ar' ? 'نقل' : 'Moving',
+        ),
+        _CategoryItem(
+          icon: Icons.more_horiz_rounded,
+          label: locale == 'ar' ? 'المزيد' : 'More',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => const ServicesMarketplaceScreen()),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CategoryItem extends StatefulWidget {
+  const _CategoryItem({
+    required this.icon,
+    required this.label,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  State<_CategoryItem> createState() => _CategoryItemState();
+}
+
+class _CategoryItemState extends State<_CategoryItem> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this, 
+      duration: ServioMotion.fast,
+    );
+    _scale = Tween<double>(begin: 1.0, end: 0.95).animate(
+      CurvedAnimation(parent: _controller, curve: ServioMotion.spring),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+
+    return GestureDetector(
+      onTapDown: (_) => _controller.forward(),
+      onTapUp: (_) {
+        _controller.reverse();
+        widget.onTap?.call();
+      },
+      onTapCancel: () => _controller.reverse(),
+      child: ScaleTransition(
+        scale: _scale,
+        child: Column(
+          children: <Widget>[
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                color: servio.backgroundSoft,
+                borderRadius: BorderRadius.circular(ServioRadius.lg),
+              ),
+              child: Icon(widget.icon, color: servio.accent, size: 28),
+            ),
+            const SizedBox(height: 8),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                widget.label,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
               ),
             ),
           ],
@@ -498,80 +658,162 @@ class CustomerHomeScreen extends StatelessWidget {
   }
 }
 
-class _FloatingHeaderDelegate extends SliverPersistentHeaderDelegate {
-  const _FloatingHeaderDelegate({
-    required this.minExtentValue,
-    required this.maxExtentValue,
-    required this.child,
-  });
+class _FeaturedProfessionals extends StatelessWidget {
+  const _FeaturedProfessionals({required this.featuredTechs});
 
-  final double minExtentValue;
-  final double maxExtentValue;
-  final Widget child;
-
-  @override
-  double get minExtent => minExtentValue;
-
-  @override
-  double get maxExtent => maxExtentValue;
-
-  @override
-  Widget build(
-      BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return child;
-  }
-
-  @override
-  bool shouldRebuild(covariant _FloatingHeaderDelegate oldDelegate) {
-    return oldDelegate.child != child ||
-        oldDelegate.minExtentValue != minExtentValue ||
-        oldDelegate.maxExtentValue != maxExtentValue;
-  }
-}
-
-class _CircleIconButton extends StatelessWidget {
-  const _CircleIconButton({
-    required this.icon,
-    this.showUnreadDot = false,
-    this.onTap,
-  });
-
-  final IconData icon;
-  final bool showUnreadDot;
-  final VoidCallback? onTap;
+  final List<dynamic> featuredTechs;
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: <Widget>[
-        GestureDetector(
-          onTap: onTap,
-          child: Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              borderRadius: BorderRadius.circular(ServioRadius.full),
-              boxShadow: ServioShadows.rest,
+    if (featuredTechs.isEmpty) return const SizedBox.shrink();
+
+    return SizedBox(
+      height: 240,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: featuredTechs.length,
+        clipBehavior: Clip.none,
+        separatorBuilder: (_, __) => const SizedBox(width: 16),
+        itemBuilder: (BuildContext context, int index) {
+          final tech = featuredTechs[index];
+          return _ProfessionalCard(tech: tech);
+        },
+      ),
+    );
+  }
+}
+
+class _ProfessionalCard extends StatefulWidget {
+  const _ProfessionalCard({required this.tech});
+
+  final dynamic tech;
+
+  @override
+  State<_ProfessionalCard> createState() => _ProfessionalCardState();
+}
+
+class _ProfessionalCardState extends State<_ProfessionalCard> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: ServioMotion.fast);
+    _scale = Tween<double>(begin: 1.0, end: 0.98).animate(
+      CurvedAnimation(parent: _controller, curve: ServioMotion.spring),
+    );
+  }
+  
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+    final tech = widget.tech;
+    final name = tech.name as String;
+    final specialty = tech.skills.isNotEmpty ? tech.skills.first as String : 'Specialist';
+
+    return GestureDetector(
+      onTapDown: (_) => _controller.forward(),
+      onTapUp: (_) {
+        _controller.reverse();
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => TechnicianProfileScreen(technicianId: tech.id),
+          ),
+        );
+      },
+      onTapCancel: () => _controller.reverse(),
+      child: ScaleTransition(
+        scale: _scale,
+        child: SizedBox(
+          width: 240,
+          child: ServioCard(
+            radius: ServioRadius.xl,
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        gradient: ServioGradients.warm,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: servio.border, width: 1),
+                      ),
+                      child: Center(
+                        child: Text(
+                          name.split(' ').take(2).map((String e) => e[0]).join(),
+                          style: theme.textTheme.titleMedium?.copyWith(color: ServioColors.deepBrown),
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: ServioColors.tint(servio.success),
+                        borderRadius: BorderRadius.circular(ServioRadius.full),
+                      ),
+                      child: Row(
+                        children: <Widget>[
+                          Icon(Icons.verified_rounded, size: 14, color: servio.success),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Verified',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: servio.success,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  name,
+                  style: theme.textTheme.titleMedium,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  specialty,
+                  style: theme.textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
+                ),
+                const Spacer(),
+                Row(
+                  children: <Widget>[
+                    Icon(Icons.star_rounded, size: 18, color: const Color(0xFFF59E0B)),
+                    const SizedBox(width: 4),
+                    Text(
+                      tech.rating.toStringAsFixed(1),
+                      style: theme.textTheme.labelLarge,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '(${tech.reviewCount})',
+                      style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            child: Icon(icon, color: Theme.of(context).colorScheme.onSurface),
           ),
         ),
-        if (showUnreadDot)
-          Positioned(
-            top: 10,
-            right: 10,
-            child: Container(
-              width: 8,
-              height: 8,
-              decoration: const BoxDecoration(
-                color: ServioColors.danger,
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-      ],
+      ),
     );
   }
 }
@@ -584,7 +826,6 @@ class _HeroBannerCard extends StatelessWidget {
     required this.icon,
     required this.onTap,
     this.badgeLabel,
-    this.useWarmGradient = false,
   });
 
   final String title;
@@ -593,231 +834,79 @@ class _HeroBannerCard extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
   final String? badgeLabel;
-  final bool useWarmGradient;
-
-  @override
-  Widget build(BuildContext context) {
-    final gradient =
-        useWarmGradient ? ServioGradients.warm : ServioGradients.brand;
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: gradient,
-        borderRadius: BorderRadius.circular(ServioRadius.xl),
-        boxShadow: ServioShadows.rest,
-      ),
-      child: Row(
-        children: <Widget>[
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                if (badgeLabel != null) ...<Widget>[
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      gradient: ServioGradients.accent,
-                      borderRadius: BorderRadius.circular(ServioRadius.full),
-                    ),
-                    child: Text(
-                      badgeLabel!,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                ],
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        color: useWarmGradient
-                            ? ServioColors.textPrimaryLight
-                            : Colors.white,
-                      ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  body,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: useWarmGradient
-                            ? ServioColors.textSecondaryLight
-                            : Colors.white.withValues(alpha: 0.88),
-                      ),
-                ),
-                const SizedBox(height: 16),
-                OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(
-                      color:
-                          useWarmGradient ? ServioColors.accent : Colors.white,
-                    ),
-                    foregroundColor:
-                        useWarmGradient ? ServioColors.accent : Colors.white,
-                  ),
-                  onPressed: onTap,
-                  child: Text('$ctaLabel ->'),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 16),
-          Container(
-            width: 82,
-            height: 82,
-            decoration: BoxDecoration(
-              color:
-                  Colors.white.withValues(alpha: useWarmGradient ? 0.45 : 0.12),
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Icon(
-              icon,
-              size: 40,
-              color: useWarmGradient ? ServioColors.accent : Colors.white,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ServiceItem extends StatelessWidget {
-  const _ServiceItem({
-    required this.icon,
-    required this.label,
-    this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final servio = context.servio;
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        children: <Widget>[
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: servio.backgroundSoft,
-              borderRadius: BorderRadius.circular(ServioRadius.full),
-            ),
-            child: Icon(icon, color: servio.accent),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall,
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TechnicianCard extends StatelessWidget {
-  const _TechnicianCard({
-    required this.name,
-    required this.specialty,
-    required this.rating,
-    required this.reviews,
-    required this.onTap,
-  });
-
-  final String name;
-  final String specialty;
-  final String rating;
-  final String reviews;
-  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
+    final isDark = theme.brightness == Brightness.dark;
 
-    return SizedBox(
-      width: 220,
-      child: ServioCard(
-        radius: ServioRadius.lg,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          gradient: isDark ? ServioGradients.brandDark : ServioGradients.brand,
+          borderRadius: BorderRadius.circular(ServioRadius.xl),
+          boxShadow: isDark ? ServioShadows.elevatedDark : ServioShadows.elevated,
+        ),
+        child: Stack(
           children: <Widget>[
-            Row(
+            Positioned(
+              right: -10,
+              bottom: -10,
+              child: Icon(
+                icon,
+                size: 120,
+                color: Colors.white.withValues(alpha: 0.05),
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    gradient: ServioGradients.warm,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: servio.accent, width: 2),
-                  ),
-                  child: Center(
+                if (badgeLabel != null) ...<Widget>[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: servio.accent,
+                      borderRadius: BorderRadius.circular(ServioRadius.full),
+                    ),
                     child: Text(
-                      name.split(' ').take(2).map((String e) => e[0]).join(),
-                      style: theme.textTheme.labelLarge
-                          ?.copyWith(color: ServioColors.deepBrown),
+                      badgeLabel!,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
+                      ),
                     ),
                   ),
+                  const SizedBox(height: 16),
+                ],
+                Text(
+                  title,
+                  style: theme.textTheme.headlineMedium?.copyWith(color: Colors.white),
                 ),
-                const Spacer(),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    gradient: ServioGradients.accent,
-                    borderRadius: BorderRadius.circular(ServioRadius.full),
-                  ),
-                  child: Text(
-                    'Verified',
-                    style: theme.textTheme.labelSmall
-                        ?.copyWith(color: Colors.white),
+                const SizedBox(height: 8),
+                Text(
+                  body,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.8),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Text(name, style: theme.textTheme.titleMedium),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: <Widget>[
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: servio.backgroundSoft,
-                    borderRadius: BorderRadius.circular(ServioRadius.sm),
-                  ),
-                  child: Text(
-                    specialty,
-                    style: theme.textTheme.labelSmall
-                        ?.copyWith(color: servio.accent),
-                  ),
+                const SizedBox(height: 24),
+                Row(
+                  children: <Widget>[
+                    Text(
+                      ctaLabel,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: servio.accent,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(Icons.arrow_forward_rounded, size: 16, color: servio.accent),
+                  ],
                 ),
               ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              '$rating rating  •  $reviews reviews',
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: servio.textSecondary),
-            ),
-            const Spacer(),
-            TextButton(
-              onPressed: onTap,
-              child: const Text('View Profile'),
             ),
           ],
         ),

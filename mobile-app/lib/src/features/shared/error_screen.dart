@@ -5,7 +5,7 @@ import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
 import '../customer/customer_home_screen.dart';
 
-class ErrorScreen extends StatelessWidget {
+class ErrorScreen extends StatefulWidget {
   const ErrorScreen({
     super.key,
     this.title = 'Page Not Found',
@@ -16,6 +16,29 @@ class ErrorScreen extends StatelessWidget {
   final String title;
   final String body;
   final String code;
+
+  @override
+  State<ErrorScreen> createState() => _ErrorScreenState();
+}
+
+class _ErrorScreenState extends State<ErrorScreen>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _entranceController;
+
+  @override
+  void initState() {
+    super.initState();
+    _entranceController = AnimationController(
+      vsync: this,
+      duration: ServioMotion.page,
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _entranceController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -30,40 +53,135 @@ class ErrorScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              Text(
-                code,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.displayLarge?.copyWith(
-                  fontSize: 80,
-                  color: servio.accent.withValues(alpha: 0.15),
+              const Spacer(flex: 2),
+
+              // ── Error code ─────────────────────────────────
+              ScaleTransition(
+                scale: Tween<double>(begin: 0.6, end: 1.0).animate(
+                  CurvedAnimation(
+                    parent: _entranceController,
+                    curve: const Interval(0.0, 0.5,
+                        curve: ServioMotion.spring),
+                  ),
+                ),
+                child: FadeTransition(
+                  opacity: CurvedAnimation(
+                    parent: _entranceController,
+                    curve: const Interval(0.0, 0.4),
+                  ),
+                  child: ShaderMask(
+                    shaderCallback: (Rect bounds) =>
+                        ServioGradients.brand.createShader(bounds),
+                    blendMode: BlendMode.srcIn,
+                    child: Text(
+                      widget.code,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.displayLarge?.copyWith(
+                        fontSize: 96,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        letterSpacing: 4,
+                      ),
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(height: 10),
-              Icon(Icons.error_outline_rounded, size: 48, color: servio.accent),
+
               const SizedBox(height: 16),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.headlineMedium,
+
+              // ── Icon ───────────────────────────────────────
+              FadeTransition(
+                opacity: CurvedAnimation(
+                  parent: _entranceController,
+                  curve: const Interval(0.2, 0.6),
+                ),
+                child: Container(
+                  width: 64,
+                  height: 64,
+                  margin: const EdgeInsets.symmetric(horizontal: 120),
+                  decoration: BoxDecoration(
+                    color: ServioColors.tint(servio.accent),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.error_outline_rounded,
+                    size: 32,
+                    color: servio.accent,
+                  ),
+                ),
               ),
-              const SizedBox(height: 10),
-              Text(
-                body,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
-              ),
+
               const SizedBox(height: 24),
-              ServioPrimaryButton(
-                label: 'Go Home',
-                onPressed: () {
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute<void>(builder: (_) => const CustomerHomeScreen()),
-                    (Route<dynamic> route) => false,
-                  );
-                },
+
+              // ── Title ──────────────────────────────────────
+              SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0, 0.2),
+                  end: Offset.zero,
+                ).animate(CurvedAnimation(
+                  parent: _entranceController,
+                  curve: const Interval(0.3, 0.7,
+                      curve: ServioMotion.spring),
+                )),
+                child: FadeTransition(
+                  opacity: CurvedAnimation(
+                    parent: _entranceController,
+                    curve: const Interval(0.3, 0.6),
+                  ),
+                  child: Text(
+                    widget.title,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.headlineMedium,
+                  ),
+                ),
               ),
-              const SizedBox(height: 12),
-              OutlinedButton(onPressed: () => Navigator.of(context).maybePop(), child: const Text('Try Again')),
+
+              const SizedBox(height: 10),
+
+              // ── Body ───────────────────────────────────────
+              FadeTransition(
+                opacity: CurvedAnimation(
+                  parent: _entranceController,
+                  curve: const Interval(0.4, 0.75),
+                ),
+                child: Text(
+                  widget.body,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(color: servio.textSecondary),
+                ),
+              ),
+
+              const Spacer(flex: 1),
+
+              // ── Buttons ────────────────────────────────────
+              FadeTransition(
+                opacity: CurvedAnimation(
+                  parent: _entranceController,
+                  curve: const Interval(0.5, 0.9),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    ServioPrimaryButton(
+                      label: 'Go Home',
+                      onPressed: () {
+                        Navigator.of(context).pushAndRemoveUntil(
+                          MaterialPageRoute<void>(
+                              builder: (_) => const CustomerHomeScreen()),
+                          (Route<dynamic> route) => false,
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton(
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      child: const Text('Try Again'),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
             ],
           ),
         ),

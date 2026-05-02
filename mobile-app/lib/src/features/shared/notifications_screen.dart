@@ -140,82 +140,130 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final servio = context.servio;
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final visible = _visible;
 
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        title: Row(
-          children: <Widget>[
-            Text('Notifications', style: theme.textTheme.titleLarge),
-            if (_totalUnread > 0) ...<Widget>[
-              const SizedBox(width: 8),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: servio.accent,
-                  borderRadius: BorderRadius.circular(ServioRadius.full),
-                ),
-                child: Text(
-                  '$_totalUnread',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-        actions: <Widget>[
-          if (_totalUnread > 0)
-            TextButton(
-              onPressed: _markAll,
-              child: Text(
-                'Mark all read',
-                style: TextStyle(color: servio.accent),
+      body: Stack(
+        children: <Widget>[
+          // Gradient header
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: MediaQuery.of(context).padding.top + 110,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: isDark ? ServioGradients.brandDark : ServioGradients.brand,
               ),
             ),
-        ],
-      ),
-      body: Column(
-        children: <Widget>[
-          _CategoryBar(
-            selected: _category,
-            onChanged: (c) => setState(() => _category = c),
-            counts: <_NCategory, int>{
-              _NCategory.all: _notifs.where((n) => n.unread).length,
-              _NCategory.bookings: _notifs
-                  .where((n) => n.type == _NType.booking && n.unread)
-                  .length,
-              _NCategory.payments: _notifs
-                  .where((n) => n.type == _NType.payment && n.unread)
-                  .length,
-              _NCategory.system: _notifs
-                  .where(
-                    (n) =>
-                        (n.type == _NType.system || n.type == _NType.ai) &&
-                        n.unread,
-                  )
-                  .length,
-            },
           ),
-          Expanded(
-            child: visible.isEmpty
-                ? _EmptyState(category: _category)
-                : ListView.separated(
-                    padding:
-                        const EdgeInsets.all(ServioSpacing.screenPadding),
-                    itemCount: visible.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
-                    itemBuilder: (_, int i) => _NotificationTile(
-                      notif: visible[i],
-                      onTap: () => _markOne(visible[i].id),
-                    ),
+          SafeArea(
+            child: Column(
+              children: <Widget>[
+                // ── Header row ───────────────────────────────
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                      ServioSpacing.screenPadding, 14, ServioSpacing.screenPadding, 14),
+                  child: Row(
+                    children: <Widget>[
+                      GestureDetector(
+                        onTap: () => Navigator.of(context).pop(),
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(ServioRadius.full),
+                          ),
+                          child: Icon(
+                            Icons.arrow_back_rounded,
+                            color: isDark ? ServioColors.navyDark : Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Notifications',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          color: isDark ? ServioColors.navyDark : Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (_totalUnread > 0) ...<Widget>[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(ServioRadius.full),
+                          ),
+                          child: Text(
+                            '$_totalUnread',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: isDark ? ServioColors.navyDark : Colors.white,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                      const Spacer(),
+                      if (_totalUnread > 0)
+                        GestureDetector(
+                          onTap: _markAll,
+                          child: Text(
+                            'Mark all read',
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: (isDark ? ServioColors.navyDark : Colors.white)
+                                  .withValues(alpha: 0.85),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
+                ),
+                // ── Category bar ─────────────────────────────
+                _CategoryBar(
+                  selected: _category,
+                  onChanged: (c) => setState(() => _category = c),
+                  counts: <_NCategory, int>{
+                    _NCategory.all: _notifs.where((n) => n.unread).length,
+                    _NCategory.bookings: _notifs
+                        .where((n) => n.type == _NType.booking && n.unread)
+                        .length,
+                    _NCategory.payments: _notifs
+                        .where((n) => n.type == _NType.payment && n.unread)
+                        .length,
+                    _NCategory.system: _notifs
+                        .where(
+                          (n) =>
+                              (n.type == _NType.system || n.type == _NType.ai) &&
+                              n.unread,
+                        )
+                        .length,
+                  },
+                ),
+                // ── List ─────────────────────────────────────
+                Expanded(
+                  child: visible.isEmpty
+                      ? _EmptyState(category: _category)
+                      : ListView.separated(
+                          padding:
+                              const EdgeInsets.all(ServioSpacing.screenPadding),
+                          itemCount: visible.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 12),
+                          itemBuilder: (_, int i) => _NotificationTile(
+                            notif: visible[i],
+                            onTap: () => _markOne(visible[i].id),
+                          ),
+                        ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

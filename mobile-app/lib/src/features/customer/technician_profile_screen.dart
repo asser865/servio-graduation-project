@@ -68,7 +68,9 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
       final reviews = await ReviewsApi(client).getWorkerReviews(widget.technicianId!);
       if (mounted) setState(() => _reviews = reviews);
     } catch (e) {
-      if (mounted) setState(() => _error = 'Could not load technician profile.');
+      if (mounted) {
+        setState(() => _error = 'Could not load technician profile.');
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -882,12 +884,10 @@ enum _ChipTone { neutral, success, warning }
 class _MiniChip extends StatelessWidget {
   const _MiniChip({
     required this.label,
-    this.icon,
     this.tone = _ChipTone.neutral,
   });
 
   final String label;
-  final IconData? icon;
   final _ChipTone tone;
 
   @override
@@ -902,7 +902,7 @@ class _MiniChip extends StatelessWidget {
     };
 
     return Container(
-      padding: EdgeInsetsDirectional.fromSTEB(icon == null ? 12 : 10, 7, 12, 7),
+      padding: const EdgeInsetsDirectional.fromSTEB(12, 7, 12, 7),
       decoration: BoxDecoration(
         color: ServioColors.tint(color),
         borderRadius: BorderRadius.circular(ServioRadius.full),
@@ -910,10 +910,6 @@ class _MiniChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          if (icon != null) ...<Widget>[
-            Icon(icon, size: 14, color: color),
-            const SizedBox(width: 6),
-          ],
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 180),
             child: Text(

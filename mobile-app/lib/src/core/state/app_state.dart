@@ -159,6 +159,26 @@ class SessionProvider extends ChangeNotifier {
     }
   }
 
+  Future<String?> updateAvailability(
+    List<Map<String, dynamic>> availability,
+  ) async {
+    try {
+      await _usersApi.updateAvailability(<String, dynamic>{
+        'availability': availability,
+      });
+      final refreshed = await _authApi.getMe();
+      _account = refreshed;
+      await _storage.setJson(_kKeySession, refreshed.toJson());
+      await _storage.setJson(_kKeyAccount, refreshed.toJson());
+      notifyListeners();
+      return null;
+    } on ApiException catch (e) {
+      return e.message;
+    } catch (_) {
+      return 'Could not save availability. Check your connection.';
+    }
+  }
+
   Future<void> logout() async {
     _account = null;
     await _storage.remove(_kKeySession);
