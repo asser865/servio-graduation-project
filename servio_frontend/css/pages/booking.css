@@ -938,6 +938,27 @@
   text-decoration: underline;
 }
 
+.booking-error {
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 12px;
+  background: rgba(239, 68, 68, 0.08);
+  color: #b42318;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+}
+
+.booking-error[hidden] {
+  display: none;
+}
+
+[data-theme="dark"] .booking-error {
+  background: rgba(248, 113, 113, 0.12);
+  border-color: rgba(248, 113, 113, 0.32);
+  color: #fca5a5;
+}
+
 /* ===================== STEP NAV (global .btn) ===================== */
 .step-nav {
   display: flex;

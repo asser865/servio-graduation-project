@@ -1,5 +1,30 @@
 enum UserRole { customer, technician }
 
+class AvailabilitySlot {
+  const AvailabilitySlot({
+    required this.day,
+    required this.from,
+    required this.to,
+  });
+
+  final String day;
+  final String from;
+  final String to;
+
+  Map<String, dynamic> toJson() => {
+        'day': day,
+        'from': from,
+        'to': to,
+      };
+
+  factory AvailabilitySlot.fromJson(Map<String, dynamic> json) =>
+      AvailabilitySlot(
+        day: (json['day'] as String?) ?? '',
+        from: (json['from'] as String?) ?? '',
+        to: (json['to'] as String?) ?? '',
+      );
+}
+
 class UserAccount {
   const UserAccount({
     required this.id,
@@ -16,6 +41,7 @@ class UserAccount {
     this.locationLabel = '',
     this.yearsExperience = 0,
     this.availabilityType = '',
+    this.availability = const <AvailabilitySlot>[],
     this.categories = const [],
   });
 
@@ -33,6 +59,7 @@ class UserAccount {
   final String locationLabel;
   final int yearsExperience;
   final String availabilityType;
+  final List<AvailabilitySlot> availability;
   final List<String> categories;
 
   String get initials {
@@ -57,6 +84,7 @@ class UserAccount {
     String? locationLabel,
     int? yearsExperience,
     String? availabilityType,
+    List<AvailabilitySlot>? availability,
     List<String>? categories,
   }) =>
       UserAccount(
@@ -74,6 +102,7 @@ class UserAccount {
         locationLabel: locationLabel ?? this.locationLabel,
         yearsExperience: yearsExperience ?? this.yearsExperience,
         availabilityType: availabilityType ?? this.availabilityType,
+        availability: availability ?? this.availability,
         categories: categories ?? this.categories,
       );
 
@@ -92,6 +121,7 @@ class UserAccount {
         'locationLabel': locationLabel,
         'yearsExperience': yearsExperience,
         'availabilityType': availabilityType,
+        'availability': availability.map((slot) => slot.toJson()).toList(),
         'categories': categories,
       };
 
@@ -113,6 +143,7 @@ class UserAccount {
         locationLabel: (json['locationLabel'] as String?) ?? '',
         yearsExperience: ((json['yearsExperience'] as num?) ?? 0).toInt(),
         availabilityType: (json['availabilityType'] as String?) ?? '',
+        availability: _availabilityFromJson(json['availability']),
         categories:
             List<String>.from((json['categories'] as List<dynamic>?) ?? []),
       );
@@ -137,8 +168,18 @@ class UserAccount {
       locationLabel: (json['locationLabel'] as String?) ?? '',
       yearsExperience: ((json['yearsExperience'] as num?) ?? 0).toInt(),
       availabilityType: (json['availabilityType'] as String?) ?? '',
+      availability: _availabilityFromJson(json['availability']),
       categories:
           List<String>.from((json['categories'] as List<dynamic>?) ?? []),
     );
   }
+}
+
+List<AvailabilitySlot> _availabilityFromJson(dynamic value) {
+  if (value is! List<dynamic>) return const <AvailabilitySlot>[];
+  return value
+      .whereType<Map<String, dynamic>>()
+      .map(AvailabilitySlot.fromJson)
+      .where((slot) => slot.day.isNotEmpty)
+      .toList();
 }

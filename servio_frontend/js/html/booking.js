@@ -27,7 +27,7 @@
 import { animate, stagger } from 'https://cdn.jsdelivr.net/npm/motion@12.38.0/+esm';
 import { createBooking } from '../api/bookings.js';
 import { getServices } from '../api/services.js';
-import { getWorker } from '../api/users.js';
+import { getWorker, getWorkers } from '../api/users.js';
 import { createPaymentIntent } from '../api/payments.js';
 
 // ─── URL Params ───────────────────────────────────────────────────────────────
@@ -45,6 +45,7 @@ const state = {
   selectedTime: null,
   selectedPayment: 'online',
   worker: null,
+  services: [],
   data: {
     serviceType: '',
     serviceId: '',
@@ -56,9 +57,154 @@ const state = {
   },
 };
 
+const MONGO_ID_RE = /^[a-f\d]{24}$/i;
+const LEGACY_SERVICE_CATEGORY = {
+  'pipe-repair': 'plumbing',
+  'drain-cleaning': 'plumbing',
+  'fixture-install': 'plumbing',
+  'water-heater': 'plumbing',
+  'full-inspection': 'plumbing',
+  emergency: 'plumbing',
+  plumbing: 'plumbing',
+  electrical: 'electrical',
+  painting: 'painting',
+  flooring: 'flooring',
+  carpentry: 'carpentry',
+  cleaning: 'cleaning',
+  hvac: 'hvac',
+  ac: 'hvac',
+  'ac-maintenance': 'hvac',
+  other: 'other',
+};
+
+function isMongoId(value) {
+  return MONGO_ID_RE.test(String(value || ''));
+}
+
+function normalizeKey(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function categoryFromKey(value) {
+  return LEGACY_SERVICE_CATEGORY[normalizeKey(value)] || '';
+}
+
+function formatBookingError(err) {
+  const validation = err?.data?.errors;
+  if (Array.isArray(validation) && validation.length) {
+    return validation
+      .map((item) => item?.message)
+      .filter(Boolean)
+      .join('\n');
+  }
+  return err?.message || 'Booking failed. Please try again.';
+}
+
+function findServiceForKey(key, services = state.services) {
+  if (!key || !services.length) return null;
+  if (isMongoId(key)) {
+    return services.find((service) => service._id === key || service.id === key) || null;
+  }
+
+  const normalized = normalizeKey(key);
+  const category = categoryFromKey(key);
+  return services.find((service) => {
+    const serviceId = service._id || service.id || '';
+    const title = normalizeKey(service.title || service.name || '');
+    const titleAr = normalizeKey(service.titleAr || '');
+    return serviceId === key ||
+      service.category === key ||
+      (category && service.category === category) ||
+      title === normalized ||
+      titleAr === normalized;
+  }) || null;
+}
+
+async function ensureServicesLoaded() {
+  if (state.services.length) return state.services;
+  const svcRes = await getServices({ limit: 50, _: Date.now().toString() });
+  state.services = svcRes.services || svcRes.data?.services || [];
+  return state.services;
+}
+
+function renderServiceOptions(services) {
+  if (!serviceType) return;
+
+  if (!services.length) {
+    serviceType.innerHTML = `<option value="" selected>${t('booking_svc_unavailable')}</option>`;
+    serviceType.value = '';
+    serviceType.disabled = true;
+    return;
+  }
+
+  serviceType.disabled = false;
+  const requested = _serviceKeyFromUrl || serviceType.value || '';
+  const selectedService = findServiceForKey(requested, services);
+  serviceType.innerHTML =
+    `<option value="" disabled>${t('booking_svc_select_ph')}</option>` +
+    services.map((service) => {
+      const id = service._id || service.id;
+      const title = service.title || service.name || 'Service';
+      const category = service.category || '';
+      return `<option value="${id}" data-category="${category}">${title}</option>`;
+    }).join('') +
+    `<option value="other">${t('booking_svc_other')}</option>`;
+
+  serviceType.value = selectedService?._id || selectedService?.id || '';
+}
+
+async function resolveSelectedService() {
+  const services = await ensureServicesLoaded();
+  if (!services.length) {
+    throw new Error(t('booking_err_no_services'));
+  }
+
+  const selectedOption = serviceType?.options[serviceType.selectedIndex];
+  const selectedValue = serviceType?.value || '';
+  const lookupValue = selectedValue === 'other'
+    ? 'other'
+    : selectedValue || _serviceKeyFromUrl || selectedOption?.dataset.category || '';
+  const service = findServiceForKey(lookupValue, services) ||
+    findServiceForKey(selectedOption?.dataset.category, services);
+
+  if (!service?._id && !service?.id) {
+    throw new Error(t('booking_err_service_catalog'));
+  }
+
+  return service;
+}
+
+async function resolveSelectedWorker(service) {
+  const existingWorkerId = _workerIdFromUrl || state.worker?._id || state.worker?.id || '';
+  if (isMongoId(existingWorkerId)) return existingWorkerId;
+
+  const category = service?.category ||
+    serviceType?.options[serviceType.selectedIndex]?.dataset.category ||
+    categoryFromKey(_serviceKeyFromUrl);
+  const workerRes = await getWorkers({
+    limit: 1,
+    ...(category ? { category } : {}),
+  });
+  const workers = workerRes.workers || workerRes.data?.workers || [];
+  const worker = workers.find((item) => isMongoId(item._id || item.id));
+
+  if (!worker) {
+    throw new Error(t('booking_err_no_worker'));
+  }
+
+  state.worker = worker;
+  updateWorkerUI(worker);
+  return worker._id || worker.id;
+}
+
 // ─── Initialize ─────────────────────────────────────────────────────────────
 async function init() {
-  if (_workerIdFromUrl) {
+  if (isMongoId(_workerIdFromUrl)) {
     try {
       const res = await getWorker(_workerIdFromUrl);
       state.worker = res.worker || res;
@@ -70,17 +216,11 @@ async function init() {
 
   // Populate services list if possible
   try {
-     const svcRes = await getServices({ limit: 50 });
-     const svcs = svcRes.services || [];
-     if (serviceType && svcs.length) {
-        // Keep "Select a service" as first option
-        const currentVal = serviceType.value;
-        serviceType.innerHTML = `<option value="" disabled selected>${t('booking_svc_select_ph')}</option>` +
-          svcs.map(s => `<option value="${s._id}" data-category="${s.category}">${s.title}</option>`).join('') +
-          `<option value="other">${t('booking_svc_other')}</option>`;
-        if (currentVal) serviceType.value = currentVal;
-     }
-  } catch(e) {}
+     const svcs = await ensureServicesLoaded();
+     renderServiceOptions(svcs);
+  } catch(e) {
+    console.warn('Failed to load services:', e);
+  }
 }
 init();
 
@@ -261,7 +401,6 @@ if (confirmBtn) {
 
     const selectedOption = serviceType?.options[serviceType?.selectedIndex];
     const serviceName = selectedOption?.text || '';
-    const serviceId   = serviceType?.value || '';
     const rawDate      = bookDate?.value || state.data.date || '';
     const readableDate = formatDate(rawDate);
     const selectedTime = state.data.time || '';
@@ -275,9 +414,13 @@ if (confirmBtn) {
     `;
 
     try {
+      const selectedService = await resolveSelectedService();
+      const workerId = await resolveSelectedWorker(selectedService);
+      const resolvedServiceId = selectedService._id || selectedService.id;
+
       const bookingPayload = {
-        workerId:      _workerIdFromUrl || state.worker?._id,
-        serviceId:     serviceId,
+        workerId:      workerId,
+        serviceId:     resolvedServiceId,
         scheduledDate: rawDate || new Date().toISOString().split('T')[0],
         address:       state.data.address,
         notes:         state.data.notes || '',
@@ -331,7 +474,7 @@ if (confirmBtn) {
       confirmBtn.innerHTML = `<span>${t('booking_confirm')}</span> <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>`;
       
       const errEl = document.querySelector('[data-booking-error]') || document.querySelector('.booking-error');
-      const msg = err.message || 'Booking failed. Please try again.';
+      const msg = formatBookingError(err);
       if (errEl) {
         errEl.textContent = msg;
         errEl.hidden = false;
@@ -568,5 +711,3 @@ document.getElementById('cardExpiry')?.addEventListener('input', (e) => {
     animate(fields, { opacity: [0, 1], y: [8, 0] }, { duration: 0.35, delay: stagger(0.06, { start: 0.55 }), easing: 'ease-out' });
   }
 })();
-
-

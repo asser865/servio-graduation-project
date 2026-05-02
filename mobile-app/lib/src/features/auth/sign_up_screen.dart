@@ -247,59 +247,144 @@ class _SignUpScreenState extends State<SignUpScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(ServioSpacing.screenPadding),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              const _BrandShowcaseStrip(),
-              const SizedBox(height: 20),
-              if (!_isSubmittedStep) ...<Widget>[
-                Row(
-                  children: <Widget>[
-                    _RoleBadge(role: widget.role),
-                    const Spacer(),
-                    Text(
-                      'Step ${_step + 1}/$_totalSteps',
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: servio.textSecondary),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _Progress(value: (_step + 1) / _totalSteps),
-                const SizedBox(height: 24),
-              ],
-              Text(_headline(), style: theme.textTheme.headlineLarge),
-              const SizedBox(height: 8),
-              Text(
-                _subtitle(),
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: servio.textSecondary,
-                  height: 1.5,
-                ),
+      body: Stack(
+        children: <Widget>[
+          // ── Gradient header ──────────────────────────────
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: MediaQuery.of(context).padding.top + 160,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: isDark ? ServioGradients.brandDark : ServioGradients.brand,
               ),
-              if (_error != null) ...<Widget>[
-                const SizedBox(height: 14),
-                _ErrorBox(message: _error!),
-              ],
-              const SizedBox(height: 24),
-              _buildStepContent(context),
-              const SizedBox(height: 24),
-              if (!_isSubmittedStep) _actionRow(),
-              if (_isSubmittedStep)
-                ServioPrimaryButton(
-                  label: 'Back to Home',
-                  isLoading: _submitting,
-                  onPressed: _submitting ? null : _finishTechnicianSubmitted,
-                ),
-              const SizedBox(height: 20),
-            ],
+            ),
           ),
-        ),
+          SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: ServioSpacing.screenPadding),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  const SizedBox(height: 16),
+                  // ── Top bar ────────────────────────────────
+                  Row(
+                    children: <Widget>[
+                      GestureDetector(
+                        onTap: _back,
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(ServioRadius.full),
+                          ),
+                          child: Icon(
+                            Icons.arrow_back_rounded,
+                            color: isDark ? ServioColors.navyDark : Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        'Create Account',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: isDark ? ServioColors.navyDark : Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const Spacer(),
+                      const SizedBox(width: 40),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  // ── Main card ──────────────────────────────
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface,
+                      borderRadius: BorderRadius.circular(ServioRadius.xl),
+                      border: Border.all(
+                        color: servio.border.withValues(alpha: isDark ? 0.45 : 1),
+                      ),
+                      boxShadow: isDark
+                          ? ServioShadows.elevatedDark
+                          : ServioShadows.elevated,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        if (!_isSubmittedStep) ...<Widget>[
+                          Row(
+                            children: <Widget>[
+                              _RoleBadge(role: widget.role),
+                              const Spacer(),
+                              Text(
+                                'Step ${_step + 1}/$_totalSteps',
+                                style: theme.textTheme.bodySmall
+                                    ?.copyWith(color: servio.textSecondary),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          _Progress(value: (_step + 1) / _totalSteps),
+                          const SizedBox(height: 20),
+                        ],
+                        AnimatedSwitcher(
+                          duration: ServioMotion.micro,
+                          switchInCurve: ServioMotion.curve,
+                          child: Text(
+                            _headline(),
+                            key: ValueKey<String>(_headline()),
+                            style: theme.textTheme.headlineMedium,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _subtitle(),
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: servio.textSecondary,
+                            height: 1.5,
+                          ),
+                        ),
+                        if (_error != null) ...<Widget>[
+                          const SizedBox(height: 14),
+                          _ErrorBox(message: _error!),
+                        ],
+                        const SizedBox(height: 20),
+                        AnimatedSwitcher(
+                          duration: ServioMotion.micro,
+                          switchInCurve: ServioMotion.curve,
+                          child: KeyedSubtree(
+                            key: ValueKey<int>(_step),
+                            child: _buildStepContent(context),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        if (!_isSubmittedStep) _actionRow(),
+                        if (_isSubmittedStep)
+                          ServioPrimaryButton(
+                            label: 'Back to Home',
+                            isLoading: _submitting,
+                            onPressed: _submitting
+                                ? null
+                                : _finishTechnicianSubmitted,
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -437,100 +522,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 }
 
-class _BrandShowcaseStrip extends StatelessWidget {
-  const _BrandShowcaseStrip();
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
 
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: ServioGradients.brand,
-        borderRadius: BorderRadius.circular(ServioRadius.xl),
-        boxShadow: ServioShadows.rest,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(ServioRadius.sm),
-                ),
-                child: const Icon(Icons.home_repair_service_rounded,
-                    color: Colors.white),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'SERVIO',
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Text(
-            'Verified work, secure payments, instant booking.',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: Colors.white.withValues(alpha: 0.82),
-              height: 1.5,
-            ),
-          ),
-          const SizedBox(height: 14),
-          const Wrap(
-            spacing: 10,
-            runSpacing: 8,
-            children: <Widget>[
-              _BrandPill(icon: Icons.verified_outlined, label: '2.5k Experts'),
-              _BrandPill(icon: Icons.task_alt_rounded, label: '15k Jobs'),
-              _BrandPill(icon: Icons.star_rounded, label: '4.9 Rating'),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BrandPill extends StatelessWidget {
-  const _BrandPill({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(ServioRadius.full),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Icon(icon, size: 14, color: ServioColors.accentLight),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _RoleBadge extends StatelessWidget {
   const _RoleBadge({required this.role});
