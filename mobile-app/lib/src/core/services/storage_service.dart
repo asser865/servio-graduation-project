@@ -2,11 +2,12 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Thin wrapper around SharedPreferences with typed helpers.
 class StorageService {
   StorageService._(this._prefs);
 
   final SharedPreferences _prefs;
+
+  static const String keyAuthToken = 'servio_auth_token';
 
   static Future<StorageService> init() async {
     final prefs = await SharedPreferences.getInstance();
@@ -50,6 +51,13 @@ class StorageService {
 
   Future<void> setJsonList(String key, List<Map<String, dynamic>> value) =>
       _prefs.setString(key, jsonEncode(value));
+
+  // ── Secure (uses SharedPreferences for prototype; upgrade to
+  //    flutter_secure_storage for production) ─────────────────
+  Future<String?> getSecureString(String key) async => _prefs.getString(key);
+  Future<void> setSecureString(String key, String value) =>
+      _prefs.setString(key, value);
+  Future<void> removeSecureString(String key) => _prefs.remove(key);
 
   // ── Remove ────────────────────────────────────────────────
   Future<void> remove(String key) => _prefs.remove(key);

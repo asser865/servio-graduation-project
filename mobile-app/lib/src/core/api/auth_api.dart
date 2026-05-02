@@ -63,6 +63,12 @@ class AuthApi {
     final response = await _client.get('/users/me');
     return UserAccount.fromBackend(_client.unwrapData(response));
   }
+
+  Future<void> forgotPassword(String email) async {
+    await _client.post('/auth/forgot-password', <String, dynamic>{
+      'email': email,
+    });
+  }
 }
 
 class AuthSession {
