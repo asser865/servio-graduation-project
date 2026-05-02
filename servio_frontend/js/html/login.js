@@ -161,8 +161,11 @@ export function initLogin() {
 
     login(email, password)
       .then((user) => {
-        // Clear stale mock account data on successful login
-        localStorage.removeItem('servio_account');
+        if (user.role === 'technician' && user.verificationStatus === 'pending') {
+          localStorage.setItem('servio_account', JSON.stringify({ verificationStatus: 'pending' }));
+        } else {
+          localStorage.removeItem('servio_account');
+        }
         routeToDashboard(user.role);
       })
       .catch((err) => {

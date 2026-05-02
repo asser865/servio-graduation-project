@@ -952,21 +952,11 @@ export function initSignup() {
 
       register(payload)
         .then((data) => {
-          // register() already calls saveSession(), but we'll ensure the mapped user is saved here too
-          // data here is the user object returned by register()
-          const mappedRole = mapRoleFromBackend(data.role || "user");
-          
-          localStorage.setItem('servio_session', JSON.stringify({
-            id:    data._id || data.id,
-            name:  data.name,
-            email: data.email,
-            role:  mappedRole,
-            profileImage: data.profileImage || '',
-          }));
-
+          // register() in auth.js already calls saveSession() with the mapped role,
+          // so data.role is already the frontend role ('customer').
           clearDraft();
           localStorage.removeItem('servio_account');
-          routeToDashboard(mappedRole);
+          routeToDashboard(data.role);
         })
         .catch((err) => {
           finishCustomer.disabled = false;
