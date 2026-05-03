@@ -65,6 +65,12 @@ const userSchema = new mongoose.Schema(
       default: true,
     },
 
+    authVersion: {
+      type:    Number,
+      default: 0,
+      min:     0,
+    },
+
     // workers must be verified by admin before appearing in listings
     isVerified: {
       type:    Boolean,
