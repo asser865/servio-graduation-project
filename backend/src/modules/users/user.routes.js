@@ -16,9 +16,13 @@ const router = Router();
 // ── Validation schemas ────────────────────────────────────────────────────────
 const profileUpdateValidation = [
   body('name').optional().trim().notEmpty().withMessage('Name cannot be empty'),
-  body('phone').optional().isMobilePhone().withMessage('Invalid phone number'),
+  body('phone').optional().trim().matches(/^[+]?[\d\s\-().]{7,20}$/).withMessage('Invalid phone number'),
   body('profileImage').optional().isURL().withMessage('Profile image must be a valid URL'),
-  body('email').optional().isEmail().normalizeEmail().withMessage('Invalid email address'),
+  body('address').optional().isObject().withMessage('Address must be an object'),
+  body('address.street').optional().trim().isLength({ max: 200 }).withMessage('Street cannot exceed 200 characters'),
+  body('address.city').optional().trim().isLength({ max: 100 }).withMessage('City cannot exceed 100 characters'),
+  body('address.state').optional().trim().isLength({ max: 100 }).withMessage('State cannot exceed 100 characters'),
+  body('address.zipCode').optional().trim().isLength({ max: 30 }).withMessage('Zip code cannot exceed 30 characters'),
   body('bio').optional().trim().isLength({ max: 1000 }).withMessage('Bio cannot exceed 1000 characters'),
   body('hourlyRate').optional().isFloat({ min: 0 }).withMessage('Hourly rate must be a non-negative number'),
   body('locationLabel').optional().trim().isLength({ max: 200 }).withMessage('Location label too long'),
@@ -28,6 +32,17 @@ const profileUpdateValidation = [
   body('skills.*').optional().isString().trim().notEmpty().withMessage('Each skill must be a non-empty string'),
   body('categories').optional().isArray().withMessage('Categories must be an array'),
   body('categories.*').optional().isIn(['plumbing','electrical','painting','flooring','carpentry','cleaning','hvac','other']).withMessage('Invalid category'),
+];
+
+const emailUpdateValidation = [
+  body('newEmail')
+    .trim()
+    .notEmpty().withMessage('New email is required')
+    .isEmail().withMessage('Invalid email address')
+    .normalizeEmail(),
+  body('currentPassword')
+    .isString()
+    .notEmpty().withMessage('Current password is required'),
 ];
 
 const availabilityValidation = [
@@ -52,6 +67,9 @@ router.get('/me', protect, userController.getMe);
 
 // PATCH /api/v1/users/me — update own profile
 router.patch('/me', protect, validate(profileUpdateValidation), userController.updateProfile);
+
+// PATCH /api/v1/users/me/email — update own email and invalidate session
+router.patch('/me/email', protect, validate(emailUpdateValidation), userController.updateEmail);
 
 // PATCH /api/v1/users/me/password — update own password
 router.patch('/me/password', protect, userController.updatePassword);
