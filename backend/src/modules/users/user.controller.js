@@ -74,13 +74,12 @@ const getWorkerProfile = async (req, res) => {
 };
 
 // ── UPDATE OWN PROFILE (Authenticated) ───────────────────────────────────────
-// WHAT: Allows any logged-in user to update their name, phone, or photo.
+// WHAT: Allows any logged-in user to update non-sensitive profile details.
 // HOW:  PATCH /api/v1/users/me
 const updateProfile = async (req, res) => {
   // Prevent users from changing their role via this endpoint
   const allowedFields = [
     'name',
-    'email',
     'bio',
     'phone',
     'profileImage',
@@ -106,6 +105,9 @@ const updateProfile = async (req, res) => {
     if (req.body[field] !== undefined) updates[field] = req.body[field];
   });
 
+  const user = await User.findById(req.user.id);
+  if (!user) throw new ApiError(StatusCodes.NOT_FOUND, 'User not found.');
+
   if (req.user?.role === 'worker') {
     const verificationFields = [
       'idFrontUrl',
@@ -129,11 +131,87 @@ const updateProfile = async (req, res) => {
     }
   }
 
-  const user = await User.findByIdAndUpdate(req.user.id, updates, {
-    new: true, runValidators: true,
+  Object.entries(updates).forEach(([field, value]) => {
+    user.set(field, value);
   });
 
+  try {
+    await user.save({ validateModifiedOnly: true });
+  } catch (err) {
+    if (err.code === 11000 && (err.keyPattern?.email || err.keyValue?.email)) {
+      throw new ApiError(StatusCodes.CONFLICT, 'An account with this email already exists.');
+    }
+    throw err;
+  }
+
   return ApiResponse.success(res, StatusCodes.OK, 'Profile updated successfully.', user);
+};
+
+// ── UPDATE OWN EMAIL (Authenticated) ─────────────────────────────────────────
+// WHAT: Isolated sensitive flow for changing email.
+// HOW:  Verifies current password, relies on the unique email index, then
+// atomically updates email + authVersion so the current JWT is invalidated.
+const updateEmail = async (req, res) => {
+  const requestedEmail = String(req.body.newEmail || '').trim().toLowerCase();
+  const currentPassword = String(req.body.currentPassword || '');
+
+  if (!requestedEmail || !currentPassword) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'New email and current password are required.');
+  }
+
+  const user = await User.findById(req.user.id).select('+password email authVersion');
+  if (!user) throw new ApiError(StatusCodes.NOT_FOUND, 'User not found.');
+
+  if (requestedEmail === user.email) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'New email must be different from your current email.');
+  }
+
+  const passwordMatches = await user.comparePassword(currentPassword);
+  if (!passwordMatches) {
+    throw new ApiError(StatusCodes.UNAUTHORIZED, 'Incorrect current password.');
+  }
+
+  const existingUser = await User.findOne({
+    email: requestedEmail,
+    _id: { $ne: user._id },
+  }).select('_id');
+  if (existingUser) {
+    throw new ApiError(StatusCodes.CONFLICT, 'An account with this email already exists.');
+  }
+
+  let updatedUser;
+  try {
+    updatedUser = await User.findOneAndUpdate(
+      { _id: user._id, email: user.email },
+      {
+        $set: { email: requestedEmail },
+        $inc: { authVersion: 1 },
+      },
+      { new: true, runValidators: true }
+    );
+  } catch (err) {
+    if (err.code === 11000 && (err.keyPattern?.email || err.keyValue?.email)) {
+      throw new ApiError(StatusCodes.CONFLICT, 'An account with this email already exists.');
+    }
+    throw err;
+  }
+
+  if (!updatedUser) {
+    throw new ApiError(StatusCodes.CONFLICT, 'Email could not be updated because the profile changed. Please reload and try again.');
+  }
+
+  logEvent({
+    req,
+    type: 'user',
+    action: 'User email updated',
+    target: requestedEmail,
+    actorEmail: requestedEmail,
+  });
+
+  return ApiResponse.success(res, StatusCodes.OK, 'Email updated successfully. Please log in again using your new email address.', {
+    email: updatedUser.email,
+    reauthRequired: true,
+  });
 };
 
 // ── UPDATE WORKER AVAILABILITY (Worker Only) ──────────────────────────────────
@@ -375,6 +453,7 @@ module.exports = {
   getMe,
   deleteMe,
   updateProfile,
+  updateEmail,
   updateAvailability,
   updatePassword,
   getAllUsers,

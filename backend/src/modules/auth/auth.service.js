@@ -15,9 +15,9 @@ const { sendPasswordResetEmail } = require('../../utils/email');
  * WHAT: Creates a cryptographically signed "Passport" (JWT) for the user.
  * WHY:  Allows the client to stay logged in without sending password every time.
  */
-const generateToken = (userId, role) => {
+const generateToken = (userId, role, authVersion = 0) => {
   return jwt.sign(
-    { id: userId, role },
+    { id: userId, role, authVersion },
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
   );
@@ -125,7 +125,7 @@ const registerUser = async (data) => {
     ...(portfolioFiles !== undefined && { portfolioFiles }),
   });
 
-  const token = generateToken(user._id, user.role);
+  const token = generateToken(user._id, user.role, user.authVersion);
 
   return { user, token };
 };
@@ -155,7 +155,7 @@ const loginUser = async ({ email, password }) => {
     throw new ApiError(StatusCodes.UNAUTHORIZED, 'Invalid email or password.');
   }
 
-  const token = generateToken(user._id, user.role);
+  const token = generateToken(user._id, user.role, user.authVersion);
 
   return { user, token };
 };
@@ -217,7 +217,7 @@ const resetPassword = async ({ token, password }) => {
   user.resetPasswordExpires = undefined;
   await user.save({ validateModifiedOnly: true });
 
-  const jwtToken = generateToken(user._id, user.role);
+  const jwtToken = generateToken(user._id, user.role, user.authVersion);
 
   return { user, token: jwtToken };
 };

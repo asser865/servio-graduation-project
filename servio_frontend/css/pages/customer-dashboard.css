@@ -323,13 +323,159 @@
 .settings-submit-row {
   display: flex;
   align-items: center;
-  gap: 0;
-  margin-top: 8px;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.settings-submit-btn,
+.settings-cancel-btn {
+  flex: 1;
+  max-width: 180px;
+  min-height: 42px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  justify-content: center;
+}
+
+.settings-cancel-btn.btn--outline:hover,
+.settings-cancel-btn.btn--outline:focus-visible {
+  background: #ef4444 !important;
+  border-color: #ef4444 !important;
+  color: #fff !important;
+  transform: none;
+}
+
+/* Slightly larger, but not too tall */
+.form-input--lg {
+  padding: 10px 14px;
+  font-size: 0.925rem;
+  min-height: 42px;
+}
+
+/* OTP field layout */
+.otp-input-wrap {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.otp-input-wrap .form-input--lg {
+  flex: 1;
+  min-width: 0;
+}
+
+.btn-send-otp {
+  flex-shrink: 0;
+  padding: 0 14px;
+  min-height: 42px;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-accent);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s, color 0.2s;
+}
+
+.btn-send-otp:hover {
+  background: var(--color-accent);
+  color: #fff;
+}
+
+.btn-send-otp:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* .settings-save-msg — moved to dashboard-layout.css */
 
 /* .star-rating — moved to dashboard-layout.css */
+
+/* Single-column form row */
+.form-row.form-row--single {
+  grid-template-columns: 1fr;
+}
+
+/* Change Password form — stacked fields, no grid */
+.cp-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.cp-field-group:last-of-type {
+  margin-bottom: 0;
+}
+
+/* Password strength — segmented bar */
+.pw-strength-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.pw-strength-segments {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+}
+
+.pw-seg {
+  flex: 1;
+  height: 5px;
+  border-radius: 99px;
+  background: var(--color-border);
+  transition: background 0.25s;
+}
+
+.pw-seg.active { background: var(--pw-seg-color, #ef4444); }
+
+.pw-strength-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  min-width: 90px;
+  white-space: nowrap;
+}
+
+/* Password requirements checklist */
+.pw-req-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+
+.pw-req {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  padding-left: 16px;
+  position: relative;
+}
+
+.pw-req::before {
+  content: "✕";
+  position: absolute;
+  left: 0;
+  font-size: 0.7rem;
+  color: #ef4444;
+  line-height: 1.5;
+}
+
+.pw-req.met {
+  color: #22c55e;
+}
+
+.pw-req.met::before {
+  content: "✓";
+  color: #22c55e;
+}
 
 /* ── Dark mode ──────────────────────────────────────────── */
 [data-theme="dark"] .fav-card {
@@ -383,8 +529,19 @@
   font-family: var(--font-primary);
 }
 
+.btn-change-photo:disabled,
+.btn-change-photo[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .btn-change-photo:hover {
   background: var(--color-bg-soft, rgba(0, 0, 0, 0.04));
+}
+
+.btn-change-photo:disabled:hover,
+.btn-change-photo[aria-disabled="true"]:hover {
+  background: transparent;
 }
 
 .btn-change-photo svg {
@@ -519,6 +676,23 @@
   .form-row,
   .dash-favourites-grid {
     grid-template-columns: 1fr;
+  }
+
+  .settings-section__header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .btn-profile-edit {
+    align-self: flex-start;
+  }
+
+  .profile-email-control {
+    grid-template-columns: 1fr;
+  }
+
+  .btn-change-email {
+    width: 100%;
   }
 }
 
@@ -2612,6 +2786,99 @@
   gap: 8px;
 }
 
+.settings-section__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.settings-section__header .settings-section__desc {
+  margin-bottom: 0;
+}
+
+.btn-profile-edit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-accent);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.btn-profile-edit:hover,
+.btn-profile-edit:focus-visible {
+  background: var(--dash-card-hover);
+  border-color: var(--color-accent);
+}
+
+.profile-email-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: stretch;
+}
+
+/* Email field: hint + Change Email button on same row below the input */
+.profile-email-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.profile-email-actions .form-hint {
+  margin: 0;
+}
+
+.btn-change-email {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  flex-shrink: 0;
+  min-height: 28px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-accent);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.btn-change-email:hover,
+.btn-change-email:focus-visible {
+  background: var(--dash-card-hover);
+  border-color: var(--color-accent);
+}
+
+.dash-settings-form .form-input[readonly] {
+  cursor: default;
+  opacity: 0.86;
+  background: var(--dash-card-hover);
+}
+
+.dash-settings-form.is-editing .form-input[readonly] {
+  opacity: 1;
+}
+
 .settings-section__heading svg {
   color: var(--color-accent);
   flex-shrink: 0;
@@ -4400,6 +4667,10 @@
 .acct-modal__icon--danger {
   background: var(--color-danger-bg);
   color: var(--color-danger);
+}
+.acct-modal__icon--neutral {
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  color: var(--color-accent);
 }
 
 .acct-modal__close {
