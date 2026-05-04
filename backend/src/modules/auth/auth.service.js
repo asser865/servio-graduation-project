@@ -7,6 +7,7 @@ const crypto         = require('crypto');
 const jwt            = require('jsonwebtoken');
 const { StatusCodes } = require('http-status-codes');
 const User           = require('../users/user.model');
+const Service        = require('../services/service.model');
 const ApiError       = require('../../utils/ApiError');
 const { sendPasswordResetEmail } = require('../../utils/email');
 
@@ -52,6 +53,7 @@ const registerUser = async (data) => {
     cvUrl,
     cvName,
     portfolioFiles,
+    services,
   } = data;
 
   // Prevent duplicate accounts — give a clear message instead of letting
@@ -98,6 +100,16 @@ const registerUser = async (data) => {
   const normalizedRole = roleMap[role] || role || 'user';
   const isWorker = normalizedRole === 'worker';
 
+  // Validate submitted service IDs for workers
+  let validatedServices = [];
+  if (isWorker && Array.isArray(services) && services.length > 0) {
+    const count = await Service.countDocuments({ _id: { $in: services }, isActive: true });
+    if (count !== services.length) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'One or more selected services are invalid or inactive.');
+    }
+    validatedServices = services;
+  }
+
   // Password hashing is handled by the pre-save hook in user.model.js
   const user = await User.create({
     name, email, password, phone, address,
@@ -123,6 +135,7 @@ const registerUser = async (data) => {
     ...(cvUrl         !== undefined && { cvUrl }),
     ...(cvName        !== undefined && { cvName }),
     ...(portfolioFiles !== undefined && { portfolioFiles }),
+    ...(isWorker && validatedServices.length > 0 && { services: validatedServices }),
   });
 
   const token = generateToken(user._id, user.role, user.authVersion);

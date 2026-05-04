@@ -32,6 +32,8 @@ const profileUpdateValidation = [
   body('skills.*').optional().isString().trim().notEmpty().withMessage('Each skill must be a non-empty string'),
   body('categories').optional().isArray().withMessage('Categories must be an array'),
   body('categories.*').optional().isIn(['plumbing','electrical','painting','flooring','carpentry','cleaning','hvac','other']).withMessage('Invalid category'),
+  body('services').optional().isArray().withMessage('Services must be an array'),
+  body('services.*').optional().isMongoId().withMessage('Each service must be a valid MongoDB ObjectId'),
 ];
 
 const emailUpdateValidation = [

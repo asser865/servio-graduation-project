@@ -10,6 +10,7 @@ const Review          = require('../reviews/review.model');
 const Booking         = require('../bookings/booking.model');
 const Payment         = require('../payments/payment.model');
 const Dispute         = require('../payments/dispute.model');
+const Service         = require('../services/service.model');
 const ApiError        = require('../../utils/ApiError');
 const ApiResponse     = require('../../utils/ApiResponse');
 const { logEvent }    = require('../admin/audit.service');
@@ -28,19 +29,27 @@ const getMe = async (req, res) => {
 
 // ── GET WORKERS (Public) ─────────────────────────────────────────────────────
 // WHAT: Returns a list of all active and verified workers.
-// HOW:  Optional ?category filter. Supports pagination (?page, ?limit).
+// HOW:  Optional ?serviceId (canonical) or ?category (legacy) filter.
+//       serviceId takes priority when both are provided.
 const getWorkers = async (req, res) => {
-  const { category, page = 1, limit = 10 } = req.query;
+  const { serviceId, category, page = 1, limit = 10 } = req.query;
 
   const filter = { role: 'worker', isActive: true, isVerified: true };
-  // Workers can belong to multiple categories — use $in for array field
-  if (category) filter.categories = { $in: [category] };
+
+  if (serviceId) {
+    // Canonical filter: match workers whose services array contains this ObjectId
+    filter.services = serviceId;
+  } else if (category) {
+    // Legacy filter: keep backward compatibility with category string filter
+    filter.categories = { $in: [category] };
+  }
 
   const skip = (Number(page) - 1) * Number(limit);
 
   const [workers, total] = await Promise.all([
     User.find(filter)
-      .select('name profileImage categories skills averageRating totalReviews location locationLabel hourlyRate isVerified availability')
+      .select('name profileImage categories services skills averageRating totalReviews location locationLabel hourlyRate isVerified availability')
+      .populate('services', 'title category')
       .sort({ averageRating: -1 })
       .skip(skip)
       .limit(Number(limit)),
@@ -90,6 +99,7 @@ const updateProfile = async (req, res) => {
     'yearsExperience',
     'availabilityType',
     'categories',
+    'services',
     'idFrontUrl',
     'idFrontName',
     'idBackUrl',
@@ -105,8 +115,21 @@ const updateProfile = async (req, res) => {
     if (req.body[field] !== undefined) updates[field] = req.body[field];
   });
 
+  // Only workers may update their service assignments
+  if (updates.services !== undefined && req.user?.role !== 'worker') {
+    delete updates.services;
+  }
+
   const user = await User.findById(req.user.id);
   if (!user) throw new ApiError(StatusCodes.NOT_FOUND, 'User not found.');
+
+  // Validate submitted service IDs for workers
+  if (updates.services !== undefined && Array.isArray(updates.services) && updates.services.length > 0) {
+    const count = await Service.countDocuments({ _id: { $in: updates.services }, isActive: true });
+    if (count !== updates.services.length) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'One or more selected services are invalid or inactive.');
+    }
+  }
 
   if (req.user?.role === 'worker') {
     const verificationFields = [
