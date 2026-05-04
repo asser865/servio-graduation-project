@@ -16,7 +16,7 @@ class ReviewResult {
   final DateTime createdAt;
 
   factory ReviewResult.fromJson(Map<String, dynamic> json) {
-    final customer = json['customerId'];
+    final customer = json['user'] ?? json['customerId'];
     String name = 'Anonymous';
     if (customer is Map<String, dynamic>) {
       name = (customer['name'] as String?) ?? 'Anonymous';
@@ -26,7 +26,8 @@ class ReviewResult {
       rating: ((json['rating'] as num?) ?? 0).toDouble(),
       comment: (json['comment'] as String?) ?? '',
       reviewerName: name,
-      createdAt: DateTime.tryParse((json['createdAt'] as String?) ?? '') ?? DateTime.now(),
+      createdAt: DateTime.tryParse((json['createdAt'] as String?) ?? '') ??
+          DateTime.now(),
     );
   }
 }
@@ -37,11 +38,15 @@ class ReviewsApi {
   final ApiClient _client;
 
   Future<List<ReviewResult>> getWorkerReviews(String workerId) async {
-    final data = _client.unwrapData(await _client.get('/reviews/worker/$workerId'));
+    final data =
+        _client.unwrapData(await _client.get('/reviews/worker/$workerId'));
     final list = (data['reviews'] as List<dynamic>?) ??
         (data['data'] as List<dynamic>?) ??
         <dynamic>[];
-    return list.whereType<Map<String, dynamic>>().map(ReviewResult.fromJson).toList();
+    return list
+        .whereType<Map<String, dynamic>>()
+        .map(ReviewResult.fromJson)
+        .toList();
   }
 
   Future<void> submitReview({
