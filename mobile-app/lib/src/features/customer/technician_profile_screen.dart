@@ -236,7 +236,7 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
                     <Widget>[
                       _ProfileSnapshotCard(
                         hourlyRate: worker.hourlyRate,
-                        locationLabel: locationLabel,
+                        yearsExperience: worker.yearsExperience,
                         isVerified: worker.isVerified,
                         locale: locale,
                       ),
@@ -374,7 +374,7 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
                         icon: Icons.map_rounded,
                         title: _copy(locale,
                             en: 'Service coverage', ar: 'نطاق الخدمة'),
-                        subtitle: locationLabel,
+                        subtitle: _copy(locale, en: 'View areas on map', ar: 'عرض المناطق على الخريطة'),
                         expanded: _expandedSections.contains(4),
                         onTap: () => _toggleSection(4),
                         child: _CoverageCard(
@@ -616,6 +616,25 @@ class _ProfileHero extends StatelessWidget {
                                 ),
                               ),
                             ],
+                            if (locationLabel.isNotEmpty) ...<Widget>[
+                              const SizedBox(height: 6),
+                              Row(
+                                children: <Widget>[
+                                  Icon(Icons.place_rounded, size: 14, color: Colors.white.withValues(alpha: 0.78)),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      locationLabel,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: theme.textTheme.bodyMedium?.copyWith(
+                                        color: Colors.white.withValues(alpha: 0.78),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -631,20 +650,6 @@ class _ProfileHero extends StatelessWidget {
                           icon: Icons.event_available_rounded,
                           label: availabilityLabel,
                         ),
-                        if (locationLabel.isNotEmpty) ...<Widget>[
-                          const SizedBox(width: 8),
-                          _HeroPill(
-                            icon: Icons.place_rounded,
-                            label: locationLabel,
-                          ),
-                        ],
-                        if (isVerified) ...<Widget>[
-                          const SizedBox(width: 8),
-                          _HeroPill(
-                            icon: Icons.verified_user_rounded,
-                            label: _copy(locale, en: 'Verified', ar: 'موثّق'),
-                          ),
-                        ],
                       ],
                     ),
                   ),
@@ -689,13 +694,13 @@ class _ProfileHero extends StatelessWidget {
 class _ProfileSnapshotCard extends StatelessWidget {
   const _ProfileSnapshotCard({
     required this.hourlyRate,
-    required this.locationLabel,
+    required this.yearsExperience,
     required this.isVerified,
     required this.locale,
   });
 
   final int hourlyRate;
-  final String locationLabel;
+  final int yearsExperience;
   final bool isVerified;
   final String locale;
 
@@ -724,11 +729,11 @@ class _ProfileSnapshotCard extends StatelessWidget {
               _VerticalDivider(color: servio.border),
               Expanded(
                 child: _SnapshotItem(
-                  icon: Icons.place_outlined,
-                  label: _copy(locale, en: 'Area', ar: 'المنطقة'),
-                  value: locationLabel.isNotEmpty
-                      ? locationLabel
-                      : _copy(locale, en: 'Cairo', ar: 'القاهرة'),
+                  icon: Icons.work_history_outlined,
+                  label: _copy(locale, en: 'Experience', ar: 'الخبرة'),
+                  value: yearsExperience > 0
+                      ? _copy(locale, en: '$yearsExperience yrs', ar: '$yearsExperience سنوات')
+                      : _copy(locale, en: 'New', ar: 'جديد'),
                 ),
               ),
               _VerticalDivider(color: servio.border),
@@ -1186,38 +1191,73 @@ class _CoverageCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final areas = area.split(',').map((String e) => e.trim()).where((String e) => e.isNotEmpty).toList();
 
     return Container(
-      height: 120,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: ServioGradients.warm,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(ServioRadius.lg),
+        border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.2)),
+        image: const DecorationImage(
+          image: AssetImage('assets/images/map_pattern.png'),
+          fit: BoxFit.cover,
+          opacity: 0.05,
+        ),
       ),
       child: Stack(
         children: <Widget>[
           PositionedDirectional(
-            end: -6,
-            bottom: -10,
+            end: -20,
+            bottom: -20,
             child: Icon(
-              Icons.map_rounded,
-              size: 86,
-              color: ServioColors.deepBrown.withValues(alpha: 0.09),
+              Icons.map_outlined,
+              size: 120,
+              color: theme.colorScheme.primary.withValues(alpha: 0.05),
             ),
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Icon(Icons.location_on_rounded, color: ServioColors.deepBrown),
-              const Spacer(),
-              Text(
-                area,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: ServioColors.deepBrown,
-                  fontWeight: FontWeight.w800,
-                ),
+              Row(
+                children: <Widget>[
+                  Icon(Icons.share_location_rounded, color: theme.colorScheme.primary, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    _copy(locale, en: 'Operating Areas', ar: 'مناطق العمل'),
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: areas.map((String a) => Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(ServioRadius.md),
+                    border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.2)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Icon(Icons.location_city_rounded, size: 14, color: theme.colorScheme.primary),
+                      const SizedBox(width: 6),
+                      Text(
+                        a,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                )).toList(),
               ),
             ],
           ),
