@@ -6,7 +6,7 @@ import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
 import '../../design_system/widgets/servio_card.dart';
-import '../auth/role_selection_screen.dart';
+import '../auth/auth_landing_screen.dart';
 import '../marketing/about_screen.dart';
 import '../marketing/contact_screen.dart';
 import '../marketing/privacy_policy_screen.dart';
@@ -196,7 +196,7 @@ class TechnicianSettingsProfileScreen extends StatelessWidget {
                       if (context.mounted) {
                         Navigator.of(context).pushAndRemoveUntil(
                           MaterialPageRoute<void>(
-                            builder: (_) => const RoleSelectionScreen(),
+                            builder: (_) => const AuthLandingScreen(),
                           ),
                           (Route<dynamic> _) => false,
                         );
