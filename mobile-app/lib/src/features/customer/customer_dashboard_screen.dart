@@ -18,6 +18,7 @@ import '../booking/booking_flow_data.dart';
 import '../booking/booking_step_one_screen.dart';
 import '../messages/chat_screen.dart';
 import '../messages/messages_screen.dart';
+import '../shared/notifications_screen.dart';
 import 'ai_smart_match_screen.dart';
 import 'customer_profile_screen.dart';
 import 'my_bookings_screen.dart';
@@ -70,13 +71,6 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
     final bookings = _bookings;
     
     final userName = context.watch<SessionProvider>().account?.name.split(' ').first ?? 'Customer';
-    final hour = DateTime.now().hour;
-    String greeting = 'Good evening';
-    if (hour < 12) {
-      greeting = 'Good morning';
-    } else if (hour < 17) {
-      greeting = 'Good afternoon';
-    }
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -204,6 +198,7 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                       children: <Widget>[
                         // Logo & Brand Header
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: <Widget>[
                             Container(
                               padding: const EdgeInsets.all(8),
@@ -223,38 +218,74 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                               ),
                             ),
                             const Spacer(),
-                            Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.15),
-                                shape: BoxShape.circle,
+                            // Notification Icon
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute<void>(builder: (_) => const NotificationsScreen()),
+                                );
+                              },
+                              child: Stack(
+                                alignment: Alignment.topRight,
+                                children: <Widget>[
+                                  Container(
+                                    width: 44,
+                                    height: 44,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withValues(alpha: 0.15),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 22),
+                                  ),
+                                  Positioned(
+                                    top: 10,
+                                    right: 12,
+                                    child: Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: const BoxDecoration(
+                                        color: ServioColors.danger,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              child: Center(
-                                child: Text(
-                                  userName.isNotEmpty ? userName[0].toUpperCase() : 'C',
-                                  style: theme.textTheme.titleMedium?.copyWith(color: Colors.white),
+                            ),
+                            const SizedBox(width: 12),
+                            // Profile Avatar
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute<void>(builder: (_) => const CustomerProfileScreen()),
+                                );
+                              },
+                              child: Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.15),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    userName.isNotEmpty ? userName[0].toUpperCase() : 'C',
+                                    style: theme.textTheme.titleMedium?.copyWith(color: Colors.white),
+                                  ),
                                 ),
                               ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 32),
-                        // Greeting and Dashboard Title
-                        Text(
-                          greeting,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.8),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
+                        // Dashboard Title
                         Text(
                           '$userName\'s Dashboard',
                           style: theme.textTheme.headlineLarge?.copyWith(
                             color: Colors.white,
                           ),
                         ),
-                        const SizedBox(height: 32),
+                        const SizedBox(height: 24),
                         // Segmented Control inside the hero
                         _DashboardSegmentedControl(
                           current: _section,
@@ -666,40 +697,54 @@ class _DashboardSegmentedControl extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return SizedBox(
-      height: 46,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: _labels.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 10),
-        itemBuilder: (BuildContext context, int index) {
-          final section = _labels.keys.elementAt(index);
+    return Container(
+      height: 48,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(ServioRadius.full),
+      ),
+      padding: const EdgeInsets.all(4),
+      child: Row(
+        children: _labels.entries.map((entry) {
+          final section = entry.key;
+          final label = entry.value;
           final active = section == current;
 
-          return GestureDetector(
-            onTap: () => onChanged(section),
-            child: AnimatedContainer(
-              duration: ServioMotion.micro,
-              curve: ServioMotion.spring,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: active ? Colors.white : Colors.white.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(ServioRadius.full),
-                border: Border.all(
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => onChanged(section),
+              behavior: HitTestBehavior.opaque,
+              child: AnimatedContainer(
+                duration: ServioMotion.micro,
+                curve: ServioMotion.spring,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
                   color: active ? Colors.white : Colors.transparent,
+                  borderRadius: BorderRadius.circular(ServioRadius.full),
+                  boxShadow: active
+                      ? <BoxShadow>[
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          )
+                        ]
+                      : null,
                 ),
-              ),
-              child: Text(
-                _labels[section]!,
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: active ? ServioColors.navyDark : Colors.white,
-                  fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                child: Text(
+                  label,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: active ? ServioColors.navyDark : Colors.white,
+                    fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                    letterSpacing: 0.3,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ),
           );
-        },
+        }).toList(),
       ),
     );
   }
