@@ -5,7 +5,7 @@ import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
 import 'auth_role.dart';
-import 'login_screen.dart';
+import 'sign_up_screen.dart';
 
 class RoleSelectionScreen extends StatefulWidget {
   const RoleSelectionScreen({super.key});
@@ -39,7 +39,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
 
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => LoginScreen(role: _selectedRole!),
+        builder: (_) => SignUpScreen(role: _selectedRole!),
       ),
     );
   }
@@ -139,7 +139,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Choose your role to get started.',
+                            'Choose your role to create your account.',
                             textAlign: TextAlign.center,
                             style: theme.textTheme.bodyMedium?.copyWith(
                               color: (isDark ? ServioColors.navyDark : Colors.white)

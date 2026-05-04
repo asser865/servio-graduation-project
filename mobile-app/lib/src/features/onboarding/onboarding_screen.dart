@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
-import '../auth/role_selection_screen.dart';
+import '../auth/auth_landing_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Onboarding – 3-slide flow (strictly follows UI spec)
@@ -71,7 +71,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
           transitionDuration: ServioMotion.page,
-          pageBuilder: (_, __, ___) => const RoleSelectionScreen(),
+          pageBuilder: (_, __, ___) => const AuthLandingScreen(),
           transitionsBuilder: (_, animation, __, child) {
             return FadeTransition(opacity: animation, child: child);
           },
