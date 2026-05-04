@@ -12,7 +12,7 @@ import '../../design_system/widgets/servio_primary_button.dart';
 import '../customer/customer_home_screen.dart';
 import '../technician/verification_upload_screen.dart';
 import 'auth_role.dart';
-import 'role_selection_screen.dart';
+import 'login_screen.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({
@@ -221,7 +221,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     await Future<void>.delayed(const Duration(milliseconds: 350));
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute<void>(builder: (_) => const RoleSelectionScreen()),
+      MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
       (Route<dynamic> route) => false,
     );
   }
@@ -243,6 +243,21 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 
+  // Returns a contextual icon for the current step
+  IconData _stepIcon() {
+    if (_isSubmittedStep) return Icons.check_circle_outline_rounded;
+    return switch ((_step, widget.role)) {
+      (0, _) => Icons.person_outline_rounded,
+      (1, _) => Icons.phone_android_rounded,
+      (2, AuthRole.customer) => Icons.task_alt_rounded,
+      (2, AuthRole.technician) => Icons.construction_rounded,
+      (3, AuthRole.technician) => Icons.calendar_today_outlined,
+      (4, AuthRole.technician) => Icons.monetization_on_outlined,
+      (5, AuthRole.technician) => Icons.verified_user_outlined,
+      _ => Icons.info_outline_rounded,
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -252,15 +267,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
     return Scaffold(
       body: Stack(
         children: <Widget>[
-          // ── Gradient header ──────────────────────────────
+          // ── Gradient header ───────────────────────────────────
           Positioned(
             top: 0,
             left: 0,
             right: 0,
-            height: MediaQuery.of(context).padding.top + 160,
+            height: MediaQuery.of(context).padding.top + 200,
             child: Container(
               decoration: BoxDecoration(
-                gradient: isDark ? ServioGradients.brandDark : ServioGradients.brand,
+                gradient:
+                    isDark ? ServioGradients.brandDark : ServioGradients.brand,
               ),
             ),
           ),
@@ -272,7 +288,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
                   const SizedBox(height: 16),
-                  // ── Top bar ────────────────────────────────
+
+                  // ── Top bar ────────────────────────────────────
                   Row(
                     children: <Widget>[
                       GestureDetector(
@@ -282,11 +299,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           height: 40,
                           decoration: BoxDecoration(
                             color: Colors.white.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(ServioRadius.full),
+                            borderRadius:
+                                BorderRadius.circular(ServioRadius.full),
                           ),
                           child: Icon(
                             Icons.arrow_back_rounded,
-                            color: isDark ? ServioColors.navyDark : Colors.white,
+                            color: isDark
+                                ? ServioColors.navyDark
+                                : Colors.white,
                             size: 20,
                           ),
                         ),
@@ -295,7 +315,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       Text(
                         'Create Account',
                         style: theme.textTheme.titleMedium?.copyWith(
-                          color: isDark ? ServioColors.navyDark : Colors.white,
+                          color: isDark
+                              ? ServioColors.navyDark
+                              : Colors.white,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -303,23 +325,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       const SizedBox(width: 40),
                     ],
                   ),
+
                   const SizedBox(height: 24),
-                  // ── Main card ──────────────────────────────
-                  Container(
+
+                  // ── Main card ──────────────────────────────────
+                  ServioCard(
+                    elevated: true,
+                    radius: ServioRadius.xl,
                     padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surface,
-                      borderRadius: BorderRadius.circular(ServioRadius.xl),
-                      border: Border.all(
-                        color: servio.border.withValues(alpha: isDark ? 0.45 : 1),
-                      ),
-                      boxShadow: isDark
-                          ? ServioShadows.elevatedDark
-                          : ServioShadows.elevated,
-                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: <Widget>[
+                        // Progress section (hidden on submitted step)
                         if (!_isSubmittedStep) ...<Widget>[
                           Row(
                             children: <Widget>[
@@ -327,37 +344,90 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               const Spacer(),
                               Text(
                                 'Step ${_step + 1}/$_totalSteps',
-                                style: theme.textTheme.bodySmall
-                                    ?.copyWith(color: servio.textSecondary),
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: servio.textSecondary,
+                                ),
                               ),
                             ],
                           ),
                           const SizedBox(height: 12),
                           _Progress(value: (_step + 1) / _totalSteps),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 22),
                         ],
+
+                        // Step icon + headline row
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: <Widget>[
+                            // Step icon badge
+                            AnimatedSwitcher(
+                              duration: ServioMotion.micro,
+                              child: Container(
+                                key: ValueKey<int>(_step),
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: _isSubmittedStep
+                                      ? ServioColors.tint(servio.success)
+                                      : ServioColors.tint(servio.accent),
+                                  borderRadius:
+                                      BorderRadius.circular(ServioRadius.md),
+                                  border: Border.all(
+                                    color: (_isSubmittedStep
+                                            ? servio.success
+                                            : servio.accent)
+                                        .withValues(alpha: 0.2),
+                                  ),
+                                ),
+                                child: Icon(
+                                  _stepIcon(),
+                                  size: 22,
+                                  color: _isSubmittedStep
+                                      ? servio.success
+                                      : servio.accent,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: AnimatedSwitcher(
+                                duration: ServioMotion.micro,
+                                switchInCurve: ServioMotion.curve,
+                                child: Text(
+                                  _headline(),
+                                  key: ValueKey<String>(_headline()),
+                                  style: theme.textTheme.headlineMedium,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 8),
+
+                        // Subtitle
                         AnimatedSwitcher(
                           duration: ServioMotion.micro,
                           switchInCurve: ServioMotion.curve,
                           child: Text(
-                            _headline(),
-                            key: ValueKey<String>(_headline()),
-                            style: theme.textTheme.headlineMedium,
+                            _subtitle(),
+                            key: ValueKey<String>(_subtitle()),
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: servio.textSecondary,
+                              height: 1.5,
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _subtitle(),
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: servio.textSecondary,
-                            height: 1.5,
-                          ),
-                        ),
+
+                        // Error box
                         if (_error != null) ...<Widget>[
                           const SizedBox(height: 14),
                           _ErrorBox(message: _error!),
                         ],
+
                         const SizedBox(height: 20),
+
+                        // Step content
                         AnimatedSwitcher(
                           duration: ServioMotion.micro,
                           switchInCurve: ServioMotion.curve,
@@ -366,20 +436,22 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             child: _buildStepContent(context),
                           ),
                         ),
+
                         const SizedBox(height: 20),
+
                         if (!_isSubmittedStep) _actionRow(),
                         if (_isSubmittedStep)
                           ServioPrimaryButton(
-                            label: 'Back to Home',
+                            label: 'Back to Sign In',
                             isLoading: _submitting,
-                            onPressed: _submitting
-                                ? null
-                                : _finishTechnicianSubmitted,
+                            onPressed:
+                                _submitting ? null : _finishTechnicianSubmitted,
                           ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
+
+                  const SizedBox(height: 24),
                 ],
               ),
             ),
@@ -427,10 +499,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
   String _headline() {
     if (_isSubmittedStep) return 'Application Submitted!';
     if (_step == 0) return 'Basic Information';
-    if (_step == 1) return 'Verify your phone number';
+    if (_step == 1) return 'Verify your phone';
     if (!_isTechnician) return 'Almost done!';
     return switch (_step) {
-      2 => 'What services do you offer?',
+      2 => 'Your services',
       3 => 'Set your availability',
       4 => 'Set your hourly rate',
       5 => 'Verify your identity',
@@ -522,8 +594,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 }
 
-
-
+// ─────────────────────────────────────────────────────────────────────────────
+// Role badge
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _RoleBadge extends StatelessWidget {
   const _RoleBadge({required this.role});
@@ -553,6 +626,10 @@ class _RoleBadge extends StatelessWidget {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Progress bar — taller for visual prominence
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _Progress extends StatelessWidget {
   const _Progress({required this.value});
 
@@ -566,13 +643,17 @@ class _Progress extends StatelessWidget {
       borderRadius: BorderRadius.circular(ServioRadius.full),
       child: LinearProgressIndicator(
         value: value,
-        minHeight: 8,
+        minHeight: 10,
         backgroundColor: servio.backgroundSoft,
         valueColor: const AlwaysStoppedAnimation<Color>(ServioColors.accent),
       ),
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Step content widgets
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _BasicInformationStep extends StatelessWidget {
   const _BasicInformationStep({
@@ -613,7 +694,7 @@ class _BasicInformationStep extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: () {},
                 icon: const Icon(Icons.g_mobiledata_rounded),
-                label: const Text('Continue with Google'),
+                label: const Text('Google'),
               ),
             ),
             const SizedBox(width: 10),
@@ -621,7 +702,7 @@ class _BasicInformationStep extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: () {},
                 icon: const Icon(Icons.apple_rounded),
-                label: const Text('Continue with Apple'),
+                label: const Text('Apple'),
               ),
             ),
           ],
@@ -703,6 +784,7 @@ class _BasicInformationStep extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 10),
+        // Password strength indicator
         ClipRRect(
           borderRadius: BorderRadius.circular(ServioRadius.full),
           child: LinearProgressIndicator(
@@ -716,7 +798,7 @@ class _BasicInformationStep extends StatelessWidget {
             valueColor: AlwaysStoppedAnimation<Color>(strengthColor),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         Align(
           alignment: AlignmentDirectional.centerStart,
           child: Text(
@@ -733,6 +815,10 @@ class _BasicInformationStep extends StatelessWidget {
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OTP step — larger, centered input for better usability
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _OtpStep extends StatefulWidget {
   const _OtpStep({
@@ -791,6 +877,8 @@ class _OtpStepState extends State<_OtpStep> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
     final canResend = _secondsLeft == 0;
     final mm = (_secondsLeft ~/ 60).toString().padLeft(2, '0');
     final ss = (_secondsLeft % 60).toString().padLeft(2, '0');
@@ -798,18 +886,27 @@ class _OtpStepState extends State<_OtpStep> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
+        // OTP field — center-aligned with generous letter spacing
         TextField(
           controller: widget.controller,
           maxLength: 6,
           keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: '6-digit code',
-            prefixIcon: Icon(Icons.pin_outlined),
-            suffixIcon: Icon(Icons.close_rounded),
+          textAlign: TextAlign.center,
+          style: theme.textTheme.headlineMedium?.copyWith(
+            letterSpacing: 10,
+            fontWeight: FontWeight.w700,
+          ),
+          decoration: InputDecoration(
+            hintText: '· · · · · ·',
+            hintStyle: theme.textTheme.headlineMedium?.copyWith(
+              color: servio.border,
+              letterSpacing: 10,
+            ),
+            prefixIcon: const Icon(Icons.pin_outlined),
             counterText: '',
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         Align(
           alignment: AlignmentDirectional.centerEnd,
           child: TextButton(
@@ -823,6 +920,10 @@ class _OtpStepState extends State<_OtpStep> {
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Customer finish step
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _CustomerFinishStep extends StatelessWidget {
   const _CustomerFinishStep({
@@ -887,6 +988,10 @@ class _CustomerFinishStep extends StatelessWidget {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Skills step
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _SkillsStep extends StatelessWidget {
   const _SkillsStep({
     required this.searchCtrl,
@@ -950,6 +1055,10 @@ class _SkillsStep extends StatelessWidget {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Availability step
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _AvailabilityStep extends StatelessWidget {
   const _AvailabilityStep({
     required this.serviceAreaCtrl,
@@ -999,9 +1108,12 @@ class _AvailabilityStep extends StatelessWidget {
                     child: Text(
                       option,
                       textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                            color: active ? Colors.white : servio.textSecondary,
-                          ),
+                      style:
+                          Theme.of(context).textTheme.labelLarge?.copyWith(
+                                color: active
+                                    ? Colors.white
+                                    : servio.textSecondary,
+                              ),
                     ),
                   ),
                 ),
@@ -1013,6 +1125,10 @@ class _AvailabilityStep extends StatelessWidget {
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pricing step
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _PricingStep extends StatelessWidget {
   const _PricingStep({
@@ -1076,6 +1192,10 @@ class _PricingStep extends StatelessWidget {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Application submitted confirmation
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _ApplicationSubmitted extends StatelessWidget {
   const _ApplicationSubmitted();
 
@@ -1095,7 +1215,8 @@ class _ApplicationSubmitted extends StatelessWidget {
               color: ServioColors.tint(servio.success),
               shape: BoxShape.circle,
             ),
-            child: Icon(Icons.check_rounded, color: servio.success, size: 38),
+            child:
+                Icon(Icons.check_rounded, color: servio.success, size: 38),
           ),
           const SizedBox(height: 16),
           Text('Next Steps', style: theme.textTheme.titleMedium),
@@ -1103,7 +1224,7 @@ class _ApplicationSubmitted extends StatelessWidget {
           const _SubmittedStep(
               number: '1', text: 'Team verifies your documents'),
           const _SubmittedStep(
-              number: '2', text: 'Email notification in 2-3 business days'),
+              number: '2', text: 'Email notification in 2–3 business days'),
           const _SubmittedStep(
               number: '3', text: 'Approved technicians get full app access'),
           const SizedBox(height: 12),
@@ -1153,6 +1274,10 @@ class _SubmittedStep extends StatelessWidget {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Trust signals
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _TrustSignals extends StatelessWidget {
   const _TrustSignals();
 
@@ -1186,6 +1311,10 @@ class _TrustSignals extends StatelessWidget {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Error box
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _ErrorBox extends StatelessWidget {
   const _ErrorBox({required this.message});
 
@@ -1196,18 +1325,31 @@ class _ErrorBox extends StatelessWidget {
     final servio = context.servio;
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: ServioColors.tint(servio.danger),
-        borderRadius: BorderRadius.circular(ServioRadius.sm),
+        borderRadius: BorderRadius.circular(ServioRadius.md),
         border: Border.all(color: servio.danger.withValues(alpha: 0.28)),
       ),
-      child: Text(
-        message,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: servio.danger,
-              fontWeight: FontWeight.w700,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Padding(
+            padding: EdgeInsets.only(top: 1),
+            child: Icon(Icons.error_outline_rounded,
+                size: 15, color: ServioColors.danger),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: servio.danger,
+                    fontWeight: FontWeight.w600,
+                  ),
             ),
+          ),
+        ],
       ),
     );
   }
