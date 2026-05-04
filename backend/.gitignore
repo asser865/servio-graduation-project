@@ -16,6 +16,9 @@ build/
 logs/
 *.log
 
+# ─── Local-only files ─────────────────────────────────────────────────────────
+src/modules/uploads/upload.routes.js
+
 # ─── OS Files ─────────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db

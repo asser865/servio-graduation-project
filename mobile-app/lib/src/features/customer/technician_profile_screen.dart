@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/data/demo_technicians.dart';
-import '../../core/models/technician_model.dart';
+import '../../core/api/api_client.dart';
+import '../../core/api/reviews_api.dart';
+import '../../core/api/users_api.dart';
+import '../../core/models/backend_worker_model.dart';
 import '../../core/state/app_state.dart';
+import '../../core/state/workers_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
@@ -18,19 +21,17 @@ class TechnicianProfileScreen extends StatefulWidget {
   final String? technicianId;
 
   @override
-  State<TechnicianProfileScreen> createState() => _TechnicianProfileScreenState();
+  State<TechnicianProfileScreen> createState() =>
+      _TechnicianProfileScreenState();
 }
 
 class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
-  final Set<int> _expandedSections = <int>{0, 1, 2, 5, 6};
+  final Set<int> _expandedSections = <int>{0, 1, 2, 3, 4};
 
-  TechnicianModel get _technician {
-    if (widget.technicianId == null) return kDemoTechnicians.first;
-    return kDemoTechnicians.firstWhere(
-      (TechnicianModel t) => t.id == widget.technicianId,
-      orElse: () => kDemoTechnicians.first,
-    );
-  }
+  BackendWorker? _worker;
+  List<ReviewResult> _reviews = <ReviewResult>[];
+  bool _loading = true;
+  String? _error;
 
   void _toggleSection(int index) {
     setState(() {
@@ -43,13 +44,142 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final technicianId = widget.technicianId?.trim();
+    if (technicianId == null || technicianId.isEmpty) {
+      setState(() {
+        _error = 'Technician profile not found.';
+        _loading = false;
+      });
+      return;
+    }
+    final workersProvider = context.read<WorkersProvider>();
+    final client = context.read<ApiClient>();
+    try {
+      final cached = workersProvider.findById(technicianId);
+      if (cached != null) {
+        setState(() => _worker = cached);
+      } else {
+        final worker = await UsersApi(client).getWorkerById(technicianId);
+        if (mounted) setState(() => _worker = worker);
+      }
+      if (!mounted) return;
+    } catch (e) {
+      if (mounted) {
+        setState(() =>
+            _error = 'Unable to load technician profile. Please try again.');
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+
+    if (!mounted || _worker == null) return;
+    try {
+      final reviews = await ReviewsApi(client).getWorkerReviews(technicianId);
+      if (mounted) setState(() => _reviews = reviews);
+    } catch (_) {
+      // Reviews are secondary; the profile should remain usable if they fail.
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
-    final locale = context.watch<LocaleProvider>().locale.languageCode;
-    final tech = _technician;
-    final techName = tech.name.of(locale);
-    final techTitle = tech.title.of(locale);
+    final locale = context.watch<LocaleProvider>().languageCode;
+
+    if (_loading) {
+      return const Scaffold(
+        body: SafeArea(child: Center(child: CircularProgressIndicator())),
+      );
+    }
+    if (_error != null || _worker == null) {
+      final canRetry = widget.technicianId?.trim().isNotEmpty == true;
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Technician Profile'),
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        ),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(ServioSpacing.screenPadding),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Icon(
+                    Icons.person_off_outlined,
+                    size: 44,
+                    color: servio.textSecondary,
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    _error ?? 'Technician profile not found.',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    canRetry
+                        ? 'Unable to load technician profile. Please try again.'
+                        : 'Open a technician from the listing to view their profile.',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: servio.textSecondary,
+                    ),
+                  ),
+                  if (canRetry) ...<Widget>[
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _load,
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('Retry'),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final worker = _worker!;
+    final workerName = worker.displayName;
+    final serviceLabels = worker.serviceLabels;
+    final primaryService = serviceLabels.isNotEmpty ? serviceLabels.first : '';
+    final availabilityLabel =
+        _availabilityLabel(worker.availabilityType, locale);
+    final locationLabel = worker.locationLabel.isNotEmpty
+        ? worker.locationLabel
+        : _copy(locale, en: 'Cairo', ar: 'القاهرة');
+    final ratingLabel =
+        worker.rating > 0 ? worker.rating.toStringAsFixed(1) : 'N/A';
+    final serviceCount = serviceLabels.length;
+    final servicesCountLabel = serviceCount == 0
+        ? _copy(locale, en: 'No services listed', ar: 'لا توجد خدمات')
+        : serviceCount == 1
+            ? _copy(locale, en: '1 service', ar: 'خدمة واحدة')
+            : _copy(locale,
+                en: '$serviceCount services', ar: '$serviceCount خدمة');
+    final aboutText = worker.bio.trim().isNotEmpty
+        ? worker.bio.trim()
+        : _copy(locale, en: 'No bio available.', ar: 'لا توجد نبذة متاحة.');
+    final rateLabel = worker.hourlyRate > 0
+        ? _copy(
+            locale,
+            en: '${worker.hourlyRate} EGP/hr',
+            ar: '${worker.hourlyRate} جنيه/ساعة',
+          )
+        : _copy(locale, en: 'Rate on request', ar: 'السعر عند الطلب');
 
     return Scaffold(
       body: Stack(
@@ -57,267 +187,177 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
           CustomScrollView(
             slivers: <Widget>[
               SliverAppBar(
-                expandedHeight: 220,
+                expandedHeight: 340,
                 pinned: true,
-                backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-                flexibleSpace: FlexibleSpaceBar(
-                  titlePadding: const EdgeInsetsDirectional.only(start: 72, bottom: 16),
-                  title: Text(techName, style: theme.textTheme.titleMedium),
-                  background: Stack(
-                    fit: StackFit.expand,
-                    children: <Widget>[
-                      Container(decoration: const BoxDecoration(gradient: ServioGradients.brand)),
-                      Positioned(
-                        right: 20,
-                        top: 80,
-                        child: Icon(
-                          Icons.handyman_rounded,
-                          size: 110,
-                          color: Colors.white.withValues(alpha: 0.14),
-                        ),
-                      ),
-                      Positioned(
-                        left: 20,
-                        bottom: 16,
-                        child: Container(
-                          width: 72,
-                          height: 72,
-                          decoration: BoxDecoration(
-                            gradient: ServioGradients.warm,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
-                            boxShadow: ServioShadows.rest,
-                          ),
-                          child: Center(
-                            child: Container(
-                              width: 68,
-                              height: 68,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(color: servio.accent, width: 2),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  tech.avatarInitials,
-                                  style: theme.textTheme.titleMedium?.copyWith(color: ServioColors.deepBrown),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                stretch: true,
+                elevation: 0,
+                backgroundColor: ServioColors.navyDark,
+                surfaceTintColor: Colors.transparent,
+                foregroundColor: Colors.white,
+                title: Text(
+                  workerName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleMedium
+                      ?.copyWith(color: Colors.white),
+                ),
+                leadingWidth: 56,
+                leading: Padding(
+                  padding: const EdgeInsetsDirectional.only(start: 8),
+                  child: _RoundIconButton(
+                    icon: Directionality.of(context) == TextDirection.rtl
+                        ? Icons.arrow_forward_rounded
+                        : Icons.arrow_back_rounded,
+                    tooltip:
+                        MaterialLocalizations.of(context).backButtonTooltip,
+                    onPressed: () => Navigator.of(context).pop(),
                   ),
                 ),
-                leading: IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.arrow_back_rounded),
+                flexibleSpace: FlexibleSpaceBar(
+                  collapseMode: CollapseMode.parallax,
+                  background: _ProfileHero(
+                    name: workerName,
+                    initials: worker.initials,
+                    profileImage: worker.profileImage,
+                    isVerified: worker.isVerified,
+                    ratingLabel: ratingLabel,
+                    reviewCount: worker.reviewCount,
+                    serviceLabels: serviceLabels,
+                    availabilityLabel: availabilityLabel,
+                    locationLabel: locationLabel,
+                    locale: locale,
+                  ),
                 ),
               ),
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 176),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate(
                     <Widget>[
-                      Text(
-                        techTitle,
-                        style: theme.textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
-                      ),
-                      const SizedBox(height: 20),
-                      Row(
-                        children: <Widget>[
-                          Expanded(
-                            child: _StatTile(
-                              value: tech.rating.toStringAsFixed(1),
-                              label: locale == 'ar' ? 'التقييم' : 'Rating',
-                            ),
-                          ),
-                          Expanded(
-                            child: _StatTile(
-                              value: '${tech.reviewCount}',
-                              label: locale == 'ar' ? 'تقييم' : 'Reviews',
-                            ),
-                          ),
-                          Expanded(
-                            child: _StatTile(
-                              value: tech.responseTime,
-                              label: locale == 'ar' ? 'استجابة' : 'Response',
-                            ),
-                          ),
-                          Expanded(
-                            child: _StatTile(
-                              value: '${tech.pricePerHour}',
-                              label: locale == 'ar' ? 'جنيه/ساعة' : 'EGP/hr',
-                            ),
-                          ),
-                        ],
+                      _ProfileSnapshotCard(
+                        hourlyRate: worker.hourlyRate,
+                        yearsExperience: worker.yearsExperience,
+                        isVerified: worker.isVerified,
+                        locale: locale,
                       ),
                       const SizedBox(height: 24),
                       _AccordionSection(
-                        title: locale == 'ar' ? 'الملف المهني' : 'Professional Summary',
+                        icon: Icons.person_search_rounded,
+                        title: _copy(locale,
+                            en: 'About technician', ar: 'عن الفني'),
+                        subtitle: worker.yearsExperience > 0
+                            ? _copy(
+                                locale,
+                                en: '${worker.yearsExperience} years experience',
+                                ar: '${worker.yearsExperience} سنة خبرة',
+                              )
+                            : null,
                         expanded: _expandedSections.contains(0),
                         onTap: () => _toggleSection(0),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
                             Text(
-                              tech.bio.of(locale),
-                              style: theme.textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
-                            ),
-                            const SizedBox(height: 12),
-                            Wrap(
-                              spacing: 8,
-                              children: <Widget>[
-                                _MiniChip(label: locale == 'ar' ? 'عربي' : 'AR'),
-                                _MiniChip(label: locale == 'ar' ? 'إنجليزي' : 'EN'),
-                                if (tech.verified)
-                                  _MiniChip(label: locale == 'ar' ? 'موثّق' : 'Verified'),
-                                _MiniChip(label: '${tech.yearsExp}${locale == 'ar' ? ' سنة خبرة' : ' yrs exp'}'),
-                              ],
+                              aboutText,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: servio.textSecondary,
+                                height: 1.45,
+                              ),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 14),
                       _AccordionSection(
-                        title: locale == 'ar' ? 'الخدمات المقدمة' : 'Services Offered',
+                        icon: Icons.home_repair_service_rounded,
+                        title: _copy(locale,
+                            en: 'Services offered', ar: 'الخدمات المقدمة'),
+                        subtitle: servicesCountLabel,
                         expanded: _expandedSections.contains(1),
                         onTap: () => _toggleSection(1),
-                        child: GridView.count(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
-                          childAspectRatio: 1.4,
-                          children: tech.services
-                              .map(
-                                (TechnicianService s) => _ServiceOfferCard(
-                                  label: s.name.of(locale),
-                                  meta: '${s.price.of(locale)} · ${s.duration.of(locale)}',
+                        child: serviceLabels.isEmpty
+                            ? Text(
+                                _copy(
+                                  locale,
+                                  en: 'No services listed.',
+                                  ar: 'لا توجد خدمات مدرجة.',
                                 ),
+                                style: theme.textTheme.bodyMedium
+                                    ?.copyWith(color: servio.textSecondary),
                               )
-                              .toList(),
-                        ),
+                            : Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: serviceLabels
+                                    .map((String label) =>
+                                        _MiniChip(label: label))
+                                    .toList(),
+                              ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 14),
                       _AccordionSection(
-                        title: locale == 'ar' ? 'معرض الأعمال' : 'Portfolio',
+                        icon: Icons.event_available_rounded,
+                        title: _copy(locale, en: 'Availability', ar: 'التوفر'),
+                        subtitle: availabilityLabel,
                         expanded: _expandedSections.contains(2),
                         onTap: () => _toggleSection(2),
-                        child: SizedBox(
-                          height: 140,
-                          child: ListView.separated(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: 3,
-                            separatorBuilder: (BuildContext context, int index) => const SizedBox(width: 12),
-                            itemBuilder: (BuildContext context, int index) {
-                              return Container(
-                                width: 180,
-                                decoration: BoxDecoration(
-                                  gradient: index.isEven ? ServioGradients.brand : ServioGradients.warm,
-                                  borderRadius: BorderRadius.circular(ServioRadius.lg),
-                                ),
-                                child: Align(
-                                  alignment: Alignment.bottomRight,
-                                  child: Container(
-                                    margin: const EdgeInsets.all(12),
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      gradient: ServioGradients.brand,
-                                      borderRadius: BorderRadius.circular(ServioRadius.full),
-                                    ),
-                                    child: Text(
-                                      '${1200 + (index * 350)} EGP',
-                                      style: theme.textTheme.labelSmall?.copyWith(color: Colors.white),
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
+                        child: _AvailabilityPanel(
+                          availabilityType: worker.availabilityType,
+                          locale: locale,
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 14),
                       _AccordionSection(
-                        title: locale == 'ar' ? 'آراء العملاء' : 'Reviews',
+                        icon: Icons.insights_rounded,
+                        title: _copy(locale, en: 'Reviews', ar: 'التقييمات'),
+                        subtitle: worker.reviewCount > 0
+                            ? _copy(
+                                locale,
+                                en: '$ratingLabel from ${worker.reviewCount} reviews',
+                                ar: '$ratingLabel من ${worker.reviewCount} تقييم',
+                              )
+                            : _copy(
+                                locale,
+                                en: 'Rating not available',
+                                ar: 'التقييم غير متاح',
+                              ),
                         expanded: _expandedSections.contains(3),
                         onTap: () => _toggleSection(3),
-                        child: Column(
-                          children: <Widget>[
-                            _MiniReviewCard(
-                              name: locale == 'ar' ? 'نور هاني' : 'Nour Hany',
-                              body: locale == 'ar' ? 'محترف وواضح جداً في التسعير.' : 'Professional and very clear on pricing.',
-                            ),
-                            const SizedBox(height: 10),
-                            _MiniReviewCard(
-                              name: locale == 'ar' ? 'كريم عادل' : 'Karim Adel',
-                              body: locale == 'ar' ? 'استجابة سريعة وعمل أنيق.' : 'Fast response and neat work.',
-                            ),
-                          ],
-                        ),
+                        child: _reviews.isEmpty
+                            ? Text(
+                                _copy(locale,
+                                    en: 'No reviews yet.',
+                                    ar: 'لا توجد تقييمات بعد.'),
+                                style: theme.textTheme.bodyMedium
+                                    ?.copyWith(color: servio.textSecondary),
+                              )
+                            : Column(
+                                children: _reviews
+                                    .take(3)
+                                    .map(
+                                      (ReviewResult r) => Padding(
+                                        padding:
+                                            const EdgeInsets.only(bottom: 10),
+                                        child: _MiniReviewCard(
+                                          name: r.reviewerName,
+                                          body: r.comment,
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                              ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 14),
                       _AccordionSection(
-                        title: locale == 'ar' ? 'نطاق الخدمة' : 'Service Coverage',
+                        icon: Icons.map_rounded,
+                        title: _copy(locale,
+                            en: 'Service coverage', ar: 'نطاق الخدمة'),
+                        subtitle: _copy(locale, en: 'View areas on map', ar: 'عرض المناطق على الخريطة'),
                         expanded: _expandedSections.contains(4),
                         onTap: () => _toggleSection(4),
-                        child: _CoverageCard(area: tech.area.of(locale)),
-                      ),
-                      const SizedBox(height: 12),
-                      _AccordionSection(
-                        title: locale == 'ar' ? 'الاعتمادات' : 'Verified Credentials',
-                        expanded: _expandedSections.contains(5),
-                        onTap: () => _toggleSection(5),
-                        child: Column(
-                          children: <Widget>[
-                            _CredentialRow(
-                              label: locale == 'ar' ? 'الرخصة المهنية' : 'License',
-                              status: locale == 'ar' ? 'موثّق' : 'Verified',
-                              pending: false,
-                            ),
-                            const SizedBox(height: 10),
-                            _CredentialRow(
-                              label: locale == 'ar' ? 'التأمين' : 'Insurance',
-                              status: locale == 'ar' ? 'موثّق' : 'Verified',
-                              pending: false,
-                            ),
-                            const SizedBox(height: 10),
-                            _CredentialRow(
-                              label: locale == 'ar' ? 'فحص الخلفية' : 'Background Check',
-                              status: locale == 'ar' ? 'قيد المراجعة' : 'Pending',
-                              pending: true,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _AccordionSection(
-                        title: locale == 'ar' ? 'التوفر' : 'Availability',
-                        expanded: _expandedSections.contains(6),
-                        onTap: () => _toggleSection(6),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            Text(
-                              tech.availability.of(locale),
-                              style: theme.textTheme.bodyMedium?.copyWith(color: servio.success),
-                            ),
-                            const SizedBox(height: 12),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: <Widget>[
-                                _AvailabilityPill(day: locale == 'ar' ? 'إث' : 'Mon', available: true),
-                                _AvailabilityPill(day: locale == 'ar' ? 'ثل' : 'Tue', available: true),
-                                _AvailabilityPill(day: locale == 'ar' ? 'أر' : 'Wed', available: true),
-                                _AvailabilityPill(day: locale == 'ar' ? 'خم' : 'Thu', available: false),
-                                _AvailabilityPill(day: locale == 'ar' ? 'جم' : 'Fri', available: true),
-                                _AvailabilityPill(day: locale == 'ar' ? 'سب' : 'Sat', available: false),
-                                _AvailabilityPill(day: locale == 'ar' ? 'أح' : 'Sun', available: true),
-                              ],
-                            ),
-                          ],
+                        child: _CoverageCard(
+                          area: locationLabel,
+                          locale: locale,
                         ),
                       ),
                     ],
@@ -331,48 +371,114 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
             child: SafeArea(
               top: false,
               child: Container(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface,
-                  boxShadow: ServioShadows.elevated,
+                  color: theme.colorScheme.surface,
+                  border: Border(
+                    top: BorderSide(
+                      color: servio.border.withValues(alpha: 0.7),
+                    ),
+                  ),
+                  boxShadow: theme.brightness == Brightness.dark
+                      ? ServioShadows.elevatedDark
+                      : ServioShadows.elevated,
                 ),
-                child: Row(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
-                    Container(
-                      width: 12,
-                      height: 12,
-                      decoration: const BoxDecoration(
-                        color: ServioColors.success,
-                        shape: BoxShape.circle,
-                      ),
+                    Row(
+                      children: <Widget>[
+                        Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: servio.success,
+                            shape: BoxShape.circle,
+                            boxShadow: <BoxShadow>[
+                              BoxShadow(
+                                color: servio.success.withValues(alpha: 0.3),
+                                blurRadius: 12,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            availabilityLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              color: servio.success,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          rateLabel,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: servio.accent,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ServioPrimaryButton(
-                        label: locale == 'ar' ? 'احجز الآن' : 'Book Now',
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => BookingStepOneScreen(
-                              data: BookingFlowData(technicianName: techName),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: <Widget>[
+                        Expanded(
+                          flex: 3,
+                          child: ServioPrimaryButton(
+                            label: _copy(locale,
+                                en: 'Book technician', ar: 'احجز الفني'),
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => BookingStepOneScreen(
+                                    data: BookingFlowData(
+                                      technicianName: workerName,
+                                      technicianId: worker.id,
+                                      serviceName: primaryService.isNotEmpty
+                                          ? primaryService
+                                          : _copy(locale,
+                                              en: 'Service visit',
+                                              ar: 'زيارة خدمة'),
+                                      specialty: primaryService,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 2,
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) =>
+                                      ChatScreen(contactName: workerName),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.chat_bubble_outline_rounded),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(52),
+                              shape: RoundedRectangleBorder(
+                                borderRadius:
+                                    BorderRadius.circular(ServioRadius.full),
+                              ),
                             ),
+                            label: Text(
+                              _copy(locale, en: 'Message', ar: 'مراسلة'),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => ChatScreen(contactName: techName),
-                            ),
-                          );
-                        },
-                        child: Text(locale == 'ar' ? 'مراسلة' : 'Message'),
-                      ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -385,133 +491,603 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
   }
 }
 
-class _StatTile extends StatelessWidget {
-  const _StatTile({required this.value, required this.label});
+// ── Profile Hero (SliverAppBar background) ────────────────────────────────────
 
-  final String value;
-  final String label;
+class _ProfileHero extends StatelessWidget {
+  const _ProfileHero({
+    required this.name,
+    required this.initials,
+    required this.profileImage,
+    required this.isVerified,
+    required this.ratingLabel,
+    required this.reviewCount,
+    required this.serviceLabels,
+    required this.availabilityLabel,
+    required this.locationLabel,
+    required this.locale,
+  });
+
+  final String name;
+  final String initials;
+  final String profileImage;
+  final bool isVerified;
+  final String ratingLabel;
+  final int reviewCount;
+  final List<String> serviceLabels;
+  final String availabilityLabel;
+  final String locationLabel;
+  final String locale;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return DecoratedBox(
+      decoration: const BoxDecoration(gradient: ServioGradients.brand),
+      child: Stack(
+        fit: StackFit.expand,
+        children: <Widget>[
+          PositionedDirectional(
+            end: -18,
+            top: 88,
+            child: Icon(
+              _specialtyIcon(
+                  serviceLabels.isNotEmpty ? serviceLabels.first : ''),
+              size: 156,
+              color: Colors.white.withValues(alpha: 0.08),
+            ),
+          ),
+          PositionedDirectional(
+            start: -44,
+            bottom: 24,
+            child: Container(
+              width: 160,
+              height: 160,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  width: 28,
+                ),
+              ),
+            ),
+          ),
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 56, 20, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: <Widget>[
+                      _ProfileAvatar(
+                        initials: initials,
+                        verified: isVerified,
+                        profileImage: profileImage,
+                        name: name,
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Text(
+                              name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.headlineMedium?.copyWith(
+                                color: Colors.white,
+                                height: 1.08,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            if (serviceLabels.isNotEmpty) ...<Widget>[
+                              const SizedBox(height: 4),
+                              Text(
+                                serviceLabels.take(3).join(' · '),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: Colors.white.withValues(alpha: 0.78),
+                                ),
+                              ),
+                            ],
+                            if (locationLabel.isNotEmpty) ...<Widget>[
+                              const SizedBox(height: 6),
+                              Row(
+                                children: <Widget>[
+                                  Icon(Icons.place_rounded, size: 14, color: Colors.white.withValues(alpha: 0.78)),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      locationLabel,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: theme.textTheme.bodyMedium?.copyWith(
+                                        color: Colors.white.withValues(alpha: 0.78),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    height: 34,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      children: <Widget>[
+                        _HeroPill(
+                          icon: Icons.event_available_rounded,
+                          label: availabilityLabel,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Spacer(),
+                  SizedBox(
+                    height: 86,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        _HeroMetric(
+                          icon: Icons.star_rounded,
+                          value: ratingLabel,
+                          label: _copy(locale, en: 'Rating', ar: 'التقييم'),
+                        ),
+                        const SizedBox(width: 8),
+                        _HeroMetric(
+                          icon: Icons.reviews_rounded,
+                          value: '$reviewCount',
+                          label: _copy(locale, en: 'Reviews', ar: 'تقييم'),
+                        ),
+                        const SizedBox(width: 8),
+                        _HeroMetric(
+                          icon: Icons.build_rounded,
+                          value: '${serviceLabels.length}',
+                          label: _copy(locale, en: 'Services', ar: 'خدمات'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Profile Snapshot Card ─────────────────────────────────────────────────────
+
+class _ProfileSnapshotCard extends StatelessWidget {
+  const _ProfileSnapshotCard({
+    required this.hourlyRate,
+    required this.yearsExperience,
+    required this.isVerified,
+    required this.locale,
+  });
+
+  final int hourlyRate;
+  final int yearsExperience;
+  final bool isVerified;
+  final String locale;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+
+    return ServioCard(
+      radius: ServioRadius.lg,
+      elevated: true,
+      child: Column(
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: _SnapshotItem(
+                  icon: Icons.payments_outlined,
+                  label: _copy(locale, en: 'Rate', ar: 'السعر'),
+                  value: hourlyRate > 0
+                      ? _copy(locale,
+                          en: '$hourlyRate EGP', ar: '$hourlyRate جنيه')
+                      : _copy(locale, en: 'On request', ar: 'عند الطلب'),
+                ),
+              ),
+              _VerticalDivider(color: servio.border),
+              Expanded(
+                child: _SnapshotItem(
+                  icon: Icons.work_history_outlined,
+                  label: _copy(locale, en: 'Experience', ar: 'الخبرة'),
+                  value: yearsExperience > 0
+                      ? _copy(locale, en: '$yearsExperience yrs', ar: '$yearsExperience سنوات')
+                      : _copy(locale, en: 'New', ar: 'جديد'),
+                ),
+              ),
+              _VerticalDivider(color: servio.border),
+              Expanded(
+                child: _SnapshotItem(
+                  icon: isVerified
+                      ? Icons.verified_user_rounded
+                      : Icons.pending_actions_rounded,
+                  label: _copy(locale, en: 'Status', ar: 'الحالة'),
+                  value: isVerified
+                      ? _copy(locale, en: 'Verified', ar: 'موثّق')
+                      : _copy(locale, en: 'Pending', ar: 'قيد المراجعة'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: servio.backgroundSoft,
+              borderRadius: BorderRadius.circular(ServioRadius.md),
+            ),
+            child: Row(
+              children: <Widget>[
+                Icon(
+                  isVerified
+                      ? Icons.verified_user_rounded
+                      : Icons.pending_actions_rounded,
+                  color: isVerified ? servio.success : servio.warning,
+                  size: 22,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    isVerified
+                        ? _copy(
+                            locale,
+                            en: 'Identity and core credentials are checked by SERVIO.',
+                            ar: 'تم التحقق من الهوية والاعتمادات الأساسية بواسطة SERVIO.',
+                          )
+                        : _copy(
+                            locale,
+                            en: 'Credential review is currently in progress.',
+                            ar: 'مراجعة الاعتمادات قيد التنفيذ حالياً.',
+                          ),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: servio.textSecondary,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Stat Tile (4-column row under snapshot card) ──────────────────────────────
+
+// ── Snapshot sub-widgets ──────────────────────────────────────────────────────
+
+class _SnapshotItem extends StatelessWidget {
+  const _SnapshotItem({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final servio = context.servio;
 
     return Column(
       children: <Widget>[
+        Icon(icon, color: servio.accent, size: 22),
+        const SizedBox(height: 8),
         Text(
           value,
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(color: servio.accent),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style:
+              theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 3),
         Text(
           label,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style:
+              theme.textTheme.labelSmall?.copyWith(color: servio.textSecondary),
         ),
       ],
     );
   }
 }
 
+class _VerticalDivider extends StatelessWidget {
+  const _VerticalDivider({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1,
+      height: 54,
+      margin: const EdgeInsets.symmetric(horizontal: 10),
+      color: color.withValues(alpha: 0.72),
+    );
+  }
+}
+
+// ── Accordion Section ─────────────────────────────────────────────────────────
+
 class _AccordionSection extends StatelessWidget {
   const _AccordionSection({
+    required this.icon,
     required this.title,
     required this.expanded,
     required this.onTap,
     required this.child,
+    this.subtitle,
   });
 
+  final IconData icon;
   final String title;
+  final String? subtitle;
   final bool expanded;
   final VoidCallback onTap;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+
     return ServioCard(
       radius: ServioRadius.lg,
+      padding: EdgeInsets.zero,
       child: Column(
         children: <Widget>[
           InkWell(
+            borderRadius: BorderRadius.circular(ServioRadius.lg),
             onTap: onTap,
-            child: Row(
-              children: <Widget>[
-                Expanded(child: Text(title, style: Theme.of(context).textTheme.titleMedium)),
-                Icon(expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded),
-              ],
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: <Widget>[
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: ServioColors.tint(servio.accent),
+                      borderRadius: BorderRadius.circular(ServioRadius.md),
+                    ),
+                    child: Icon(icon, color: servio.accent, size: 21),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(title, style: theme.textTheme.titleMedium),
+                        if (subtitle != null) ...<Widget>[
+                          const SizedBox(height: 3),
+                          Text(
+                            subtitle!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall
+                                ?.copyWith(color: servio.textSecondary),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  AnimatedRotation(
+                    turns: expanded ? 0.5 : 0,
+                    duration: ServioMotion.fast,
+                    curve: ServioMotion.spring,
+                    child: Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: servio.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           AnimatedCrossFade(
             firstChild: const SizedBox.shrink(),
             secondChild: Padding(
-              padding: const EdgeInsets.only(top: 16),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               child: child,
             ),
-            crossFadeState: expanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+            crossFadeState:
+                expanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
             duration: ServioMotion.micro,
+            firstCurve: ServioMotion.standard,
+            secondCurve: ServioMotion.spring,
+            sizeCurve: ServioMotion.spring,
           ),
         ],
       ),
     );
   }
 }
+
+// ── Mini Chip ─────────────────────────────────────────────────────────────────
+
+enum _ChipTone { neutral, success, warning }
 
 class _MiniChip extends StatelessWidget {
-  const _MiniChip({required this.label});
+  const _MiniChip({
+    required this.label,
+    this.tone = _ChipTone.neutral,
+  });
 
   final String label;
+  final _ChipTone tone;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final servio = context.servio;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: servio.backgroundSoft,
-        borderRadius: BorderRadius.circular(ServioRadius.sm),
-      ),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(color: servio.accent),
-      ),
-    );
-  }
-}
-
-class _ServiceOfferCard extends StatelessWidget {
-  const _ServiceOfferCard({required this.label, required this.meta});
-
-  final String label;
-  final String meta;
-
-  @override
-  Widget build(BuildContext context) {
-    final servio = context.servio;
+    final color = switch (tone) {
+      _ChipTone.success => servio.success,
+      _ChipTone.warning => servio.warning,
+      _ChipTone.neutral => servio.accent,
+    };
+    final availableWidth = MediaQuery.sizeOf(context).width - 88;
+    final maxLabelWidth = availableWidth < 120
+        ? 120.0
+        : availableWidth > 220
+            ? 220.0
+            : availableWidth;
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsetsDirectional.fromSTEB(12, 7, 12, 7),
       decoration: BoxDecoration(
-        color: servio.backgroundSoft,
-        borderRadius: BorderRadius.circular(ServioRadius.md),
+        color: ServioColors.tint(color),
+        borderRadius: BorderRadius.circular(ServioRadius.full),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Icon(Icons.build_circle_outlined, color: servio.accent),
-          const SizedBox(height: 8),
-          Text(label, style: Theme.of(context).textTheme.labelLarge),
-          const SizedBox(height: 4),
-          Text(
-            meta,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+          ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxLabelWidth),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 }
+
+// ── Availability Panel ────────────────────────────────────────────────────────
+
+class _AvailabilityPanel extends StatelessWidget {
+  const _AvailabilityPanel({
+    required this.availabilityType,
+    required this.locale,
+  });
+
+  final String availabilityType;
+  final String locale;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+
+    final label = switch (availabilityType) {
+      'weekdays' =>
+        _copy(locale, en: 'Available weekdays', ar: 'متاح أيام الأسبوع'),
+      'weekends' => _copy(locale,
+          en: 'Available weekends', ar: 'متاح في عطلات نهاية الأسبوع'),
+      'both' =>
+        _copy(locale, en: 'Available all week', ar: 'متاح طوال الأسبوع'),
+      _ => _copy(locale, en: 'Flexible schedule', ar: 'جدول مرن'),
+    };
+
+    final weekdays =
+        availabilityType == 'weekdays' || availabilityType == 'both';
+    final weekends =
+        availabilityType == 'weekends' || availabilityType == 'both';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: ServioColors.tint(servio.success),
+            borderRadius: BorderRadius.circular(ServioRadius.md),
+            border: Border.all(color: servio.success.withValues(alpha: 0.22)),
+          ),
+          child: Row(
+            children: <Widget>[
+              Icon(Icons.check_circle_rounded, color: servio.success),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  label,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: servio.success,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: <Widget>[
+            _AvailabilityPill(
+              day: _copy(locale, en: 'Mon', ar: 'إث'),
+              available: weekdays,
+            ),
+            _AvailabilityPill(
+              day: _copy(locale, en: 'Tue', ar: 'ثل'),
+              available: weekdays,
+            ),
+            _AvailabilityPill(
+              day: _copy(locale, en: 'Wed', ar: 'أر'),
+              available: weekdays,
+            ),
+            _AvailabilityPill(
+              day: _copy(locale, en: 'Thu', ar: 'خم'),
+              available: weekdays,
+            ),
+            _AvailabilityPill(
+              day: _copy(locale, en: 'Fri', ar: 'جم'),
+              available: weekdays,
+            ),
+            _AvailabilityPill(
+              day: _copy(locale, en: 'Sat', ar: 'سب'),
+              available: weekends,
+            ),
+            _AvailabilityPill(
+              day: _copy(locale, en: 'Sun', ar: 'أح'),
+              available: weekends,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+// ── Mini Review Card ──────────────────────────────────────────────────────────
 
 class _MiniReviewCard extends StatelessWidget {
   const _MiniReviewCard({required this.name, required this.body});
@@ -521,23 +1097,60 @@ class _MiniReviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final servio = context.servio;
 
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: servio.backgroundSoft,
         borderRadius: BorderRadius.circular(ServioRadius.md),
+        border: Border.all(color: servio.border.withValues(alpha: 0.55)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(name, style: Theme.of(context).textTheme.labelLarge),
-          const SizedBox(height: 6),
+          Row(
+            children: <Widget>[
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  gradient: ServioGradients.warm,
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: ServioColors.deepBrown,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelLarge
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+              ),
+              const Icon(Icons.star_rounded, color: Colors.amber, size: 16),
+            ],
+          ),
+          const SizedBox(height: 10),
           Text(
             body,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: servio.textSecondary,
+              height: 1.4,
+            ),
           ),
         ],
       ),
@@ -545,65 +1158,94 @@ class _MiniReviewCard extends StatelessWidget {
   }
 }
 
+// ── Coverage Card ─────────────────────────────────────────────────────────────
+
 class _CoverageCard extends StatelessWidget {
-  const _CoverageCard({required this.area});
+  const _CoverageCard({required this.area, required this.locale});
 
   final String area;
+  final String locale;
 
   @override
   Widget build(BuildContext context) {
-    final servio = context.servio;
+    final theme = Theme.of(context);
+    final areas = area.split(',').map((String e) => e.trim()).where((String e) => e.isNotEmpty).toList();
 
     return Container(
-      height: 120,
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: ServioGradients.warm,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(ServioRadius.lg),
-      ),
-      child: Center(
-        child: Text(
-          area,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(color: servio.accent),
+        border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.2)),
+        image: const DecorationImage(
+          image: AssetImage('assets/images/map_pattern.png'),
+          fit: BoxFit.cover,
+          opacity: 0.05,
         ),
       ),
-    );
-  }
-}
-
-class _CredentialRow extends StatelessWidget {
-  const _CredentialRow({
-    required this.label,
-    required this.status,
-    required this.pending,
-  });
-
-  final String label;
-  final String status;
-  final bool pending;
-
-  @override
-  Widget build(BuildContext context) {
-    final servio = context.servio;
-
-    return Row(
-      children: <Widget>[
-        Icon(
-          pending ? Icons.hourglass_top_rounded : Icons.check_circle_rounded,
-          color: pending ? servio.warning : servio.success,
-          size: 18,
-        ),
-        const SizedBox(width: 10),
-        Expanded(child: Text(label)),
-        Text(
-          status,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: pending ? servio.warning : servio.success,
+      child: Stack(
+        children: <Widget>[
+          PositionedDirectional(
+            end: -20,
+            bottom: -20,
+            child: Icon(
+              Icons.map_outlined,
+              size: 120,
+              color: theme.colorScheme.primary.withValues(alpha: 0.05),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  Icon(Icons.share_location_rounded, color: theme.colorScheme.primary, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    _copy(locale, en: 'Operating Areas', ar: 'مناطق العمل'),
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
               ),
-        ),
-      ],
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: areas.map((String a) => Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(ServioRadius.md),
+                    border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.2)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Icon(Icons.location_city_rounded, size: 14, color: theme.colorScheme.primary),
+                      const SizedBox(width: 6),
+                      Text(
+                        a,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                )).toList(),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
+
+// ── Availability Pill ─────────────────────────────────────────────────────────
 
 class _AvailabilityPill extends StatelessWidget {
   const _AvailabilityPill({required this.day, required this.available});
@@ -613,20 +1255,268 @@ class _AvailabilityPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final servio = context.servio;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      constraints: const BoxConstraints(minWidth: 46),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
         color: available ? servio.success : servio.backgroundSoft,
         borderRadius: BorderRadius.circular(ServioRadius.full),
+        border: Border.all(
+          color: available
+              ? servio.success.withValues(alpha: 0.42)
+              : servio.border.withValues(alpha: 0.62),
+        ),
       ),
       child: Text(
         day,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: available ? Colors.white : servio.textSecondary,
+        textAlign: TextAlign.center,
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: available ? Colors.white : servio.textSecondary,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
+// ── Profile Avatar ────────────────────────────────────────────────────────────
+
+class _ProfileAvatar extends StatelessWidget {
+  const _ProfileAvatar({
+    required this.initials,
+    required this.verified,
+    required this.profileImage,
+    required this.name,
+  });
+
+  final String initials;
+  final bool verified;
+  final String profileImage;
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: <Widget>[
+        Container(
+          width: 88,
+          height: 88,
+          decoration: BoxDecoration(
+            gradient: ServioGradients.warm,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.9),
+              width: 3,
+            ),
+            boxShadow: ServioShadows.elevated,
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Semantics(
+            image: true,
+            label: '$name profile image',
+            child: profileImage.isEmpty
+                ? _AvatarInitials(initials: initials)
+                : Image.network(
+                    profileImage,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        _AvatarInitials(initials: initials),
+                  ),
+          ),
+        ),
+        if (verified)
+          PositionedDirectional(
+            end: 0,
+            bottom: 0,
+            child: Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: ServioColors.success,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              child: const Icon(Icons.check_rounded,
+                  size: 17, color: Colors.white),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// ── Hero sub-widgets ──────────────────────────────────────────────────────────
+
+class _AvatarInitials extends StatelessWidget {
+  const _AvatarInitials({required this.initials});
+
+  final String initials;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Text(
+        initials,
+        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              color: ServioColors.deepBrown,
+              fontWeight: FontWeight.w700,
             ),
       ),
     );
   }
+}
+
+class _HeroPill extends StatelessWidget {
+  const _HeroPill({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsetsDirectional.fromSTEB(10, 7, 12, 7),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.13),
+        borderRadius: BorderRadius.circular(ServioRadius.full),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Icon(icon, size: 15, color: Colors.white),
+          const SizedBox(width: 6),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 220),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeroMetric extends StatelessWidget {
+  const _HeroMetric({
+    required this.icon,
+    required this.value,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(ServioRadius.md),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            Icon(icon, size: 16, color: ServioColors.neutralWarm),
+            const SizedBox(height: 5),
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 1),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall
+                  ?.copyWith(color: Colors.white.withValues(alpha: 0.7)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Round Icon Button ─────────────────────────────────────────────────────────
+
+class _RoundIconButton extends StatelessWidget {
+  const _RoundIconButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      icon: Icon(icon),
+      style: IconButton.styleFrom(
+        backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.92),
+        foregroundColor: theme.colorScheme.onSurface,
+        minimumSize: const Size.square(42),
+      ),
+    );
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+IconData _specialtyIcon(String specialty) {
+  return switch (specialty.toLowerCase()) {
+    'plumbing' => Icons.plumbing_rounded,
+    'electrical' => Icons.electrical_services_rounded,
+    'hvac' || 'ac-maintenance' => Icons.ac_unit_rounded,
+    'painting' => Icons.format_paint_rounded,
+    'carpentry' => Icons.carpenter_rounded,
+    'cleaning' => Icons.cleaning_services_rounded,
+    'flooring' => Icons.grid_on_rounded,
+    _ => Icons.handyman_rounded,
+  };
+}
+
+String _availabilityLabel(String availabilityType, String locale) {
+  return switch (availabilityType) {
+    'weekdays' =>
+      _copy(locale, en: 'Available weekdays', ar: 'متاح أيام الأسبوع'),
+    'weekends' => _copy(locale,
+        en: 'Available weekends', ar: 'متاح في عطلات نهاية الأسبوع'),
+    'both' => _copy(locale, en: 'Available all week', ar: 'متاح طوال الأسبوع'),
+    _ => _copy(locale, en: 'Flexible schedule', ar: 'جدول مرن'),
+  };
+}
+
+String _copy(String locale, {required String en, required String ar}) {
+  return locale == 'ar' ? ar : en;
 }
