@@ -693,7 +693,7 @@ class _DashboardSegmentedControl extends StatelessWidget {
               child: Text(
                 _labels[section]!,
                 style: theme.textTheme.labelLarge?.copyWith(
-                  color: active ? ServioColors.brandDark : Colors.white,
+                  color: active ? ServioColors.navyDark : Colors.white,
                   fontWeight: active ? FontWeight.w700 : FontWeight.w500,
                 ),
               ),
