@@ -1,5 +1,6 @@
 import '../models/user_account.dart';
 import 'api_client.dart';
+import 'api_exception.dart';
 
 class AuthApi {
   AuthApi(this._client);
@@ -14,7 +15,21 @@ class AuthApi {
       'email': email,
       'password': password,
     });
-    return AuthSession.fromApi(_client.unwrapData(response));
+    final data = _client.unwrapData(response);
+
+    // Block admin accounts from accessing the mobile app.
+    // This check runs before AuthSession is constructed so no token or user
+    // data is ever held in memory or written to storage.
+    final userJson = data['user'] as Map<String, dynamic>?;
+    final rawRole = (userJson?['role'] as String?) ?? '';
+    if (rawRole == 'admin') {
+      throw const ApiException(
+        statusCode: 403,
+        message: 'Admin accounts can only log in through the website.',
+      );
+    }
+
+    return AuthSession.fromApi(data);
   }
 
   Future<AuthSession> registerCustomer({
