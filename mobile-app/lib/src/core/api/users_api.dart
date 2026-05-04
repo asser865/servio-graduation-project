@@ -26,6 +26,8 @@ class UsersApi {
 
   Future<BackendWorker> getWorkerById(String id) async {
     final data = _client.unwrapData(await _client.get('/users/workers/$id'));
+    final worker = data['worker'];
+    if (worker is Map<String, dynamic>) return BackendWorker.fromJson(worker);
     return BackendWorker.fromJson(data);
   }
 

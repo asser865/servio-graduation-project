@@ -37,6 +37,19 @@ const createBooking = async (userId, data) => {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Service not found or no longer available.');
   }
 
+  // Verify the worker supports this specific service (canonical check via ObjectId)
+  const workerSupportsService = Array.isArray(worker.services) &&
+    worker.services.some((id) => id.toString() === service._id.toString());
+
+  // Backward-compatibility: also accept if worker's legacy categories include this service's category
+  const legacyCategoryMatches = !workerSupportsService &&
+    Array.isArray(worker.categories) &&
+    worker.categories.includes(service.category);
+
+  if (!workerSupportsService && !legacyCategoryMatches) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Selected worker does not support this service.');
+  }
+
   const booking = await Booking.create({
     user: userId,
     worker: workerId,

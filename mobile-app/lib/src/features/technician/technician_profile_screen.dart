@@ -34,10 +34,13 @@ class TechnicianSettingsProfileScreen extends StatelessWidget {
       ),
       bottomNavigationBar: ServioBottomNavigationBar(
         items: const <ServioBottomNavItem>[
-          ServioBottomNavItem(icon: Icons.bar_chart_rounded, label: 'Dashboard'),
+          ServioBottomNavItem(
+              icon: Icons.bar_chart_rounded, label: 'Dashboard'),
           ServioBottomNavItem(icon: Icons.work_outline_rounded, label: 'Jobs'),
-          ServioBottomNavItem(icon: Icons.account_balance_wallet_outlined, label: 'Earnings'),
-          ServioBottomNavItem(icon: Icons.schedule_rounded, label: 'Availability'),
+          ServioBottomNavItem(
+              icon: Icons.account_balance_wallet_outlined, label: 'Earnings'),
+          ServioBottomNavItem(
+              icon: Icons.schedule_rounded, label: 'Availability'),
           ServioBottomNavItem(icon: Icons.person_rounded, label: 'Profile'),
         ],
         currentIndex: 4,
@@ -130,7 +133,8 @@ class TechnicianSettingsProfileScreen extends StatelessWidget {
                         iconColor: context.servio.warning,
                         label: 'Report a Problem',
                         subtitle: 'Send us feedback or issues',
-                        onTap: () => _showPlaceholder(context, 'Report a Problem'),
+                        onTap: () =>
+                            _showPlaceholder(context, 'Report a Problem'),
                       ),
                       _NavTile(
                         icon: Icons.headset_mic_outlined,
@@ -245,7 +249,8 @@ class _ProfessionalCard extends StatelessWidget {
         children: <Widget>[
           Text(
             'Specialties',
-            style: theme.textTheme.labelLarge?.copyWith(color: servio.textSecondary),
+            style: theme.textTheme.labelLarge
+                ?.copyWith(color: servio.textSecondary),
           ),
           const SizedBox(height: 10),
           Wrap(
@@ -664,7 +669,10 @@ class _MiniChip extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(color: servio.accent),
+        style: Theme.of(context)
+            .textTheme
+            .labelSmall
+            ?.copyWith(color: servio.accent),
       ),
     );
   }
