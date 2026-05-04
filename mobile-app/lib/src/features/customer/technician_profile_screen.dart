@@ -187,7 +187,7 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
           CustomScrollView(
             slivers: <Widget>[
               SliverAppBar(
-                expandedHeight: 340,
+                expandedHeight: 290,
                 pinned: true,
                 stretch: true,
                 elevation: 0,
@@ -263,28 +263,6 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
                                 color: servio.textSecondary,
                                 height: 1.45,
                               ),
-                            ),
-                            const SizedBox(height: 16),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: <Widget>[
-                                if (worker.isVerified)
-                                  _MiniChip(
-                                    label: _copy(locale,
-                                        en: 'Verified', ar: 'موثّق'),
-                                    tone: _ChipTone.success,
-                                  ),
-                                if (worker.yearsExperience > 0)
-                                  _MiniChip(
-                                    label: _copy(
-                                      locale,
-                                      en: '${worker.yearsExperience} years exp.',
-                                      ar: '${worker.yearsExperience} سنة خبرة',
-                                    ),
-                                  ),
-                                _MiniChip(label: availabilityLabel),
-                              ],
                             ),
                           ],
                         ),
@@ -409,38 +387,13 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: <Widget>[
-                        Container(
-                          width: 10,
-                          height: 10,
-                          decoration: BoxDecoration(
-                            color: servio.success,
-                            shape: BoxShape.circle,
-                            boxShadow: <BoxShadow>[
-                              BoxShadow(
-                                color: servio.success.withValues(alpha: 0.3),
-                                blurRadius: 12,
-                                spreadRadius: 2,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            availabilityLabel,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.labelLarge?.copyWith(
-                              color: servio.success,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
                         Text(
                           rateLabel,
                           style: theme.textTheme.titleMedium?.copyWith(
                             color: servio.accent,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ],
@@ -639,19 +592,6 @@ class _ProfileHero extends StatelessWidget {
                         ),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 18),
-                  SizedBox(
-                    height: 34,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      children: <Widget>[
-                        _HeroPill(
-                          icon: Icons.event_available_rounded,
-                          label: availabilityLabel,
-                        ),
-                      ],
-                    ),
                   ),
                   const Spacer(),
                   SizedBox(
