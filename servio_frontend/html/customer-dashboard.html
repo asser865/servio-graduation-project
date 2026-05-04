@@ -7,7 +7,27 @@
   <meta name="description" content="Manage your bookings, favourites, and profile." />
   <script src="../js/config.js"></script>
   <script src="../js/theme-init.js"></script>
-  <script src="../js/lang-init.js"></script>
+    <script src="../js/lang-init.js"></script>
+    <script>
+      (function() {
+        const TAB_KEY = 'servio_activeTab_customer';
+        const savedTab = sessionStorage.getItem(TAB_KEY) || 'overview';
+        document.documentElement.classList.add('is-restoring-tab');
+        window.addEventListener('DOMContentLoaded', () => {
+          const btn = document.querySelector(`[data-tab="${savedTab}"]`);
+          const panel = document.querySelector(`[data-panel="${savedTab}"]`);
+          if (btn) {
+            btn.classList.add('is-active');
+            btn.setAttribute('aria-selected', 'true');
+          }
+          if (panel) {
+            panel.classList.add('is-active');
+            panel.hidden = false;
+          }
+          document.documentElement.classList.remove('is-restoring-tab');
+        });
+      })();
+    </script>
     <link rel="stylesheet" href="../css/main.css" />
   </head>
   <body>
@@ -84,7 +104,7 @@
 <div class="dash-sidebar__nav-scroll dash-sidebar__nav-scroll--customer">
 <ul class="dash-nav" role="tablist" aria-label="Dashboard sections">
 <li role="none">
-<button class="dash-nav__btn is-active" role="tab" aria-selected="true"
+<button class="dash-nav__btn" role="tab" aria-selected="false"
               aria-controls="panel-overview" id="tab-overview" data-tab="overview" title="Overview">
         <span class="dash-nav__icon-slot" aria-hidden="true">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -213,11 +233,12 @@
 
         <!-- Overview panel -->
         <section
-          class="dash-panel is-active"
+          class="dash-panel"
           id="panel-overview"
           role="tabpanel"
           aria-labelledby="tab-overview"
           data-panel="overview"
+          hidden
         >
           <div class="dash-welcome dash-welcome--compact" data-reveal>
             <div class="dash-welcome__text">
@@ -1398,13 +1419,104 @@
   ══════════════════════════════════════════ -->
   <div class="stab-pane" id="stab-security" role="tabpanel" aria-labelledby="stab-btn-security" hidden>
 
-    <!-- Security overview -->
-    <div class="settings-section">
-      <h2 class="settings-section__heading">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        <span data-i18n="cust_settings_security">Security</span>
-      </h2>
-      <p class="settings-section__desc" data-i18n="cust_settings_security_desc">Sensitive account changes are handled in dedicated verification flows.</p>
+    <!-- Change Password -->
+    <div class="settings-section cp-section">
+      <div class="cp-section__header">
+        <div class="cp-section__header-icon">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
+        <div>
+          <h2 class="settings-section__heading" style="margin-bottom:2px;">Change Password</h2>
+          <p class="settings-section__desc" style="margin-bottom:0;">Choose a strong password to keep your account secure.</p>
+        </div>
+      </div>
+
+      <div class="cp-divider"></div>
+
+      <form class="change-password-form" id="change-password-form" novalidate>
+
+        <!-- Current Password — full width -->
+        <div class="cp-field-group">
+          <label class="form-label" for="cp-current">Current Password <span class="required-mark" aria-hidden="true">*</span></label>
+          <div class="input-password-wrap">
+            <input class="form-input form-input--lg" type="password" id="cp-current" name="currentPassword" placeholder="Enter your current password" autocomplete="current-password" />
+            <button type="button" class="btn-toggle-password" aria-label="Show password" tabindex="-1">
+              <svg class="eye-icon eye-icon--show" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg class="eye-icon eye-icon--hide" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- New + Confirm side by side -->
+        <div class="cp-row">
+
+          <!-- New Password + strength + requirements -->
+          <div class="cp-field-group">
+            <label class="form-label" for="cp-new">New Password <span class="required-mark" aria-hidden="true">*</span></label>
+            <div class="input-password-wrap">
+              <input class="form-input form-input--lg" type="password" id="cp-new" name="newPassword" placeholder="Min. 8 characters" autocomplete="new-password" />
+              <button type="button" class="btn-toggle-password" aria-label="Show password" tabindex="-1">
+                <svg class="eye-icon eye-icon--show" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="eye-icon eye-icon--hide" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              </button>
+            </div>
+
+            <!-- Strength bar -->
+            <div class="pw-strength-wrap" id="cp-strength-wrap">
+              <div class="pw-strength-segments">
+                <div class="pw-seg" id="cp-seg-1"></div>
+                <div class="pw-seg" id="cp-seg-2"></div>
+                <div class="pw-seg" id="cp-seg-3"></div>
+                <div class="pw-seg" id="cp-seg-4"></div>
+              </div>
+              <span class="pw-strength-label" id="cp-strength-label">Enter a password</span>
+            </div>
+
+            <!-- Requirements as chips -->
+            <ul class="pw-req-list" id="cp-req-list">
+              <li class="pw-req" id="req-len">
+                <svg class="pw-req__icon" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                8+ characters
+              </li>
+              <li class="pw-req" id="req-upper">
+                <svg class="pw-req__icon" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                Uppercase
+              </li>
+              <li class="pw-req" id="req-num">
+                <svg class="pw-req__icon" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                Number
+              </li>
+              <li class="pw-req" id="req-special">
+                <svg class="pw-req__icon" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                Special char
+              </li>
+            </ul>
+          </div>
+
+          <!-- Confirm Password -->
+          <div class="cp-field-group">
+            <label class="form-label" for="cp-confirm">Confirm New Password <span class="required-mark" aria-hidden="true">*</span></label>
+            <div class="input-password-wrap">
+              <input class="form-input form-input--lg" type="password" id="cp-confirm" name="confirmPassword" placeholder="Repeat new password" autocomplete="new-password" />
+              <button type="button" class="btn-toggle-password" aria-label="Show password" tabindex="-1">
+                <svg class="eye-icon eye-icon--show" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="eye-icon eye-icon--hide" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              </button>
+            </div>
+          </div>
+
+        </div><!-- /cp-row -->
+
+        <p class="field-error" id="cp-error" hidden></p>
+
+        <div class="cp-actions">
+          <button class="btn btn--primary cp-submit-btn" type="submit" id="cp-submit">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            Update Password
+          </button>
+          <button class="btn btn--ghost cp-clear-btn" type="reset" id="cp-reset">Clear</button>
+        </div>
+      </form>
     </div>
 
     <!-- 2-Factor Authentication -->
@@ -1423,80 +1535,6 @@
           <span class="stab-toggle__track"><span class="stab-toggle__thumb"></span></span>
         </button>
       </div>
-    </div>
-
-    <!-- Change Password -->
-    <div class="settings-section">
-      <h2 class="settings-section__heading">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        <span>Change Password</span>
-      </h2>
-      <p class="settings-section__desc">Choose a strong password to keep your account secure.</p>
-
-      <form class="change-password-form" id="change-password-form" novalidate>
-
-        <!-- Current Password -->
-        <div class="cp-field-group">
-          <label class="form-label" for="cp-current">Current Password <span class="required-mark" aria-hidden="true">*</span></label>
-          <div class="input-password-wrap">
-            <input class="form-input form-input--lg" type="password" id="cp-current" name="currentPassword" placeholder="Enter your current password" autocomplete="current-password" />
-            <button type="button" class="btn-toggle-password" aria-label="Show password" tabindex="-1">
-              <svg class="eye-icon eye-icon--show" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              <svg class="eye-icon eye-icon--hide" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-            </button>
-          </div>
-        </div>
-
-        <!-- New Password + strength meter -->
-        <div class="cp-field-group">
-          <label class="form-label" for="cp-new">New Password <span class="required-mark" aria-hidden="true">*</span></label>
-          <div class="input-password-wrap">
-            <input class="form-input form-input--lg" type="password" id="cp-new" name="newPassword" placeholder="Min. 8 characters" autocomplete="new-password" />
-            <button type="button" class="btn-toggle-password" aria-label="Show password" tabindex="-1">
-              <svg class="eye-icon eye-icon--show" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              <svg class="eye-icon eye-icon--hide" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-            </button>
-          </div>
-
-          <!-- Strength bar — always visible -->
-          <div class="pw-strength-wrap" id="cp-strength-wrap">
-            <div class="pw-strength-segments">
-              <div class="pw-seg" id="cp-seg-1"></div>
-              <div class="pw-seg" id="cp-seg-2"></div>
-              <div class="pw-seg" id="cp-seg-3"></div>
-              <div class="pw-seg" id="cp-seg-4"></div>
-            </div>
-            <span class="pw-strength-label" id="cp-strength-label">Enter a password</span>
-          </div>
-
-          <!-- Requirements checklist -->
-          <ul class="pw-req-list" id="cp-req-list">
-            <li class="pw-req" id="req-len">At least 8 characters</li>
-            <li class="pw-req" id="req-upper">One uppercase letter</li>
-            <li class="pw-req" id="req-num">One number</li>
-            <li class="pw-req" id="req-special">One special character</li>
-          </ul>
-        </div>
-
-        <!-- Confirm Password -->
-        <div class="cp-field-group">
-          <label class="form-label" for="cp-confirm">Confirm New Password <span class="required-mark" aria-hidden="true">*</span></label>
-          <div class="input-password-wrap">
-            <input class="form-input form-input--lg" type="password" id="cp-confirm" name="confirmPassword" placeholder="Repeat new password" autocomplete="new-password" />
-            <button type="button" class="btn-toggle-password" aria-label="Show password" tabindex="-1">
-              <svg class="eye-icon eye-icon--show" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              <svg class="eye-icon eye-icon--hide" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-            </button>
-          </div>
-        </div>
-
-        <p class="field-error" id="cp-error" hidden></p>
-
-        <div class="settings-submit-row" style="margin-top:20px;">
-          <button class="btn btn--primary settings-submit-btn" type="submit" id="cp-submit">Update Password</button>
-          <button class="btn btn--outline settings-cancel-btn" type="reset" id="cp-reset">Clear</button>
-        </div>
-      </form>
     </div>
 
     <!-- Active sessions / last login -->

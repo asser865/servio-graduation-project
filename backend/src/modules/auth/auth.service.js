@@ -180,7 +180,7 @@ const forgotPassword = async ({ email, clientUrl }) => {
   user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
   await user.save({ validateModifiedOnly: true });
 
-  const origin   = clientUrl || process.env.CLIENT_URL.split(',')[0].trim();
+  const origin   = process.env.FRONTEND_URL || clientUrl || process.env.CLIENT_URL.split(',')[0].trim();
   const resetUrl = `${origin}/html/reset-password.html?token=${rawToken}`;
 
   await sendPasswordResetEmail(user.email, resetUrl);

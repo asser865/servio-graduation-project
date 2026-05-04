@@ -21,7 +21,7 @@ const getAllServices = async ({ category, page = 1, limit = 100 }) => {
   const [services, total] = await Promise.all([
     Service.find(filter)
       .populate('createdBy', 'name email')
-      .sort({ createdAt: -1 })
+      .sort({ createdAt: 1 })
       .skip(skip)
       .limit(Number(limit)),
     Service.countDocuments(filter),

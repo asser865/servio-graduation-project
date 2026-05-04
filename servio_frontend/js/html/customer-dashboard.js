@@ -18,7 +18,7 @@ let _pendingPhotoUrl = null;
 
 function getSession() {
   try {
-    return JSON.parse(localStorage.getItem('servio_session') || 'null');
+    return JSON.parse(sessionStorage.getItem('servio_session') || localStorage.getItem('servio_session') || 'null');
   } catch { return null; }
 }
 
@@ -84,7 +84,7 @@ function initTabs() {
       p.hidden = !active;
       if (active) revealAll(p);
     });
-    localStorage.setItem(TAB_KEY, id);
+    sessionStorage.setItem(TAB_KEY, id);
   }
 
   tabs.forEach(tab => tab.addEventListener('click', () => showTab(tab.dataset.tab)));
@@ -129,7 +129,7 @@ function initTabs() {
   });
 
   // Restore saved tab
-  const saved = localStorage.getItem(TAB_KEY) || 'overview';
+  const saved = sessionStorage.getItem(TAB_KEY) || 'overview';
   showTab(saved);
 }
 

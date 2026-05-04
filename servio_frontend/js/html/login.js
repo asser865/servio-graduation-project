@@ -161,11 +161,36 @@ export function initLogin() {
 
     login(email, password)
       .then((user) => {
-        if (user.role === 'technician' && user.verificationStatus === 'pending') {
-          localStorage.setItem('servio_account', JSON.stringify({ verificationStatus: 'pending' }));
-        } else {
-          localStorage.removeItem('servio_account');
-        }
+        // Persist the full user profile so dashboards can populate
+        // form fields synchronously without waiting for getMe() API call
+        const account = {
+          fullName:           user.name  || '',
+          name:               user.name  || '',
+          email:              user.email || '',
+          phone:              user.phone || '',
+          role:               user.role  || '',
+          verificationStatus: user.verificationStatus || '',
+          verificationRejectionReason: user.verificationRejectionReason || '',
+          profileImage:       user.profileImage || '',
+          skills:             user.skills || [],
+          specialty:          Array.isArray(user.skills) ? user.skills.join(', ') : '',
+          hourlyRate:         user.hourlyRate  ?? '',
+          yearsExperience:    user.yearsExperience ?? '',
+          experience:         user.yearsExperience ?? '',
+          bio:                user.bio || '',
+          uploadedDocs: {
+            idFront:  { uploaded: !!(user.idFrontUrl),  url: user.idFrontUrl  || '', name: user.idFrontName  || '' },
+            idBack:   { uploaded: !!(user.idBackUrl),   url: user.idBackUrl   || '', name: user.idBackName   || '' },
+            idSelfie: { uploaded: !!(user.idSelfieUrl), url: user.idSelfieUrl || '', name: user.idSelfieName || '' },
+            cvFile:   { uploaded: !!(user.cvUrl),       url: user.cvUrl       || '', name: user.cvName       || '' },
+            portfolio: {
+              uploaded: !!(user.portfolioFiles?.length),
+              count:    user.portfolioFiles?.length || 0,
+              files:    (user.portfolioFiles || []).map(f => ({ url: f.url || '', name: f.name || '' })),
+            },
+          },
+        };
+        localStorage.setItem('servio_account', JSON.stringify(account));
         routeToDashboard(user.role);
       })
       .catch((err) => {

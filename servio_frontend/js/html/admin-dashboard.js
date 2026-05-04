@@ -136,7 +136,7 @@ function initAdminDashboard() {
   const panels  = document.querySelectorAll('.admin-panel');
 
   const headerTitle = document.getElementById('admin-header-title');
-  function switchTab(tabName) {
+  function switchTab(tabName, save = true) {
     navBtns.forEach(b => b.classList.toggle('is-active', b.dataset.tab === tabName));
     panels.forEach(p => p.classList.toggle('is-active', p.dataset.panel === tabName));
     // Sync topbar title with active tab label
@@ -148,6 +148,18 @@ function initAdminDashboard() {
         headerTitle.setAttribute('data-i18n', labelEl.getAttribute('data-i18n'));
       }
     }
+    // Persist tab state
+    if (save) {
+      sessionStorage.setItem('servio_admin_active_tab', tabName);
+    }
+  }
+
+  // Restore active tab from sessionStorage or default to overview
+  const savedTab = sessionStorage.getItem('servio_admin_active_tab');
+  if (savedTab) {
+    switchTab(savedTab, false);
+  } else {
+    switchTab('overview', false);
   }
 
   navBtns.forEach(btn => {

@@ -6,7 +6,11 @@
 
 const mongoose = require('mongoose');
 
-const SERVICE_CATEGORIES = ['plumbing', 'electrical', 'painting', 'flooring', 'carpentry', 'cleaning', 'hvac', 'other'];
+const SERVICE_CATEGORIES = [
+  'plumbing', 'electrical', 'hvac', 'carpentry', 'appliance', 'handyman',
+  'renovation', 'painting', 'flooring', 'drywall', 'roofing',
+  'cleaning', 'pest-control', 'landscaping', 'installation', 'other',
+];
 const PRICE_UNITS        = ['per_hour', 'per_sqm', 'fixed'];
 
 const serviceSchema = new mongoose.Schema(
