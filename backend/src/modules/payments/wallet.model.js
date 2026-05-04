@@ -114,8 +114,13 @@ walletSchema.methods.releasePending = async function (amount) {
 // WHAT: Remove from pendingBalance when a booking is refunded.
 // WHY:  The funds were never truly the worker's — they go back to the user.
 walletSchema.methods.deductPending = async function (amount) {
-  const deduct = Math.min(this.pendingBalance, amount); // Safety: never go below 0
-  this.pendingBalance -= deduct;
+  if (this.pendingBalance < amount) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      `Insufficient pending balance. Pending: ${this.pendingBalance}, Deducting: ${amount}.`
+    );
+  }
+  this.pendingBalance -= amount;
   return this.save();
 };
 

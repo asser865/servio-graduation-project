@@ -10,24 +10,46 @@ const Review          = require('../reviews/review.model');
 const Booking         = require('../bookings/booking.model');
 const Payment         = require('../payments/payment.model');
 const Dispute         = require('../payments/dispute.model');
+const Service         = require('../services/service.model');
 const ApiError        = require('../../utils/ApiError');
 const ApiResponse     = require('../../utils/ApiResponse');
+const { logEvent }    = require('../admin/audit.service');
+
+function normalizeWorkerDecision(body) {
+  if (body?.decision === 'approved' || body?.isVerified === true) return 'approved';
+  if (body?.decision === 'rejected' || body?.isVerified === false) return 'rejected';
+  return '';
+}
+const getMe = async (req, res) => {
+  const user = await User.findById(req.user.id).select('-password');
+  if (!user) throw new ApiError(StatusCodes.NOT_FOUND, 'User not found.');
+  return ApiResponse.success(res, StatusCodes.OK, 'Profile retrieved.', user);
+};
+
 
 // ── GET WORKERS (Public) ─────────────────────────────────────────────────────
 // WHAT: Returns a list of all active and verified workers.
-// HOW:  Optional ?category filter. Supports pagination (?page, ?limit).
+// HOW:  Optional ?serviceId (canonical) or ?category (legacy) filter.
+//       serviceId takes priority when both are provided.
 const getWorkers = async (req, res) => {
-  const { category, page = 1, limit = 10 } = req.query;
+  const { serviceId, category, page = 1, limit = 10 } = req.query;
 
   const filter = { role: 'worker', isActive: true, isVerified: true };
-  // Workers can belong to multiple categories — use $in for array field
-  if (category) filter.categories = { $in: [category] };
+
+  if (serviceId) {
+    // Canonical filter: match workers whose services array contains this ObjectId
+    filter.services = serviceId;
+  } else if (category) {
+    // Legacy filter: keep backward compatibility with category string filter
+    filter.categories = { $in: [category] };
+  }
 
   const skip = (Number(page) - 1) * Number(limit);
 
   const [workers, total] = await Promise.all([
     User.find(filter)
-      .select('name profileImage categories averageRating totalReviews location')
+      .select('name profileImage categories services skills averageRating totalReviews location locationLabel hourlyRate isVerified availability')
+      .populate('services', 'title category')
       .sort({ averageRating: -1 })
       .skip(skip)
       .limit(Number(limit)),
@@ -61,21 +83,158 @@ const getWorkerProfile = async (req, res) => {
 };
 
 // ── UPDATE OWN PROFILE (Authenticated) ───────────────────────────────────────
-// WHAT: Allows any logged-in user to update their name, phone, or photo.
+// WHAT: Allows any logged-in user to update non-sensitive profile details.
 // HOW:  PATCH /api/v1/users/me
 const updateProfile = async (req, res) => {
   // Prevent users from changing their role via this endpoint
-  const allowedFields = ['name', 'phone', 'profileImage'];
+  const allowedFields = [
+    'name',
+    'bio',
+    'phone',
+    'profileImage',
+    'address',
+    'locationLabel',
+    'hourlyRate',
+    'skills',
+    'yearsExperience',
+    'availabilityType',
+    'categories',
+    'services',
+    'idFrontUrl',
+    'idFrontName',
+    'idBackUrl',
+    'idBackName',
+    'idSelfieUrl',
+    'idSelfieName',
+    'cvUrl',
+    'cvName',
+    'portfolioFiles',
+  ];
   const updates = {};
   allowedFields.forEach((field) => {
     if (req.body[field] !== undefined) updates[field] = req.body[field];
   });
 
-  const user = await User.findByIdAndUpdate(req.user.id, updates, {
-    new: true, runValidators: true,
+  // Only workers may update their service assignments
+  if (updates.services !== undefined && req.user?.role !== 'worker') {
+    delete updates.services;
+  }
+
+  const user = await User.findById(req.user.id);
+  if (!user) throw new ApiError(StatusCodes.NOT_FOUND, 'User not found.');
+
+  // Validate submitted service IDs for workers
+  if (updates.services !== undefined && Array.isArray(updates.services) && updates.services.length > 0) {
+    const count = await Service.countDocuments({ _id: { $in: updates.services }, isActive: true });
+    if (count !== updates.services.length) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'One or more selected services are invalid or inactive.');
+    }
+  }
+
+  if (req.user?.role === 'worker') {
+    const verificationFields = [
+      'idFrontUrl',
+      'idFrontName',
+      'idBackUrl',
+      'idBackName',
+      'idSelfieUrl',
+      'idSelfieName',
+      'cvUrl',
+      'cvName',
+      'portfolioFiles',
+    ];
+    const touchedVerification = verificationFields.some((field) => req.body[field] !== undefined);
+    if (touchedVerification) {
+      updates.isVerified = false;
+      updates.verificationStatus = 'pending';
+      updates.verificationSubmittedAt = new Date();
+      updates.verificationReviewedAt = null;
+      updates.verificationReviewedBy = '';
+      updates.verificationRejectionReason = '';
+    }
+  }
+
+  Object.entries(updates).forEach(([field, value]) => {
+    user.set(field, value);
   });
 
+  try {
+    await user.save({ validateModifiedOnly: true });
+  } catch (err) {
+    if (err.code === 11000 && (err.keyPattern?.email || err.keyValue?.email)) {
+      throw new ApiError(StatusCodes.CONFLICT, 'An account with this email already exists.');
+    }
+    throw err;
+  }
+
   return ApiResponse.success(res, StatusCodes.OK, 'Profile updated successfully.', user);
+};
+
+// ── UPDATE OWN EMAIL (Authenticated) ─────────────────────────────────────────
+// WHAT: Isolated sensitive flow for changing email.
+// HOW:  Verifies current password, relies on the unique email index, then
+// atomically updates email + authVersion so the current JWT is invalidated.
+const updateEmail = async (req, res) => {
+  const requestedEmail = String(req.body.newEmail || '').trim().toLowerCase();
+  const currentPassword = String(req.body.currentPassword || '');
+
+  if (!requestedEmail || !currentPassword) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'New email and current password are required.');
+  }
+
+  const user = await User.findById(req.user.id).select('+password email authVersion');
+  if (!user) throw new ApiError(StatusCodes.NOT_FOUND, 'User not found.');
+
+  if (requestedEmail === user.email) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'New email must be different from your current email.');
+  }
+
+  const passwordMatches = await user.comparePassword(currentPassword);
+  if (!passwordMatches) {
+    throw new ApiError(StatusCodes.UNAUTHORIZED, 'Incorrect current password.');
+  }
+
+  const existingUser = await User.findOne({
+    email: requestedEmail,
+    _id: { $ne: user._id },
+  }).select('_id');
+  if (existingUser) {
+    throw new ApiError(StatusCodes.CONFLICT, 'An account with this email already exists.');
+  }
+
+  let updatedUser;
+  try {
+    updatedUser = await User.findOneAndUpdate(
+      { _id: user._id, email: user.email },
+      {
+        $set: { email: requestedEmail },
+        $inc: { authVersion: 1 },
+      },
+      { new: true, runValidators: true }
+    );
+  } catch (err) {
+    if (err.code === 11000 && (err.keyPattern?.email || err.keyValue?.email)) {
+      throw new ApiError(StatusCodes.CONFLICT, 'An account with this email already exists.');
+    }
+    throw err;
+  }
+
+  if (!updatedUser) {
+    throw new ApiError(StatusCodes.CONFLICT, 'Email could not be updated because the profile changed. Please reload and try again.');
+  }
+
+  logEvent({
+    req,
+    type: 'user',
+    action: 'User email updated',
+    target: requestedEmail,
+    actorEmail: requestedEmail,
+  });
+
+  return ApiResponse.success(res, StatusCodes.OK, 'Email updated successfully. Please log in again using your new email address.', {
+    email: updatedUser.email,
+    reauthRequired: true,
+  });
 };
 
 // ── UPDATE WORKER AVAILABILITY (Worker Only) ──────────────────────────────────
@@ -88,6 +247,38 @@ const updateAvailability = async (req, res) => {
     { new: true, runValidators: true }
   );
   return ApiResponse.success(res, StatusCodes.OK, 'Availability updated.', user);
+};
+
+// ── UPDATE PASSWORD (Authenticated) ──────────────────────────────────────────
+// WHAT: Allows any logged-in user to change their password safely.
+// HOW:  PATCH /api/v1/users/me/password
+const updatePassword = async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Please provide both current and new passwords.');
+  }
+
+  const user = await User.findById(req.user.id).select('+password');
+  if (!user) throw new ApiError(StatusCodes.NOT_FOUND, 'User not found.');
+
+  const isMatch = await user.comparePassword(currentPassword);
+  if (!isMatch) {
+    throw new ApiError(StatusCodes.UNAUTHORIZED, 'Incorrect current password.');
+  }
+
+  user.password = newPassword; // the pre-save hook handles hashing (if not temporarily disabled)
+  await user.save();
+
+  return ApiResponse.success(res, StatusCodes.OK, 'Password updated successfully.', undefined);
+};
+
+// ── DELETE OWN ACCOUNT (Authenticated) ───────────────────────────────────────
+// WHAT: Permanently removes a user's own account from the system.
+// HOW:  DELETE /api/v1/users/me
+const deleteMe = async (req, res) => {
+  const user = await User.findByIdAndDelete(req.user.id);
+  if (!user) throw new ApiError(StatusCodes.NOT_FOUND, 'User not found.');
+  return ApiResponse.success(res, StatusCodes.OK, 'Your account has been successfully deleted.');
 };
 
 // ── GET ALL USERS (Admin Only) ───────────────────────────────────────────────
@@ -126,6 +317,8 @@ const updateUserStatus = async (req, res) => {
   );
   if (!user) throw new ApiError(StatusCodes.NOT_FOUND, 'User not found.');
 
+  logEvent({ req, type: 'user', action: isActive ? 'User activated' : 'User suspended', target: user.email });
+
   return ApiResponse.success(res, StatusCodes.OK, `User ${isActive ? 'activated' : 'deactivated'}.`, user);
 };
 
@@ -133,19 +326,49 @@ const updateUserStatus = async (req, res) => {
 // WHAT: Approves a worker so they can appear in search and receive bookings.
 // HOW:  PATCH /api/v1/users/workers/:id/verify { "isVerified": true }
 const verifyWorker = async (req, res) => {
-  const { isVerified } = req.body;
-  if (typeof isVerified !== 'boolean') {
-    throw new ApiError(StatusCodes.BAD_REQUEST, 'isVerified must be a boolean.');
+  const decision = normalizeWorkerDecision(req.body);
+  const rejectionReason = String(req.body?.rejectionReason || '').trim();
+  if (!decision) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'A review decision is required.');
+  }
+  if (decision === 'rejected' && !rejectionReason) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'A rejection reason is required.');
   }
 
   const worker = await User.findOneAndUpdate(
     { _id: req.params.id, role: 'worker' },
-    { isVerified },
+    {
+      isVerified: decision === 'approved',
+      verificationStatus: decision,
+      verificationReviewedAt: new Date(),
+      verificationReviewedBy: req.user?.email || '',
+      verificationRejectionReason: decision === 'rejected' ? rejectionReason : '',
+    },
     { new: true }
   );
   if (!worker) throw new ApiError(StatusCodes.NOT_FOUND, 'Worker not found.');
 
-  return ApiResponse.success(res, StatusCodes.OK, `Worker ${isVerified ? 'approved' : 'rejected'}.`, worker);
+  logEvent({
+    req,
+    type: 'user',
+    action: decision === 'approved' ? 'Technician approved' : `Technician rejected: ${rejectionReason}`,
+    target: worker.email,
+    status: decision === 'approved' ? 'ok' : 'warn',
+  });
+
+  return ApiResponse.success(res, StatusCodes.OK, `Worker ${decision}.`, worker);
+};
+
+// ── DELETE USER (Admin Only) ──────────────────────────────────────────────────
+// WHAT: Permanently removes a user from the system.
+// HOW:  DELETE /api/v1/users/:id
+const deleteUser = async (req, res) => {
+  const user = await User.findByIdAndDelete(req.params.id);
+  if (!user) throw new ApiError(StatusCodes.NOT_FOUND, 'User not found.');
+
+  logEvent({ req, type: 'user', action: 'User account deleted', target: user.email, status: 'warn' });
+
+  return ApiResponse.success(res, StatusCodes.OK, 'User deleted successfully.');
 };
 
 // ── GET ANALYTICS (Admin Only) ────────────────────────────────────────────────
@@ -236,7 +459,6 @@ const getPaymentAnalytics = async (req, res) => {
     acc[item._id] = item.count;
     return acc;
   }, {});
-
   return ApiResponse.success(res, StatusCodes.OK, 'Payment analytics retrieved.', {
     totalRevenue:    revenueResult[0]?.total  || 0,
     totalEscrow:     totalEscrow[0]?.total    || 0,
@@ -251,11 +473,16 @@ const getPaymentAnalytics = async (req, res) => {
 module.exports = {
   getWorkers,
   getWorkerProfile,
+  getMe,
+  deleteMe,
   updateProfile,
+  updateEmail,
   updateAvailability,
+  updatePassword,
   getAllUsers,
   updateUserStatus,
   verifyWorker,
+  deleteUser,
   getAnalytics,
   getPaymentAnalytics,
 };

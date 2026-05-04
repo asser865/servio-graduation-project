@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/api/api_client.dart';
+import '../../core/api/bookings_api.dart';
+import '../../core/models/backend_booking_model.dart';
 import '../../core/models/booking_model.dart';
-import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
@@ -12,12 +15,9 @@ import '../../design_system/widgets/servio_status_chip.dart';
 import '../booking/booking_flow_data.dart';
 import '../messages/chat_screen.dart';
 import 'ai_smart_match_screen.dart';
-import 'customer_home_screen.dart';
 import 'customer_profile_screen.dart';
 import 'services_marketplace_screen.dart';
 import 'write_review_screen.dart';
-import 'ai_smart_match_screen.dart';
-import 'services_marketplace_screen.dart';
 
 class MyBookingsScreen extends StatefulWidget {
   const MyBookingsScreen({
@@ -33,11 +33,27 @@ class MyBookingsScreen extends StatefulWidget {
 
 class _MyBookingsScreenState extends State<MyBookingsScreen> {
   late int _tabIndex;
+  List<BookingModel> _bookings = <BookingModel>[];
+  bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
     _tabIndex = widget.initialTabIndex;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _fetchBookings());
+  }
+
+  Future<void> _fetchBookings() async {
+    try {
+      final client = context.read<ApiClient>();
+      final raw = await BookingsApi(client).getMyBookings();
+      _bookings = raw.map(_toBookingModel).toList();
+    } catch (_) {
+      _error = 'Could not load bookings.';
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
@@ -139,14 +155,15 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
   }
 
   Widget _buildTabContent() {
-    final bookingsProvider = context.watch<BookingsProvider>();
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_error != null) return Center(child: Text(_error!));
 
     switch (_tabIndex) {
       case 0:
-        final active = bookingsProvider.upcoming;
-        if (active.isEmpty) {
-          return const _EmptyState(message: 'No active bookings yet.');
-        }
+        final active = _bookings
+            .where((b) => b.status == BookingStatus.upcoming || b.status == BookingStatus.inProgress)
+            .toList();
+        if (active.isEmpty) return const _EmptyState(message: 'No active bookings yet.');
         return ListView.separated(
           itemCount: active.length,
           separatorBuilder: (_, __) => const SizedBox(height: 16),
@@ -175,10 +192,10 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
           },
         );
       case 1:
-        final past = bookingsProvider.past;
-        if (past.isEmpty) {
-          return const _EmptyState(message: 'No booking history yet.');
-        }
+        final past = _bookings
+            .where((b) => b.status == BookingStatus.completed || b.status == BookingStatus.cancelled)
+            .toList();
+        if (past.isEmpty) return const _EmptyState(message: 'No booking history yet.');
         return ListView.separated(
           itemCount: past.length,
           separatorBuilder: (_, __) => const SizedBox(height: 16),
@@ -209,11 +226,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
       default:
         return ListView(
           children: const <Widget>[
-            _FavouriteTechnicianCard(
-                name: 'Khaled Mohamed', specialty: 'Plumbing'),
+            _FavouriteTechnicianCard(name: 'Khaled Mohamed', specialty: 'Plumbing'),
             SizedBox(height: 16),
-            _FavouriteTechnicianCard(
-                name: 'Mahmoud Ibrahim', specialty: 'Electrical'),
+            _FavouriteTechnicianCard(name: 'Mahmoud Ibrahim', specialty: 'Electrical'),
           ],
         );
     }
@@ -630,6 +645,30 @@ class _DetailsPair extends StatelessWidget {
     );
   }
 }
+
+BookingModel _toBookingModel(BackendBooking b) {
+  return BookingModel(
+    id: b.id,
+    reference: '#${b.id.length >= 8 ? b.id.substring(0, 8).toUpperCase() : b.id.toUpperCase()}',
+    serviceName: b.serviceName.isNotEmpty ? b.serviceName : 'Service',
+    technicianName: b.workerName.isNotEmpty ? b.workerName : 'Technician',
+    technicianId: b.workerId,
+    date: DateFormat('MMM d, y').format(b.scheduledDate),
+    time: DateFormat('h:mm a').format(b.scheduledDate),
+    location: b.addressCity.isNotEmpty ? b.addressCity : 'Cairo',
+    amount: 'EGP ${b.totalAmount.toStringAsFixed(0)}',
+    status: _parseBookingStatus(b.status),
+    pin: '0000',
+    notes: b.notes,
+  );
+}
+
+BookingStatus _parseBookingStatus(String s) => switch (s) {
+  'confirmed' || 'pending' => BookingStatus.upcoming,
+  'in_progress' || 'inProgress' => BookingStatus.inProgress,
+  'completed' => BookingStatus.completed,
+  _ => BookingStatus.cancelled,
+};
 
 class _FavouriteTechnicianCard extends StatelessWidget {
   const _FavouriteTechnicianCard({

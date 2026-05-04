@@ -109,8 +109,13 @@ function injectBanner() {
 
   document.body.insertBefore(banner, document.body.firstChild);
 
-  // Push page content below the banner
+  // Push page content and fixed header below the banner
   document.body.style.paddingTop = `${BANNER_HEIGHT}px`;
+  
+  const header = document.querySelector('[data-site-header]') || document.querySelector('.site-header');
+  if (header) {
+    header.style.top = `${BANNER_HEIGHT}px`;
+  }
 
   document.getElementById('exitPreviewBtn').addEventListener('click', () => {
     localStorage.removeItem('servio_preview_mode');

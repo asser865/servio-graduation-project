@@ -1,15 +1,13 @@
-/**
- * services-marketplace.js
- * Search, category filter, sort, result count, empty state — fully interactive
- */
+import { getServices } from '../api/services.js';
+import { initScrollReveal } from '../components/scroll-reveal.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   // ── DOM refs ──────────────────────────────────────────────────────────────
   const searchInput      = document.getElementById('service-search');
   const searchClear      = document.getElementById('serviceSearchClear');
   const filterBtns       = document.querySelectorAll('.filter-chip[data-filter]');
-  const productCards     = document.querySelectorAll('.product-card');
-  const categoryGroups   = document.querySelectorAll('.category-group');
+  // productCards and categoryGroups will be dynamically managed now
+  const resultsContainer = document.querySelector('.marketplace-results');
   const featuredSection  = document.querySelector('.featured-section');
   const marketplaceSection = document.querySelector('.marketplace-section');
   const resultCount      = document.getElementById('service-result-count');
@@ -21,6 +19,24 @@ document.addEventListener('DOMContentLoaded', () => {
   const paginationPrev   = document.getElementById('paginationPrev');
   const paginationNext   = document.getElementById('paginationNext');
   const paginationPages  = document.getElementById('paginationPages');
+
+  // ── Drawer Refs ───────────────────────────────────────────────────────────
+  const svcDrawerOverlay      = document.getElementById('svcDrawerOverlay');
+  const svcDrawer             = document.getElementById('svcDrawer');
+  const svcDrawerClose        = document.getElementById('svcDrawerClose');
+  const svcDrawerTopbar       = document.getElementById('svcDrawerTopbar');
+  const svcDrawerTopbarTitle  = document.getElementById('svcDrawerTopbarTitle');
+  const svcDrawerScroller     = document.getElementById('svcDrawerScroller');
+  const svcDrawerImg          = document.getElementById('svcDrawerImg');
+  const svcDrawerCategory     = document.getElementById('svcDrawerCategory');
+  const svcDrawerTitle        = document.getElementById('svcDrawerTitle');
+  const svcDrawerStats        = document.getElementById('svcDrawerStats');
+  const svcDrawerFeatures     = document.getElementById('svcDrawerFeatures');
+  const svcDrawerPricing      = document.getElementById('svcDrawerPricing');
+  const svcDrawerReviewText   = document.getElementById('svcDrawerReviewText');
+  const svcDrawerReviewerName = document.getElementById('svcDrawerReviewerName');
+  const svcDrawerAvatar       = document.getElementById('svcDrawerAvatar');
+  const svcDrawerCta          = document.getElementById('svcDrawerCta');
 
   // Custom Dropdown & Panel Refs
   const sortDropdown     = document.getElementById('sort-dropdown');
@@ -43,12 +59,12 @@ document.addEventListener('DOMContentLoaded', () => {
     view: 'grid',
     page: 1,
     advanced: {
-      availability: [],
-      rating: null,
-      badges: [],
-      price: { min: null, max: null },
-      details: []
-    }
+      category: [],
+      scope: [],
+      cert: [],
+      price: { min: null, max: null }
+    },
+    apiServices: [] // Full list from API
   };
   const PAGE_SIZE = 6;
 
@@ -138,20 +154,295 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // ── Sorting Logic ─────────────────────────────────────────────────────────
-  function sortCards(cards) {
-    const list = [...cards];
+  // ── API & Rendering ───────────────────────────────────────────────────────
+  async function fetchServices() {
+    try {
+      // api client already unwraps 'data', so response = { services, pagination }
+      const response = await getServices({ limit: 50 });
+      state.apiServices = response.services || [];
+      console.log('[marketplace] fetched services:', state.apiServices.length, state.apiServices);
+      applyFilters();
+    } catch (err) {
+      console.error('Failed to fetch services:', err);
+      state.apiServices = [];
+      applyFilters();
+    }
+  }
+
+  // ── Dynamic badge logic ───────────────────────────────────────────────────
+  function resolveServiceBadges(svc) {
+    const category = (svc.category || 'other').toLowerCase();
+    const rating   = parseFloat(svc.averageRating) || 0;
+    const reviews  = parseInt(svc.totalReviews)    || 0;
+    const price    = parseFloat(svc.basePrice)      || 0;
+    const isNew    = svc.createdAt
+      ? (Date.now() - new Date(svc.createdAt).getTime()) < 30 * 24 * 60 * 60 * 1000
+      : false;
+
+    // Primary: professional category label (always shown)
+    const categoryMeta = {
+      plumbing:      { label: 'Emergency Ready', labelAr: 'جاهز للطوارئ',    cls: 'tag--danger',    i18n: 'badge_emergency_ready'  },
+      electrical:    { label: 'Licensed Pro',    labelAr: 'محترف مرخّص',      cls: 'tag--secondary', i18n: 'badge_licensed_pro'     },
+      hvac:          { label: 'Climate Expert',  labelAr: 'خبير مناخي',       cls: 'tag--secondary', i18n: 'badge_climate_expert'   },
+      cleaning:      { label: 'Deep Clean Pro',  labelAr: 'تنظيف عميق',       cls: 'tag--success',   i18n: 'badge_deep_clean'       },
+      painting:      { label: 'Master Finish',   labelAr: 'دهان محترف',       cls: 'tag--paint',     i18n: 'badge_master_finish'    },
+      carpentry:     { label: 'Custom Craft',    labelAr: 'نجارة مخصصة',      cls: 'tag--wood',      i18n: 'badge_custom_craft'     },
+      flooring:      { label: 'Floor Expert',    labelAr: 'خبير أرضيات',      cls: 'tag--outline',   i18n: 'badge_floor_expert'     },
+      appliance:     { label: 'Appliance Pro',   labelAr: 'متخصص أجهزة',      cls: 'tag--secondary', i18n: 'badge_appliance_pro'    },
+      handyman:      { label: 'All-Round Fix',   labelAr: 'إصلاح متكامل',     cls: 'tag--outline',   i18n: 'badge_all_round'        },
+      renovation:    { label: 'Full Reno',       labelAr: 'تجديد شامل',       cls: 'tag--danger',    i18n: 'badge_full_reno'        },
+      drywall:       { label: 'Wall Expert',     labelAr: 'خبير جدران',       cls: 'tag--outline',   i18n: 'badge_wall_expert'      },
+      roofing:       { label: 'Roof Specialist', labelAr: 'متخصص أسطح',       cls: 'tag--secondary', i18n: 'badge_roof_specialist'  },
+      'pest-control':{ label: 'Eco Safe',        labelAr: 'آمن بيئياً',        cls: 'tag--success',   i18n: 'badge_eco_safe'         },
+      landscaping:   { label: 'Garden Pro',      labelAr: 'خبير حدائق',       cls: 'tag--success',   i18n: 'badge_garden_pro'       },
+      installation:  { label: 'Precision Fit',   labelAr: 'تركيب دقيق',       cls: 'tag--outline',   i18n: 'badge_precision_fit'    },
+      other:         { label: 'Specialist',      labelAr: 'متخصص',            cls: 'tag--outline',   i18n: 'badge_specialist'       },
+    };
+    const primary = categoryMeta[category] || categoryMeta.other;
+
+    // Secondary: quality/price badge (dynamic, shown only when meaningful)
+    let secondary = null;
+    if (rating >= 4.8 && reviews > 0) {
+      secondary = { label: 'Top Rated', labelAr: 'الأعلى تقييماً', cls: 'tag--gold',    i18n: 'badge_top_rated'       };
+    } else if (reviews >= 10) {
+      secondary = { label: 'Popular',   labelAr: 'الأكثر طلباً',  cls: 'tag--popular', i18n: 'badge_popular'         };
+    } else if (isNew) {
+      secondary = { label: 'New',       labelAr: 'جديد',           cls: 'tag--new',     i18n: 'badge_new'             };
+    } else if (svc.priceUnit === 'fixed') {
+      secondary = { label: 'Fixed Price', labelAr: 'سعر ثابت',     cls: 'tag--outline', i18n: 'badge_fixed_price'     };
+    } else if (price > 0 && price <= 80) {
+      secondary = { label: 'Budget Friendly', labelAr: 'اقتصادي',  cls: 'tag--outline', i18n: 'badge_budget_friendly' };
+    } else if (price > 300) {
+      secondary = { label: 'Premium',  labelAr: 'بريميوم',         cls: 'tag--secondary',i18n: 'badge_premium'        };
+    }
+
+    return { primary, secondary };
+  }
+
+  function generateServiceCard(svc) {
+    const title    = svc.title || 'Untitled Service';
+    const category = (svc.category || 'other').toLowerCase();
+    const isAr     = (window.__lang || document.documentElement.lang) === 'ar';
+
+    const displayTitle = title.charAt(0).toUpperCase() + title.slice(1);
+    const nameKey      = 'svc_' + title.toLowerCase().replace(/ /g, '_');
+    const descKey      = nameKey + '_desc';
+
+    const icons = {
+      plumbing:      `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"/><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"/></svg>`,
+      electrical:    `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>`,
+      hvac:          `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20"/><path d="M12 2v20"/><path d="m20 16-4-4 4-4"/><path d="m4 8 4 4-4 4"/><path d="m16 4-4 4-4-4"/><path d="m8 20 4-4 4 4"/></svg>`,
+      cleaning:      `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4.5 8-11.8A8 8 0 0 0 12 2a8 8 0 0 0-8 8.2c0 7.3 8 11.8 8 11.8z"/><circle cx="12" cy="10" r="3"/></svg>`,
+      painting:      `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>`,
+      carpentry:     `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 12-8.373 8.373a1 1 0 1 1-3-3L12 9"/><path d="m18 15 4-4"/><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172V7l-2.26-2.26a6 6 0 0 0-4.202-1.756L9 2.96l.92.82A6.18 6.18 0 0 1 12 8.4V10l2 2h1.172a2 2 0 0 1 1.414.586L18 14"/></svg>`,
+      flooring:      `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>`,
+      appliance:     `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="15" x="2" y="4" rx="2"/><path d="M8 4v15M16 4v15M2 9h20M2 14h20"/></svg>`,
+      handyman:      `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`,
+      renovation:    `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
+      drywall:       `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M2 9h20M2 15h20M8 3v6M16 3v6M8 15v6M16 15v6"/></svg>`,
+      roofing:       `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7"/><path d="M3 9v13h18V9"/><path d="M9 22V12h6v10"/></svg>`,
+      'pest-control':`<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12h8M12 8v8"/><circle cx="12" cy="12" r="9"/><path d="M4.93 4.93l14.14 14.14"/></svg>`,
+      landscaping:   `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-7l-2-2"/><path d="M17 8v.8A6 6 0 0 1 13.8 20v0H10v0A6.5 6.5 0 0 1 7 8h0a5 5 0 0 1 10 0z"/><path d="m14 14-2 2-2-2"/></svg>`,
+      installation:  `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>`,
+      other:         `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`,
+    };
+
+    const iconClass = ['plumbing','hvac','electrical'].includes(category)
+      ? 'product-card__icon--primary'
+      : 'product-card__icon--secondary';
+
+    const price     = svc.basePrice || 0;
+    const priceUnit = { per_hour: '/hr', per_sqm: '/m²', fixed: '' }[svc.priceUnit] || '';
+
+    const rating  = parseFloat(svc.averageRating) || 0;
+    const reviews = parseInt(svc.totalReviews)    || 0;
+
+    const article = document.createElement('article');
+    article.className = 'product-card';
+    article.dataset.id       = svc._id;
+    article.dataset.category = category;
+    article.dataset.rating   = svc.averageRating || '0';
+    article.dataset.price    = svc.basePrice || 0;
+    article.style.cursor     = 'pointer';
+    article.dataset.reveal   = '';
+
+    const responseTime = {
+      plumbing: '~45 min', electrical: '~30 min', hvac: '~60 min',
+      cleaning: '~20 min', painting: '~50 min', carpentry: '~70 min',
+      flooring: '~90 min', appliance: '~40 min', roofing: '~120 min',
+      landscaping: '~60 min', handyman: '~25 min', renovation: '~120 min',
+      drywall: '~80 min', installation: '~35 min',
+    }[category] || '~45 min';
+
+    const ratingHtml = rating > 0
+      ? `<span class="product-card__rating" aria-label="Rating ${rating.toFixed(1)}">
+           <svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+           ${rating.toFixed(1)}<span class="product-card__rating-count">${reviews > 0 ? ` (${reviews})` : ''}</span>
+         </span>`
+      : '';
+
+    const priceLabel = price > 0
+      ? `from <strong>${price} EGP${priceUnit}</strong>`
+      : '<strong>On Request</strong>';
+
+    article.innerHTML = `
+      <div class="product-card__icon ${iconClass}">${icons[category] || icons.other}</div>
+      <h4 class="product-card__title" data-i18n="${nameKey}">${displayTitle}</h4>
+      <p class="product-card__desc" data-i18n="${descKey}">${svc.description || ''}</p>
+      <div class="product-card__info">
+        ${ratingHtml}
+        <span class="product-card__response">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          ${responseTime}
+        </span>
+      </div>
+      <div class="product-card__footer">
+        <span class="product-card__price">${priceLabel}</span>
+        <button class="product-card__action" type="button">View Details →</button>
+      </div>
+    `;
+
+    article.addEventListener('click', () => openServiceDrawer(svc));
+
+    return article;
+  }
+
+  // ── Drawer Data & Logic ───────────────────────────────────────────────────
+  const DRAWER_FEATURES = {
+    plumbing:    ['Pipe Repair & Replacement', 'Drain Cleaning', 'Fixture Installation', 'Water Heater Service', 'Leak Detection', 'Full Inspections'],
+    electrical:  ['Panel Upgrades', 'Outlet Installation', 'Wiring & Rewiring', 'Safety Inspections', 'Smart Home Setup', 'Emergency Repairs'],
+    hvac:        ['AC Installation', 'System Maintenance', 'Filter Replacement', 'Duct Cleaning', 'Thermostat Setup', 'Full Diagnostics'],
+    cleaning:    ['Full Home Deep Clean', 'Kitchen Degreasing', 'Bathroom Sanitizing', 'Post-Construction', 'Move In/Out Clean', 'Window Cleaning'],
+    painting:    ['Interior Painting', 'Exterior Painting', 'Wall Preparation', 'Priming & Sealing', 'Color Consultation', 'Trim & Detail Work'],
+    carpentry:   ['Custom Furniture', 'Door Fitting', 'Shelving & Storage', 'Flooring Install', 'Wood Repair', 'Kitchen Cabinetry'],
+    flooring:    ['Hardwood Installation', 'Tile & Stone Work', 'Laminate Flooring', 'Subfloor Repair', 'Sanding & Refinishing', 'Grout & Sealing'],
+    appliance:   ['Washer & Dryer Repair', 'Refrigerator Service', 'Oven & Stove Repair', 'Dishwasher Fix', 'Installation & Setup', 'Warranty Support'],
+    roofing:     ['Roof Inspection', 'Leak Repair', 'Shingle Replacement', 'Gutter Cleaning', 'Waterproofing', 'Full Roof Replacement'],
+    landscaping: ['Lawn Mowing & Edging', 'Tree Trimming', 'Garden Design', 'Irrigation Setup', 'Pest Control', 'Seasonal Cleanup'],
+    default:     ['Professional Service', 'Licensed Technicians', 'Quality Guarantee', 'Transparent Pricing', 'Background Checked', 'Fully Insured'],
+  };
+
+  const DRAWER_REVIEWS = {
+    plumbing:   { text: 'Fixed our burst pipe within an hour. Incredibly professional and transparent pricing — no surprises.', reviewer: 'Sara M.', avatarId: 12 },
+    electrical: { text: 'Had our entire kitchen rewired safely and on time. Explained every step clearly — highly recommend.', reviewer: 'Karim A.', avatarId: 33 },
+    hvac:       { text: 'Diagnosed and fixed our AC in under 2 hours during the hottest week of summer. Lifesavers!', reviewer: 'Nour H.', avatarId: 47 },
+    cleaning:   { text: 'Transformed our apartment before move-in. Every surface spotless — even cleaned inside the cabinets.', reviewer: 'Dina F.', avatarId: 21 },
+    painting:   { text: 'Clean lines, no mess, perfect finish. The color consultation alone was worth it.', reviewer: 'Omar T.', avatarId: 68 },
+    carpentry:  { text: 'Built us a stunning custom bookcase. Precise craftsmanship and a great eye for detail.', reviewer: 'Layla R.', avatarId: 56 },
+    default:    { text: 'Outstanding work from start to finish. Punctual, professional, and genuinely quality service.', reviewer: 'Ahmed K.', avatarId: 15 },
+  };
+
+  const DRAWER_HERO_IMGS = {
+    plumbing:    'https://images.unsplash.com/photo-1585771724684-38269d6639fd?q=70&w=900&auto=format&fit=crop',
+    electrical:  'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=70&w=900&auto=format&fit=crop',
+    hvac:        'https://images.unsplash.com/photo-1497366216548-37526070297c?q=70&w=900&auto=format&fit=crop',
+    cleaning:    'https://images.unsplash.com/photo-1581578731548-c64695cc6952?q=70&w=900&auto=format&fit=crop',
+    painting:    'https://images.unsplash.com/photo-1562259949-e8e7689d7828?q=70&w=900&auto=format&fit=crop',
+    carpentry:   'https://images.unsplash.com/photo-1504148455328-c376907d081c?q=70&w=900&auto=format&fit=crop',
+    flooring:    'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?q=70&w=900&auto=format&fit=crop',
+    roofing:     'https://images.unsplash.com/photo-1632759145355-8b8a6d018a34?q=70&w=900&auto=format&fit=crop',
+    landscaping: 'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?q=70&w=900&auto=format&fit=crop',
+    default:     'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?q=70&w=900&auto=format&fit=crop',
+  };
+
+  function openServiceDrawer(svc) {
+    if (!svcDrawer) return;
+    const category = (svc.category || 'other').toLowerCase();
+    const title     = svc.title ? (svc.title.charAt(0).toUpperCase() + svc.title.slice(1)) : 'Service';
+    const rating    = parseFloat(svc.averageRating) || 0;
+    const reviews   = parseInt(svc.totalReviews) || 0;
+    const price     = svc.basePrice || 0;
+    const priceUnit = svc.priceUnit === 'per_hour' ? '/hr' : svc.priceUnit === 'per_sqm' ? '/m²' : '';
+
+    svcDrawerImg.src          = DRAWER_HERO_IMGS[category] || DRAWER_HERO_IMGS.default;
+    svcDrawerImg.alt          = title;
+    svcDrawerCategory.textContent = (svc.category || 'Service').charAt(0).toUpperCase() + (svc.category || 'Service').slice(1) + ' Service';
+    svcDrawerTitle.textContent    = title;
+
+    svcDrawerStats.innerHTML = [
+      { icon: '★', value: rating > 0 ? rating.toFixed(1) : '—', label: 'Rating' },
+      { icon: '💬', value: reviews > 0 ? reviews : '—', label: 'Reviews' },
+      { icon: '💰', value: price > 0 ? `${price} EGP${priceUnit}` : '—', label: 'Starting From' },
+    ].map(s => `
+      <div class="svc-drawer__stat">
+        <div class="svc-drawer__stat-icon">${s.icon}</div>
+        <div class="svc-drawer__stat-value">${s.value}</div>
+        <div class="svc-drawer__stat-label">${s.label}</div>
+      </div>
+    `).join('');
+
+    const features = DRAWER_FEATURES[category] || DRAWER_FEATURES.default;
+    svcDrawerFeatures.innerHTML = features.map(f => `
+      <div class="svc-drawer__feature-row">
+        <span class="svc-drawer__feature-check">
+          <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+        </span>
+        ${f}
+      </div>
+    `).join('');
+
+    const base = price || 50;
+    svcDrawerPricing.innerHTML = [
+      { tier: 'Basic',    amount: base,              unit: priceUnit, desc: 'Minor repairs & fixes' },
+      { tier: 'Standard', amount: Math.round(base * 1.4), unit: priceUnit, desc: 'Installations & overhauls', featured: true },
+      { tier: 'Premium',  amount: Math.round(base * 2),   unit: priceUnit, desc: 'Full renovation scope' },
+    ].map(p => `
+      <div class="svc-drawer__price-card${p.featured ? ' is-featured' : ''}">
+        <div class="svc-drawer__price-tier">${p.tier}</div>
+        <div class="svc-drawer__price-amount">${p.amount} EGP<sub>${p.unit}</sub></div>
+        <div class="svc-drawer__price-desc">${p.desc}</div>
+      </div>
+    `).join('');
+
+    const rev = DRAWER_REVIEWS[category] || DRAWER_REVIEWS.default;
+    svcDrawerReviewText.textContent   = rev.text;
+    svcDrawerReviewerName.textContent = rev.reviewer;
+    svcDrawerAvatar.src = `https://i.pravatar.cc/68?img=${rev.avatarId}`;
+
+    if (svcDrawerCta) svcDrawerCta.href = `./technician-listing.html?service=${category}`;
+
+    // Reset scroll-collapse state
+    if (svcDrawerImg)         svcDrawerImg.style.transform = 'scale(1.08) translateY(0)';
+    if (svcDrawerTopbar)      svcDrawerTopbar.classList.remove('is-solid');
+    if (svcDrawerTopbarTitle) svcDrawerTopbarTitle.textContent = title;
+    if (svcDrawerScroller)    svcDrawerScroller.scrollTop = 0;
+    svcDrawerScroller?.addEventListener('scroll', handleDrawerScroll);
+
+    svcDrawerOverlay?.classList.add('is-open');
+    svcDrawer.classList.add('is-open');
+    document.body.style.overflow = 'hidden';
+    document.querySelector('[data-chat-fab]')?.style.setProperty('display', 'none');
+  }
+
+  function closeServiceDrawer() {
+    svcDrawerOverlay?.classList.remove('is-open');
+    svcDrawer?.classList.remove('is-open');
+    document.body.style.overflow = '';
+    document.querySelector('[data-chat-fab]')?.style.removeProperty('display');
+    svcDrawerScroller?.removeEventListener('scroll', handleDrawerScroll);
+  }
+
+  // ── Drawer Hero Parallax on Scroll (GPU-only, zero reflow) ───────────────
+  function handleDrawerScroll() {
+    if (!svcDrawerScroller || !svcDrawerImg || !svcDrawerTopbar) return;
+    const scrollY = svcDrawerScroller.scrollTop;
+    svcDrawerImg.style.transform = `scale(1.08) translateY(${scrollY * 0.25}px)`;
+    svcDrawerTopbar.classList.toggle('is-solid', scrollY > 140);
+  }
+
+  svcDrawerClose?.addEventListener('click', closeServiceDrawer);
+  svcDrawerOverlay?.addEventListener('click', closeServiceDrawer);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeServiceDrawer(); });
+
+  function sortServices(services) {
+    const list = [...services];
     if (state.sort === 'featured') return list;
     
     return list.sort((a, b) => {
-      const titleA = (a.querySelector('.product-card__title')?.textContent || '').toLowerCase();
-      const titleB = (b.querySelector('.product-card__title')?.textContent || '').toLowerCase();
-      
       switch(state.sort) {
-        case 'price_low': return 100 - 200; // Mock price logic
-        case 'price_high': return 200 - 100;
-        case 'top_rated': return -1; // Mock rating logic
-        default: return titleA.localeCompare(titleB);
+        case 'price_low': return (a.basePrice || 0) - (b.basePrice || 0);
+        case 'price_high': return (b.basePrice || 0) - (a.basePrice || 0);
+        default: return (a.title || '').localeCompare(b.title || '');
       }
     });
   }
@@ -162,7 +453,6 @@ document.addEventListener('DOMContentLoaded', () => {
     activeFiltersContainer.innerHTML = '';
     let count = 0;
 
-    // Helper to add token
     const addToken = (label, type, value) => {
       count++;
       const token = document.createElement('div');
@@ -176,13 +466,9 @@ document.addEventListener('DOMContentLoaded', () => {
       activeFiltersContainer.appendChild(token);
     };
 
-    // Availability
-    state.advanced.availability.forEach(v => addToken(`Availability: ${v}`, 'availability', v));
-    // Badges
-    state.advanced.badges.forEach(v => addToken(v.charAt(0).toUpperCase() + v.slice(1), 'badge', v));
-    // Rating
-    if (state.advanced.rating) addToken(`${state.advanced.rating}+ Stars`, 'rating', state.advanced.rating);
-    // Price
+    (state.advanced.category || []).forEach(v => addToken(`Category: ${v}`, 'category', v));
+    (state.advanced.scope || []).forEach(v => addToken(`Scope: ${v}`, 'scope', v));
+    (state.advanced.cert || []).forEach(v => addToken(v.charAt(0).toUpperCase() + v.slice(1), 'cert', v));
     if (state.advanced.price.min !== null || state.advanced.price.max !== null) {
       let priceLabel = 'Price: ';
       if (state.advanced.price.min && state.advanced.price.max) priceLabel += `${state.advanced.price.min} - ${state.advanced.price.max} EGP`;
@@ -190,14 +476,12 @@ document.addEventListener('DOMContentLoaded', () => {
       else priceLabel += `<${state.advanced.price.max} EGP`;
       addToken(priceLabel, 'price', 'range');
     }
-    
-    // Update badge
+
     if (filterCountBadge) {
       filterCountBadge.textContent = count;
       filterCountBadge.hidden = count === 0;
     }
 
-    // Token removal listeners
     activeFiltersContainer.querySelectorAll('.filter-token__remove').forEach(btn => {
       btn.addEventListener('click', () => {
         removeSpecificFilter(btn.dataset.type, btn.dataset.value);
@@ -206,12 +490,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function removeSpecificFilter(type, value) {
-    if (type === 'availability') state.advanced.availability = state.advanced.availability.filter(v => v !== value);
-    if (type === 'badge') state.advanced.badges = state.advanced.badges.filter(v => v !== value);
-    if (type === 'rating') state.advanced.rating = null;
+    if (type === 'category') state.advanced.category = (state.advanced.category || []).filter(v => v !== value);
+    if (type === 'scope') state.advanced.scope = (state.advanced.scope || []).filter(v => v !== value);
+    if (type === 'cert') state.advanced.cert = (state.advanced.cert || []).filter(v => v !== value);
     if (type === 'price') { state.advanced.price.min = null; state.advanced.price.max = null; }
-    
-    // Sync UI elements back
+
     syncFilterPanelToState();
     state.page = 1;
     applyFilters();
@@ -219,18 +502,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function syncFilterPanelToState() {
     if (!filterPanel) return;
-    // Checks
     filterPanel.querySelectorAll('input[type="checkbox"]').forEach(cb => {
       const name = cb.name;
       const val = cb.value;
-      if (name === 'availability') cb.checked = state.advanced.availability.includes(val);
-      if (name === 'badge') cb.checked = state.advanced.badges.includes(val);
+      if (name === 'category') cb.checked = (state.advanced.category || []).includes(val);
+      if (name === 'scope') cb.checked = (state.advanced.scope || []).includes(val);
+      if (name === 'cert') cb.checked = (state.advanced.cert || []).includes(val);
     });
-    // Radios
-    filterPanel.querySelectorAll('.filter-radio-btn').forEach(btn => {
-      btn.classList.toggle('is-active', btn.dataset.value === state.advanced.rating);
-    });
-    // Price inputs
     const minInput = document.getElementById('price-min');
     const maxInput = document.getElementById('price-max');
     if (minInput) minInput.value = state.advanced.price.min || '';
@@ -239,103 +517,136 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ── Main Filter Application ────────────────────────────────────────────────
   function applyFilters() {
-    const hasAdvancedFilters = state.advanced.availability.length > 0
-      || state.advanced.badges.length > 0
-      || !!state.advanced.rating
-      || state.advanced.details.length > 0
+    const hasAdvancedFilters = (state.advanced.category && state.advanced.category.length > 0)
+      || (state.advanced.scope && state.advanced.scope.length > 0)
+      || (state.advanced.cert && state.advanced.cert.length > 0)
       || state.advanced.price.min !== null
       || state.advanced.price.max !== null;
     const isFiltering = state.query !== '' || state.filter !== 'all' || hasAdvancedFilters;
 
     if (featuredSection) featuredSection.style.display = isFiltering ? 'none' : '';
 
-    const filteredCards = [];
-
-    productCards.forEach(card => {
-      const title = (card.querySelector('.product-card__title')?.textContent || '').toLowerCase();
-      const desc = (card.querySelector('.product-card__desc')?.textContent || '').toLowerCase();
-      const category = card.getAttribute('data-category') || '';
+    const filtered = (state.apiServices || []).filter(svc => {
+      const title = (svc.title || '').toLowerCase();
+      const desc = (svc.description || svc.desc || '').toLowerCase();
+      const category = (svc.category || '').toLowerCase();
 
       const matchesSearch = !state.query || title.includes(state.query) || desc.includes(state.query);
-      const matchesFilter = state.filter === 'all' || category === state.filter;
+      
+      // Map frontend filter chips to backend categories
+      let matchesFilter = state.filter === 'all';
+      if (!matchesFilter) {
+        if (state.filter === 'maintenance') {
+          matchesFilter = ['plumbing', 'electrical', 'cleaning', 'hvac'].includes(category);
+        } else if (state.filter === 'improvement') {
+          matchesFilter = ['painting', 'flooring', 'carpentry'].includes(category);
+        } else if (state.filter === 'specialty') {
+          matchesFilter = ['other'].includes(category);
+        } else {
+          matchesFilter = category === state.filter;
+        }
+      }
 
-      // Advanced Filter Logic
       let matchesAdvanced = true;
+      if (state.advanced.category && state.advanced.category.length > 0 && !state.advanced.category.includes(category)) matchesAdvanced = false;
+      if (matchesAdvanced && state.advanced.scope && state.advanced.scope.length > 0 && svc.scope && !state.advanced.scope.includes(svc.scope)) matchesAdvanced = false;
+      if (matchesAdvanced && state.advanced.cert && state.advanced.cert.length > 0 && svc.cert && !state.advanced.cert.includes(svc.cert)) matchesAdvanced = false;
+      if (matchesAdvanced && state.advanced.price.min !== null && svc.basePrice < state.advanced.price.min) matchesAdvanced = false;
+      if (matchesAdvanced && state.advanced.price.max !== null && svc.basePrice > state.advanced.price.max) matchesAdvanced = false;
 
-      // 1. Availability
-      if (state.advanced.availability.length > 0) {
-        const cardAvail = (card.getAttribute('data-availability') || '').split(',');
-        const hasMatch = state.advanced.availability.some(v => cardAvail.includes(v));
-        if (!hasMatch) matchesAdvanced = false;
-      }
-
-      // 2. Badges
-      if (matchesAdvanced && state.advanced.badges.length > 0) {
-        const cardBadges = (card.getAttribute('data-badges') || '').split(',');
-        const hasMatch = state.advanced.badges.some(v => cardBadges.includes(v));
-        if (!hasMatch) matchesAdvanced = false;
-      }
-
-      // 3. Rating
-      if (matchesAdvanced && state.advanced.rating) {
-        const cardRating = parseFloat(card.getAttribute('data-rating') || '0');
-        if (cardRating < parseFloat(state.advanced.rating)) matchesAdvanced = false;
-      }
-
-      // 4. Price Range
-      if (matchesAdvanced && (state.advanced.price.min !== null || state.advanced.price.max !== null)) {
-        const cardPrice = parseFloat(card.getAttribute('data-price') || '0');
-        if (state.advanced.price.min !== null && cardPrice < state.advanced.price.min) matchesAdvanced = false;
-        if (state.advanced.price.max !== null && cardPrice > state.advanced.price.max) matchesAdvanced = false;
-      }
-
-      if (matchesSearch && matchesFilter && matchesAdvanced) filteredCards.push(card);
+      return matchesSearch && matchesFilter && matchesAdvanced;
     });
 
-    const orderedCards = state.sort !== 'featured' ? sortCards(filteredCards) : filteredCards;
-
-    if (state.sort !== 'featured') {
-      orderedCards.forEach(card => card.parentElement?.appendChild(card));
-    }
-
-    const total = orderedCards.length;
-    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-    state.page = Math.min(state.page, totalPages);
+    const ordered = sortServices(filtered);
+    const total = ordered.length;
+    const totalPages = Math.ceil(total / PAGE_SIZE);
+    state.page = totalPages > 0 ? Math.min(state.page, totalPages) : 1;
 
     const pageStart = (state.page - 1) * PAGE_SIZE;
-    const pageCards = orderedCards.slice(pageStart, pageStart + PAGE_SIZE);
-    const pageCardSet = new Set(pageCards);
-    const groupVisible = {};
-    categoryGroups.forEach(group => {
-      groupVisible[group.getAttribute('data-group')] = false;
-    });
+    const pageItems = ordered.slice(pageStart, pageStart + PAGE_SIZE);
 
-    productCards.forEach(card => {
-      const category = card.getAttribute('data-category') || '';
-      const visible = pageCardSet.has(card);
-      card.style.display = visible ? '' : 'none';
-      if (visible && Object.prototype.hasOwnProperty.call(groupVisible, category)) {
-        groupVisible[category] = true;
+    // Clear and render groups
+    if (resultsContainer) {
+      resultsContainer.innerHTML = '';
+      
+      if (pageItems.length === 0) {
+        resultsContainer.appendChild(emptyState);
+        emptyState.classList.add('is-visible');
+      } else {
+        emptyState.classList.remove('is-visible');
+        
+        // Group by category for visual grouping
+        const groups = {};
+        const masterGroupMap = {
+          plumbing: 'maintenance',
+          electrical: 'maintenance',
+          hvac: 'maintenance',
+          cleaning: 'maintenance',
+          painting: 'improvement',
+          flooring: 'improvement',
+          carpentry: 'improvement',
+          specialty: 'specialty',
+          other: 'specialty'
+        };
+
+        pageItems.forEach(svc => {
+          const master = masterGroupMap[svc.category.toLowerCase()] || 'specialty';
+          if (!groups[master]) groups[master] = { label: master, services: [] };
+          groups[master].services.push(svc);
+        });
+
+        Object.keys(groups).forEach(master => {
+          const groupDiv = document.createElement('div');
+          groupDiv.className = 'category-group';
+          groupDiv.dataset.group = master;
+          
+          const heading = document.createElement('h3');
+          heading.className = 'category-heading';
+          heading.dataset.i18n = `smp_heading_${master}`;
+          
+          // Better labeling
+          const labels = {
+            maintenance: 'Home Maintenance & Repair',
+            improvement: 'Home Improvement & Restoration',
+            specialty: 'Specialized Property Services'
+          };
+          heading.textContent = labels[master] || master.toUpperCase();
+          
+          const grid = document.createElement('div');
+          grid.className = 'product-grid';
+          if (state.view === 'list') grid.classList.add('is-list-view');
+          
+          groups[master].services.forEach(svc => {
+            grid.appendChild(generateServiceCard(svc));
+          });
+          
+          groupDiv.appendChild(heading);
+          groupDiv.appendChild(grid);
+          resultsContainer.appendChild(groupDiv);
+        });
       }
-    });
-
-    categoryGroups.forEach(group => {
-      const key = group.getAttribute('data-group');
-      group.style.display = groupVisible[key] ? '' : 'none';
-    });
-
-    const hasVisibleCards = pageCards.length > 0;
+    }
 
     if (resultCount) animateCount(resultCount, total);
     if (resultLabel) {
       resultLabel.textContent = isFiltering ? `service${total === 1 ? '' : 's'} found` : `service${total === 1 ? '' : 's'} available`;
     }
 
-    if (emptyState) emptyState.classList.toggle('is-visible', isFiltering && !hasVisibleCards);
     renderPagination(total);
-
     updateFilterTokens();
+    
+    // Re-trigger animations and translations for new cards with a slight delay
+    setTimeout(() => {
+      if (typeof window.initScrollReveal === 'function') {
+        window.initScrollReveal();
+      } else {
+        document.querySelectorAll('[data-reveal]').forEach(el => el.classList.add('is-visible'));
+      }
+    }, 50);
+    
+    if (typeof window.translatePage === 'function') window.translatePage();
   }
+
 
   // ── Event Handlers ────────────────────────────────────────────────────────
   
@@ -392,8 +703,9 @@ document.addEventListener('DOMContentLoaded', () => {
   if (applyFiltersBtn) {
     applyFiltersBtn.addEventListener('click', () => {
       // Capture checkbox states
-      state.advanced.availability = Array.from(filterPanel.querySelectorAll('input[name="availability"]:checked')).map(cb => cb.value);
-      state.advanced.badges = Array.from(filterPanel.querySelectorAll('input[name="badge"]:checked')).map(cb => cb.value);
+      state.advanced.category = Array.from(filterPanel.querySelectorAll('input[name="category"]:checked')).map(cb => cb.value);
+      state.advanced.scope = Array.from(filterPanel.querySelectorAll('input[name="scope"]:checked')).map(cb => cb.value);
+      state.advanced.cert = Array.from(filterPanel.querySelectorAll('input[name="cert"]:checked')).map(cb => cb.value);
       
       // Capture price range
       const minVal = document.getElementById('price-min')?.value;
@@ -410,7 +722,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (resetFiltersBtn) {
     resetFiltersBtn.addEventListener('click', () => {
-      state.advanced = { availability: [], rating: null, badges: [], price: { min: null, max: null }, details: [] };
+      state.advanced = { category: [], scope: [], cert: [], price: { min: null, max: null } };
       syncFilterPanelToState();
       state.page = 1;
       applyFilters();
@@ -468,7 +780,7 @@ document.addEventListener('DOMContentLoaded', () => {
       state.filter = 'all';
       state.sort = 'featured';
       state.page = 1;
-      state.advanced = { availability: [], rating: null, badges: [], price: { min: null, max: null }, details: [] };
+      state.advanced = { category: [], scope: [], cert: [], price: { min: null, max: null } };
       
       filterBtns.forEach(b => b.classList.remove('filter-chip--active'));
       document.querySelector('.filter-chip[data-filter="all"]')?.classList.add('filter-chip--active');
@@ -512,18 +824,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Init
-  applyFilters();
-
-  // ── Card click → service details page ────
-  productCards.forEach(card => {
-    card.style.cursor = 'pointer';
-    card.addEventListener('click', e => {
-      if (e.target.closest('a')) return; // let anchor handle navigation
-      const link = card.querySelector('.product-card__action');
-      if (link) window.location.href = link.href;
-    });
-  });
-
+  fetchServices();
 });
 
-// .
+

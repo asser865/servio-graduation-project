@@ -4,13 +4,21 @@
 import { showToast } from '../components/toast.js';
 import { revealAll } from '../components/scroll-reveal.js';
 import { getInitials } from '../utils/string.js';
+import { getMe, updateMe, updateEmail, deleteMe, updatePassword } from '../api/users.js';
+import { clearSession } from '../api/client.js';
+import { uploadPublicFile } from '../api/uploads.js';
+import { getMyBookings, cancelBooking } from '../api/bookings.js';
+// No customer-facing review fetch endpoint exists on backend
 
 
 const TAB_KEY = 'servio_activeTab_customer';
 
+// Holds the uploaded avatar URL between file-select and form-save
+let _pendingPhotoUrl = null;
+
 function getSession() {
   try {
-    return JSON.parse(localStorage.getItem('servio_session') || 'null');
+    return JSON.parse(sessionStorage.getItem('servio_session') || localStorage.getItem('servio_session') || 'null');
   } catch { return null; }
 }
 
@@ -30,6 +38,17 @@ function getAccount() {
   try {
     return JSON.parse(localStorage.getItem('servio_account') || 'null');
   } catch { return null; }
+}
+
+function normalizeEmail(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function getErrorMessage(err, fallback) {
+  return err?.data?.errors?.[0]?.message
+    || err?.data?.message
+    || err?.message
+    || fallback;
 }
 
 /* ── Tab switching ──────────────────────────────────────── */
@@ -65,7 +84,7 @@ function initTabs() {
       p.hidden = !active;
       if (active) revealAll(p);
     });
-    localStorage.setItem(TAB_KEY, id);
+    sessionStorage.setItem(TAB_KEY, id);
   }
 
   tabs.forEach(tab => tab.addEventListener('click', () => showTab(tab.dataset.tab)));
@@ -80,31 +99,37 @@ function initTabs() {
 
   // Cancel booking with contextual confirmation
   document.querySelectorAll('[data-cancel-booking]').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
+      const bookingId = btn.dataset.cancelBooking;
       const type = btn.dataset.cancelType || 'confirmed';
       const msg =
         type === 'pending'
           ? (typeof window.t === 'function' ? window.t('confirm_withdraw') : 'Withdraw this pending request? You can submit a new booking anytime.')
           : (typeof window.t === 'function' ? window.t('confirm_cancel') : 'Cancel this confirmed visit? You may need to book a new slot if you still need the service.');
       if (!window.confirm(msg)) return;
-      const card = btn.closest('.dash-card, .booking-card');
-      if (card) {
-        card.style.transition = 'opacity 0.3s, transform 0.3s';
-        card.style.opacity = '0';
-        card.style.transform = 'translateX(8px)';
-        setTimeout(() => {
-          card.remove();
-          if (typeof window.applyBookingFilter === 'function') window.applyBookingFilter();
-        }, 300);
+      try {
+        if (bookingId) await cancelBooking(bookingId);
+        const card = btn.closest('.dash-card, .booking-card');
+        if (card) {
+          card.style.transition = 'opacity 0.3s, transform 0.3s';
+          card.style.opacity = '0';
+          card.style.transform = 'translateX(8px)';
+          setTimeout(() => {
+            card.remove();
+            if (typeof window.applyBookingFilter === 'function') window.applyBookingFilter();
+          }, 300);
+        }
+        showToast(typeof window.t === 'function'
+          ? (type === 'pending' ? window.t('toast_request_withdrawn') : window.t('toast_booking_cancelled'))
+          : (type === 'pending' ? 'Request withdrawn.' : 'Booking cancelled.'), 'info');
+      } catch (err) {
+        showToast(err.message || 'Failed to cancel booking', 'error');
       }
-      showToast(typeof window.t === 'function'
-        ? (type === 'pending' ? window.t('toast_request_withdrawn') : window.t('toast_booking_cancelled'))
-        : (type === 'pending' ? 'Request withdrawn.' : 'Booking cancelled.'), 'info');
     });
   });
 
   // Restore saved tab
-  const saved = localStorage.getItem(TAB_KEY) || 'overview';
+  const saved = sessionStorage.getItem(TAB_KEY) || 'overview';
   showTab(saved);
 }
 
@@ -120,7 +145,7 @@ function populateProfile() {
     return;
   }
 
-  const name = session.name || account?.fullName || 'User';
+  const name = session.name || 'User';
   const initials = getInitials(name);
 
   document.querySelectorAll('[data-dash-initials]').forEach(el => { el.textContent = initials; });
@@ -132,9 +157,11 @@ function populateProfile() {
     nameEl.removeAttribute('data-i18n'); // real name set — prevent lang.js from re-translating to "Loading…"
   }
   if (emailEl) {
-    const email = session.email || account?.email || '';
+    const email = session.email || '';
     emailEl.textContent = email || '—';
   }
+  const settingsEmailInput = document.getElementById('settings-email');
+  if (settingsEmailInput) settingsEmailInput.value = session.email || '';
   const firstName = name.split(' ')[0];
   document.querySelectorAll('[data-dash-firstname]').forEach(el => {
     el.textContent = firstName;
@@ -152,41 +179,197 @@ function populateProfile() {
         f.value = account[f.dataset.settingsField];
       }
     });
-    // Update avatar preview initials
-    const preview = document.querySelector('[data-avatar-preview]');
-    if (preview && preview.children.length === 0) preview.textContent = initials;
   }
-}
 
-/* ── Stats ──────────────────────────────────────────────── */
-function populateStats() {
-  const bookingsTotal = 3; // Demo static values
-  const goalTotal     = 5;
-  const pct = Math.round((bookingsTotal / goalTotal) * 100);
-
-  const tEl = document.querySelector('[data-stat="total-bookings"]');
-  const aEl = document.querySelector('[data-stat="active-bookings"]');
-  const sEl = document.querySelector('[data-stat="saved-technicians"]');
-
-  if (tEl) tEl.textContent = String(bookingsTotal);
-  if (aEl) aEl.textContent = '2';
-  if (sEl) sEl.textContent = '2';
-
-  const spentEl = document.querySelector('[data-stat="total-spent"]');
-  if (spentEl) spentEl.textContent = '1,250 EGP';
-
-  // Update Goal Context & Progress Bar
-  const ctxE = document.querySelector('.dash-stat-card__context[data-i18n-html]');
-  if (ctxE) {
-    ctxE.setAttribute('data-i18n-pct', String(pct));
-    // Trigger translation again if lang.js is available
-    if (window.applyLanguage && window.__lang) {
-      window.applyLanguage(window.__lang);
+  // Render avatar — photo takes priority over initials
+  function renderAvatar(photoUrl) {
+    const preview  = document.querySelector('[data-avatar-preview]');
+    const topbar   = document.getElementById('topbar-avatar');
+    const imgStyle = 'width:100%;height:100%;object-fit:cover;border-radius:50%;';
+    if (preview) {
+      preview.innerHTML = photoUrl
+        ? `<img src="${photoUrl}" alt="Profile photo" style="${imgStyle}" />`
+        : `<span data-dash-initials>${initials}</span>`;
+    }
+    if (topbar) {
+      topbar.innerHTML = photoUrl
+        ? `<img src="${photoUrl}" alt="Profile photo" style="${imgStyle}" />`
+        : initials[0] || 'U';
     }
   }
 
-  const barFill = document.querySelector('[data-stat-goal-bar="total"]');
-  if (barFill) barFill.style.width = pct + '%';
+  // Show photo from session immediately (no flash)
+  renderAvatar(session.profileImage || null);
+
+  // Enrich profile from real API
+  getMe().then(res => {
+    const user = res;
+    if (!user) return;
+    const apiInitials = getInitials(user.name || '');
+    document.querySelectorAll('[data-dash-initials]').forEach(el => { el.textContent = apiInitials; });
+
+    // Update avatar with server photo if available
+    if (user.profileImage) {
+      renderAvatar(user.profileImage);
+      // Keep session in sync
+      const s = getSession();
+      if (s && s.profileImage !== user.profileImage) {
+        s.profileImage = user.profileImage;
+        localStorage.setItem('servio_session', JSON.stringify(s));
+      }
+    }
+
+    document.querySelectorAll('[data-dash-name], [data-cust-name], [data-dash-firstname]').forEach(el => {
+      if (el.dataset.dashFirstname !== undefined) {
+        el.textContent = (user.name || '').split(' ')[0] || '—';
+      } else {
+        el.textContent = user.name || '—';
+      }
+      el.removeAttribute('data-i18n');
+    });
+    const apiName = user.name || '';
+    document.querySelectorAll('[data-dash-email], [data-cust-email]').forEach(el => {
+      el.textContent = user.email || '—';
+      el.removeAttribute('data-i18n');
+    });
+
+    // Pre-fill settings fields
+    window.__servio_profile_email = user.email || '';
+    try {
+      const storedAccount = getAccount() || {};
+      const syncedAccount = {
+        ...storedAccount,
+        name: apiName,
+        fullName: apiName,
+        email: user.email || '',
+        phone: user.phone || '',
+      };
+      delete syncedAccount.city;
+      localStorage.setItem('servio_account', JSON.stringify(syncedAccount));
+    } catch (_) {}
+
+    const fieldsMap = { name: apiName, fullName: apiName, email: user.email || '', phone: user.phone || '' };
+    Object.entries(fieldsMap).forEach(([key, val]) => {
+      const f = document.querySelector(`[data-settings-field="${key}"], input[name="${key}"]`);
+      if (f) f.value = val;
+    });
+    const settingsEmail = document.getElementById('settings-email');
+    if (settingsEmail) settingsEmail.value = user.email || '';
+
+    if (user.address) {
+      const fullAddr = [user.address.street, user.address.city, user.address.state, user.address.zipCode].filter(Boolean).join(', ');
+      const addrHomeVal = document.getElementById('addr-home-value');
+      if (addrHomeVal && fullAddr) {
+        addrHomeVal.textContent = fullAddr;
+        addrHomeVal.removeAttribute('data-i18n');
+      }
+      
+      const addrProfEl = document.getElementById('profile-address');
+      if(addrProfEl && fullAddr){
+          addrProfEl.textContent = fullAddr;
+      }
+      
+      // We will also store the true object into a global so the edit form can access it
+      window.__servio_user_address = user.address;
+    }
+
+    // Update session in localStorage with fresh data
+    try {
+      const sess = JSON.parse(localStorage.getItem('servio_session') || '{}');
+      localStorage.setItem('servio_session', JSON.stringify({ ...sess, name: apiName, email: user.email }));
+    } catch (_) {}
+    updateProfileCompleteness();
+    if (typeof window.__servio_refreshProfileEditState === 'function') {
+      window.__servio_refreshProfileEditState();
+    }
+  }).catch((err) => {
+    console.error('Failed to load profile:', err);
+    showToast(getErrorMessage(err, 'Failed to load the latest profile details.'), 'error');
+  });
+}
+
+/* ── Live bookings & reviews data from API ──────────────── */
+async function loadBookingsData() {
+  try {
+    const res = await getMyBookings();
+    const bookings = res.bookings || [];
+
+    // Update stats
+    const active = bookings.filter(b => ['pending','accepted','in_progress'].includes(b.status));
+    const completed = bookings.filter(b => b.status === 'completed');
+    const tEl = document.querySelector('[data-stat="total-bookings"]');
+    const aEl = document.querySelector('[data-stat="active-bookings"]');
+    if (tEl) tEl.textContent = String(bookings.length);
+    if (aEl) aEl.textContent = String(active.length);
+
+    // Render bookings into the active-bookings panel
+    const activeRoot = document.getElementById('activeBookingsRoot') || document.querySelector('[data-panel="bookings"] .dash-card-list, [data-panel="bookings"] .bookings-list');
+    if (activeRoot && bookings.length) {
+      const _t = typeof window.t === 'function' ? window.t : k => k;
+      const STATUS_MAP = { pending:'Booked', accepted:'Confirmed', in_progress:'In Progress', completed:'Complete', cancelled:'Cancelled' };
+      activeRoot.innerHTML = bookings.slice(0, 20).map(b => {
+        const status = STATUS_MAP[b.status] || b.status || 'Booked';
+        const date = b.scheduledDate ? new Date(b.scheduledDate).toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric'}) : '—';
+        const workerName = b.worker?.name || '—';
+        const svcTitle = b.service?.title || b.serviceId || 'Service';
+        return `<div class="booking-card" data-booking-card data-booking-status="${b.status}">
+          <div class="booking-card__header">
+            <span class="booking-card__service">${svcTitle}</span>
+            <span class="booking-card__status booking-card__status--${b.status}">${status}</span>
+          </div>
+          <div class="booking-card__meta">
+            <span>${date}</span>
+            <span>${workerName}</span>
+          </div>
+          <div class="booking-card__actions">
+            <a class="btn btn--sm" href="./booking-details.html?id=${b._id}">View Details</a>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    // No endpoint exists to fetch a customer's submitted reviews — clear the panel
+    const reviewRoot = document.querySelector('[data-panel="reviews"] .dash-card-list, [data-panel="reviews"] .reviews-list');
+    if (reviewRoot) {
+      reviewRoot.innerHTML = '<p class="empty-state">No reviews yet.</p>';
+    }
+  } catch (_) {}
+}
+
+/* ── Stats ──────────────────────────────────────────────── */
+async function populateStats() {
+  try {
+    const res = await getMyBookings({ limit: 100 });
+    const bookings = res.bookings || [];
+
+    const total     = bookings.length;
+    const active    = bookings.filter(b => ['pending','accepted','in_progress'].includes(b.status)).length;
+    const completed = bookings.filter(b => b.status === 'completed').length;
+    const totalSpent = bookings
+      .filter(b => b.status === 'completed' && b.totalPrice)
+      .reduce((sum, b) => sum + (b.totalPrice || 0), 0);
+
+    const goalTotal = 5;
+    const pct = Math.min(Math.round((completed / goalTotal) * 100), 100);
+
+    const tEl = document.querySelector('[data-stat="total-bookings"]');
+    const aEl = document.querySelector('[data-stat="active-bookings"]');
+    if (tEl) tEl.textContent = total;
+    if (aEl) aEl.textContent = active;
+
+    const spentEl = document.querySelector('[data-stat="total-spent"]');
+    if (spentEl) spentEl.textContent = totalSpent + ' EGP';
+
+    const ctxE = document.querySelector('.dash-stat-card__context[data-i18n-html]');
+    if (ctxE) {
+      ctxE.setAttribute('data-i18n-pct', String(pct));
+      if (window.applyLanguage && window.__lang) window.applyLanguage(window.__lang);
+    }
+    const barFill = document.querySelector('[data-stat-goal-bar="total"]');
+    if (barFill) barFill.style.width = pct + '%';
+  } catch {
+    // silently fallback — stats not critical
+  }
 }
 
 /* ── Time-aware welcome text ────────────────────────────── */
@@ -232,101 +415,388 @@ function initNotifications() {
   });
 }
 
-/* ── Settings: photo upload preview ────────────────────── */
+/* ── Settings: photo upload ─────────────────────────────── */
 function initSettingsForm() {
-  // Fix 5: Photo upload via hidden input + Change Photo button
   const photoUploadInput = document.getElementById('photo-upload-input');
-  const changePhotoBtn = document.getElementById('btn-change-photo');
-  const preview = document.querySelector('[data-avatar-preview]');
+  const changePhotoBtn   = document.getElementById('btn-change-photo');
+  const preview          = document.querySelector('[data-avatar-preview]');
+  const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
+  const form             = document.querySelector('[data-settings-form]');
+  const editBtn          = document.getElementById('btn-profile-edit');
+  const cancelBtn        = document.getElementById('btn-profile-cancel');
+  const editActions      = form?.querySelector('[data-profile-edit-actions]');
+  const editableFields   = form ? Array.from(form.querySelectorAll('[data-settings-field]')) : [];
+  const emailInput       = document.getElementById('settings-email');
+  const submitBtn        = form?.querySelector('button[type="submit"]');
+
+  let isProfileEditing = false;
+  let profileSnapshot = {};
+
+  function setError(input, message) {
+    if (!input) return;
+    input.classList.add('is-invalid');
+    input.classList.remove('is-valid');
+    const host = input.closest('.form-field') || input.parentElement;
+    let err = host?.querySelector('.field-error');
+    if (!err && host) {
+      err = document.createElement('p');
+      err.className = 'field-error';
+      host.appendChild(err);
+    }
+    if (err) {
+      err.textContent = message;
+      err.classList.add('is-visible');
+    }
+  }
+
+  function clearError(input) {
+    if (!input) return;
+    input.classList.remove('is-invalid');
+    const host = input.closest('.form-field') || input.parentElement;
+    const err = host?.querySelector('.field-error');
+    if (err) err.classList.remove('is-visible');
+  }
+
+  function clearProfileErrors() {
+    form?.querySelectorAll('.is-invalid, .is-valid').forEach(el => {
+      el.classList.remove('is-invalid', 'is-valid');
+    });
+    form?.querySelectorAll('.field-error').forEach(el => el.classList.remove('is-visible'));
+  }
+
+  function snapshotProfileFields() {
+    profileSnapshot = {};
+    editableFields.forEach(field => {
+      profileSnapshot[field.dataset.settingsField] = field.value;
+    });
+    profileSnapshot.photoUrl = _pendingPhotoUrl || getSession()?.profileImage || null;
+  }
+
+  function renderProfilePreview(photoUrl) {
+    const currentSession = getSession() || {};
+    const initials = getInitials(currentSession.name || profileSnapshot.fullName || 'User');
+    const topbar = document.getElementById('topbar-avatar');
+    const imgStyle = 'width:100%;height:100%;object-fit:cover;border-radius:50%;';
+    if (preview) {
+      preview.innerHTML = photoUrl
+        ? `<img src="${photoUrl}" alt="Profile photo" style="${imgStyle}" />`
+        : `<span data-dash-initials>${initials}</span>`;
+    }
+    if (topbar) {
+      topbar.innerHTML = photoUrl
+        ? `<img src="${photoUrl}" alt="Profile photo" style="${imgStyle}" />`
+        : initials[0] || 'U';
+    }
+  }
+
+  function restoreProfileSnapshot() {
+    editableFields.forEach(field => {
+      const key = field.dataset.settingsField;
+      if (profileSnapshot[key] !== undefined) field.value = profileSnapshot[key];
+    });
+    _pendingPhotoUrl = null;
+    renderProfilePreview(profileSnapshot.photoUrl || getSession()?.profileImage || null);
+    clearProfileErrors();
+  }
+
+  function setProfileEditMode(enabled, options = {}) {
+    isProfileEditing = enabled;
+    form?.classList.toggle('is-editing', enabled);
+    if (enabled) {
+      snapshotProfileFields();
+    } else if (options.reset) {
+      restoreProfileSnapshot();
+    }
+
+    editableFields.forEach(field => {
+      field.readOnly = !enabled;
+      field.setAttribute('aria-readonly', enabled ? 'false' : 'true');
+    });
+
+    if (changePhotoBtn) {
+      changePhotoBtn.disabled = !enabled;
+      changePhotoBtn.setAttribute('aria-disabled', String(!enabled));
+    }
+    if (editActions) editActions.hidden = !enabled;
+    if (editBtn) {
+      editBtn.setAttribute('aria-pressed', String(enabled));
+      editBtn.disabled = enabled;
+    }
+  }
+
+  window.__servio_refreshProfileEditState = () => {
+    if (!isProfileEditing) {
+      snapshotProfileFields();
+      setProfileEditMode(false);
+    }
+  };
+
+  editableFields.forEach(field => {
+    field.addEventListener('input', () => {
+      clearError(field);
+    });
+  });
+  editBtn?.addEventListener('click', () => setProfileEditMode(true));
+  cancelBtn?.addEventListener('click', () => {
+    setProfileEditMode(false, { reset: true });
+    showToast(_t('toast_profile_edit_cancelled') || 'Profile edits discarded.', 'info');
+  });
 
   if (changePhotoBtn && photoUploadInput) {
-    changePhotoBtn.addEventListener('click', () => photoUploadInput.click());
+    changePhotoBtn.addEventListener('click', () => {
+      if (!isProfileEditing) return;
+      photoUploadInput.click();
+    });
   }
 
   if (photoUploadInput && preview) {
-    photoUploadInput.addEventListener('change', () => {
-      const file = photoUploadInput.files[0];
-      if (!file) {
-        // Fall back to initials
-        const session = getSession();
-        const account = getAccount();
-        const name = session?.name || account?.fullName || 'User';
-        preview.innerHTML = `<span data-dash-initials>${getInitials(name)}</span>`;
+    photoUploadInput.addEventListener('change', async () => {
+      if (!isProfileEditing) {
+        photoUploadInput.value = '';
         return;
       }
+      const file = photoUploadInput.files[0];
+      if (!file) return;
+
+      if (file.size > 2 * 1024 * 1024) {
+        showToast(_t('toast_photo_error') || 'Image must be under 2 MB.', 'error');
+        photoUploadInput.value = '';
+        return;
+      }
+
+      // Show local preview immediately
       const reader = new FileReader();
       reader.onload = (evt) => {
-        preview.innerHTML = `<img src="${evt.target.result}" alt="Profile photo" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`;
+        const imgStyle = 'width:100%;height:100%;object-fit:cover;border-radius:50%;';
+        preview.innerHTML = `<img src="${evt.target.result}" alt="Profile photo" style="${imgStyle}" />`;
+        const topbar = document.getElementById('topbar-avatar');
+        if (topbar) topbar.innerHTML = `<img src="${evt.target.result}" alt="Profile photo" style="${imgStyle}" />`;
       };
       reader.readAsDataURL(file);
+
+      // Upload to server
+      changePhotoBtn.disabled = true;
+      changePhotoBtn.textContent = _t('toast_photo_uploading') || 'Uploading…';
+      try {
+        const result = await uploadPublicFile(file, 'avatar');
+        _pendingPhotoUrl = result.url;
+        showToast(_t('toast_photo_uploaded') || 'Photo uploaded.', 'success');
+      } catch {
+        showToast(_t('toast_photo_error') || 'Failed to upload photo.', 'error');
+        _pendingPhotoUrl = null;
+        renderProfilePreview(profileSnapshot.photoUrl || getSession()?.profileImage || null);
+      } finally {
+        changePhotoBtn.disabled = !isProfileEditing;
+        changePhotoBtn.setAttribute('aria-disabled', String(!isProfileEditing));
+        changePhotoBtn.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg><span data-i18n="cust_change_photo">${_t('cust_change_photo') || 'Change Photo'}</span>`;
+      }
     });
   }
 
-  const form = document.querySelector('[data-settings-form]');
   if (!form) return;
-  form.addEventListener('submit', (e) => {
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    let reqOk = true;
-    form.querySelectorAll('input[data-required]').forEach(input => {
-      if (!input.value.trim()) reqOk = false;
-    });
-    if (!reqOk) {
-      showToast(typeof window.t === 'function' ? window.t('toast_fill_required') : 'Please fill all required fields.', 'info');
+    if (!isProfileEditing) {
+      showToast(_t('toast_profile_locked') || 'Click Edit before changing profile details.', 'info');
       return;
     }
-    const newPw = form.querySelector('#settings-new-password');
-    const confirmPw = form.querySelector('#settings-confirm-password');
-    const currentPw = form.querySelector('#settings-current-password');
-    if (newPw?.value || confirmPw?.value) {
-      if (!currentPw?.value?.trim()) {
-        showToast(typeof window.t === 'function' ? window.t('toast_enter_current_pw') : 'Enter your current password to set a new one.', 'info');
-        currentPw?.focus();
-        return;
-      }
-      if (newPw.value.length < 8) {
-        showToast(typeof window.t === 'function' ? window.t('toast_pw_min_length') : 'New password must be at least 8 characters.', 'info');
-        newPw.focus();
-        return;
-      }
-      if (!/(?=.*[A-Za-z])(?=.*\d)/.test(newPw.value)) {
-        showToast(typeof window.t === 'function' ? window.t('toast_pw_needs_letter_num') : 'New password needs at least one letter and one number.', 'info');
-        newPw.focus();
-        return;
-      }
-      if (newPw.value !== confirmPw.value) {
-        showToast(typeof window.t === 'function' ? window.t('toast_pw_mismatch') : 'New password and confirmation do not match.', 'info');
-        confirmPw.focus();
-        return;
-      }
-    }
-    const account = getAccount() || {};
-    const passwordFields = new Set(['newPassword', 'confirmPassword']);
-    document.querySelectorAll('[data-settings-field]').forEach(f => {
-      if (!passwordFields.has(f.dataset.settingsField)) {
-        account[f.dataset.settingsField] = f.value;
+
+    clearProfileErrors();
+    let reqOk = true;
+    form.querySelectorAll('input[data-required]').forEach(input => {
+      if (!input.value.trim()) {
+        reqOk = false;
+        setError(input, _t('toast_fill_required') || 'Please fill all required fields.');
       }
     });
-    localStorage.setItem('servio_account', JSON.stringify(account));
-    const session = getSession();
-    if (session && account.fullName) {
-      session.name = account.fullName;
-      localStorage.setItem('servio_session', JSON.stringify(session));
+    if (!reqOk) {
+      showToast(_t('toast_fill_required') || 'Please fill all required fields.', 'info');
+      return;
     }
-    if (newPw?.value) {
-      newPw.value = '';
-      confirmPw.value = '';
-      if (currentPw) currentPw.value = '';
-      showToast(typeof window.t === 'function' ? window.t('toast_pw_saved') : 'Profile saved. Password change simulated (demo only).', 'success');
-    } else {
-      showToast(typeof window.t === 'function' ? window.t('toast_settings_saved') : 'Your changes have been saved.', 'success');
+
+    const fullName = document.getElementById('settings-fullname')?.value.trim() || '';
+    const phone = document.getElementById('settings-phone')?.value.trim() || '';
+    const phoneOk = /^[+]?[\d\s\-().]{7,20}$/.test(phone);
+
+    if (!phoneOk) {
+      const phoneInput = document.getElementById('settings-phone');
+      setError(phoneInput, _t('err_invalid_phone') || 'Please enter a valid phone number.');
+      phoneInput?.focus();
+      return;
     }
-    populateProfile();
-    updateWelcomeText();
+
+    let savedProfile = false;
+    try {
+      if (submitBtn) submitBtn.disabled = true;
+      const updatePayload = { name: fullName, phone };
+      const currentSession = getSession();
+      const photoUrl = _pendingPhotoUrl || currentSession?.profileImage || null;
+      if (photoUrl) updatePayload.profileImage = photoUrl;
+
+      const updatedUser = await updateMe(updatePayload);
+      const savedName = updatedUser?.name || fullName;
+      const savedEmail = updatedUser?.email || emailInput?.value || getSession()?.email || '';
+      const savedPhone = updatedUser?.phone || phone;
+
+      const account = {
+        ...(getAccount() || {}),
+        name: savedName,
+        fullName: savedName,
+        email: savedEmail,
+        phone: savedPhone,
+      };
+      delete account.city;
+      localStorage.setItem('servio_account', JSON.stringify(account));
+
+      if (currentSession) {
+        currentSession.name = savedName;
+        currentSession.email = savedEmail;
+        if (photoUrl) currentSession.profileImage = photoUrl;
+        localStorage.setItem('servio_session', JSON.stringify(currentSession));
+      }
+      if (_pendingPhotoUrl) _pendingPhotoUrl = null;
+
+      document.getElementById('settings-fullname').value = savedName;
+      if (emailInput) emailInput.value = savedEmail;
+      document.getElementById('settings-phone').value = savedPhone;
+      window.__servio_profile_email = savedEmail;
+      snapshotProfileFields();
+      setProfileEditMode(false);
+      showToast(_t('toast_settings_saved') || 'Your changes have been saved.', 'success');
+      savedProfile = true;
+    } catch (err) {
+      const msg = getErrorMessage(err, 'Failed to save settings.');
+      showToast(msg, 'error');
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
+    }
+    if (savedProfile) {
+      populateProfile();
+      updateWelcomeText();
+    }
     updateProfileCompleteness();
   });
 }
 
 /* ── Fix 3: Delete account button ──────────────────────── */
+function initEmailChangeModal() {
+  const modal = document.getElementById('modal-change-email');
+  const openBtn = document.getElementById('btn-change-email');
+  const closeBtn = document.getElementById('btn-close-change-email');
+  const cancelBtn = document.getElementById('btn-change-email-cancel');
+  const form = document.getElementById('change-email-form');
+  const newEmailInput = document.getElementById('change-email-new');
+  const passwordInput = document.getElementById('change-email-password');
+  const submitBtn = document.getElementById('btn-change-email-confirm');
+  const profileEmail = document.getElementById('settings-email');
+  const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
+  if (!modal || !openBtn || !form) return;
+
+  function setError(input, message) {
+    if (!input) return;
+    input.classList.add('is-invalid');
+    input.classList.remove('is-valid');
+    const host = input.closest('.form-field') || input.parentElement;
+    let err = host?.querySelector('.field-error');
+    if (!err && host) {
+      err = document.createElement('p');
+      err.className = 'field-error';
+      host.appendChild(err);
+    }
+    if (err) {
+      err.textContent = message;
+      err.classList.add('is-visible');
+    }
+  }
+
+  function clearError(input) {
+    if (!input) return;
+    input.classList.remove('is-invalid', 'is-valid');
+    const host = input.closest('.form-field') || input.parentElement;
+    const err = host?.querySelector('.field-error');
+    if (err) err.classList.remove('is-visible');
+  }
+
+  function clearForm() {
+    [newEmailInput, passwordInput].forEach(clearError);
+    if (newEmailInput) newEmailInput.value = '';
+    if (passwordInput) passwordInput.value = '';
+  }
+
+  function openModal() {
+    clearForm();
+    if (newEmailInput) {
+      newEmailInput.placeholder = profileEmail?.value || 'new@email.com';
+    }
+    modal.removeAttribute('hidden');
+    document.body.style.overflow = 'hidden';
+    newEmailInput?.focus();
+  }
+
+  function closeModal() {
+    modal.setAttribute('hidden', '');
+    document.body.style.overflow = '';
+    clearForm();
+  }
+
+  openBtn.addEventListener('click', openModal);
+  closeBtn?.addEventListener('click', closeModal);
+  cancelBtn?.addEventListener('click', closeModal);
+  modal.addEventListener('click', (event) => {
+    if (event.target === modal) closeModal();
+  });
+
+  [newEmailInput, passwordInput].forEach(input => {
+    input?.addEventListener('input', () => clearError(input));
+  });
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const newEmail = normalizeEmail(newEmailInput?.value);
+    const currentPassword = passwordInput?.value || '';
+    const currentEmail = normalizeEmail(profileEmail?.value || window.__servio_profile_email || getSession()?.email);
+
+    let valid = true;
+    if (!newEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
+      setError(newEmailInput, _t('err_invalid_email') || 'Please enter a valid email address.');
+      valid = false;
+    } else if (newEmail === currentEmail) {
+      setError(newEmailInput, _t('err_email_same') || 'New email must be different from your current email.');
+      valid = false;
+    }
+    if (!currentPassword) {
+      setError(passwordInput, _t('toast_email_current_pw_required') || 'Enter your current password to change your email address.');
+      valid = false;
+    }
+    if (!valid) return;
+
+    try {
+      if (submitBtn) submitBtn.disabled = true;
+      const result = await updateEmail({ newEmail, currentPassword });
+      if (profileEmail && result?.email) profileEmail.value = result.email;
+      showToast(_t('toast_email_updated_relogin') || 'Email updated. Please log in again with your new email.', 'success');
+      closeModal();
+      clearSession();
+      setTimeout(() => {
+        window.location.href = './login.html';
+      }, 1200);
+    } catch (err) {
+      const msg = getErrorMessage(err, 'Failed to update email.');
+      if (err.status === 409) setError(newEmailInput, msg);
+      else if (err.status === 401) setError(passwordInput, msg);
+      else if (Array.isArray(err?.data?.errors)) {
+        err.data.errors.forEach(error => {
+          if (error.field === 'newEmail') setError(newEmailInput, error.message);
+          if (error.field === 'currentPassword') setError(passwordInput, error.message);
+        });
+      }
+      showToast(msg, 'error');
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  });
+}
+
 function initDeleteAccount() {
   const btn = document.getElementById('btn-delete-account');
   if (!btn) return;
@@ -340,7 +810,8 @@ function initPasswordToggles() {
   document.querySelectorAll('.btn-toggle-password').forEach(btn => {
     btn.addEventListener('click', () => {
       const wrap = btn.closest('.input-password-wrap');
-      const input = wrap.querySelector('input');
+      const input = wrap?.querySelector('input');
+      if (!input) return;
       const isPassword = input.type === 'password';
       input.type = isPassword ? 'text' : 'password';
       btn.querySelector('.eye-icon--open').style.display = isPassword ? 'none' : '';
@@ -383,31 +854,6 @@ function initSettingsValidation() {
   form.querySelectorAll('input').forEach(input => {
     input.addEventListener('input', () => clearError(input));
   });
-
-  // Email blur validation
-  const emailInput = form.querySelector('input[type="email"], input[name="email"], #settings-email');
-  if (emailInput) {
-    emailInput.addEventListener('blur', () => {
-      if (emailInput.value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput.value)) {
-        setError(emailInput, typeof window.t === 'function' ? window.t('err_invalid_email') : 'Please enter a valid email address.');
-      } else if (emailInput.value) {
-        setValid(emailInput);
-      }
-    });
-  }
-
-  // Confirm password blur
-  const newPw = form.querySelector('#settings-new-password, input[name="new-password"]');
-  const confirmPw = form.querySelector('#settings-confirm-password, input[name="confirm-password"]');
-  if (newPw && confirmPw) {
-    confirmPw.addEventListener('blur', () => {
-      if (confirmPw.value && confirmPw.value !== newPw.value) {
-        setError(confirmPw, typeof window.t === 'function' ? window.t('err_pw_mismatch') : 'Passwords do not match.');
-      } else if (confirmPw.value) {
-        setValid(confirmPw);
-      }
-    });
-  }
 
   /* Required fields on submit are handled in initSettingsForm (toast + return). */
 }
@@ -653,6 +1099,15 @@ function initNotificationActions() {
 /* ── Sidebar toggle (click to expand/collapse) ──────────── */
 /* ── Init ───────────────────────────────────────────────── */
 populateProfile();
+loadBookingsData();
+let _custPollInterval = null;
+const startCustPolling = () => {
+  if (_custPollInterval) clearInterval(_custPollInterval);
+  _custPollInterval = setInterval(() => loadBookingsData(), 30000);
+};
+const stopCustPolling = () => { if (_custPollInterval) clearInterval(_custPollInterval); _custPollInterval = null; };
+startCustPolling();
+document.addEventListener('visibilitychange', () => { document.hidden ? stopCustPolling() : startCustPolling(); });
 populateStats();
 updateWelcomeText();
 
@@ -663,11 +1118,13 @@ initFavouritesPanel();
 initNotificationActions();
 initNotifications();
 initSettingsForm();
+initEmailChangeModal();
 initDeleteAccount();
 initPasswordToggles();
 initSettingsValidation();
 initSettingsTabs();
 initSecurityForm();
+initOtpField();
 initPasswordStrength();
 initSettingToggles();
 initLanguageCards();
@@ -700,96 +1157,175 @@ function initSettingsTabs() {
   updateProfileCompleteness();
 }
 
-/* ── Security form (separate from profile form) ──────────── */
+/* ── Security form — Change Password ─────────────────────── */
 function initSecurityForm() {
-  const form = document.getElementById('security-form');
+  const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
+
+  // Eye-toggle for all password fields in this form
+  document.querySelectorAll('#change-password-form .btn-toggle-password').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const wrap = btn.closest('.input-password-wrap');
+      const input = wrap?.querySelector('input');
+      if (!input) return;
+      const show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      btn.querySelector('.eye-icon--show').style.display = show ? 'none' : '';
+      btn.querySelector('.eye-icon--hide').style.display = show ? '' : 'none';
+    });
+  });
+
+  // Strength segments + requirements checklist
+  const newPwInput   = document.getElementById('cp-new');
+  const strengthLabel = document.getElementById('cp-strength-label');
+  const segs = [1,2,3,4].map(i => document.getElementById(`cp-seg-${i}`));
+  const COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e'];
+  const LABELS = ['Weak', 'Fair', 'Good', 'Strong'];
+
+  const REQS = {
+    'req-len':     v => v.length >= 8,
+    'req-upper':   v => /[A-Z]/.test(v),
+    'req-num':     v => /[0-9]/.test(v),
+    'req-special': v => /[^A-Za-z0-9]/.test(v),
+  };
+
+  function updateStrength(val) {
+    let score = 0;
+    Object.entries(REQS).forEach(([id, test]) => {
+      const met = test(val);
+      if (met) score++;
+      const el = document.getElementById(id);
+      if (el) el.classList.toggle('met', met);
+    });
+
+    const color = val ? (COLORS[score - 1] || COLORS[0]) : 'var(--color-border)';
+    segs.forEach((seg, i) => {
+      if (!seg) return;
+      const active = val && i < score;
+      seg.classList.toggle('active', active);
+      seg.style.setProperty('--pw-seg-color', color);
+    });
+
+    if (strengthLabel) {
+      strengthLabel.textContent = val ? (LABELS[score - 1] || LABELS[0]) : 'Enter a password';
+      strengthLabel.style.color = val ? color : '';
+    }
+  }
+
+  if (newPwInput) {
+    newPwInput.addEventListener('input', () => updateStrength(newPwInput.value));
+  }
+
+  const form      = document.getElementById('change-password-form');
+  const errEl     = document.getElementById('cp-error');
+  const submitBtn = document.getElementById('cp-submit');
+
   if (!form) return;
-  form.addEventListener('submit', (e) => {
+
+  form.addEventListener('reset', () => {
+    // Reset strength UI on Clear button click
+    setTimeout(() => updateStrength(''), 0);
+  });
+
+  form.addEventListener('submit', async e => {
     e.preventDefault();
-    const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
-    const currentPw = form.querySelector('#settings-current-password');
-    const newPw     = form.querySelector('#settings-new-password');
-    const confirmPw = form.querySelector('#settings-confirm-password');
-    if (!currentPw.value.trim()) {
-      showToast(_t('toast_enter_current_pw'), 'info');
-      currentPw.focus(); return;
+    if (errEl) errEl.hidden = true;
+
+    const currentPw = document.getElementById('cp-current')?.value?.trim() || '';
+    const newPw     = document.getElementById('cp-new')?.value             || '';
+    const confirmPw = document.getElementById('cp-confirm')?.value         || '';
+
+    if (!currentPw || !newPw || !confirmPw) {
+      if (errEl) { errEl.textContent = 'Please fill in all password fields.'; errEl.hidden = false; }
+      return;
     }
-    if (newPw.value.length < 8) {
-      showToast(_t('toast_pw_min_length'), 'info');
-      newPw.focus(); return;
+    if (newPw.length < 8) {
+      if (errEl) { errEl.textContent = 'New password must be at least 8 characters.'; errEl.hidden = false; }
+      return;
     }
-    if (!/(?=.*[A-Za-z])(?=.*\d)/.test(newPw.value)) {
-      showToast(_t('toast_pw_needs_letter_num'), 'info');
-      newPw.focus(); return;
+    if (newPw !== confirmPw) {
+      if (errEl) { errEl.textContent = 'New passwords do not match.'; errEl.hidden = false; }
+      return;
     }
-    if (newPw.value !== confirmPw.value) {
-      showToast(_t('toast_pw_mismatch'), 'info');
-      confirmPw.focus(); return;
+
+    try {
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Updating…'; }
+      // Calls PATCH /users/me/password → { currentPassword, newPassword }
+      await updatePassword({ currentPassword: currentPw, newPassword: newPw });
+      showToast(_t('toast_password_changed') || 'Password updated successfully.', 'success');
+      form.reset();
+      updateStrength('');
+    } catch (err) {
+      const msg = err?.data?.message || err?.message || 'Failed to update password. Check your current password and try again.';
+      if (errEl) { errEl.textContent = msg; errEl.hidden = false; }
+    } finally {
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Update Password'; }
     }
-    currentPw.value = '';
-    newPw.value = '';
-    confirmPw.value = '';
-    document.getElementById('pw-strength-wrap')?.setAttribute('hidden', '');
-    document.querySelectorAll('.pw-check').forEach(c => c.classList.remove('is-met'));
-    showToast(_t('toast_pw_updated'), 'success');
+  });
+}
+
+/* ── OTP field visibility (show when phone changes in edit mode) ─ */
+function initOtpField() {
+  const phoneInput = document.getElementById('settings-phone');
+  const otpWrap    = document.getElementById('otp-field-wrap');
+  const sendOtpBtn = document.getElementById('btn-send-otp');
+  const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
+
+  if (!phoneInput || !otpWrap) return;
+
+  let originalPhone = phoneInput.value;
+
+  // Show OTP field when the phone value changes during editing
+  phoneInput.addEventListener('input', () => {
+    const changed = phoneInput.value.trim() !== originalPhone.trim();
+    otpWrap.hidden = !changed;
+  });
+
+  // Re-snapshot original when edit mode is activated
+  document.getElementById('btn-profile-edit')?.addEventListener('click', () => {
+    originalPhone = phoneInput.value;
+    otpWrap.hidden = true;
+    if (document.getElementById('settings-phone-otp')) {
+      document.getElementById('settings-phone-otp').value = '';
+    }
+  });
+
+  // Cancel restores original, hides OTP
+  document.getElementById('btn-profile-cancel')?.addEventListener('click', () => {
+    otpWrap.hidden = true;
+    if (document.getElementById('settings-phone-otp')) {
+      document.getElementById('settings-phone-otp').value = '';
+    }
+  });
+
+  if (!sendOtpBtn) return;
+  sendOtpBtn.addEventListener('click', () => {
+    const phone = phoneInput.value.trim();
+    if (!/^[+]?[\d\s\-().]{7,20}$/.test(phone)) {
+      showToast('Please enter a valid phone number first.', 'error');
+      return;
+    }
+    // Simulate sending OTP (wire to backend when endpoint is available)
+    showToast(_t('toast_otp_sent') || `Verification code sent to ${phone}`, 'success');
+    sendOtpBtn.disabled = true;
+    let sec = 60;
+    sendOtpBtn.textContent = `Resend in ${sec}s`;
+    const interval = setInterval(() => {
+      sec--;
+      sendOtpBtn.textContent = sec > 0 ? `Resend in ${sec}s` : 'Send Code';
+      if (sec <= 0) { clearInterval(interval); sendOtpBtn.disabled = false; }
+    }, 1000);
   });
 }
 
 /* ── Password strength meter + live checklist ────────────── */
 function initPasswordStrength() {
-  const newPw     = document.getElementById('settings-new-password');
-  const confirmPw = document.getElementById('settings-confirm-password');
-  const wrap      = document.getElementById('pw-strength-wrap');
-  const fill      = document.getElementById('pw-strength-fill');
-  const label     = document.getElementById('pw-strength-label');
-  const matchHint = document.getElementById('pw-match-hint');
-  if (!newPw || !wrap) return;
-
-  const checks = {
-    length:  { el: document.getElementById('pwc-length'),  test: v => v.length >= 8 },
-    upper:   { el: document.getElementById('pwc-upper'),   test: v => /[A-Z]/.test(v) },
-    number:  { el: document.getElementById('pwc-number'),  test: v => /\d/.test(v) },
-    special: { el: document.getElementById('pwc-special'), test: v => /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(v) },
-  };
-
-  const strengthLabels = ['', 'cust_pw_strength_weak', 'cust_pw_strength_fair', 'cust_pw_strength_good', 'cust_pw_strength_strong'];
-
-  newPw.addEventListener('input', () => {
-    const v = newPw.value;
-    if (!v) { wrap.setAttribute('hidden', ''); return; }
-    wrap.removeAttribute('hidden');
-
-    let met = 0;
-    Object.values(checks).forEach(c => {
-      const pass = c.test(v);
-      c.el?.classList.toggle('is-met', pass);
-      if (pass) met++;
-    });
-
-    fill.setAttribute('data-level', met);
-    fill.style.width = (met * 25) + '%';
-    const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
-    label.textContent = _t(strengthLabels[met]);
-    label.setAttribute('data-level', met);
-
-    if (confirmPw.value) checkMatch();
-  });
-
-  function checkMatch() {
-    if (!matchHint || !confirmPw.value) return;
-    const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
-    const match = newPw.value === confirmPw.value;
-    matchHint.removeAttribute('hidden');
-    matchHint.textContent = _t(match ? 'cust_pw_match' : 'cust_pw_no_match');
-    matchHint.className = 'pw-match-hint ' + (match ? 'is-match' : 'is-mismatch');
-  }
-  confirmPw?.addEventListener('input', checkMatch);
+  // Handled inside initSecurityForm for the change-password form.
 }
 
 /* ── Profile completeness bar ────────────────────────────── */
 function updateProfileCompleteness() {
   const account = getAccount ? getAccount() : null;
-  const fields = ['fullName', 'email', 'phone', 'city', 'bio'];
+  const fields = ['fullName', 'email', 'phone'];
   const filled = fields.filter(f => account && account[f] && account[f].trim()).length;
   const avatar = document.querySelector('.settings-avatar-preview img');
   const total  = fields.length + 1; // +1 for photo
@@ -908,12 +1444,14 @@ function initAddressTab() {
   function openForm(target) {
     currentAddrTarget = target;
     formTitle.textContent = _t('cust_addr_edit_title');
-    // Pre-fill if stored
-    const saved = JSON.parse(localStorage.getItem('servio_addresses') || '{}');
-    const data = saved[target] || {};
-    document.getElementById('addr-input-street').value   = data.street   || '';
-    document.getElementById('addr-input-district').value = data.district || '';
-    document.getElementById('addr-input-city').value     = data.city     || '';
+    
+    // We pre-fill from our window global
+    const userAddr = window.__servio_user_address || {};
+    
+    document.getElementById('addr-input-street').value   = userAddr.street || '';
+    document.getElementById('addr-input-district').value = userAddr.state || '';
+    document.getElementById('addr-input-city').value     = userAddr.city || '';
+    
     formWrap.removeAttribute('hidden');
     btnAdd.setAttribute('hidden', '');
     document.getElementById('addr-input-street').focus();
@@ -933,33 +1471,38 @@ function initAddressTab() {
   btnAdd.addEventListener('click', () => openForm('other-' + Date.now()));
   btnCancel.addEventListener('click', closeForm);
 
-  btnSave.addEventListener('click', () => {
+  btnSave.addEventListener('click', async () => {
     if (!currentAddrTarget) return;
     const street   = document.getElementById('addr-input-street').value.trim();
-    const district = document.getElementById('addr-input-district').value.trim();
+    const state    = document.getElementById('addr-input-district').value.trim();
     const city     = document.getElementById('addr-input-city').value.trim();
     if (!street) { document.getElementById('addr-input-street').focus(); return; }
 
-    const saved = JSON.parse(localStorage.getItem('servio_addresses') || '{}');
-    saved[currentAddrTarget] = { street, district, city };
-    localStorage.setItem('servio_addresses', JSON.stringify(saved));
+    try {
+      const address = { street, city, state, zipCode: window.__servio_user_address?.zipCode || '' };
+      await updateMe({ address });
+      window.__servio_user_address = address;
+      
+      const session = JSON.parse(localStorage.getItem('servio_session') || '{}');
+      session.address = address;
+      localStorage.setItem('servio_session', JSON.stringify(session));
 
-    const full = [street, district, city].filter(Boolean).join(', ');
-    const valueEl = document.getElementById('addr-' + currentAddrTarget + '-value');
-    if (valueEl) valueEl.textContent = full;
+      const full = [street, city, state].filter(Boolean).join(', ');
+      const valueEl = document.getElementById('addr-home-value');
+      if (valueEl) valueEl.textContent = full;
+      
+      const addrProfEl = document.getElementById('profile-address');
+      if(addrProfEl) addrProfEl.textContent = full;
 
-    closeForm();
-    showToast(_t('toast_addr_saved'), 'success');
+      closeForm();
+      showToast(_t('toast_addr_saved') || 'Address saved successfully.', 'success');
+    } catch (err) {
+      console.error('Failed to save address:', err);
+      showToast(err.response?.data?.message || err.message || 'Failed to save address', 'error');
+    }
   });
 
-  // Restore saved addresses on load
-  const saved = JSON.parse(localStorage.getItem('servio_addresses') || '{}');
-  ['home', 'work'].forEach(key => {
-    const data = saved[key];
-    if (!data) return;
-    const el = document.getElementById('addr-' + key + '-value');
-    if (el) el.textContent = [data.street, data.district, data.city].filter(Boolean).join(', ');
-  });
+  // Note: Values set dynamically by populateProfile
 }
 
 /* ── Account tab (export / deactivate / delete) ─────────── */
@@ -1040,9 +1583,21 @@ function initAccountTab() {
     btnDeleteOk.disabled = !match;
   });
 
-  btnDeleteOk?.addEventListener('click', () => {
-    closeDeleteModal();
-    showToast(_t('toast_delete_demo'), 'info');
+  btnDeleteOk?.addEventListener('click', async () => {
+    btnDeleteOk.disabled = true;
+    try {
+      await deleteMe();
+      closeDeleteModal();
+      showToast(_t('toast_delete_success') || 'Account deleted successfully.', 'success');
+      setTimeout(() => {
+        localStorage.removeItem('servio_token');
+        localStorage.removeItem('servio_session');
+        window.location.href = 'index.html';
+      }, 1500);
+    } catch (error) {
+      btnDeleteOk.disabled = false;
+      showToast(error.response?.data?.message || error.message || 'Failed to delete account.', 'error');
+    }
   });
 
   /* ── Close on backdrop click ── */
@@ -1210,13 +1765,12 @@ document.addEventListener('DOMContentLoaded', refreshDynamicText, { once: true }
   });
 
   document.getElementById('confirmBookingBtn')?.addEventListener('click', () => {
-    const pin = Math.floor(1000 + Math.random() * 9000);
     const booking = {
-      id: 'S-' + Math.floor(2900 + Math.random() * 100),
+      id: 'S-' + Date.now(),
       tech: pendingProposal?.tech || 'Technician',
       price: pendingProposal?.price || 0,
       payment: document.querySelector('[name="paymentMethod"]:checked')?.value || 'online',
-      pin, status: 'Booked', timestamp: Date.now(),
+      pin: null, status: 'Booked', timestamp: Date.now(),
     };
     localStorage.setItem('servio_active_booking', JSON.stringify(booking));
     const bookings = JSON.parse(localStorage.getItem('servio_bookings') || '[]');

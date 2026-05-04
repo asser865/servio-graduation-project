@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/api/api_client.dart';
+import '../../core/api/bookings_api.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
@@ -22,6 +25,8 @@ class BookingStepThreeScreen extends StatefulWidget {
 
 class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
   bool _termsAccepted = false;
+  bool _loading = false;
+  String? _error;
 
   // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -42,11 +47,43 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
     );
   }
 
-  void _confirmBooking() {
+  Future<void> _confirmBooking() async {
     if (!_termsAccepted) return;
+
+    final data = widget.data;
+    final hasIds = data.technicianId.isNotEmpty && data.serviceId.isNotEmpty;
+
+    if (hasIds) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+      try {
+        final client = context.read<ApiClient>();
+        await BookingsApi(client).createBooking(
+          workerId: data.technicianId,
+          serviceId: data.serviceId,
+          scheduledDate: data.scheduledDateTime ?? DateTime.now().add(const Duration(days: 1)),
+          addressCity: data.addressCity.isNotEmpty ? data.addressCity : 'Cairo',
+          addressStreet: data.addressStreet.isNotEmpty ? data.addressStreet : '',
+          notes: data.notes,
+        );
+        if (!mounted) return;
+      } catch (e) {
+        if (!mounted) return;
+        setState(() {
+          _loading = false;
+          _error = 'Booking failed. Please try again.';
+        });
+        return;
+      }
+      setState(() => _loading = false);
+    }
+
+    if (!mounted) return;
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => BookingConfirmationScreen(data: widget.data),
+        builder: (_) => BookingConfirmationScreen(data: data),
       ),
     );
   }
@@ -261,6 +298,32 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
               ),
               const SizedBox(height: 20),
 
+              // ── Error banner ────────────────────────────────────────────────
+              if (_error != null) ...<Widget>[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: ServioColors.tint(ServioColors.danger),
+                    borderRadius: BorderRadius.circular(ServioRadius.md),
+                  ),
+                  child: Row(
+                    children: <Widget>[
+                      Icon(Icons.error_outline_rounded,
+                          color: ServioColors.danger, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _error!,
+                          style: theme.textTheme.bodySmall
+                              ?.copyWith(color: ServioColors.danger),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
               // ── Terms & Conditions consent ────────────────────────────────────
               ServioCard(
                 radius: ServioRadius.md,
@@ -346,8 +409,8 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
                     child: Opacity(
                       opacity: _termsAccepted ? 1.0 : 0.5,
                       child: ServioPrimaryButton(
-                        label: 'Confirm Booking',
-                        onPressed: _termsAccepted ? _confirmBooking : null,
+                        label: _loading ? 'Confirming…' : 'Confirm Booking',
+                        onPressed: (_termsAccepted && !_loading) ? _confirmBooking : null,
                       ),
                     ),
                   ),

@@ -5,6 +5,10 @@ import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
 import '../auth/role_selection_screen.dart';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Onboarding – 3-slide flow (strictly follows UI spec)
+// ─────────────────────────────────────────────────────────────────────────────
+
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -12,28 +16,36 @@ class OnboardingScreen extends StatefulWidget {
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
-class _OnboardingScreenState extends State<OnboardingScreen> {
+class _OnboardingScreenState extends State<OnboardingScreen>
+    with TickerProviderStateMixin {
   late final PageController _pageController;
+  late final AnimationController _iconPulse;
   int _currentIndex = 0;
 
   static const List<_OnboardingSlideData> _slides = <_OnboardingSlideData>[
     _OnboardingSlideData(
       title: 'Find Trusted Experts',
-      body: 'Verified technicians at your fingertips.',
-      icon: Icons.plumbing_rounded,
-      accentIcon: Icons.search_rounded,
+      body:
+          'Access our vetted network of master electricians, certified plumbers, and elite designers — all background-checked and trade-licensed.',
+      icon: Icons.search_rounded,
+      secondaryIcon: Icons.verified_user_rounded,
+      gradientColors: <Color>[Color(0xFF3C2415), Color(0xFF5C3D2E)],
     ),
     _OnboardingSlideData(
       title: 'Book with Confidence',
-      body: 'Escrow payments protect every transaction.',
-      icon: Icons.verified_user_rounded,
-      accentIcon: Icons.home_rounded,
+      body:
+          'Secure escrow payments protect every transaction. Your money is held safely until the job is completed to your satisfaction.',
+      icon: Icons.lock_outline_rounded,
+      secondaryIcon: Icons.payments_outlined,
+      gradientColors: <Color>[Color(0xFF222831), Color(0xFF393E46)],
     ),
     _OnboardingSlideData(
       title: 'AI Finds the Right Pro',
-      body: 'Describe your issue. We handle the match.',
+      body:
+          'Describe your issue or snap a photo — our AI instantly matches you with the best-rated professional for the job.',
       icon: Icons.auto_awesome_rounded,
-      accentIcon: Icons.smartphone_rounded,
+      secondaryIcon: Icons.smart_toy_outlined,
+      gradientColors: <Color>[Color(0xFF9A8C73), Color(0xFFBFB09A)],
     ),
   ];
 
@@ -41,19 +53,28 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void initState() {
     super.initState();
     _pageController = PageController();
+    _iconPulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat(reverse: true);
   }
 
   @override
   void dispose() {
     _pageController.dispose();
+    _iconPulse.dispose();
     super.dispose();
   }
 
   void _nextOrFinish() {
     if (_currentIndex == _slides.length - 1) {
-      Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => const RoleSelectionScreen(),
+      Navigator.of(context).pushReplacement(
+        PageRouteBuilder(
+          transitionDuration: ServioMotion.page,
+          pageBuilder: (_, __, ___) => const RoleSelectionScreen(),
+          transitionsBuilder: (_, animation, __, child) {
+            return FadeTransition(opacity: animation, child: child);
+          },
         ),
       );
       return;
@@ -81,103 +102,122 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: ServioSpacing.screenPadding),
-          child: Column(
-            children: <Widget>[
-              const SizedBox(height: 8),
-              Row(
+        child: Column(
+          children: <Widget>[
+            // ── Skip button ──────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                  ServioSpacing.screenPadding, 12, ServioSpacing.screenPadding, 0),
+              child: Row(
                 children: <Widget>[
                   const Spacer(),
-                  TextButton(
-                    onPressed: _currentIndex == _slides.length - 1 ? null : _skip,
-                    child: Text(
-                      'Skip',
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: servio.textSecondary,
+                  AnimatedOpacity(
+                    opacity:
+                        _currentIndex == _slides.length - 1 ? 0.0 : 1.0,
+                    duration: ServioMotion.micro,
+                    child: TextButton(
+                      onPressed: _currentIndex == _slides.length - 1
+                          ? null
+                          : _skip,
+                      child: Text(
+                        'Skip',
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: servio.textSecondary,
+                        ),
                       ),
                     ),
                   ),
                 ],
               ),
-              Expanded(
-                child: PageView.builder(
-                  controller: _pageController,
-                  onPageChanged: (int index) {
-                    setState(() {
-                      _currentIndex = index;
-                    });
-                  },
-                  itemCount: _slides.length,
-                  itemBuilder: (BuildContext context, int index) {
-                    final slide = _slides[index];
+            ),
 
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+            // ── PageView ─────────────────────────────────────
+            Expanded(
+              child: PageView.builder(
+                controller: _pageController,
+                onPageChanged: (int index) {
+                  setState(() => _currentIndex = index);
+                },
+                itemCount: _slides.length,
+                itemBuilder: (BuildContext context, int index) {
+                  final slide = _slides[index];
+
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: ServioSpacing.screenPadding),
+                    child: Column(
                       children: <Widget>[
+                        // ── Illustration area ────────────────
                         Expanded(
-                          flex: 55,
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: 8, bottom: 20),
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                gradient: ServioGradients.warm,
-                                borderRadius: BorderRadius.circular(ServioRadius.xl),
-                                border: Border.all(
-                                  color: servio.border.withValues(alpha: isDark ? 0.45 : 1),
-                                ),
-                              ),
-                              child: _OnboardingIllustration(data: slide),
+                          flex: 50,
+                          child: Center(
+                            child: _IconContainerMorphing(
+                              slide: slide,
+                              pulse: _iconPulse,
+                              isDark: isDark,
                             ),
                           ),
                         ),
+
+                        // ── Text + Controls ──────────────────
                         Expanded(
-                          flex: 45,
+                          flex: 50,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: <Widget>[
+                              const SizedBox(height: 8),
+                              // Title with AnimatedSwitcher
                               AnimatedSwitcher(
                                 duration: ServioMotion.micro,
                                 switchInCurve: ServioMotion.curve,
                                 switchOutCurve: ServioMotion.curve,
+                                transitionBuilder: (Widget child,
+                                    Animation<double> animation) {
+                                  return FadeTransition(
+                                    opacity: animation,
+                                    child: SlideTransition(
+                                      position: Tween<Offset>(
+                                        begin: const Offset(0, 0.15),
+                                        end: Offset.zero,
+                                      ).animate(animation),
+                                      child: child,
+                                    ),
+                                  );
+                                },
                                 child: Text(
                                   slide.title,
                                   key: ValueKey<String>(slide.title),
                                   style: theme.textTheme.headlineLarge,
                                 ),
                               ),
-                              const SizedBox(height: 12),
+                              const SizedBox(height: 14),
+                              // Body with AnimatedSwitcher
                               AnimatedSwitcher(
                                 duration: ServioMotion.micro,
                                 switchInCurve: ServioMotion.curve,
                                 switchOutCurve: ServioMotion.curve,
+                                transitionBuilder: (Widget child,
+                                    Animation<double> animation) {
+                                  return FadeTransition(
+                                    opacity: animation,
+                                    child: child,
+                                  );
+                                },
                                 child: Text(
                                   slide.body,
                                   key: ValueKey<String>(slide.body),
-                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                  style:
+                                      theme.textTheme.bodyMedium?.copyWith(
                                     color: servio.textSecondary,
+                                    height: 1.6,
                                   ),
                                 ),
                               ),
-                              const SizedBox(height: 24),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: List<Widget>.generate(
-                                  _slides.length,
-                                  (int dotIndex) => AnimatedContainer(
-                                    duration: ServioMotion.micro,
-                                    curve: ServioMotion.curve,
-                                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                                    width: dotIndex == _currentIndex ? 26 : 8,
-                                    height: 8,
-                                    decoration: BoxDecoration(
-                                      color: dotIndex == _currentIndex
-                                          ? servio.accent
-                                          : servio.border,
-                                      borderRadius: BorderRadius.circular(ServioRadius.full),
-                                    ),
-                                  ),
-                                ),
+                              const SizedBox(height: 32),
+                              // Dot indicator (8px → 24px)
+                              _DotIndicator(
+                                count: _slides.length,
+                                current: _currentIndex,
                               ),
                               const Spacer(),
                               ServioPrimaryButton(
@@ -186,16 +226,53 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                     : 'Continue',
                                 onPressed: _nextOrFinish,
                               ),
-                              const SizedBox(height: 20),
+                              const SizedBox(height: 24),
                             ],
                           ),
                         ),
                       ],
-                    );
-                  },
-                ),
+                    ),
+                  );
+                },
               ),
-            ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Dot Indicator — animates width 8→24 per spec
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _DotIndicator extends StatelessWidget {
+  const _DotIndicator({
+    required this.count,
+    required this.current,
+  });
+
+  final int count;
+  final int current;
+
+  @override
+  Widget build(BuildContext context) {
+    final servio = context.servio;
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List<Widget>.generate(
+        count,
+        (int index) => AnimatedContainer(
+          duration: ServioMotion.micro,
+          curve: ServioMotion.spring,
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          width: index == current ? 24 : 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: index == current ? servio.accent : servio.border,
+            borderRadius: BorderRadius.circular(ServioRadius.full),
           ),
         ),
       ),
@@ -203,166 +280,161 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Icon Container with gradient morphing + glow
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _IconContainerMorphing extends StatelessWidget {
+  const _IconContainerMorphing({
+    required this.slide,
+    required this.pulse,
+    required this.isDark,
+  });
+
+  final _OnboardingSlideData slide;
+  final AnimationController pulse;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: ServioMotion.page,
+      switchInCurve: ServioMotion.reveal,
+      switchOutCurve: ServioMotion.reveal,
+      transitionBuilder: (Widget child, Animation<double> animation) {
+        return FadeTransition(
+          opacity: animation,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.85, end: 1.0).animate(
+              CurvedAnimation(parent: animation, curve: ServioMotion.spring),
+            ),
+            child: child,
+          ),
+        );
+      },
+      child: SizedBox(
+        key: ValueKey<String>(slide.title),
+        width: 260,
+        height: 260,
+        child: Stack(
+          alignment: Alignment.center,
+          children: <Widget>[
+            // Outer glow ring
+            AnimatedBuilder(
+              animation: pulse,
+              builder: (BuildContext context, Widget? child) {
+                return Container(
+                  width: 260,
+                  height: 260,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Color.lerp(
+                        slide.gradientColors.first.withValues(alpha: 0.0),
+                        slide.gradientColors.first.withValues(alpha: 0.2),
+                        pulse.value,
+                      )!,
+                      width: 2,
+                    ),
+                  ),
+                );
+              },
+            ),
+            // Mid ring
+            AnimatedBuilder(
+              animation: pulse,
+              builder: (BuildContext context, Widget? child) {
+                return Container(
+                  width: 220,
+                  height: 220,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: slide.gradientColors.first
+                        .withValues(alpha: 0.04 + 0.03 * pulse.value),
+                  ),
+                );
+              },
+            ),
+            // Main icon container with gradient
+            Container(
+              width: 160,
+              height: 160,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: slide.gradientColors,
+                ),
+                shape: BoxShape.circle,
+                boxShadow: <BoxShadow>[
+                  BoxShadow(
+                    color: slide.gradientColors.first.withValues(alpha: 0.25),
+                    blurRadius: 40,
+                    offset: const Offset(0, 16),
+                  ),
+                ],
+              ),
+              child: Icon(
+                slide.icon,
+                size: 64,
+                color: Colors.white,
+              ),
+            ),
+            // Secondary floating icon
+            Positioned(
+              bottom: 32,
+              right: 16,
+              child: AnimatedBuilder(
+                animation: pulse,
+                builder: (BuildContext context, Widget? child) {
+                  return Transform.translate(
+                    offset: Offset(0, -4 * pulse.value),
+                    child: child,
+                  );
+                },
+                child: Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? ServioColors.surfaceRaisedDark
+                        : Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: isDark
+                        ? ServioShadows.restDark
+                        : ServioShadows.elevated,
+                  ),
+                  child: Icon(
+                    slide.secondaryIcon,
+                    size: 24,
+                    color: slide.gradientColors.first,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Data
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _OnboardingSlideData {
   const _OnboardingSlideData({
     required this.title,
     required this.body,
     required this.icon,
-    required this.accentIcon,
+    required this.secondaryIcon,
+    required this.gradientColors,
   });
 
   final String title;
   final String body;
   final IconData icon;
-  final IconData accentIcon;
-}
-
-class _OnboardingIllustration extends StatelessWidget {
-  const _OnboardingIllustration({
-    required this.data,
-  });
-
-  final _OnboardingSlideData data;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return LayoutBuilder(
-      builder: (BuildContext context, BoxConstraints constraints) {
-        return Stack(
-          children: <Widget>[
-            Positioned(
-              top: 28,
-              left: 24,
-              right: 24,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: <Widget>[
-                  _IllustrationBubble(
-                    size: 72,
-                    icon: data.accentIcon,
-                    gradient: ServioGradients.accent,
-                    iconColor: Colors.white,
-                  ),
-                  _IllustrationBubble(
-                    size: 48,
-                    icon: Icons.verified_rounded,
-                    color: Colors.white.withValues(alpha: 0.55),
-                    iconColor: ServioColors.accent,
-                  ),
-                ],
-              ),
-            ),
-            Positioned(
-              left: 24,
-              right: 24,
-              bottom: 34,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: <Widget>[
-                  Expanded(
-                    child: Container(
-                      height: constraints.maxHeight * 0.52,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.52),
-                        borderRadius: BorderRadius.circular(32),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Container(
-                    width: constraints.maxWidth * 0.26,
-                    height: constraints.maxHeight * 0.44,
-                    decoration: BoxDecoration(
-                      gradient: ServioGradients.brand,
-                      borderRadius: BorderRadius.circular(28),
-                      boxShadow: ServioShadows.rest,
-                    ),
-                    child: Icon(
-                      data.icon,
-                      color: Colors.white,
-                      size: 40,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Positioned(
-              left: 44,
-              right: 96,
-              bottom: 70,
-              child: Container(
-                height: 76,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.88),
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: ServioShadows.rest,
-                ),
-              ),
-            ),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Container(
-                height: 34,
-                decoration: const BoxDecoration(
-                  color: Color(0x26FFFFFF),
-                  borderRadius: BorderRadius.vertical(
-                    bottom: Radius.circular(ServioRadius.xl),
-                  ),
-                ),
-              ),
-            ),
-            Center(
-              child: AnimatedScale(
-                duration: const Duration(milliseconds: 600),
-                curve: ServioMotion.curve,
-                scale: 1,
-                child: Icon(
-                  data.icon,
-                  size: 108,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.16),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _IllustrationBubble extends StatelessWidget {
-  const _IllustrationBubble({
-    required this.size,
-    required this.icon,
-    required this.iconColor,
-    this.gradient,
-    this.color,
-  });
-
-  final double size;
-  final IconData icon;
-  final Color iconColor;
-  final Gradient? gradient;
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: color,
-        gradient: gradient,
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Icon(
-        icon,
-        color: iconColor,
-      ),
-    );
-  }
+  final IconData secondaryIcon;
+  final List<Color> gradientColors;
 }

@@ -5,8 +5,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SERVIO | My Dashboard</title>
   <meta name="description" content="Manage your bookings, favourites, and profile." />
+  <script src="../js/config.js"></script>
   <script src="../js/theme-init.js"></script>
-  <script src="../js/lang-init.js"></script>
+    <script src="../js/lang-init.js"></script>
+    <script>
+      (function() {
+        const TAB_KEY = 'servio_activeTab_customer';
+        const savedTab = sessionStorage.getItem(TAB_KEY) || 'overview';
+        document.documentElement.classList.add('is-restoring-tab');
+        window.addEventListener('DOMContentLoaded', () => {
+          const btn = document.querySelector(`[data-tab="${savedTab}"]`);
+          const panel = document.querySelector(`[data-panel="${savedTab}"]`);
+          if (btn) {
+            btn.classList.add('is-active');
+            btn.setAttribute('aria-selected', 'true');
+          }
+          if (panel) {
+            panel.classList.add('is-active');
+            panel.hidden = false;
+          }
+          document.documentElement.classList.remove('is-restoring-tab');
+        });
+      })();
+    </script>
     <link rel="stylesheet" href="../css/main.css" />
   </head>
   <body>
@@ -83,7 +104,7 @@
 <div class="dash-sidebar__nav-scroll dash-sidebar__nav-scroll--customer">
 <ul class="dash-nav" role="tablist" aria-label="Dashboard sections">
 <li role="none">
-<button class="dash-nav__btn is-active" role="tab" aria-selected="true"
+<button class="dash-nav__btn" role="tab" aria-selected="false"
               aria-controls="panel-overview" id="tab-overview" data-tab="overview" title="Overview">
         <span class="dash-nav__icon-slot" aria-hidden="true">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -212,11 +233,12 @@
 
         <!-- Overview panel -->
         <section
-          class="dash-panel is-active"
+          class="dash-panel"
           id="panel-overview"
           role="tabpanel"
           aria-labelledby="tab-overview"
           data-panel="overview"
+          hidden
         >
           <div class="dash-welcome dash-welcome--compact" data-reveal>
             <div class="dash-welcome__text">
@@ -1320,18 +1342,26 @@
 
     <!-- Avatar + basic info -->
     <div class="settings-section">
-      <h2 class="settings-section__heading">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        <span data-i18n="cust_settings_profile">Profile Information</span>
-      </h2>
-      <p class="settings-section__desc" data-i18n="cust_settings_profile_desc">Your name, email and contact details shown to technicians.</p>
+      <div class="settings-section__header">
+        <div>
+          <h2 class="settings-section__heading">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <span data-i18n="cust_settings_profile">Profile Information</span>
+          </h2>
+          <p class="settings-section__desc" data-i18n="cust_settings_profile_desc">Your name, email and contact details shown to technicians.</p>
+        </div>
+        <button type="button" class="btn-profile-edit" id="btn-profile-edit" aria-pressed="false">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+          <span data-i18n="cust_edit_profile">Edit</span>
+        </button>
+      </div>
 
       <div class="settings-avatar-wrap">
         <div class="settings-avatar-preview" data-avatar-preview>
           <span data-dash-initials>?</span>
         </div>
         <div class="settings-avatar-actions">
-          <button type="button" class="btn-change-photo" id="btn-change-photo">
+          <button type="button" class="btn-change-photo" id="btn-change-photo" disabled aria-disabled="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
             <span data-i18n="cust_change_photo">Change Photo</span>
           </button>
@@ -1344,36 +1374,40 @@
         <div class="form-row">
           <div class="form-field">
             <label class="form-label" for="settings-fullname" data-i18n="cust_label_fullname">Full Name <span class="required-mark" aria-hidden="true">*</span></label>
-            <input class="form-input" type="text" id="settings-fullname" name="fullName" data-settings-field="fullName" placeholder="Your full name" data-i18n-placeholder="cust_ph_fullname" autocomplete="name" data-required />
+            <input class="form-input form-input--lg" type="text" id="settings-fullname" name="fullName" data-settings-field="fullName" placeholder="Your full name" data-i18n-placeholder="cust_ph_fullname" autocomplete="name" data-required readonly aria-readonly="true" />
             <span class="form-hint" data-i18n="cust_hint_fullname">This name appears on your bookings and receipts.</span>
           </div>
           <div class="form-field">
-            <label class="form-label" for="settings-email" data-i18n="cust_label_email">Email <span class="required-mark" aria-hidden="true">*</span></label>
-            <input class="form-input" type="email" id="settings-email" name="email" data-settings-field="email" placeholder="your@email.com" autocomplete="email" data-required />
-            <span class="form-hint" data-i18n="cust_hint_email">Used for booking confirmations and notifications.</span>
+            <label class="form-label" for="settings-email" data-i18n="cust_label_email">Email</label>
+            <input class="form-input form-input--lg" type="email" id="settings-email" placeholder="your@email.com" autocomplete="email" readonly aria-readonly="true" />
+            <div class="profile-email-actions">
+              <span class="form-hint" data-i18n="cust_hint_email">Used for booking confirmations and notifications.</span>
+              <button type="button" class="btn-change-email" id="btn-change-email">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 4h16v16H4z"/><path d="m22 6-10 7L2 6"/></svg>
+                <span data-i18n="cust_change_email">Change Email</span>
+              </button>
+            </div>
           </div>
         </div>
         <div class="form-row">
           <div class="form-field">
             <label class="form-label" for="settings-phone" data-i18n="cust_label_phone">Phone <span class="required-mark" aria-hidden="true">*</span></label>
-            <input class="form-input" type="tel" id="settings-phone" name="phone" data-settings-field="phone" placeholder="+20 100 000 0000" autocomplete="tel" data-required />
+            <input class="form-input form-input--lg" type="tel" id="settings-phone" name="phone" data-settings-field="phone" placeholder="+20 100 000 0000" autocomplete="tel" data-required readonly aria-readonly="true" />
             <span class="form-hint" data-i18n="cust_hint_phone">Technicians may contact you on this number.</span>
           </div>
-          <div class="form-field">
-            <label class="form-label" for="settings-city" data-i18n="cust_label_city">City</label>
-            <input class="form-input" type="text" id="settings-city" name="city" data-settings-field="city" placeholder="e.g. Cairo" data-i18n-placeholder="cust_ph_city" autocomplete="address-level2" />
-            <span class="form-hint" data-i18n="cust_hint_city">Used to match you with nearby technicians.</span>
+          <div class="form-field" id="otp-field-wrap" hidden>
+            <label class="form-label" for="settings-phone-otp">Verification Code</label>
+            <div class="otp-input-wrap">
+              <input class="form-input form-input--lg" type="text" id="settings-phone-otp" name="phoneOtp" inputmode="numeric" maxlength="6" placeholder="6-digit code" autocomplete="one-time-code" />
+              <button type="button" class="btn-send-otp" id="btn-send-otp">Send Code</button>
+            </div>
+            <span class="form-hint">Enter the code sent to your phone number.</span>
           </div>
         </div>
-        <div class="form-row">
-          <div class="form-field form-field--full">
-            <label class="form-label" for="settings-bio" data-i18n="cust_label_bio">Short Bio <span class="form-label-optional" data-i18n="cust_optional">(Optional)</span></label>
-            <textarea class="form-input form-textarea" id="settings-bio" name="bio" data-settings-field="bio" rows="2" placeholder="A few words about yourself or your home service needs…" data-i18n-placeholder="cust_ph_bio" autocomplete="off"></textarea>
-            <span class="form-hint" data-i18n="cust_hint_bio">Visible to technicians you work with regularly.</span>
-          </div>
-        </div>
-        <div class="settings-submit-row">
-          <button class="btn btn--primary" type="submit" data-i18n="cust_save_changes">Save Changes</button>
+
+        <div class="settings-submit-row" data-profile-edit-actions hidden>
+          <button class="btn btn--primary settings-submit-btn" type="submit" data-i18n="cust_save_changes">Save Changes</button>
+          <button class="btn btn--outline settings-cancel-btn" type="button" id="btn-profile-cancel" data-i18n="cust_cancel">Cancel</button>
         </div>
       </form>
     </div>
@@ -1385,66 +1419,102 @@
   ══════════════════════════════════════════ -->
   <div class="stab-pane" id="stab-security" role="tabpanel" aria-labelledby="stab-btn-security" hidden>
 
-    <!-- Change password -->
-    <div class="settings-section">
-      <h2 class="settings-section__heading">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        <span data-i18n="cust_settings_security">Security</span>
-      </h2>
-      <p class="settings-section__desc" data-i18n="cust_settings_security_desc">Change your password to keep your account secure.</p>
+    <!-- Change Password -->
+    <div class="settings-section cp-section">
+      <div class="cp-section__header">
+        <div class="cp-section__header-icon">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
+        <div>
+          <h2 class="settings-section__heading" style="margin-bottom:2px;">Change Password</h2>
+          <p class="settings-section__desc" style="margin-bottom:0;">Choose a strong password to keep your account secure.</p>
+        </div>
+      </div>
 
-      <form class="dash-settings-security-form" id="security-form" novalidate>
-        <div class="form-row">
-          <div class="form-field form-field--full">
-            <label class="form-label" for="settings-current-password" data-i18n="cust_label_current_pass">Current Password <span class="required-mark" aria-hidden="true">*</span></label>
-            <div class="input-password-wrap">
-              <input class="form-input" type="password" id="settings-current-password" name="currentPassword" placeholder="Your current password" data-i18n-placeholder="cust_ph_current_pass" autocomplete="current-password" />
-              <button type="button" class="btn-toggle-password" aria-label="Show password">
-                <svg class="eye-icon eye-icon--open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                <svg class="eye-icon eye-icon--closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-              </button>
-            </div>
+      <div class="cp-divider"></div>
+
+      <form class="change-password-form" id="change-password-form" novalidate>
+
+        <!-- Current Password — full width -->
+        <div class="cp-field-group">
+          <label class="form-label" for="cp-current">Current Password <span class="required-mark" aria-hidden="true">*</span></label>
+          <div class="input-password-wrap">
+            <input class="form-input form-input--lg" type="password" id="cp-current" name="currentPassword" placeholder="Enter your current password" autocomplete="current-password" />
+            <button type="button" class="btn-toggle-password" aria-label="Show password" tabindex="-1">
+              <svg class="eye-icon eye-icon--show" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg class="eye-icon eye-icon--hide" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+            </button>
           </div>
         </div>
-        <div class="form-row">
-          <div class="form-field">
-            <label class="form-label" for="settings-new-password" data-i18n="cust_label_new_pass">New Password <span class="required-mark" aria-hidden="true">*</span></label>
+
+        <!-- New + Confirm side by side -->
+        <div class="cp-row">
+
+          <!-- New Password + strength + requirements -->
+          <div class="cp-field-group">
+            <label class="form-label" for="cp-new">New Password <span class="required-mark" aria-hidden="true">*</span></label>
             <div class="input-password-wrap">
-              <input class="form-input" type="password" id="settings-new-password" name="newPassword" data-settings-field="newPassword" placeholder="New password" data-i18n-placeholder="cust_ph_new_pass" autocomplete="new-password" />
-              <button type="button" class="btn-toggle-password" aria-label="Show password">
-                <svg class="eye-icon eye-icon--open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                <svg class="eye-icon eye-icon--closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              <input class="form-input form-input--lg" type="password" id="cp-new" name="newPassword" placeholder="Min. 8 characters" autocomplete="new-password" />
+              <button type="button" class="btn-toggle-password" aria-label="Show password" tabindex="-1">
+                <svg class="eye-icon eye-icon--show" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="eye-icon eye-icon--hide" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
               </button>
             </div>
-            <!-- Strength meter -->
-            <div class="pw-strength-wrap" id="pw-strength-wrap" hidden>
-              <div class="pw-strength-bar">
-                <div class="pw-strength-fill" id="pw-strength-fill"></div>
+
+            <!-- Strength bar -->
+            <div class="pw-strength-wrap" id="cp-strength-wrap">
+              <div class="pw-strength-segments">
+                <div class="pw-seg" id="cp-seg-1"></div>
+                <div class="pw-seg" id="cp-seg-2"></div>
+                <div class="pw-seg" id="cp-seg-3"></div>
+                <div class="pw-seg" id="cp-seg-4"></div>
               </div>
-              <span class="pw-strength-label" id="pw-strength-label"></span>
+              <span class="pw-strength-label" id="cp-strength-label">Enter a password</span>
             </div>
-            <!-- Live checklist -->
-            <ul class="pw-checklist" id="pw-checklist" aria-label="Password requirements">
-              <li class="pw-check" id="pwc-length" data-i18n="cust_pwc_length">At least 8 characters</li>
-              <li class="pw-check" id="pwc-upper" data-i18n="cust_pwc_upper">One uppercase letter</li>
-              <li class="pw-check" id="pwc-number" data-i18n="cust_pwc_number">One number</li>
-              <li class="pw-check" id="pwc-special" data-i18n="cust_pwc_special">One special character (!@#$…)</li>
+
+            <!-- Requirements as chips -->
+            <ul class="pw-req-list" id="cp-req-list">
+              <li class="pw-req" id="req-len">
+                <svg class="pw-req__icon" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                8+ characters
+              </li>
+              <li class="pw-req" id="req-upper">
+                <svg class="pw-req__icon" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                Uppercase
+              </li>
+              <li class="pw-req" id="req-num">
+                <svg class="pw-req__icon" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                Number
+              </li>
+              <li class="pw-req" id="req-special">
+                <svg class="pw-req__icon" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                Special char
+              </li>
             </ul>
           </div>
-          <div class="form-field">
-            <label class="form-label" for="settings-confirm-password" data-i18n="cust_label_confirm_pass">Confirm Password <span class="required-mark" aria-hidden="true">*</span></label>
+
+          <!-- Confirm Password -->
+          <div class="cp-field-group">
+            <label class="form-label" for="cp-confirm">Confirm New Password <span class="required-mark" aria-hidden="true">*</span></label>
             <div class="input-password-wrap">
-              <input class="form-input" type="password" id="settings-confirm-password" name="confirmPassword" data-settings-field="confirmPassword" placeholder="Confirm new password" data-i18n-placeholder="cust_ph_confirm_pass" autocomplete="new-password" />
-              <button type="button" class="btn-toggle-password" aria-label="Show password">
-                <svg class="eye-icon eye-icon--open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                <svg class="eye-icon eye-icon--closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              <input class="form-input form-input--lg" type="password" id="cp-confirm" name="confirmPassword" placeholder="Repeat new password" autocomplete="new-password" />
+              <button type="button" class="btn-toggle-password" aria-label="Show password" tabindex="-1">
+                <svg class="eye-icon eye-icon--show" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="eye-icon eye-icon--hide" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
               </button>
             </div>
-            <span class="pw-match-hint" id="pw-match-hint" hidden></span>
           </div>
-        </div>
-        <div class="settings-submit-row">
-          <button class="btn btn--primary" type="submit" data-i18n="cust_update_password">Update Password</button>
+
+        </div><!-- /cp-row -->
+
+        <p class="field-error" id="cp-error" hidden></p>
+
+        <div class="cp-actions">
+          <button class="btn btn--primary cp-submit-btn" type="submit" id="cp-submit">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            Update Password
+          </button>
+          <button class="btn btn--ghost cp-clear-btn" type="reset" id="cp-reset">Clear</button>
         </div>
       </form>
     </div>
@@ -2290,6 +2360,42 @@
   </script>
 
     <!-- ── Deactivate Account modal ────────────────────────── -->
+    <!-- Change Email modal -->
+    <div class="modal-overlay acct-modal" id="modal-change-email" hidden role="dialog" aria-modal="true" aria-labelledby="modal-change-email-title">
+      <div class="modal-box acct-modal__box">
+        <div class="modal-box__header acct-modal__header">
+          <div class="acct-modal__icon acct-modal__icon--neutral" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="m22 6-10 7L2 6"/></svg>
+          </div>
+          <h3 id="modal-change-email-title" data-i18n="cust_modal_email_title">Change Email Address</h3>
+          <button type="button" class="modal-close acct-modal__close" id="btn-close-change-email" aria-label="Close">&times;</button>
+        </div>
+        <form id="change-email-form" novalidate>
+          <div class="modal-box__body acct-modal__body">
+            <p class="acct-modal__lead" data-i18n="cust_modal_email_lead">Enter your new email and current password to verify this sensitive account change.</p>
+            <div class="form-field">
+              <label class="form-label" for="change-email-new" data-i18n="cust_label_new_email">New Email <span class="required-mark" aria-hidden="true">*</span></label>
+              <input class="form-input" type="email" id="change-email-new" name="newEmail" placeholder="new@email.com" data-i18n-placeholder="cust_ph_new_email" autocomplete="email" required />
+            </div>
+            <div class="form-field">
+              <label class="form-label" for="change-email-password" data-i18n="cust_label_current_pass">Current Password <span class="required-mark" aria-hidden="true">*</span></label>
+              <div class="input-password-wrap">
+                <input class="form-input" type="password" id="change-email-password" name="currentPassword" placeholder="Your current password" data-i18n-placeholder="cust_ph_current_pass" autocomplete="current-password" required />
+                <button type="button" class="btn-toggle-password" aria-label="Show password">
+                  <svg class="eye-icon eye-icon--open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  <svg class="eye-icon eye-icon--closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="modal-box__footer acct-modal__footer">
+            <button type="button" class="btn btn--outline" id="btn-change-email-cancel" data-i18n="cust_modal_cancel">Cancel</button>
+            <button type="submit" class="btn btn--primary" id="btn-change-email-confirm" data-i18n="cust_confirm_email_change">Confirm Change</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <div class="modal-overlay acct-modal" id="modal-deactivate" hidden role="dialog" aria-modal="true" aria-labelledby="modal-deactivate-title">
       <div class="modal-box acct-modal__box">
         <div class="modal-box__header acct-modal__header acct-modal__header--warning">

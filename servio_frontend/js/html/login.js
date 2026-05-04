@@ -3,17 +3,9 @@
    ═══════════════════════════════════════════════════════════ */
 
 import { initShowcaseAtmosphere } from '../components/showcase-atmosphere.js';
+import { login } from '../api/auth.js';
 
 initShowcaseAtmosphere();
-
-function getStoredAccount() {
-  try {
-    const raw = localStorage.getItem("servio_account");
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
 
 function setError(el, message) {
   if (!el) return;
@@ -58,7 +50,7 @@ function routeToDashboard(role) {
     const isAuthPage = redirect.includes('signup.html') || redirect.includes('login.html');
     
     // Basic validation to prevent (ensure it's local)
-    if (!isAuthPage && (redirect.startsWith('./') || redirect.startsWith('/') || !redirect.includes('://'))) {
+    if (!isAuthPage && (redirect.startsWith('./') || redirect.startsWith('/'))) {
       window.location.href = decodeURIComponent(redirect);
       return;
     }
@@ -152,25 +144,6 @@ export function initLogin() {
     const email = form.querySelector('input[name="email"]')?.value?.trim() || "";
     const password = form.querySelector('input[name="password"]')?.value || "";
 
-    // Wrap the rest of the logic in a timeout to show the animation
-    setTimeout(() => {
-    // Hardcoded demo account shortcuts
-    if (email === 'admin@servio.eg' && password === 'admin123') {
-      localStorage.setItem('servio_session', JSON.stringify({ role: 'admin', email: 'admin@servio.eg', name: 'Admin' }));
-      routeToDashboard('admin');
-      return;
-    }
-    if (email === 'ahmed@test.com' && password === 'test1234') {
-      localStorage.setItem('servio_session', JSON.stringify({ role: 'customer', email: 'ahmed@test.com', name: 'Ahmed Yasser' }));
-      routeToDashboard('customer');
-      return;
-    }
-    if (email === 'khaled@test.com' && password === 'test1234') {
-      localStorage.setItem('servio_session', JSON.stringify({ role: 'technician', email: 'khaled@test.com', name: 'Khaled Mohamed' }));
-      routeToDashboard('technician');
-      return;
-    }
-
     if (!isValidEmail(email)) {
       setLoading(false);
       return setError(errorEl, "Enter a valid email address.");
@@ -180,34 +153,53 @@ export function initLogin() {
       return setError(errorEl, "Password must be at least 8 characters.");
     }
 
-    // Remember email if checkbox is checked
     if (rememberCheckbox && rememberCheckbox.checked) {
       localStorage.setItem("servio_remember_email", email);
     } else {
       localStorage.removeItem("servio_remember_email");
     }
 
-    // Detect role from stored account
-    const acct = getStoredAccount();
-    const role =
-      acct && acct.email && acct.role && acct.email.toLowerCase() === email.toLowerCase()
-        ? acct.role
-        : "customer";
-
-    // Block pending technicians from logging in
-    if (role === 'technician' && acct?.status === 'pending') {
-      setLoading(false);
-      setError(errorEl, 'Your account is pending approval. Our team will notify you within 24 hours. Need help? Contact support@servio.eg');
-      return;
-    }
-
-    const name = acct?.fullName || acct?.email || '';
-    localStorage.setItem('servio_session', JSON.stringify({ role, email, name }));
-    routeToDashboard(role);
-    }, 1200); // 1.2s delay to show off the pretty animation
+    login(email, password)
+      .then((user) => {
+        // Persist the full user profile so dashboards can populate
+        // form fields synchronously without waiting for getMe() API call
+        const account = {
+          fullName:           user.name  || '',
+          name:               user.name  || '',
+          email:              user.email || '',
+          phone:              user.phone || '',
+          role:               user.role  || '',
+          verificationStatus: user.verificationStatus || '',
+          verificationRejectionReason: user.verificationRejectionReason || '',
+          profileImage:       user.profileImage || '',
+          skills:             user.skills || [],
+          specialty:          Array.isArray(user.skills) ? user.skills.join(', ') : '',
+          hourlyRate:         user.hourlyRate  ?? '',
+          yearsExperience:    user.yearsExperience ?? '',
+          experience:         user.yearsExperience ?? '',
+          bio:                user.bio || '',
+          uploadedDocs: {
+            idFront:  { uploaded: !!(user.idFrontUrl),  url: user.idFrontUrl  || '', name: user.idFrontName  || '' },
+            idBack:   { uploaded: !!(user.idBackUrl),   url: user.idBackUrl   || '', name: user.idBackName   || '' },
+            idSelfie: { uploaded: !!(user.idSelfieUrl), url: user.idSelfieUrl || '', name: user.idSelfieName || '' },
+            cvFile:   { uploaded: !!(user.cvUrl),       url: user.cvUrl       || '', name: user.cvName       || '' },
+            portfolio: {
+              uploaded: !!(user.portfolioFiles?.length),
+              count:    user.portfolioFiles?.length || 0,
+              files:    (user.portfolioFiles || []).map(f => ({ url: f.url || '', name: f.name || '' })),
+            },
+          },
+        };
+        localStorage.setItem('servio_account', JSON.stringify(account));
+        routeToDashboard(user.role);
+      })
+      .catch((err) => {
+        setLoading(false);
+        setError(errorEl, err.message || "Invalid email or password.");
+      });
   });
 }
 
 initLogin();
 
-// .
+

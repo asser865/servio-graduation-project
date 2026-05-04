@@ -6,7 +6,7 @@
 
 const mongoose = require('mongoose');
 
-const BOOKING_STATUSES = ['pending', 'accepted', 'rejected', 'in_progress', 'completed', 'cancelled'];
+const BOOKING_STATUSES = ['pending', 'accepted', 'rejected', 'in_progress', 'completed', 'cancelled', 'disputed'];
 
 const bookingSchema = new mongoose.Schema(
   {

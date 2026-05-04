@@ -4,8 +4,13 @@
 import { revealAll } from '../components/scroll-reveal.js';
 import { showToast } from '../components/toast.js';
 import { getInitials } from '../utils/string.js';
+import { getMe, updateMe, updatePassword, updateEmail, deleteMe } from '../api/users.js';
+import { uploadPublicFile } from '../api/uploads.js';
 
 const TAB_KEY = 'servio_activeTab_technician';
+
+// Holds uploaded avatar URL between file-select and form-save
+let _pendingPhotoUrl = null;
 const DAYS_KEYS = ['avail_day_mon','avail_day_tue','avail_day_wed','avail_day_thu','avail_day_fri','avail_day_sat','avail_day_sun'];
 const SKILLS_KEYS = ['skill_plumbing','skill_electrical','skill_hvac','skill_painting','skill_carpentry',
   'skill_cleaning','skill_roofing','skill_flooring','skill_appliance','skill_landscaping','skill_general'];
@@ -90,7 +95,7 @@ function initTabs() {
       p.hidden = !active;
       if (active) revealAll(p);
     });
-    localStorage.setItem(TAB_KEY, id);
+    sessionStorage.setItem(TAB_KEY, id);
     // Update topbar title
     const labelKey = TAB_LABEL_KEYS[id];
     const el = document.getElementById('dash-topbar-title');
@@ -118,7 +123,7 @@ function initTabs() {
   const quickAvail = document.querySelector('[data-quick-availability]');
   if (quickAvail) quickAvail.addEventListener('click', () => showTab('availability'));
 
-  const saved = localStorage.getItem(TAB_KEY) || 'overview';
+  const saved = sessionStorage.getItem(TAB_KEY) || 'overview';
   showTab(saved);
 }
 
@@ -150,16 +155,135 @@ function populateProfile() {
   // First name in welcome banner
   document.querySelectorAll('[data-dash-firstname]').forEach(el => { el.textContent = name.split(' ')[0]; });
 
-  if (account) {
-    document.querySelectorAll('[data-settings-field]').forEach(f => {
-      if (account[f.dataset.settingsField] != null) f.value = account[f.dataset.settingsField];
-    });
-    const preview = document.querySelector('[data-avatar-preview]');
-    if (preview && preview.children.length === 0) preview.textContent = initials;
-    // Pre-fill service area
-    const serviceAreaInput = document.getElementById('service-area');
-    if (serviceAreaInput && account.serviceArea) serviceAreaInput.value = account.serviceArea;
+  // Build an effective account by merging session fields as fallback for missing account data
+  const effectiveAccount = {
+    fullName:        session.name || '',
+    name:            session.name || '',
+    email:           session.email || '',
+    phone:           session.phone || '',
+    skills:          session.skills || [],
+    specialty:       Array.isArray(session.skills) ? session.skills.join(', ') : '',
+    hourlyRate:      session.hourlyRate ?? '',
+    yearsExperience: session.yearsExperience ?? '',
+    experience:      session.yearsExperience ?? '',
+    bio:             session.bio || '',
+    ...( account || {} ),
+  };
+
+  // Normalise field aliases
+  if (!effectiveAccount.fullName && effectiveAccount.name) effectiveAccount.fullName = effectiveAccount.name;
+  if (effectiveAccount.yearsExperience != null && effectiveAccount.experience == null) {
+    effectiveAccount.experience = effectiveAccount.yearsExperience;
   }
+  if (!effectiveAccount.specialty && Array.isArray(effectiveAccount.skills) && effectiveAccount.skills.length) {
+    effectiveAccount.specialty = effectiveAccount.skills.join(', ');
+  }
+
+  document.querySelectorAll('[data-settings-field]').forEach(f => {
+    const val = effectiveAccount[f.dataset.settingsField];
+    if (val != null && val !== '') f.value = val;
+  });
+  const serviceAreaInput = document.getElementById('service-area');
+  if (serviceAreaInput && effectiveAccount.serviceArea) serviceAreaInput.value = effectiveAccount.serviceArea;
+
+  // Render avatar — photo takes priority over initials
+  const imgStyle = 'width:100%;height:100%;object-fit:cover;border-radius:50%;';
+  // Only trust server URL if it's an actual HTTP/HTTPS/relative URL (not a local filesystem path)
+  const serverImg = session.profileImage || '';
+  const serverImgUsable = serverImg && (serverImg.startsWith('http') || serverImg.startsWith('/'));
+  const photoUrl = serverImgUsable ? serverImg : (localStorage.getItem('servio_avatar_cache') || null);
+  const preview  = document.querySelector('[data-avatar-preview]');
+  const topbar   = document.getElementById('topbar-avatar');
+
+  if (preview) {
+    if (photoUrl) {
+      preview.innerHTML = `<img src="${photoUrl}" alt="Profile photo" style="${imgStyle}" />`;
+      preview.classList.remove('avatar-required');
+    } else {
+      preview.innerHTML = `<span>${initials}</span>`;
+      // Mandatory guard — red ring + hint when no photo
+      preview.classList.add('avatar-required');
+      const wrap = preview.closest('.settings-avatar-wrap');
+      if (wrap && !wrap.querySelector('.avatar-required-hint')) {
+        const hint = document.createElement('p');
+        hint.className = 'avatar-required-hint';
+        hint.textContent = typeof window.t === 'function'
+          ? window.t('toast_photo_required')
+          : 'Please add a profile photo before saving.';
+        wrap.insertAdjacentElement('afterend', hint);
+      }
+    }
+  }
+  if (topbar) {
+    topbar.innerHTML = photoUrl
+      ? `<img src="${photoUrl}" alt="Profile photo" style="${imgStyle}" />`
+      : (initials[0] || 'T');
+  }
+
+  // Sync from API — refresh photo and populate form fields with authoritative data
+  getMe().then(user => {
+    if (!user) return;
+
+    // Update profile photo if changed (only use server URL if it's a real HTTP URL)
+    const apiImg = user.profileImage || '';
+    const apiImgUsable = apiImg && (apiImg.startsWith('http') || apiImg.startsWith('/'));
+    const resolvedPhoto = apiImgUsable ? apiImg : (localStorage.getItem('servio_avatar_cache') || null);
+    if (resolvedPhoto && resolvedPhoto !== photoUrl) {
+      if (apiImgUsable) {
+        const s = getSession();
+        if (s) { s.profileImage = apiImg; localStorage.setItem('servio_session', JSON.stringify(s)); }
+      }
+      if (preview) {
+        preview.innerHTML = `<img src="${resolvedPhoto}" alt="Profile photo" style="${imgStyle}" />`;
+        preview.classList.remove('avatar-required');
+        const hint = preview.closest('.settings-avatar-wrap')?.nextElementSibling;
+        if (hint?.classList.contains('avatar-required-hint')) hint.remove();
+      }
+      if (topbar) topbar.innerHTML = `<img src="${resolvedPhoto}" alt="Profile photo" style="${imgStyle}" />`;
+    }
+
+    // Populate settings form fields from live API data
+    const fieldMap = {
+      fullName:   user.name,
+      email:      user.email,
+      phone:      user.phone,
+      specialty:  Array.isArray(user.skills) ? user.skills.join(', ') : (user.specialty || ''),
+      hourlyRate: user.hourlyRate,
+      experience: user.yearsExperience,
+      bio:        user.bio,
+      facebook:   user.facebook,
+      instagram:  user.instagram,
+      portfolio:  user.portfolioUrl,
+    };
+    Object.entries(fieldMap).forEach(([field, val]) => {
+      if (val == null || val === '') return;
+      const el = document.querySelector(`[data-settings-field="${field}"]`);
+      if (el) el.value = val;
+    });
+
+    // Update sidebar name and initials
+    if (user.name) {
+      document.querySelectorAll('[data-dash-name]').forEach(el => { el.textContent = user.name; });
+      const freshInitials = getInitials(user.name);
+      document.querySelectorAll('[data-dash-initials]').forEach(el => { el.textContent = freshInitials; });
+      document.querySelectorAll('[data-dash-firstname]').forEach(el => { el.textContent = user.name.split(' ')[0]; });
+    }
+
+    // Persist updated data locally for offline use
+    try {
+      const acc = getAccount() || {};
+      if (user.name)            { acc.fullName = user.name; acc.name = user.name; }
+      if (user.phone)           acc.phone       = user.phone;
+      if (user.skills)          { acc.skills = user.skills; acc.specialty = user.skills.join(', '); }
+      if (user.hourlyRate)      acc.hourlyRate   = user.hourlyRate;
+      if (user.yearsExperience != null) { acc.yearsExperience = user.yearsExperience; acc.experience = user.yearsExperience; }
+      if (user.bio)             acc.bio          = user.bio;
+      if (user.facebook)        acc.facebook     = user.facebook;
+      if (user.instagram)       acc.instagram    = user.instagram;
+      if (user.portfolioUrl)    acc.portfolio    = user.portfolioUrl;
+      localStorage.setItem('servio_account', JSON.stringify(acc));
+    } catch (_) {}
+  }).catch(() => {});
 }
 
 function updateWelcomeText() {
@@ -294,21 +418,21 @@ function initSettingsValidation() {
   const newPasswordInput = document.getElementById('s-new-password');
   const confirmPasswordInput = document.getElementById('s-confirm-password');
 
+  function getContainer(input) {
+    const wrap = input.closest('.input-password-wrap');
+    return wrap ? wrap.parentElement : input.parentElement;
+  }
+
   function setFieldState(input, valid, message) {
     input.classList.toggle('is-valid', valid);
     input.classList.toggle('is-invalid', !valid);
-    let errorEl = input.parentElement.querySelector('.field-error');
+    const container = getContainer(input);
+    let errorEl = container.querySelector('.field-error');
     if (!valid && message) {
       if (!errorEl) {
         errorEl = document.createElement('span');
         errorEl.className = 'field-error';
-        // If inside .input-password-wrap, append to parent form-field
-        const wrap = input.closest('.input-password-wrap');
-        if (wrap) {
-          wrap.parentElement.appendChild(errorEl);
-        } else {
-          input.parentElement.appendChild(errorEl);
-        }
+        container.appendChild(errorEl);
       }
       errorEl.textContent = message;
     } else if (errorEl) {
@@ -318,9 +442,7 @@ function initSettingsValidation() {
 
   function clearFieldState(input) {
     input.classList.remove('is-valid', 'is-invalid');
-    const wrap = input.closest('.input-password-wrap');
-    const container = wrap ? wrap.parentElement : input.parentElement;
-    const errorEl = container.querySelector('.field-error');
+    const errorEl = getContainer(input).querySelector('.field-error');
     if (errorEl) errorEl.remove();
   }
 
@@ -343,29 +465,36 @@ function initSettingsValidation() {
     });
   }
 
-  function validatePasswordMatch() {
+  const mismatchMsg = () => typeof window.t === 'function' ? window.t('err_pw_mismatch') : 'Passwords do not match.';
+
+  function validatePasswordMatch(showError = true) {
     if (!newPasswordInput || !confirmPasswordInput) return;
-    const newVal = newPasswordInput.value;
+    const newVal     = newPasswordInput.value;
     const confirmVal = confirmPasswordInput.value;
     if (!newVal && !confirmVal) {
-      clearFieldState(newPasswordInput);
       clearFieldState(confirmPasswordInput);
       return;
     }
-    if (confirmVal && newVal !== confirmVal) {
-      setFieldState(confirmPasswordInput, false, typeof window.t === 'function' ? window.t('err_pw_mismatch') : 'Passwords do not match.');
-    } else if (confirmVal) {
+    if (!confirmVal) { clearFieldState(confirmPasswordInput); return; }
+    if (newVal === confirmVal) {
       setFieldState(confirmPasswordInput, true, '');
+    } else if (showError) {
+      setFieldState(confirmPasswordInput, false, mismatchMsg());
+    } else {
+      // While typing: clear the error if it was previously shown, don't add a new one
+      clearFieldState(confirmPasswordInput);
     }
   }
 
   if (confirmPasswordInput) {
-    confirmPasswordInput.addEventListener('blur', validatePasswordMatch);
-    confirmPasswordInput.addEventListener('input', validatePasswordMatch);
+    // Show error only after the user leaves the field
+    confirmPasswordInput.addEventListener('blur', () => validatePasswordMatch(true));
+    // While typing: only clear the error when they've matched; never add new error mid-type
+    confirmPasswordInput.addEventListener('input', () => validatePasswordMatch(false));
   }
   if (newPasswordInput) {
     newPasswordInput.addEventListener('input', () => {
-      if (confirmPasswordInput && confirmPasswordInput.value) validatePasswordMatch();
+      if (confirmPasswordInput?.value) validatePasswordMatch(false);
     });
   }
 }
@@ -374,54 +503,108 @@ function initSettingsForm() {
   const form = document.querySelector('[data-settings-form]');
   if (!form) return;
 
-  // Fix 5: Change Photo button with FileReader preview
-  const changePhotoBtn = document.getElementById('btn-change-photo');
+  const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
+  const imgStyle = 'width:100%;height:100%;object-fit:cover;border-radius:50%;';
+
+  // ── Photo upload ──────────────────────────────────────────
+  const changePhotoBtn   = document.getElementById('btn-change-photo');
   const photoUploadInput = document.getElementById('photo-upload-input');
-  const preview = document.querySelector('[data-avatar-preview]');
+  const preview          = document.querySelector('[data-avatar-preview]');
 
   if (changePhotoBtn && photoUploadInput) {
     changePhotoBtn.addEventListener('click', () => photoUploadInput.click());
-    photoUploadInput.addEventListener('change', () => {
+
+    photoUploadInput.addEventListener('change', async () => {
       const file = photoUploadInput.files[0];
       if (!file) return;
+
+      if (file.size > 2 * 1024 * 1024) {
+        showToast(_t('toast_photo_error') || 'Image must be under 2 MB.', 'error');
+        photoUploadInput.value = '';
+        return;
+      }
+
+      // Instant local preview
       const reader = new FileReader();
       reader.onload = (e) => {
         if (preview) {
-          preview.innerHTML = `<img src="${e.target.result}" alt="Profile photo" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`;
+          preview.innerHTML = `<img src="${e.target.result}" alt="Profile photo" style="${imgStyle}" />`;
+          preview.classList.remove('avatar-required');
+          const hint = preview.closest('.settings-avatar-wrap')?.nextElementSibling;
+          if (hint?.classList.contains('avatar-required-hint')) hint.remove();
         }
-        // Also update topbar avatar with image
-        const topbarAvatar = document.getElementById('topbar-avatar');
-        if (topbarAvatar) {
-          topbarAvatar.innerHTML = `<img src="${e.target.result}" alt="Profile photo" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`;
-        }
+        const topbar = document.getElementById('topbar-avatar');
+        if (topbar) topbar.innerHTML = `<img src="${e.target.result}" alt="Profile photo" style="${imgStyle}" />`;
+        // Cache locally so photo persists across reloads before save
+        try { localStorage.setItem('servio_avatar_cache', e.target.result); } catch (_) {}
       };
       reader.readAsDataURL(file);
+
+      // Upload to server
+      changePhotoBtn.disabled = true;
+      changePhotoBtn.textContent = _t('toast_photo_uploading') || 'Uploading…';
+      try {
+        const result = await uploadPublicFile(file, 'avatar');
+        _pendingPhotoUrl = result.url;
+        showToast(_t('toast_photo_uploaded') || 'Photo uploaded.', 'success');
+      } catch {
+        showToast(_t('toast_photo_error') || 'Failed to upload photo.', 'error');
+        _pendingPhotoUrl = null;
+      } finally {
+        changePhotoBtn.disabled = false;
+        changePhotoBtn.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg><span data-i18n="cust_change_photo">${_t('cust_change_photo') || 'Change Photo'}</span>`;
+      }
     });
   }
 
-  form.addEventListener('submit', (e) => {
+  // ── Save ──────────────────────────────────────────────────
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
+
+    const currentSession = getSession();
+    const photoUrl = _pendingPhotoUrl || currentSession?.profileImage || null;
+
+    // Mandatory guard — technicians must have a profile photo
+    if (!photoUrl) {
+      showToast(_t('toast_photo_required') || 'Please add a profile photo before saving.', 'error');
+      if (preview) preview.classList.add('avatar-required');
+      return;
+    }
+
     const account = getAccount() || {};
     const passwordFields = new Set(['newPassword', 'confirmPassword']);
     document.querySelectorAll('[data-settings-field]').forEach(f => {
-      if (!passwordFields.has(f.dataset.settingsField)) {
-        account[f.dataset.settingsField] = f.value;
-      }
+      if (!passwordFields.has(f.dataset.settingsField)) account[f.dataset.settingsField] = f.value;
     });
     localStorage.setItem('servio_account', JSON.stringify(account));
-    const session = getSession();
-    if (session && account.fullName) {
-      session.name = account.fullName;
-      localStorage.setItem('servio_session', JSON.stringify(session));
+
+    try {
+      await updateMe({
+        name:         account.fullName || account.name || '',
+        phone:        account.phone || '',
+        profileImage: photoUrl,
+      });
+
+      if (currentSession) {
+        if (account.fullName) currentSession.name = account.fullName;
+        currentSession.profileImage = photoUrl;
+        localStorage.setItem('servio_session', JSON.stringify(currentSession));
+      }
+      if (_pendingPhotoUrl) _pendingPhotoUrl = null;
+      // Keep servio_avatar_cache — server may return a local path that browsers can't load
+
+      showToast(_t('toast_settings_saved') || 'Your changes have been saved.', 'success');
+    } catch (err) {
+      showToast(err.message || 'Failed to save settings.', 'error');
     }
-    showToast(typeof window.t === 'function' ? window.t('toast_settings_saved') : 'Your changes have been saved.', 'success');
   });
 
-  // Delete account button (Fix 3)
+  // Delete account button — opens confirmation modal
   const deleteBtn = document.getElementById('btn-delete-account');
   if (deleteBtn) {
     deleteBtn.addEventListener('click', () => {
-      showToast(typeof window.t === 'function' ? window.t('toast_delete_demo') : 'Account deletion is not available in demo mode.', 'info');
+      const modal = document.getElementById('modal-delete-account');
+      if (modal) modal.style.display = 'flex';
     });
   }
 
@@ -461,7 +644,7 @@ function initSettingsTabs() {
 /* ── Profile completeness bar ────────────────────────────── */
 function updateProfileCompleteness() {
   const account = typeof getAccount === 'function' ? getAccount() : null;
-  const fields = ['fullName', 'email', 'phone', 'address', 'specialty'];
+  const fields = ['fullName', 'email', 'phone', 'specialty', 'hourlyRate'];
   const filled = fields.filter(f => account && account[f] && String(account[f]).trim()).length;
   const avatar = document.querySelector('.settings-avatar-preview img');
   const total  = fields.length + 1;
@@ -479,33 +662,42 @@ function initTechSecurityForm() {
   const form = document.getElementById('tech-security-form');
   if (!form) return;
   const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
-  form.addEventListener('submit', (e) => {
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const currentPw = form.querySelector('#s-current-password');
     const newPw     = form.querySelector('#s-new-password');
     const confirmPw = form.querySelector('#s-confirm-password');
+    const submitBtn = form.querySelector('[type="submit"]');
     if (!currentPw.value.trim()) {
-      showToast(_t('toast_enter_current_pw'), 'info');
+      showToast(_t('toast_enter_current_pw') || 'Enter your current password.', 'info');
       currentPw.focus(); return;
     }
     if (newPw.value.length < 8) {
-      showToast(_t('toast_pw_min_length'), 'info');
+      showToast(_t('toast_pw_min_length') || 'Password must be at least 8 characters.', 'info');
       newPw.focus(); return;
     }
     if (!/(?=.*[A-Za-z])(?=.*\d)/.test(newPw.value)) {
-      showToast(_t('toast_pw_needs_letter_num'), 'info');
+      showToast(_t('toast_pw_needs_letter_num') || 'Password must contain a letter and a number.', 'info');
       newPw.focus(); return;
     }
     if (newPw.value !== confirmPw.value) {
-      showToast(_t('toast_pw_mismatch'), 'info');
+      showToast(_t('toast_pw_mismatch') || 'Passwords do not match.', 'info');
       confirmPw.focus(); return;
     }
-    currentPw.value = '';
-    newPw.value = '';
-    confirmPw.value = '';
-    document.getElementById('pw-strength-wrap')?.setAttribute('hidden', '');
-    document.querySelectorAll('.pw-check').forEach(c => c.classList.remove('is-met'));
-    showToast(_t('toast_pw_updated'), 'success');
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = _t('tech_updating') || 'Updating…'; }
+    try {
+      await updatePassword({ currentPassword: currentPw.value, newPassword: newPw.value });
+      currentPw.value = '';
+      newPw.value = '';
+      confirmPw.value = '';
+      document.getElementById('pw-strength-wrap')?.setAttribute('hidden', '');
+      document.querySelectorAll('.pw-check').forEach(c => c.classList.remove('is-met'));
+      showToast(_t('toast_pw_updated') || 'Password updated successfully.', 'success');
+    } catch (err) {
+      showToast(err.message || 'Failed to update password.', 'error');
+    } finally {
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = _t('tech_update_password') || 'Update Password'; }
+    }
   });
 }
 
@@ -658,6 +850,269 @@ function initDashLogout() {
   });
 }
 
+/* ── Pending account guard ──────────────────────────────────
+   Blocks all dashboard tabs except Verification and Settings
+   while the account is pending admin approval.
+─────────────────────────────────────────────────────────── */
+function initPendingGuard() {
+  const account = getAccount();
+  const isPending =
+    account?.status === 'pending' ||
+    account?.verificationStatus === 'pending';
+  if (!isPending) return;
+
+  // Build inline doc status rows
+  const docs = account?.uploadedDocs || {};
+  const DOC_LABELS = {
+    idFront:   'National ID — Front',
+    idBack:    'National ID — Back',
+    idSelfie:  'Selfie with ID',
+    cvFile:    'CV / Resume',
+    portfolio: 'Portfolio',
+  };
+  const docRows = Object.entries(DOC_LABELS).map(([key, label]) => {
+    const doc = docs[key];
+    const uploaded = key === 'portfolio' ? !!(doc?.count) : !!(doc?.uploaded);
+    const badge = uploaded
+      ? '<span style="color:#065f46;font-weight:600;font-size:0.75rem;">&#10003; Uploaded</span>'
+      : '<span style="color:#92400e;font-size:0.75rem;">Pending</span>';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--color-border,#e5e7eb);">
+      <span style="font-size:0.82rem;">${label}</span>${badge}</div>`;
+  }).join('');
+
+  const overlay = document.createElement('div');
+  overlay.id = 'pending-overlay';
+  overlay.setAttribute('role', 'alert');
+  overlay.setAttribute('aria-live', 'polite');
+  overlay.innerHTML = `
+    <div class="pending-overlay__card">
+      <div class="pending-overlay__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+        </svg>
+      </div>
+      <h2 class="pending-overlay__title">Application Under Review</h2>
+      <p class="pending-overlay__desc">Your documents are being reviewed by our team. This typically takes 1–2 business days. You'll have full access once your account is approved.</p>
+      <div style="width:100%;margin-top:12px;margin-bottom:4px;">${docRows}</div>
+      <p style="font-size:0.78rem;color:var(--color-text-light,#6b7280);margin-top:12px;">Questions? Contact us at <strong>support@servio.com</strong></p>
+      <div style="width:100%;height:1px;background:var(--color-border,#e5e7eb);margin:20px 0 16px;"></div>
+      <button type="button" id="pending-overlay-logout" style="display:inline-flex;align-items:center;gap:7px;padding:9px 20px;border:none;border-radius:10px;background:#f3f4f6;color:#6b7280;font-size:0.82rem;font-weight:500;cursor:pointer;letter-spacing:0.01em;transition:background 0.18s,color 0.18s;" onmouseover="this.style.background='#fee2e2';this.style.color='#dc2626';" onmouseout="this.style.background='#f3f4f6';this.style.color='#6b7280';">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Sign Out
+      </button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  // Overlay is permanent — never hidden while account is pending
+  overlay.removeAttribute('hidden');
+
+  document.getElementById('pending-overlay-logout')?.addEventListener('click', () => {
+    localStorage.removeItem('servio_session');
+    window.location.href = './login.html';
+  });
+
+  // Swallow ALL tab navigation so sidebar clicks do nothing while pending
+  document.querySelectorAll('[data-tab]').forEach(tab => {
+    tab.addEventListener('click', e => e.stopImmediatePropagation(), true);
+  });
+}
+
+/* ── Verification tab: sync document statuses from signup data ──
+   Reads account.uploadedDocs written by signup.js and updates
+   each document row's badge and shows uploaded filenames.
+─────────────────────────────────────────────────────────── */
+function updateVerifStatusBanner(status) {
+  const banner   = document.getElementById('verif-status-banner');
+  const textEl   = document.getElementById('verif-status-text');
+  const hintEl   = document.getElementById('verif-status-hint');
+  if (!banner || !textEl) return;
+
+  banner.className = 'verif-status';
+  if (status === 'verified' || status === 'approved') {
+    banner.classList.add('verif-status--verified');
+    textEl.textContent = 'Status: Verified ✓';
+    if (hintEl) hintEl.textContent = 'Your identity has been verified. You are now a trusted professional on SERVIO.';
+  } else if (status === 'rejected') {
+    banner.classList.add('verif-status--rejected');
+    textEl.textContent = 'Status: Rejected';
+    if (hintEl) hintEl.textContent = 'Your verification was rejected. Please re-upload your documents and try again.';
+  } else if (status === 'pending' || status === 'not_submitted') {
+    banner.classList.add('verif-status--review');
+    textEl.textContent = 'Status: Pending Submission';
+    if (hintEl) hintEl.textContent = 'Please upload your identity documents to start the verification process.';
+  } else {
+    banner.classList.add('verif-status--review');
+    textEl.textContent = 'Status: Under Review';
+    if (hintEl) hintEl.textContent = 'Your documents are being verified. This typically takes 1–2 business days.';
+  }
+}
+
+function toAbsUrl(url) {
+  if (!url) return '';
+  if (url.startsWith('http')) return url;
+  const base = (window.SERVIO_CONFIG?.API_BASE || 'http://127.0.0.1:5000/api/v1').replace('/api/v1', '');
+  return base + url;
+}
+
+function initVerificationTab() {
+  const panel = document.getElementById('panel-verification');
+  if (!panel) return;
+
+  const account = getAccount();
+  const docs    = account?.uploadedDocs || {};
+
+  // Show status from localStorage first, then refresh from API
+  updateVerifStatusBanner(account?.verificationStatus || 'pending');
+
+  panel.querySelectorAll('[data-verif-doc]').forEach(row => {
+    const key   = row.dataset.verifDoc;
+    const doc   = docs[key];
+    const badge = row.querySelector('[data-verif-badge]');
+    const viewBtn  = row.querySelector('[data-verif-view]');
+    const labelSpan = row.querySelector('[data-verif-upload-label]');
+    const fileInput = row.querySelector('input[type="file"]');
+    const body = row.querySelector('.verif-doc-row-v2__body');
+
+    // Determine upload state
+    const isPortfolio = key === 'portfolio';
+    const uploaded = isPortfolio ? !!(doc?.count) : !!(doc?.uploaded);
+    const url      = isPortfolio ? doc?.files?.[0]?.url : doc?.url;
+    const name     = isPortfolio
+      ? (doc?.count ? doc.count + ' file' + (doc.count > 1 ? 's' : '') + ' uploaded' : '')
+      : (doc?.name || '');
+
+    // Update badge
+    if (badge) {
+      if (uploaded) {
+        badge.className = 'badge badge--confirmed';
+        badge.textContent = 'Uploaded';
+      } else {
+        badge.className = 'badge badge--pending';
+        badge.textContent = 'Pending';
+      }
+    }
+
+    // Show/wire View button
+    if (viewBtn) {
+      const absUrl = toAbsUrl(url);
+      if (uploaded && absUrl) {
+        viewBtn.hidden = false;
+        viewBtn.onclick = () => window.open(absUrl, '_blank');
+      } else {
+        viewBtn.hidden = true;
+      }
+    }
+
+    // Update upload label
+    if (labelSpan) labelSpan.textContent = uploaded ? 'Replace' : 'Upload';
+
+    // Show filename hint
+    if (name && body && !body.querySelector('.verif-doc-filename')) {
+      const hint = document.createElement('p');
+      hint.className = 'verif-doc-filename';
+      hint.textContent = name;
+      body.appendChild(hint);
+    }
+
+    // Wire re-upload
+    if (fileInput) {
+      fileInput.addEventListener('change', async () => {
+        const files = isPortfolio ? [...fileInput.files] : [fileInput.files[0]];
+        if (!files.length || !files[0]) return;
+
+        if (labelSpan) labelSpan.textContent = 'Uploading…';
+        try {
+          const uploads = await Promise.all(files.map(f => uploadPublicFile(f, key)));
+          const firstUrl = toAbsUrl(uploads[0]?.url || '');
+
+          // Update badge
+          if (badge) { badge.className = 'badge badge--confirmed'; badge.textContent = 'Uploaded'; }
+          // Update view button
+          if (viewBtn && firstUrl) { viewBtn.hidden = false; viewBtn.onclick = () => window.open(firstUrl, '_blank'); }
+          // Update label
+          if (labelSpan) labelSpan.textContent = 'Replace';
+          // Update filename hint
+          const existingHint = body?.querySelector('.verif-doc-filename');
+          const newName = isPortfolio
+            ? files.length + ' file' + (files.length > 1 ? 's' : '') + ' uploaded'
+            : (files[0].name || '');
+          if (existingHint) {
+            existingHint.textContent = newName;
+          } else if (body && newName) {
+            const hint = document.createElement('p');
+            hint.className = 'verif-doc-filename';
+            hint.textContent = newName;
+            body.appendChild(hint);
+          }
+
+          // Persist to account
+          const acc = getAccount() || {};
+          if (!acc.uploadedDocs) acc.uploadedDocs = {};
+          if (isPortfolio) {
+            acc.uploadedDocs.portfolio = { uploaded: true, count: uploads.length, files: uploads.map(u => ({ url: u.url, name: u.name || '' })) };
+          } else {
+            acc.uploadedDocs[key] = { uploaded: true, url: firstUrl, name: files[0].name || '' };
+          }
+          localStorage.setItem('servio_account', JSON.stringify(acc));
+
+          showToast('Document uploaded successfully.', 'success');
+        } catch {
+          if (labelSpan) labelSpan.textContent = uploaded ? 'Replace' : 'Upload';
+          showToast('Upload failed. Please try again.', 'error');
+        }
+      });
+    }
+  });
+
+  // Sync fresh data from API — updates status + view button URLs
+  getMe().then(user => {
+    if (!user) return;
+    updateVerifStatusBanner(user.verificationStatus || 'pending');
+
+    // Update account cache
+    const acc = getAccount() || {};
+    acc.verificationStatus = user.verificationStatus;
+    if (!acc.uploadedDocs) acc.uploadedDocs = {};
+
+    const apiDocMap = {
+      idFront:  { url: user.idFrontUrl,  name: user.idFrontName  },
+      idBack:   { url: user.idBackUrl,   name: user.idBackName   },
+      idSelfie: { url: user.idSelfieUrl, name: user.idSelfieName },
+      cvFile:   { url: user.cvUrl,       name: user.cvName       },
+    };
+
+    Object.entries(apiDocMap).forEach(([key, { url, name }]) => {
+      if (!url) return;
+      const absUrl = toAbsUrl(url);
+      acc.uploadedDocs[key] = { uploaded: true, url: absUrl, name: name || '' };
+
+      // Update view button in DOM
+      const row = panel.querySelector(`[data-verif-doc="${key}"]`);
+      if (!row) return;
+      const vBtn = row.querySelector('[data-verif-view]');
+      const badge = row.querySelector('[data-verif-badge]');
+      if (vBtn) { vBtn.hidden = false; vBtn.onclick = () => window.open(absUrl, '_blank'); }
+      if (badge) { badge.className = 'badge badge--confirmed'; badge.textContent = 'Uploaded'; }
+    });
+
+    // Portfolio
+    if (user.portfolioFiles?.length) {
+      const absFirst = toAbsUrl(user.portfolioFiles[0]?.url || '');
+      acc.uploadedDocs.portfolio = { uploaded: true, count: user.portfolioFiles.length, files: user.portfolioFiles.map(f => ({ url: toAbsUrl(f.url), name: f.name || '' })) };
+      const row = panel.querySelector('[data-verif-doc="portfolio"]');
+      if (row) {
+        const vBtn = row.querySelector('[data-verif-view]');
+        const badge = row.querySelector('[data-verif-badge]');
+        if (vBtn && absFirst) { vBtn.hidden = false; vBtn.onclick = () => window.open(absFirst, '_blank'); }
+        if (badge) { badge.className = 'badge badge--confirmed'; badge.textContent = 'Uploaded'; }
+      }
+    }
+
+    localStorage.setItem('servio_account', JSON.stringify(acc));
+  }).catch(() => {});
+}
+
 /* ── Notification panel ─────────────────────────────────── */
 function initNotifPanel() {
   const btn   = document.getElementById('topbar-notif-btn');
@@ -766,6 +1221,8 @@ initAccountTab();
 initDashLogout();
 initNotifPanel();
 initPhase2();
+initVerificationTab();
+initPendingGuard();
 
 /* Re-render dynamic grids and welcome text on language change */
 document.addEventListener('langchange', () => {
@@ -1203,8 +1660,156 @@ function updateActionNeededDates() {
   });
 }
 
+/* ── Profile read-only / edit mode ────────────────────────── */
+function initProfileReadOnly() {
+  const form       = document.querySelector('[data-readonly-form]');
+  const editBtn    = document.getElementById('btn-edit-profile');
+  const cancelBtn  = document.getElementById('btn-cancel-profile');
+  const actionsRow = document.getElementById('profile-edit-actions');
+  if (!form || !editBtn) return;
+
+  // Snapshot values so Cancel can restore them
+  let _snapshot = {};
+
+  function getEditableInputs() {
+    return [...form.querySelectorAll('input:not([type="file"]):not([id="s-email"]), textarea')];
+  }
+
+  function enableEdit() {
+    _snapshot = {};
+    getEditableInputs().forEach(el => {
+      _snapshot[el.id || el.name] = el.value;
+      el.removeAttribute('readonly');
+    });
+    if (actionsRow) actionsRow.style.display = 'flex';
+    editBtn.style.display = 'none';
+  }
+
+  function disableEdit() {
+    getEditableInputs().forEach(el => el.setAttribute('readonly', ''));
+    if (actionsRow) actionsRow.style.display = 'none';
+    editBtn.style.display = '';
+  }
+
+  editBtn.addEventListener('click', enableEdit);
+
+  cancelBtn?.addEventListener('click', () => {
+    getEditableInputs().forEach(el => {
+      const key = el.id || el.name;
+      if (key in _snapshot) el.value = _snapshot[key];
+    });
+    disableEdit();
+  });
+
+  // After a successful save, return to read-only
+  form.addEventListener('submit', async () => {
+    // Small delay so the submit handler runs first
+    setTimeout(disableEdit, 100);
+  }, { capture: true });
+}
+
+/* ── Email change modal ────────────────────────────────────── */
+function initEmailChange() {
+  const modal      = document.getElementById('modal-change-email-tech');
+  const openBtn    = document.getElementById('btn-change-email-tech');
+  const closeBtn   = document.getElementById('btn-close-change-email-tech');
+  const cancelBtn  = document.getElementById('btn-change-email-tech-cancel');
+  const form       = document.getElementById('change-email-tech-form');
+  const newEmailEl = document.getElementById('change-email-tech-new');
+  const pwEl       = document.getElementById('change-email-tech-password');
+  const errorEl    = document.getElementById('change-email-tech-error');
+  const submitBtn  = document.getElementById('btn-change-email-tech-confirm');
+  if (!modal || !openBtn || !form) return;
+
+  function openModal() { modal.removeAttribute('hidden'); newEmailEl?.focus(); }
+  function closeModal() { modal.setAttribute('hidden', ''); form.reset(); if (errorEl) errorEl.hidden = true; }
+
+  openBtn.addEventListener('click', openModal);
+  closeBtn?.addEventListener('click', closeModal);
+  cancelBtn?.addEventListener('click', closeModal);
+  modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (errorEl) errorEl.hidden = true;
+    const newEmail = newEmailEl?.value?.trim();
+    const currentPassword = pwEl?.value;
+    if (!newEmail) { if (errorEl) { errorEl.textContent = 'Please enter a new email address.'; errorEl.hidden = false; } return; }
+    if (!currentPassword) { if (errorEl) { errorEl.textContent = 'Please enter your current password.'; errorEl.hidden = false; } return; }
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Updating…'; }
+    try {
+      await updateEmail({ newEmail, currentPassword });
+      const sess = getSession();
+      if (sess) { sess.email = newEmail; localStorage.setItem('servio_session', JSON.stringify(sess)); }
+      const acc = getAccount() || {};
+      acc.email = newEmail;
+      localStorage.setItem('servio_account', JSON.stringify(acc));
+      const emailInput = document.getElementById('s-email');
+      if (emailInput) emailInput.value = newEmail;
+      closeModal();
+      showToast('Email updated successfully. Please log in again.', 'success');
+      setTimeout(() => { localStorage.removeItem('servio_session'); window.location.href = './login.html'; }, 2000);
+    } catch (err) {
+      if (errorEl) { errorEl.textContent = err.message || 'Failed to update email.'; errorEl.hidden = false; }
+    } finally {
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Update Email'; }
+    }
+  });
+}
+
+/* ── Delete Account Modal ──────────────────────────────────── */
+function initDeleteAccount() {
+  const modal     = document.getElementById('modal-delete-account');
+  const cancelBtn = document.getElementById('btn-delete-account-cancel');
+  const confirmBtn= document.getElementById('btn-delete-account-confirm');
+  const inputEl   = document.getElementById('delete-account-confirm-input');
+  const errorEl   = document.getElementById('delete-account-error');
+  if (!modal || !confirmBtn) return;
+
+  function closeModal() {
+    modal.style.display = 'none';
+    if (inputEl) inputEl.value = '';
+    if (errorEl) { errorEl.textContent = ''; errorEl.hidden = true; }
+    if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.textContent = 'Delete My Account'; }
+  }
+
+  cancelBtn?.addEventListener('click', closeModal);
+  document.getElementById('btn-delete-account-cancel-footer')?.addEventListener('click', closeModal);
+  modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+
+  // Enable confirm button only when user types DELETE
+  if (inputEl) {
+    inputEl.addEventListener('input', () => {
+      confirmBtn.disabled = inputEl.value.trim() !== 'DELETE';
+    });
+  }
+
+  confirmBtn.addEventListener('click', async () => {
+    if (inputEl && inputEl.value.trim() !== 'DELETE') return;
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Deleting…';
+    if (errorEl) { errorEl.hidden = true; }
+    try {
+      await deleteMe();
+      // Wipe all local data and redirect to home
+      localStorage.clear();
+      window.location.href = './index.html';
+    } catch (err) {
+      if (errorEl) {
+        errorEl.textContent = err.message || 'Failed to delete account. Please try again.';
+        errorEl.hidden = false;
+      }
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = 'Delete My Account';
+    }
+  });
+}
+
 // Initial update for dates
 updateActionNeededDates();
+initProfileReadOnly();
+initEmailChange();
+initDeleteAccount();
 
 // Re-run on language change
 document.addEventListener('langchange', updateActionNeededDates);

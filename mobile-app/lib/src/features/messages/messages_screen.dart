@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/api/api_client.dart';
+import '../../core/api/messages_api.dart';
 import '../../core/models/message_model.dart';
 import '../../core/models/user_account.dart';
 import '../../core/state/app_state.dart';
@@ -21,6 +23,22 @@ class MessagesScreen extends StatefulWidget {
 class _MessagesScreenState extends State<MessagesScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
+  List<ApiConversation> _apiConversations = <ApiConversation>[];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _fetchConversations());
+  }
+
+  Future<void> _fetchConversations() async {
+    try {
+      final client = context.read<ApiClient>();
+      final convs = await MessagesApi(client).getConversations();
+      if (!mounted) return;
+      setState(() => _apiConversations = convs);
+    } catch (_) {}
+  }
 
   @override
   void dispose() {
@@ -142,11 +160,15 @@ class _MessagesScreenState extends State<MessagesScreen> {
                           conversation: conv,
                           onTap: () {
                             context.read<MessagesProvider>().markRead(conv.id);
+                            final apiConv = _apiConversations
+                                .where((a) => a.otherUserName == conv.contactName)
+                                .firstOrNull;
                             Navigator.of(context).push(
                               MaterialPageRoute<void>(
                                 builder: (_) => ChatScreen(
                                   conversationId: conv.id,
                                   contactName: conv.contactName,
+                                  bookingId: apiConv?.bookingId,
                                 ),
                               ),
                             );

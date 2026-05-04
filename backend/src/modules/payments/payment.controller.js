@@ -8,6 +8,7 @@ const paymentService   = require('./payment.service');
 const disputeService   = require('./dispute.service');
 const ApiResponse      = require('../../utils/ApiResponse');
 const ApiError         = require('../../utils/ApiError');
+const { logEvent }     = require('../admin/audit.service');
 
 // ── CREATE PAYMENT INTENT (User Only) ─────────────────────────────────────────
 // WHAT: Starts the payment flow — creates Stripe PaymentIntent.
@@ -101,6 +102,7 @@ const adminRefund = async (req, res) => {
   }
 
   const payment = await paymentService.refundPayment(paymentId, req.user.id, reason);
+  logEvent({ req, type: 'finance', action: 'Admin refund issued', target: paymentId, status: 'warn' });
   return ApiResponse.success(res, StatusCodes.OK, 'Payment refunded successfully.', payment);
 };
 
@@ -115,6 +117,7 @@ const openDispute = async (req, res) => {
   const dispute = await disputeService.openDispute(
     bookingId, req.user.id, reason, evidence
   );
+  logEvent({ req, type: 'finance', action: 'Dispute opened', target: bookingId, status: 'warn' });
   return ApiResponse.success(res, StatusCodes.CREATED, 'Dispute opened successfully.', dispute);
 };
 
@@ -131,6 +134,7 @@ const resolveDispute = async (req, res) => {
   const dispute = await disputeService.resolveDispute(
     id, req.user.id, resolution, decision
   );
+  logEvent({ req, type: 'finance', action: `Dispute resolved: ${decision}`, target: id });
   return ApiResponse.success(res, StatusCodes.OK, 'Dispute resolved.', dispute);
 };
 

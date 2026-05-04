@@ -5,9 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Book Service – Omar Tarek | SERVIO</title>
   <meta name="description" content="Book a professional home service with Omar Tarek through SERVIO." />
+  <script src="../js/config.js"></script>
   <script src="../js/theme-init.js"></script>
   <script src="../js/lang-init.js"></script>
   <link rel="stylesheet" href="../css/main.css" />
+  <script src="https://js.stripe.com/v3/"></script>
 </head>
 <body>
   <div class="scroll-progress" data-scroll-progress aria-hidden="true"></div>
@@ -509,6 +511,8 @@
                 <a href="#" data-i18n="booking_terms_cancel">Cancellation Policy</a><span data-i18n="booking_terms_suffix">. I understand the final cost may vary based on actual hours worked.</span>
               </span>
             </label>
+
+            <div class="booking-error" data-booking-error hidden role="alert"></div>
 
             <div class="step-nav">
               <button type="button" class="btn btn--sm" id="step3Back">

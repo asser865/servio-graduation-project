@@ -12,6 +12,8 @@ const express    = require('express');
 const helmet     = require('helmet');
 const cors       = require('cors');
 const morgan     = require('morgan');
+const path       = require('path');
+const os         = require('os');
 const { StatusCodes } = require('http-status-codes');
 
 // ── Route modules ─────────────────────────────────────────────────────────────
@@ -21,12 +23,18 @@ const serviceRoutes  = require('./modules/services/service.routes');
 const bookingRoutes  = require('./modules/bookings/booking.routes');
 const reviewRoutes   = require('./modules/reviews/review.routes');
 const aiRoutes       = require('./modules/ai/ai.routes');
+const messageRoutes  = require('./modules/messages/message.routes');
 const paymentRoutes  = require('./modules/payments/payment.routes');
+const adminRoutes    = require('./modules/admin/audit.routes');
+const uploadRoutes   = require('./modules/uploads/upload.routes');
 
 // ── Global error middleware ───────────────────────────────────────────────────
 const { notFound, errorHandler } = require('./middleware/error.middleware');
 
 const app = express();
+const uploadRoot = process.env.SERVIO_UPLOAD_DIR
+  ? path.resolve(process.env.SERVIO_UPLOAD_DIR)
+  : path.join(os.tmpdir(), 'servio-uploads');
 
 // ── Security headers ─────────────────────────────────────────────────────────
 // helmet sets ~15 HTTP response headers that protect against common web
@@ -36,11 +44,26 @@ app.use(helmet());
 // ── CORS ──────────────────────────────────────────────────────────────────────
 // Allow the React web client and Flutter app to call this API.
 // In production, restrict origin to the actual deployed client URL.
+const allowedOrigins = (process.env.CLIENT_URL || '*')
+  .split(',')
+  .map(o => o.trim());
+
+if (process.env.NODE_ENV === 'production' && allowedOrigins.includes('*')) {
+  throw new Error('CLIENT_URL must be explicitly set in production — wildcard origin is not allowed with credentials.');
+}
+
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || '*',
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS: origin ${origin} not allowed`));
+      }
+    },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
   })
 );
 
@@ -65,9 +88,20 @@ if (process.env.NODE_ENV !== 'test') {
 app.use(`/api/v1/payments`, paymentRoutes);
 
 // ── Body parsing ──────────────────────────────────────────────────────────────
-// Parse incoming JSON request bodies (max 10 MB to prevent payload attacks).
+// Parse incoming JSON request bodies. Verification uploads are currently sent as
+// small metadata payloads only. Actual files go through the upload route below.
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Public file access for uploaded technician documents.
+// New uploads live outside the repo by default so dev file-watchers do not
+// reload the frontend while signup is still waiting for /auth/register.
+// Cross-Origin-Resource-Policy must be cross-origin so that the frontend
+// (served from a different port by the dev live-server) can load these images.
+app.use('/uploads', (req, res, next) => {
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  next();
+}, express.static(uploadRoot));
 
 // ── Health check ──────────────────────────────────────────────────────────────
 // Simple endpoint for load balancers / uptime monitors to verify the service
@@ -92,6 +126,9 @@ app.use(`${API_PREFIX}/services`, serviceRoutes);
 app.use(`${API_PREFIX}/bookings`, bookingRoutes);
 app.use(`${API_PREFIX}/reviews`,  reviewRoutes);
 app.use(`${API_PREFIX}/ai`,       aiRoutes);
+app.use(`${API_PREFIX}/messages`, messageRoutes);
+app.use(`${API_PREFIX}/admin`,    adminRoutes);
+app.use(`${API_PREFIX}/uploads`,  uploadRoutes);
 // Note: payment routes are already mounted above express.json() for webhook support
 
 // ── 404 + error handlers ──────────────────────────────────────────────────────

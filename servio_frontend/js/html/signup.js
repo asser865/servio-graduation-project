@@ -3,39 +3,120 @@
    ═══════════════════════════════════════════════════════════ */
 
 import { initShowcaseAtmosphere } from '../components/showcase-atmosphere.js';
+import { register } from '../api/auth.js';
+import { mapRoleFromBackend } from '../api/client.js';
+import { uploadPublicFile } from '../api/uploads.js';
 
 initShowcaseAtmosphere();
 
-const SKILLS = [
-  "Plumbing",
-  "Electrical",
-  "HVAC",
-  "Painting",
-  "Carpentry",
-  "Cleaning",
-  "Roofing",
-  "Flooring",
-  "Appliance Repair",
-  "Landscaping",
-  "General Maintenance",
-];
+const SKILLS = ['plumbing', 'electrical', 'painting', 'flooring', 'carpentry', 'cleaning', 'hvac', 'other'];
+
+const SKILLS_DISPLAY = {
+  plumbing:   'Plumbing',
+  electrical: 'Electrical',
+  painting:   'Painting',
+  flooring:   'Flooring',
+  carpentry:  'Carpentry',
+  cleaning:   'Cleaning',
+  hvac:       'HVAC',
+  other:      'Other',
+};
 
 const SKILLS_AR = {
-  "Plumbing":             "السباكة",
-  "Electrical":           "الكهرباء",
-  "HVAC":                 "التكييف والتدفئة",
-  "Painting":             "الدهانات",
-  "Carpentry":            "النجارة",
-  "Cleaning":             "التنظيف",
-  "Roofing":              "الأسقف",
-  "Flooring":             "الأرضيات",
-  "Appliance Repair":     "إصلاح الأجهزة",
-  "Landscaping":          "تنسيق الحدائق",
-  "General Maintenance":  "الصيانة العامة",
+  plumbing:   "السباكة",
+  electrical: "الكهرباء",
+  painting:   "الدهانات",
+  flooring:   "الأرضيات",
+  carpentry:  "النجارة",
+  cleaning:   "التنظيف",
+  hvac:       "التكييف والتدفئة",
+  other:      "أخرى",
 };
 
 function qs(sel, root = document) {
   return root.querySelector(sel);
+}
+
+const DRAFT_KEY = 'servio_signup_draft';
+
+function saveDraft(form, state) {
+  if (!form || !state) return;
+  const fields = {};
+  // Capture all inputs (except passwords/files for security/size)
+  const inputs = qsa('input:not([type="file"]):not([type="password"]), select, textarea', form);
+  inputs.forEach(input => {
+    if (input.name) {
+      if (input.type === 'checkbox' || input.type === 'radio') {
+        if (input.checked) fields[input.name] = input.value;
+      } else {
+        fields[input.name] = input.value;
+      }
+    }
+  });
+
+  const draft = {
+    role: state.role,
+    idx: state.idx,
+    skills: Array.from(state.skills),
+    fields
+  };
+  localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+}
+
+function loadDraft(form, state) {
+  const raw = localStorage.getItem(DRAFT_KEY);
+  if (!raw) return;
+  try {
+    const draft = JSON.parse(raw);
+    if (!draft) return;
+    
+    // 1. Restore core state
+    state.role = draft.role || "";
+    state.skills = new Set(draft.skills || []);
+    if (state.role) {
+      state.flow = computeFlow(state.role);
+    }
+
+    // IMPORTANT: If the draft was saved at a step that requires file uploads
+    // (tech-verification) or a success screen (tech-review / customer-finish),
+    // discard the entire draft and start fresh. Browsers always clear file inputs
+    // on page load, so restoring to those steps causes silent validation failures
+    // that trap the user. Starting fresh is the safest and clearest UX.
+    const fileOrSuccessSteps = ['tech-verification', 'tech-review', 'customer-finish'];
+    const restoredStep = state.flow[draft.idx || 0];
+    if (restoredStep && fileOrSuccessSteps.includes(restoredStep)) {
+      localStorage.removeItem(DRAFT_KEY);
+      state.idx = 0;
+      state.role = '';
+      state.flow = computeFlow('customer');
+      state.skills = new Set();
+      return; // exit loadDraft — start fresh
+    }
+
+    state.idx = draft.idx || 0;
+
+    // 2. Restore form fields
+    if (draft.fields) {
+      Object.entries(draft.fields).forEach(([name, value]) => {
+        const inputs = qsa(`[name="${name}"]`, form);
+        inputs.forEach(input => {
+          if (input.type === 'checkbox' || input.type === 'radio') {
+            input.checked = input.value === value;
+          } else {
+            input.value = value;
+          }
+          // Dispatch input event so UI listeners (e.g. enabling buttons) fire
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+      });
+    }
+  } catch (e) {
+    console.warn("Failed to load signup draft", e);
+  }
+}
+
+function clearDraft() {
+  localStorage.removeItem(DRAFT_KEY);
 }
 
 function qsa(sel, root = document) {
@@ -70,14 +151,15 @@ function routeToDashboard(role) {
   const authPages = ['login.html', 'signup.html'];
   const isRedirectToAuth = authPages.some(p => redirectUrl && redirectUrl.includes(p));
 
+  // 1. If we have a valid non-auth redirect URL, go there
   if (redirectUrl && !isRedirectToAuth) {
-    // Basic validation to ensure it's a local path (prevent open-redirect)
-    if (redirectUrl.startsWith('./') || redirectUrl.startsWith('/') || !redirectUrl.includes('://')) {
+    if (redirectUrl.startsWith('./') || redirectUrl.startsWith('/')) {
       window.location.href = redirectUrl;
       return;
     }
   }
 
+  // 2. Otherwise go to role-specific dashboard
   const next = role === "technician" ? "./technician-dashboard.html" : "./customer-dashboard.html";
   window.location.href = next;
 }
@@ -102,10 +184,6 @@ function isStrongPassword(v) {
   const hasLetter = /[A-Za-z]/.test(s);
   const hasNumber = /\d/.test(s);
   return hasLetter && hasNumber;
-}
-
-function saveAccount(payload) {
-  localStorage.setItem("servio_account", JSON.stringify(payload));
 }
 
 /* ── Flow computation ──────────────────────────────────── */
@@ -155,11 +233,12 @@ function renderSkills(form, selected, filter) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = `chip${selected.has(skill) ? " is-selected" : ""}`;
-    btn.textContent = isAr ? (SKILLS_AR[skill] || skill) : skill;
+    btn.textContent = isAr ? (SKILLS_AR[skill] || skill) : (SKILLS_DISPLAY[skill] || skill);
     btn.addEventListener("click", () => {
       if (selected.has(skill)) selected.delete(skill);
       else selected.add(skill);
       renderSkills(form, selected, qs("#skills-search", form)?.value || "");
+      form.dispatchEvent(new Event('input', { bubbles: true }));
     });
     chipsWrap.appendChild(btn);
   });
@@ -178,10 +257,14 @@ function initAvailabilityToggles(form) {
   };
 
   buttons.forEach((btn) => {
-    btn.addEventListener("click", () => set(btn.dataset.availability));
+    btn.addEventListener("click", () => {
+      set(btn.dataset.availability);
+      // Trigger save on interaction
+      btn.dispatchEvent(new Event('input', { bubbles: true }));
+    });
   });
 
-  set("");
+  set(hidden?.value || "");
 }
 
 /* ── Role card selection ──────────────────────────────── */
@@ -208,14 +291,21 @@ function initRoleCards(form, state) {
   };
 
   cards.forEach((card) => {
-    card.addEventListener("click", () => setRole(card.dataset.role));
     card.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
         setRole(card.dataset.role);
+        saveDraft(form, state);
       }
     });
+
+    card.addEventListener("click", () => {
+      setRole(card.dataset.role);
+      saveDraft(form, state);
+    });
   });
+
+  if (state.role) setRole(state.role);
 }
 
 /* ── Password toggles ─────────────────────────────────── */
@@ -251,9 +341,6 @@ function initSignupOtp(form, state) {
 }
 
 function refreshOtpStepUI(form, state) {
-  if (!state.signupOtpExpected) {
-    state.signupOtpExpected = "123456";
-  }
   const dest = qs("[data-otp-destination]", form);
   const phone = qs('input[name="phone"]', form)?.value || "";
   if (dest) {
@@ -339,19 +426,7 @@ function validateCurrentStep(form, stepKey, state) {
   }
 
   if (stepKey === "otp") {
-    if (!state.signupOtpExpected) {
-      state.signupOtpExpected = "123456";
-    }
-    const raw =
-      qs('input[name="signupOtp"]', form)?.value?.trim().replace(/\s/g, "") || "";
-    if (!/^\d{6}$/.test(raw)) {
-      setError(form, "otp", "Enter the 6-digit verification code.");
-      return false;
-    }
-    if (raw !== state.signupOtpExpected) {
-      setError(form, "otp", "That code doesn't match. Try again or resend.");
-      return false;
-    }
+    // OTP verification bypassed — SMS gateway not integrated yet
     setError(form, "otp", "");
     return true;
   }
@@ -388,35 +463,161 @@ function validateCurrentStep(form, stepKey, state) {
   if (stepKey === "tech-verification") {
     let valid = true;
 
+    const photoInput = qs('input[name="profilePhoto"]', form);
+    if (!photoInput?.files?.length) {
+      setError(form, 'doc-avatar',
+        typeof window.t === 'function'
+          ? window.t('signup_photo_required')
+          : 'Profile photo is required.');
+      const preview = qs('#signup-avatar-preview', form);
+      if (preview) preview.classList.add('is-required');
+      valid = false;
+    } else {
+      setError(form, 'doc-avatar', '');
+    }
+
+    const markCard = (name, isError) => {
+      const card = qs(`[data-vdoc="${name}"]`, form);
+      if (card) card.classList.toggle('is-error', isError);
+    };
+
     const idFront = qs('input[name="idFront"]', form);
-    const idBack = qs('input[name="idBack"]', form);
-    const selfie = qs('input[name="idSelfie"]', form);
+    const idBack  = qs('input[name="idBack"]', form);
+    const selfie  = qs('input[name="idSelfie"]', form);
+    const cv      = qs('input[name="cvFile"]', form);
 
     if (!idFront?.files?.length) {
       setError(form, "doc-idfront", "National ID front photo is required.");
+      markCard("idFront", true);
       valid = false;
     } else {
       setError(form, "doc-idfront", "");
+      markCard("idFront", false);
     }
 
     if (!idBack?.files?.length) {
       setError(form, "doc-idback", "National ID back photo is required.");
+      markCard("idBack", true);
       valid = false;
     } else {
       setError(form, "doc-idback", "");
+      markCard("idBack", false);
     }
 
     if (!selfie?.files?.length) {
       setError(form, "doc-selfie", "A selfie holding your ID is required.");
+      markCard("idSelfie", true);
       valid = false;
     } else {
       setError(form, "doc-selfie", "");
+      markCard("idSelfie", false);
+    }
+
+    if (cv?.files?.[0]) {
+      const allowedCvTypes = [
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ];
+      if (!allowedCvTypes.includes(cv.files[0].type)) {
+        setError(form, "doc-cv", "CV must be a PDF, DOC, or DOCX file.");
+        markCard("cvFile", true);
+        valid = false;
+      } else {
+        setError(form, "doc-cv", "");
+        markCard("cvFile", false);
+      }
+    } else {
+      setError(form, "doc-cv", "");
+      markCard("cvFile", false);
     }
 
     return valid;
   }
 
   return true;
+}
+
+/* ── Profile photo preview (signup) ───────────────────── */
+function initProfilePhotoPreview(form) {
+  const btn     = qs('#btn-signup-photo', form);
+  const input   = qs('#signup-photo-input', form);
+  const preview = qs('#signup-avatar-preview', form);
+  const card    = qs('#signup-avatar-field', form);
+  if (!btn || !input || !preview) return;
+
+  btn.addEventListener('click', () => input.click());
+
+  input.addEventListener('change', () => {
+    const file = input.files[0];
+    setError(form, 'doc-avatar', '');
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      setError(form, 'doc-avatar',
+        typeof window.t === 'function'
+          ? window.t('signup_photo_hint')
+          : 'Image must be under 2 MB.');
+      input.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      preview.innerHTML = `<img src="${e.target.result}" alt="Profile photo" />`;
+      preview.classList.add('has-photo');
+      preview.classList.remove('is-required');
+      card?.classList.add('has-photo');
+      card?.classList.remove('is-required');
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+/* ── Document upload cards ─────────────────────────────── */
+function initDocUploadCards(form) {
+  const IMAGE_KINDS = ['idFront', 'idBack', 'idSelfie', 'portfolio'];
+
+  qsa('[data-vdoc-trigger]', form).forEach(btn => {
+    const name  = btn.dataset.vdocTrigger;
+    const input = qs(`input[name="${name}"]`, form);
+    const card  = btn.closest('[data-vdoc]');
+    const thumb = qs(`#vthumb-${name}`, form);
+    if (!input || !card) return;
+
+    btn.addEventListener('click', () => input.click());
+
+    input.addEventListener('change', () => {
+      const file = input.files[0];
+      if (!file) return;
+
+      card.classList.add('is-filled');
+      card.classList.remove('is-error');
+
+      // Show image thumbnail for photo uploads
+      if (thumb && IMAGE_KINDS.includes(name) && file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          thumb.innerHTML = `<img src="${e.target.result}" alt="${name}" />`;
+        };
+        reader.readAsDataURL(file);
+      }
+
+      // Show filename for CV
+      if (thumb && name === 'cvFile') {
+        const short = file.name.length > 18 ? file.name.slice(0, 15) + '…' : file.name;
+        const hint  = qs('.vdoc-card__hint', card);
+        if (hint) hint.textContent = short;
+      }
+
+      // Portfolio: update hint with count
+      if (name === 'portfolio') {
+        const count = input.files.length;
+        const hint  = qs('.vdoc-card__hint', card);
+        if (hint) hint.textContent = `${count} photo${count !== 1 ? 's' : ''} selected`;
+      }
+    });
+  });
 }
 
 /* ── Portfolio preview ─────────────────────────────────── */
@@ -466,10 +667,11 @@ export function initSignup() {
     role: "",
     flow: computeFlow("customer"),
     idx: 0,
-    skills: new Set(),
-    /** Demo OTP — SMS not wired; shown in UI hint */
+    skills:           new Set(),
     signupOtpExpected: "",
   };
+
+  loadDraft(form, state);
 
   const stepSections = qsa("[data-step]", form);
 
@@ -490,6 +692,8 @@ export function initSignup() {
       const total = state.role === "technician" ? state.flow.length : state.flow.length - 1;
       updateProgress(progress, state.idx, total);
     }
+
+    saveDraft(form, state);
 
     if (key === "otp") {
       refreshOtpStepUI(form, state);
@@ -532,31 +736,55 @@ export function initSignup() {
     }
   };
 
-  const persistTechnicianAccount = () => {
+  const persistTechnicianAccount = async () => {
+    const profilePhotoInput = qs('input[name="profilePhoto"]', form);
+    const idFrontInput      = qs('input[name="idFront"]', form);
+    const idBackInput       = qs('input[name="idBack"]', form);
+    const idSelfieInput     = qs('input[name="idSelfie"]', form);
+    const cvInput           = qs('input[name="cvFile"]', form);
+    const portfolioInput    = qs('input[name="portfolio"]', form);
+
+    const [avatarUpload, idFrontUpload, idBackUpload, idSelfieUpload, cvUpload, portfolioUploads] = await Promise.all([
+      uploadPublicFile(profilePhotoInput?.files?.[0], 'avatar'),
+      uploadPublicFile(idFrontInput?.files?.[0], 'idFront'),
+      uploadPublicFile(idBackInput?.files?.[0], 'idBack'),
+      uploadPublicFile(idSelfieInput?.files?.[0], 'idSelfie'),
+      cvInput?.files?.[0] ? uploadPublicFile(cvInput.files[0], 'cv') : Promise.resolve(null),
+      Promise.all(Array.from(portfolioInput?.files || []).slice(0, 5).map(file => uploadPublicFile(file, 'portfolio'))),
+    ]);
+
     const payload = {
-      role: "technician",
-      fullName: qs('input[name="fullName"]', form)?.value?.trim() || "",
-      email: qs('input[name="email"]', form)?.value?.trim() || "",
-      phone: qs('input[name="phone"]', form)?.value?.trim() || "",
-      skills: Array.from(state.skills),
-      serviceArea: qs('input[name="serviceArea"]', form)?.value?.trim() || "",
-      availability: qs('input[name="availability"]', form)?.value || "",
-      currency: qs('select[name="currency"]', form)?.value || "EGP",
-      hourlyRate: qs('input[name="hourlyRate"]', form)?.value || "",
-      status: "pending",
+      name:             qs('input[name="fullName"]', form)?.value?.trim() || "",
+      email:            qs('input[name="email"]', form)?.value?.trim() || "",
+      phone:            qs('input[name="phone"]', form)?.value?.trim() || "",
+      password:         qs('input[name="password"]', form)?.value || "",
+      role:             "worker",
+      skills:           Array.from(state.skills),
+      locationLabel:    qs('input[name="serviceArea"]', form)?.value?.trim() || "",
+      hourlyRate:       Number(qs('input[name="hourlyRate"]', form)?.value) || 0,
+      bio:              qs('textarea[name="bio"]', form)?.value?.trim() || "",
+      yearsExperience:  Number(qs('input[name="yearsExperience"]', form)?.value) || 0,
+      availabilityType: qs('input[name="availability"]', form)?.value || "",
+      profileImage:     avatarUpload?.url || "",
+      idFrontUrl:       idFrontUpload?.url || "",
+      idFrontName:      idFrontUpload?.name || "",
+      idBackUrl:        idBackUpload?.url || "",
+      idBackName:       idBackUpload?.name || "",
+      idSelfieUrl:      idSelfieUpload?.url || "",
+      idSelfieName:     idSelfieUpload?.name || "",
+      cvUrl:            cvUpload?.url || "",
+      cvName:           cvUpload?.name || "",
+      portfolioFiles:   portfolioUploads.map(item => ({ url: item.url, name: item.name })),
     };
-    saveAccount(payload);
-    localStorage.setItem(
-      "servio_session",
-      JSON.stringify({
-        role: "technician",
-        email: payload.email,
-        name: payload.fullName,
-      }),
-    );
+
+    return register(payload);
   };
 
+  let _isSubmitting = false; // guard against double-submit
+
   const goNext = () => {
+    if (_isSubmitting) return; // prevent double-click while async is running
+
     const currentKey = state.flow[state.idx];
     if (!validateCurrentStep(form, currentKey, state)) return;
 
@@ -568,7 +796,83 @@ export function initSignup() {
     if (!next) return;
 
     if (next === "tech-review") {
-      persistTechnicianAccount();
+      // Find the submit button and show loading state
+      const submitBtn = qs('[data-next]', form);
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        const btnSpan = submitBtn.querySelector('span');
+        if (btnSpan) btnSpan.textContent = 'Submitting...';
+      }
+      _isSubmitting = true;
+
+      persistTechnicianAccount()
+        .then((data) => {
+          try {
+            localStorage.setItem('servio_account', JSON.stringify({
+              role:                        'technician',
+              status:                      data?.verificationStatus || 'pending',
+              name:                        data?.name  || '',
+              fullName:                    data?.name  || '',
+              email:                       data?.email || '',
+              phone:                       data?.phone || '',
+              skills:                      data?.skills || [],
+              specialty:                   (data?.skills || []).join(', '),
+              hourlyRate:                  data?.hourlyRate || '',
+              serviceArea:                 data?.locationLabel || '',
+              verificationStatus:          data?.verificationStatus || 'pending',
+              verificationRejectionReason: data?.verificationRejectionReason || '',
+              uploadedDocs: {
+                idFront:  { uploaded: !!(data?.idFrontUrl),  name: data?.idFrontName  || '', url: data?.idFrontUrl  || '' },
+                idBack:   { uploaded: !!(data?.idBackUrl),   name: data?.idBackName   || '', url: data?.idBackUrl   || '' },
+                idSelfie: { uploaded: !!(data?.idSelfieUrl), name: data?.idSelfieName || '', url: data?.idSelfieUrl || '' },
+                cvFile:   { uploaded: !!(data?.cvUrl),       name: data?.cvName       || '', url: data?.cvUrl       || '' },
+                portfolio: {
+                  uploaded: !!(data?.portfolioFiles?.length),
+                  count:    data?.portfolioFiles?.length || 0,
+                  files:    data?.portfolioFiles || [],
+                },
+              },
+            }));
+            // Open the verification tab on the dashboard so the user
+            // lands directly on the "Under Review" pending screen
+            localStorage.setItem('servio_activeTab_technician', 'verification');
+          } catch (_) {}
+
+          clearDraft();
+          // Go directly to dashboard — bypasses the in-form step which was
+          // unreliable inside an async .then() chain, and avoids the
+          // ?redirect= param in routeToDashboard sending them to the wrong page
+          window.location.href = './technician-dashboard.html';
+        })
+        .catch((err) => {
+          // Re-enable submit button on failure so user can retry
+          const submitBtn = qs('[data-next]', form);
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            const btnSpan = submitBtn.querySelector('span');
+            if (btnSpan) {
+              btnSpan.textContent =
+                (typeof window.t === 'function')
+                  ? window.t('signup_submit_app')
+                  : 'Submit application';
+            }
+          }
+          _isSubmitting = false;
+
+          // Show error on the page
+          const errEl = qs('[data-error-for="tech-verification"]', form) || qs('[data-error-for="email"]', form);
+          if (errEl) {
+            const fieldErrors = err?.data?.errors;
+            const detail = fieldErrors?.length
+              ? fieldErrors.map(e => e.message).join(' ')
+              : err.message || 'Registration failed. Please try again.';
+            errEl.textContent = detail;
+            errEl.hidden = false;
+            // Scroll error into view
+            errEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        });
+      return;
     }
 
     showStep(next);
@@ -585,8 +889,17 @@ export function initSignup() {
   initPasswordToggles(form);
   initResetButtons(form);
   initSignupOtp(form, state);
+  initProfilePhotoPreview(form);
+  initDocUploadCards(form);
   initPortfolioPreview(form);
   renderSkills(form, state.skills, "");
+
+  // Auto-save on any form input
+  form.addEventListener('input', (e) => {
+    // Avoid saving passwords if they happen to trigger input (mostly they shouldn't in our logic)
+    if (e.target.type === 'password' || e.target.type === 'file') return;
+    saveDraft(form, state);
+  });
 
   // Skills search filter
   const search = qs("#skills-search", form);
@@ -619,31 +932,46 @@ export function initSignup() {
   const finishCustomer = qs("[data-finish-customer]", form);
   if (finishCustomer) {
     finishCustomer.addEventListener("click", () => {
+      if (finishCustomer.disabled) return;
       const currentKey = state.flow[state.idx];
       if (!validateCurrentStep(form, currentKey, state)) return;
 
+      finishCustomer.disabled = true;
       const payload = {
-        role: "customer",
-        fullName: qs('input[name="fullName"]', form)?.value?.trim() || "",
+        name: qs('input[name="fullName"]', form)?.value?.trim() || "",
         email: qs('input[name="email"]', form)?.value?.trim() || "",
         phone: qs('input[name="phone"]', form)?.value?.trim() || "",
-        address: qs('input[name="address"]', form)?.value?.trim() || "",
+        address: {
+          street: qs('input[name="addressStreet"]', form)?.value?.trim() || "",
+          city: qs('input[name="addressCity"]', form)?.value?.trim() || "",
+          state: qs('input[name="addressState"]', form)?.value?.trim() || "",
+          zipCode: qs('input[name="addressZip"]', form)?.value?.trim() || "",
+        },
+        password: qs('input[name="password"]', form)?.value || "",
+        role: "customer",
       };
-      saveAccount(payload);
-      localStorage.setItem('servio_session', JSON.stringify({
-        role: 'customer',
-        email: payload.email,
-        name: payload.fullName
-      }));
-      routeToDashboard("customer");
+
+      register(payload)
+        .then((data) => {
+          // register() in auth.js already calls saveSession() with the mapped role,
+          // so data.role is already the frontend role ('customer').
+          clearDraft();
+          localStorage.removeItem('servio_account');
+          routeToDashboard(data.role);
+        })
+        .catch((err) => {
+          finishCustomer.disabled = false;
+          const errEl = qs('[data-error-for="customer-finish"]', form) || qs('[data-error-for="email"]', form);
+          if (errEl) { errEl.textContent = err.message || "Registration failed. Please try again."; errEl.hidden = false; }
+        });
     });
   }
 
-  // Technician "Back to Home" after submission
+  // Technician "Back to Home" — go to dashboard so pending gate can show
   const gotIt = qs("[data-got-it]", form);
   if (gotIt) {
     gotIt.addEventListener('click', () => {
-      window.location.href = './index.html';
+      window.location.href = './technician-dashboard.html';
     });
   }
 
@@ -659,9 +987,9 @@ export function initSignup() {
   });
 
   // Show initial step
-  showStep(state.flow[0]);
+  showStep(state.flow[state.idx] || state.flow[0]);
 }
 
 initSignup();
 
-// .
+

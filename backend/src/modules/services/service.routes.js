@@ -15,7 +15,7 @@ const serviceValidation = [
   body('title').trim().notEmpty().withMessage('Title is required'),
   body('description').trim().notEmpty().withMessage('Description is required'),
   body('category')
-    .isIn(['plumbing', 'electrical', 'painting', 'flooring', 'carpentry', 'cleaning', 'other'])
+    .isIn(['plumbing', 'electrical', 'painting', 'flooring', 'carpentry', 'cleaning', 'hvac', 'other'])
     .withMessage('Invalid category'),
   body('basePrice').isFloat({ min: 0 }).withMessage('Base price must be a positive number'),
   body('priceUnit')
@@ -26,6 +26,9 @@ const serviceValidation = [
 // ── Public routes ─────────────────────────────────────────────────────────────
 router.get('/',    serviceController.getAll);
 router.get('/:id', serviceController.getOne);
+
+// GET /api/v1/services/:serviceId/technicians — list workers assigned to a service
+router.get('/:serviceId/technicians', serviceController.getTechnicians);
 
 // ── Admin-only routes ─────────────────────────────────────────────────────────
 router.post(

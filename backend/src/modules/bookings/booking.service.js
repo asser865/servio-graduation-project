@@ -14,7 +14,7 @@ const ApiError       = require('../../utils/ApiError');
 const TRANSITION_RULES = {
   worker: ['accepted', 'rejected', 'in_progress', 'completed'],
   user:   ['cancelled'],
-  admin:  ['pending', 'accepted', 'rejected', 'in_progress', 'completed', 'cancelled'],
+  admin:  ['pending', 'accepted', 'rejected', 'in_progress', 'completed', 'cancelled', 'disputed'],
 };
 
 /**
@@ -35,6 +35,19 @@ const createBooking = async (userId, data) => {
   const service = await Service.findOne({ _id: serviceId, isActive: true });
   if (!service) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Service not found or no longer available.');
+  }
+
+  // Verify the worker supports this specific service (canonical check via ObjectId)
+  const workerSupportsService = Array.isArray(worker.services) &&
+    worker.services.some((id) => id.toString() === service._id.toString());
+
+  // Backward-compatibility: also accept if worker's legacy categories include this service's category
+  const legacyCategoryMatches = !workerSupportsService &&
+    Array.isArray(worker.categories) &&
+    worker.categories.includes(service.category);
+
+  if (!workerSupportsService && !legacyCategoryMatches) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Selected worker does not support this service.');
   }
 
   const booking = await Booking.create({
@@ -162,4 +175,20 @@ const updateBookingStatus = async (bookingId, newStatus, actorId, actorRole) => 
   return booking;
 };
 
-module.exports = { createBooking, getUserBookings, getWorkerBookings, getAllBookings, updateBookingStatus };
+const getBookingById = async (bookingId, requestingUser) => {
+  const booking = await Booking.findById(bookingId)
+    .populate('user',    'name email phone profileImage')
+    .populate('worker',  'name email phone profileImage')
+    .populate('service', 'title basePrice category');
+
+  if (!booking) throw new ApiError(StatusCodes.NOT_FOUND, 'Booking not found');
+
+  const isUser   = booking.user._id.toString() === requestingUser.id.toString();
+  const isWorker = booking.worker._id.toString() === requestingUser.id.toString();
+  const isAdmin  = requestingUser.role === 'admin';
+  if (!isUser && !isWorker && !isAdmin) throw new ApiError(StatusCodes.FORBIDDEN, 'Not authorized to view this booking');
+
+  return booking;
+};
+
+module.exports = { createBooking, getUserBookings, getWorkerBookings, getAllBookings, updateBookingStatus, getBookingById };

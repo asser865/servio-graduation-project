@@ -25,6 +25,17 @@
  */
 
 import { animate, stagger } from 'https://cdn.jsdelivr.net/npm/motion@12.38.0/+esm';
+import { createBooking } from '../api/bookings.js';
+import { getServices } from '../api/services.js';
+import { getWorker, getWorkers } from '../api/users.js';
+import { createPaymentIntent } from '../api/payments.js';
+
+// ─── URL Params ───────────────────────────────────────────────────────────────
+function getParam(key) {
+  return new URLSearchParams(window.location.search).get(key);
+}
+const _workerIdFromUrl   = getParam('worker')  || '';
+const _serviceKeyFromUrl = getParam('service') || '';
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -33,8 +44,11 @@ const state = {
   totalSteps: 3,
   selectedTime: null,
   selectedPayment: 'online',
+  worker: null,
+  services: [],
   data: {
     serviceType: '',
+    serviceId: '',
     date: '',
     time: '',
     address: '',
@@ -42,6 +56,222 @@ const state = {
     payment: 'online',
   },
 };
+
+const MONGO_ID_RE = /^[a-f\d]{24}$/i;
+const LEGACY_SERVICE_CATEGORY = {
+  'pipe-repair': 'plumbing',
+  'drain-cleaning': 'plumbing',
+  'fixture-install': 'plumbing',
+  'water-heater': 'plumbing',
+  'full-inspection': 'plumbing',
+  emergency: 'plumbing',
+  plumbing: 'plumbing',
+  electrical: 'electrical',
+  painting: 'painting',
+  flooring: 'flooring',
+  carpentry: 'carpentry',
+  cleaning: 'cleaning',
+  hvac: 'hvac',
+  ac: 'hvac',
+  'ac-maintenance': 'hvac',
+  other: 'other',
+};
+
+function isMongoId(value) {
+  return MONGO_ID_RE.test(String(value || ''));
+}
+
+function normalizeKey(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function categoryFromKey(value) {
+  return LEGACY_SERVICE_CATEGORY[normalizeKey(value)] || '';
+}
+
+function formatBookingError(err) {
+  const validation = err?.data?.errors;
+  if (Array.isArray(validation) && validation.length) {
+    return validation
+      .map((item) => item?.message)
+      .filter(Boolean)
+      .join('\n');
+  }
+  return err?.message || 'Booking failed. Please try again.';
+}
+
+function findServiceForKey(key, services = state.services) {
+  if (!key || !services.length) return null;
+  if (isMongoId(key)) {
+    return services.find((service) => service._id === key || service.id === key) || null;
+  }
+
+  const normalized = normalizeKey(key);
+  const category = categoryFromKey(key);
+  return services.find((service) => {
+    const serviceId = service._id || service.id || '';
+    const title = normalizeKey(service.title || service.name || '');
+    const titleAr = normalizeKey(service.titleAr || '');
+    return serviceId === key ||
+      service.category === key ||
+      (category && service.category === category) ||
+      title === normalized ||
+      titleAr === normalized;
+  }) || null;
+}
+
+async function ensureServicesLoaded() {
+  if (state.services.length) return state.services;
+  const svcRes = await getServices({ limit: 50, _: Date.now().toString() });
+  state.services = svcRes.services || svcRes.data?.services || [];
+  return state.services;
+}
+
+function renderServiceOptions(services) {
+  if (!serviceType) return;
+
+  if (!services.length) {
+    serviceType.innerHTML = `<option value="" selected>${t('booking_svc_unavailable')}</option>`;
+    serviceType.value = '';
+    serviceType.disabled = true;
+    return;
+  }
+
+  serviceType.disabled = false;
+  const requested = _serviceKeyFromUrl || serviceType.value || '';
+  const selectedService = findServiceForKey(requested, services);
+  serviceType.innerHTML =
+    `<option value="" disabled>${t('booking_svc_select_ph')}</option>` +
+    services.map((service) => {
+      const id = service._id || service.id;
+      const title = service.title || service.name || 'Service';
+      const category = service.category || '';
+      return `<option value="${id}" data-category="${category}">${title}</option>`;
+    }).join('') +
+    `<option value="other">${t('booking_svc_other')}</option>`;
+
+  serviceType.value = selectedService?._id || selectedService?.id || '';
+}
+
+async function resolveSelectedService() {
+  const services = await ensureServicesLoaded();
+  if (!services.length) {
+    throw new Error(t('booking_err_no_services'));
+  }
+
+  const selectedOption = serviceType?.options[serviceType.selectedIndex];
+  const selectedValue = serviceType?.value || '';
+  const lookupValue = selectedValue === 'other'
+    ? 'other'
+    : selectedValue || _serviceKeyFromUrl || selectedOption?.dataset.category || '';
+  const service = findServiceForKey(lookupValue, services) ||
+    findServiceForKey(selectedOption?.dataset.category, services);
+
+  if (!service?._id && !service?.id) {
+    throw new Error(t('booking_err_service_catalog'));
+  }
+
+  return service;
+}
+
+async function resolveSelectedWorker(service) {
+  const existingWorkerId = _workerIdFromUrl || state.worker?._id || state.worker?.id || '';
+  if (isMongoId(existingWorkerId)) return existingWorkerId;
+
+  const category = service?.category ||
+    serviceType?.options[serviceType.selectedIndex]?.dataset.category ||
+    categoryFromKey(_serviceKeyFromUrl);
+  const workerRes = await getWorkers({
+    limit: 1,
+    ...(category ? { category } : {}),
+  });
+  const workers = workerRes.workers || workerRes.data?.workers || [];
+  const worker = workers.find((item) => isMongoId(item._id || item.id));
+
+  if (!worker) {
+    throw new Error(t('booking_err_no_worker'));
+  }
+
+  state.worker = worker;
+  updateWorkerUI(worker);
+  return worker._id || worker.id;
+}
+
+// ─── Initialize ─────────────────────────────────────────────────────────────
+async function init() {
+  if (isMongoId(_workerIdFromUrl)) {
+    try {
+      const res = await getWorker(_workerIdFromUrl);
+      state.worker = res.worker || res;
+      updateWorkerUI(state.worker);
+    } catch (err) {
+      console.error('Failed to fetch worker:', err);
+    }
+  }
+
+  // Populate services list if possible
+  try {
+     const svcs = await ensureServicesLoaded();
+     renderServiceOptions(svcs);
+  } catch(e) {
+    console.warn('Failed to load services:', e);
+  }
+}
+init();
+
+function updateWorkerUI(w) {
+  if (!w) return;
+  // Hero elements
+  const heroName = document.querySelector('.tech-hero-card__name');
+  const heroService = document.querySelector('.tech-hero-card__service');
+  const heroAvatar = document.querySelector('.tech-hero-card__avatar');
+  const heroRating = document.querySelector('.hero-rating-num');
+  
+  if (heroName) heroName.textContent = w.name;
+  if (heroService) heroService.textContent = w.category || 'Professional';
+  if (heroAvatar) {
+     if (w.profileImage) {
+        heroAvatar.innerHTML = `<img src="${w.profileImage}" alt="${w.name}" style="width:100%;height:100%;border-radius:inherit;object-fit:cover;">`;
+     } else {
+        heroAvatar.textContent = w.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
+     }
+  }
+  if (heroRating) heroRating.textContent = (w.averageRating || 4.9).toFixed(1);
+
+  // Strip
+  const stripName = document.querySelector('.service-strip__name');
+  const stripRate = document.querySelector('.service-strip__rate');
+  const stripAvatar = document.querySelector('.service-strip__avatar');
+  if (stripName) stripName.textContent = w.name;
+  if (stripRate) stripRate.textContent = `${w.hourlyRate || 50} EGP / hr`;
+  if (stripAvatar && w.profileImage) stripAvatar.src = w.profileImage;
+
+  // Sidebar
+  const sideName = document.querySelector('.summary-tech__name');
+  const sideAvatar = document.querySelector('.summary-tech__avatar');
+  const sideBaseRate = document.querySelector('[data-i18n="booking_summary_base_rate_val"]');
+  const sideTotal = document.querySelector('[data-i18n="booking_summary_total_val"]');
+  const reviewRate = document.querySelector('[data-i18n="booking_review_base_rate_val"]');
+  const reviewTotal = document.querySelector('[data-i18n="booking_review_total_val"]');
+
+  if (sideName) sideName.textContent = w.name;
+  if (sideAvatar && w.profileImage) sideAvatar.src = w.profileImage;
+  
+  const rate = w.hourlyRate || 50;
+  const fee = (rate * 0.10);
+  const total = rate + fee;
+
+  const fmt = (n) => n.toFixed(2) + ' EGP';
+  if (sideBaseRate) sideBaseRate.textContent = fmt(rate);
+  if (sideTotal) sideTotal.textContent = fmt(total) + '+';
+  if (reviewRate) reviewRate.textContent = fmt(rate) + ' / hr';
+  if (reviewTotal) reviewTotal.textContent = fmt(total) + ' EGP+';
+}
 
 // ─── DOM refs ─────────────────────────────────────────────────────────────────
 
@@ -158,61 +388,101 @@ document.querySelectorAll('.review-block__edit').forEach((btn) => {
 // ─── Confirm button: require terms ───────────────────────────────────────────
 
 if (confirmBtn) {
-  confirmBtn.addEventListener('click', (e) => {
+  confirmBtn.addEventListener('click', async (e) => {
     e.preventDefault();
     if (!termsCheck || !termsCheck.checked) {
-      // Shake the terms checkbox
       animate(termsCheck?.closest('.terms-check') || confirmBtn,
-        { x: [0, -6, 6, -4, 4, 0] },
-        { duration: 0.4 }
-      );
-      return false;
+        { x: [0, -6, 6, -4, 4, 0] }, { duration: 0.4 });
+      return;
     }
+
     collectStep1();
     collectStep2();
 
-    // Read service name directly from the select element to avoid stale state
     const selectedOption = serviceType?.options[serviceType?.selectedIndex];
-    const rawServiceText = selectedOption?.text || '';
-    const serviceName = (rawServiceText && rawServiceText !== 'Select a service…')
-      ? rawServiceText
-      : (state.data.serviceType || '');
-
-    // Read date directly from the input element
-    const rawDate = bookDate?.value || state.data.date || '';
+    const serviceName = selectedOption?.text || '';
+    const rawDate      = bookDate?.value || state.data.date || '';
     const readableDate = formatDate(rawDate);
-
-    // Time is set in state.data.time by the timeslot click handler
     const selectedTime = state.data.time || '';
-
     const paymentMethod = PAYMENT_LABELS[state.data.payment] || state.data.payment || 'Online Payment';
 
-    // Save booking data to localStorage before navigating
-    const pin = Math.floor(1000 + Math.random() * 9000);
-    const bookingData = {
-      id: 'S-' + Math.floor(2900 + Math.random() * 100),
-      service: serviceName,
-      category: serviceName,
-      payment: state.data.payment || 'online',
-      paymentMethod: paymentMethod,
-      date: readableDate,
-      scheduledDate: readableDate,
-      time: selectedTime,
-      scheduledTime: selectedTime,
-      pin: pin,
-      status: 'Booked',
-      timestamp: Date.now(),
-    };
-    localStorage.setItem('servio_active_booking', JSON.stringify(bookingData));
-    const existingBookings = JSON.parse(localStorage.getItem('servio_bookings') || '[]');
-    existingBookings.push(bookingData);
-    // Cap at 50 entries to avoid localStorage quota issues
-    if (existingBookings.length > 50) existingBookings.splice(0, existingBookings.length - 50);
-    localStorage.setItem('servio_bookings', JSON.stringify(existingBookings));
-    // Animate button before navigation
-    animate(confirmBtn, { scale: [1, 0.95, 1.02, 1] }, { duration: 0.3 });
-    // Wait for animation then navigate
-    setTimeout(() => { window.location.href = './booking-confirmation.html'; }, 320);
+    // Disable button to prevent double-submit
+    confirmBtn.disabled = true;
+    confirmBtn.innerHTML = `
+      <svg class="spinner" width="16" height="16" viewBox="0 0 24 24" style="margin-right:8px; animation: rotate 1s linear infinite"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="31.4 31.4"/></svg>
+      Processing...
+    `;
+
+    try {
+      const selectedService = await resolveSelectedService();
+      const workerId = await resolveSelectedWorker(selectedService);
+      const resolvedServiceId = selectedService._id || selectedService.id;
+
+      const bookingPayload = {
+        workerId:      workerId,
+        serviceId:     resolvedServiceId,
+        scheduledDate: rawDate || new Date().toISOString().split('T')[0],
+        address:       state.data.address,
+        notes:         state.data.notes || '',
+      };
+
+      const res  = await createBooking(bookingPayload);
+      const booking = res.booking || res;
+      const bookingId = booking._id;
+
+      // ── Handle Payment ──
+      if (state.data.payment === 'online') {
+        try {
+          const intentRes = await createPaymentIntent(bookingId);
+          const { clientSecret } = intentRes;
+
+          if (clientSecret && window.Stripe) {
+            const stripe = Stripe(window.SERVIO_CONFIG.STRIPE_PUBLIC_KEY || 'pk_test_placeholder');
+            // For a production app, we would mount Stripe Elements or use redirect
+            // Here we simulate the successful payment redirect if it's a test environment
+            console.log('Payment Intent Created:', clientSecret);
+            // Example: const result = await stripe.confirmCardPayment(clientSecret, { ... });
+          }
+        } catch (payErr) {
+          console.warn('Payment intent failed, proceeding as cash/pending:', payErr);
+        }
+      }
+
+      const bookingData = {
+        id:            bookingId,
+        _id:           bookingId,
+        service:       serviceName,
+        category:      serviceName,
+        payment:       state.data.payment,
+        paymentMethod: paymentMethod,
+        date:          readableDate,
+        scheduledDate: readableDate,
+        time:          selectedTime,
+        scheduledTime: selectedTime,
+        pin:           booking.pin || '—',
+        status:        'Booked',
+        timestamp:     Date.now(),
+      };
+
+      localStorage.setItem('servio_active_booking', JSON.stringify(bookingData));
+
+      animate(confirmBtn, { scale: [1, 0.95, 1.02, 1] }, { duration: 0.3 });
+      setTimeout(() => { window.location.href = './booking-confirmation.html'; }, 500);
+
+    } catch (err) {
+      confirmBtn.disabled = false;
+      confirmBtn.innerHTML = `<span>${t('booking_confirm')}</span> <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>`;
+      
+      const errEl = document.querySelector('[data-booking-error]') || document.querySelector('.booking-error');
+      const msg = formatBookingError(err);
+      if (errEl) {
+        errEl.textContent = msg;
+        errEl.hidden = false;
+        animate(errEl, { opacity: [0, 1], y: [-10, 0] });
+      } else {
+        alert(msg);
+      }
+    }
   });
 }
 
@@ -441,5 +711,3 @@ document.getElementById('cardExpiry')?.addEventListener('input', (e) => {
     animate(fields, { opacity: [0, 1], y: [8, 0] }, { duration: 0.35, delay: stagger(0.06, { start: 0.55 }), easing: 'ease-out' });
   }
 })();
-
-// .
