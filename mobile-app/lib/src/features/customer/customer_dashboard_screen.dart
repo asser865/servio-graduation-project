@@ -18,6 +18,7 @@ import '../booking/booking_flow_data.dart';
 import '../booking/booking_step_one_screen.dart';
 import '../messages/chat_screen.dart';
 import '../messages/messages_screen.dart';
+import '../shared/notifications_screen.dart';
 import 'ai_smart_match_screen.dart';
 import 'customer_profile_screen.dart';
 import 'my_bookings_screen.dart';
@@ -38,11 +39,19 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
   String _bookingFilter = 'All';
   String _historyFilter = 'All';
   List<BookingModel> _bookings = <BookingModel>[];
+  late ScrollController _scrollController;
 
   @override
   void initState() {
     super.initState();
+    _scrollController = ScrollController();
     WidgetsBinding.instance.addPostFrameCallback((_) => _fetchBookings());
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchBookings() async {
@@ -56,9 +65,12 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final servio = context.servio;
     final unreadMessages = context.watch<MessagesProvider>().totalUnread;
     final bookings = _bookings;
+    
+    final userName = context.watch<SessionProvider>().account?.name.split(' ').first ?? 'Customer';
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -107,98 +119,253 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
           }
         },
       ),
-      body: SafeArea(
-        child: CustomScrollView(
-          slivers: <Widget>[
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Row(
+      body: Stack(
+        children: <Widget>[
+          // 1. Dynamic Parallax Background
+          AnimatedBuilder(
+            animation: _scrollController,
+            builder: (BuildContext context, Widget? child) {
+              double offset = 0;
+              if (_scrollController.hasClients) {
+                offset = _scrollController.offset;
+                if (offset < 0) offset = 0;
+              }
+              return Positioned(
+                top: -offset * 0.4,
+                left: 0,
+                right: 0,
+                height: MediaQuery.of(context).size.height * 0.55,
+                child: child!,
+              );
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: isDark ? ServioGradients.brandDark : ServioGradients.brand,
+              ),
+              child: Stack(
+                children: <Widget>[
+                  Positioned(
+                    top: -40,
+                    right: -60,
+                    child: Container(
+                      width: 280,
+                      height: 280,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: <Color>[
+                            Colors.white.withValues(alpha: 0.12),
+                            Colors.white.withValues(alpha: 0.0),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 40,
+                    left: -80,
+                    child: Container(
+                      width: 320,
+                      height: 320,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: <Color>[
+                            Colors.white.withValues(alpha: 0.08),
+                            Colors.white.withValues(alpha: 0.0),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          
+          // 2. Foreground Scrolling Content
+          CustomScrollView(
+            controller: _scrollController,
+            slivers: <Widget>[
+              // Header Section
+              SliverToBoxAdapter(
+                child: SafeArea(
+                  bottom: false,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: <Widget>[
-                              Text(
-                                'CUSTOMER DASHBOARD',
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: servio.accent,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 1.1,
+                        // Logo & Brand Header
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: <Widget>[
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(ServioRadius.sm),
+                              ),
+                              child: const Icon(Icons.home_repair_service_rounded, color: Colors.white, size: 20),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              'SERVIO',
+                              style: theme.textTheme.headlineMedium?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.5,
+                              ),
+                            ),
+                            const Spacer(),
+                            // Notification Icon
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute<void>(builder: (_) => const NotificationsScreen()),
+                                );
+                              },
+                              child: Stack(
+                                alignment: Alignment.topRight,
+                                children: <Widget>[
+                                  Container(
+                                    width: 44,
+                                    height: 44,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withValues(alpha: 0.15),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 22),
+                                  ),
+                                  Positioned(
+                                    top: 10,
+                                    right: 12,
+                                    child: Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: const BoxDecoration(
+                                        color: ServioColors.danger,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            // Profile Avatar
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute<void>(builder: (_) => const CustomerProfileScreen()),
+                                );
+                              },
+                              child: Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.15),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    userName.isNotEmpty ? userName[0].toUpperCase() : 'C',
+                                    style: theme.textTheme.titleMedium?.copyWith(color: Colors.white),
+                                  ),
                                 ),
                               ),
-                              const SizedBox(height: 6),
-                              Text('Your SERVIO',
-                                  style: theme.textTheme.headlineLarge),
-                            ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 32),
+                        // Dashboard Title
+                        Text(
+                          '$userName\'s Dashboard',
+                          style: theme.textTheme.headlineLarge?.copyWith(
+                            color: Colors.white,
                           ),
                         ),
-                        _RoundIconButton(
-                          icon: Icons.calendar_month_rounded,
-                          onTap: () => setState(
+                        const SizedBox(height: 24),
+                        // Segmented Control inside the hero
+                        _DashboardSegmentedControl(
+                          current: _section,
+                          onChanged: (value) => setState(() => _section = value),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              
+              // Bottom Layered Sheet Section
+              SliverToBoxAdapter(
+                child: Container(
+                  width: double.infinity,
+                  constraints: BoxConstraints(
+                    minHeight: MediaQuery.of(context).size.height * 0.6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.scaffoldBackgroundColor,
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+                    boxShadow: <BoxShadow>[
+                      BoxShadow(
+                        color: isDark ? Colors.black.withValues(alpha: 0.4) : Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 24,
+                        offset: const Offset(0, -8),
+                      ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.fromLTRB(20, 32, 20, 48),
+                  child: AnimatedSwitcher(
+                    duration: ServioMotion.tabSwitch,
+                    switchInCurve: ServioMotion.spring,
+                    switchOutCurve: ServioMotion.standard,
+                    layoutBuilder: (Widget? currentChild, List<Widget> previousChildren) {
+                      return Stack(
+                        alignment: Alignment.topCenter,
+                        children: <Widget>[
+                          ...previousChildren,
+                          if (currentChild != null) currentChild,
+                        ],
+                      );
+                    },
+                    child: switch (_section) {
+                      _DashboardSection.overview => _OverviewSection(
+                          key: const ValueKey<String>('overview'),
+                          bookings: bookings,
+                          onBookService: _openBooking,
+                          onViewBookings: () => setState(
                             () => _section = _DashboardSection.bookings,
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 18),
-                    _DashboardSegmentedControl(
-                      current: _section,
-                      onChanged: (value) => setState(() => _section = value),
-                    ),
-                  ],
+                      _DashboardSection.bookings => _BookingsSection(
+                          key: const ValueKey<String>('bookings'),
+                          bookings: bookings,
+                          filter: _bookingFilter,
+                          onFilterChanged: (value) =>
+                              setState(() => _bookingFilter = value),
+                          onViewDetails: _openBookingDetails,
+                          onChat: _openChat,
+                          onCancel: _cancelBooking,
+                        ),
+                      _DashboardSection.history => _HistorySection(
+                          key: const ValueKey<String>('history'),
+                          bookings: bookings,
+                          filter: _historyFilter,
+                          onFilterChanged: (value) =>
+                              setState(() => _historyFilter = value),
+                        ),
+                      _DashboardSection.favourites => const _FavouritesSection(
+                          key: ValueKey<String>('favourites'),
+                        ),
+                    },
+                  ),
                 ),
               ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 22, 20, 24),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate(
-                  <Widget>[
-                    AnimatedSwitcher(
-                      duration: ServioMotion.tabSwitch,
-                      switchInCurve: ServioMotion.spring,
-                      switchOutCurve: ServioMotion.standard,
-                      child: switch (_section) {
-                        _DashboardSection.overview => _OverviewSection(
-                            key: const ValueKey<String>('overview'),
-                            bookings: bookings,
-                            onBookService: _openBooking,
-                            onViewBookings: () => setState(
-                              () => _section = _DashboardSection.bookings,
-                            ),
-                          ),
-                        _DashboardSection.bookings => _BookingsSection(
-                            key: const ValueKey<String>('bookings'),
-                            bookings: bookings,
-                            filter: _bookingFilter,
-                            onFilterChanged: (value) =>
-                                setState(() => _bookingFilter = value),
-                            onViewDetails: _openBookingDetails,
-                            onChat: _openChat,
-                            onCancel: _cancelBooking,
-                          ),
-                        _DashboardSection.history => _HistorySection(
-                            key: const ValueKey<String>('history'),
-                            bookings: bookings,
-                            filter: _historyFilter,
-                            onFilterChanged: (value) =>
-                                setState(() => _historyFilter = value),
-                          ),
-                        _DashboardSection.favourites => const _FavouritesSection(
-                            key: ValueKey<String>('favourites'),
-                          ),
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -397,7 +564,7 @@ class _BookingsSection extends StatelessWidget {
           selected: filter,
           onSelected: onFilterChanged,
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
         if (filtered.isEmpty)
           const _EmptyDashboardState(message: 'No bookings match this filter.')
         else
@@ -480,7 +647,7 @@ class _HistorySection extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
         _HorizontalChips(
           items: _filters,
           selected: filter,
@@ -488,13 +655,13 @@ class _HistorySection extends StatelessWidget {
             value == 'Clear All' ? 'All' : value,
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
         if (completed.isEmpty)
           const _EmptyDashboardState(message: 'No completed bookings yet.')
         else
           ...completed.map(
             (booking) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.only(bottom: 16),
               child: _HistoryBookingTile(booking: booking),
             ),
           ),
@@ -512,7 +679,7 @@ class _FavouritesSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         ServioSectionHeading(title: 'Saved Technicians'),
-        SizedBox(height: 24),
+        SizedBox(height: 16),
         _EmptyDashboardState(message: 'Save technicians from their profile to see them here.'),
       ],
     );
@@ -538,42 +705,60 @@ class _DashboardSegmentedControl extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final servio = context.servio;
     final theme = Theme.of(context);
 
-    return SizedBox(
-      height: 46,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: _labels.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 10),
-        itemBuilder: (BuildContext context, int index) {
-          final section = _labels.keys.elementAt(index);
+    return Container(
+      height: 48,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(ServioRadius.full),
+      ),
+      padding: const EdgeInsets.all(4),
+      child: Row(
+        children: _labels.entries.map((entry) {
+          final section = entry.key;
+          final label = entry.value;
           final active = section == current;
 
-          return GestureDetector(
-            onTap: () => onChanged(section),
-            child: AnimatedContainer(
-              duration: ServioMotion.micro,
-              curve: ServioMotion.spring,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: active ? servio.accent : servio.backgroundSoft,
-                borderRadius: BorderRadius.circular(ServioRadius.full),
-                border: Border.all(
-                  color: active ? servio.accent : servio.border,
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => onChanged(section),
+              behavior: HitTestBehavior.opaque,
+              child: AnimatedContainer(
+                duration: ServioMotion.micro,
+                curve: ServioMotion.spring,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: active ? Colors.white : Colors.transparent,
+                  borderRadius: BorderRadius.circular(ServioRadius.full),
+                  boxShadow: active
+                      ? <BoxShadow>[
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          )
+                        ]
+                      : null,
                 ),
-              ),
-              child: Text(
-                _labels[section]!,
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: active ? Colors.white : servio.textSecondary,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      label,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: active ? ServioColors.navyDark : Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
                 ),
               ),
             ),
           );
-        },
+        }).toList(),
       ),
     );
   }
@@ -1853,18 +2038,28 @@ class _EmptyDashboardState extends StatelessWidget {
     final servio = context.servio;
 
     return Container(
-      padding: const EdgeInsets.all(24),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: servio.backgroundSoft,
         borderRadius: BorderRadius.circular(ServioRadius.lg),
-        border: Border.all(color: servio.border),
+        border: Border.all(color: servio.border.withValues(alpha: 0.5)),
       ),
-      child: Text(
-        message,
-        textAlign: TextAlign.center,
-        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: servio.textSecondary,
+      child: Row(
+        children: <Widget>[
+          Icon(Icons.info_outline_rounded, color: servio.textSecondary, size: 24),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              message,
+              textAlign: TextAlign.left,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: servio.textSecondary,
+                    height: 1.5,
+                  ),
             ),
+          ),
+        ],
       ),
     );
   }

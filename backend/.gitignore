@@ -17,6 +17,9 @@ logs/
 *.log
 uploads/
 
+# ─── Local-only files ─────────────────────────────────────────────────────────
+src/modules/uploads/upload.routes.js
+
 # ─── OS Files ─────────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
