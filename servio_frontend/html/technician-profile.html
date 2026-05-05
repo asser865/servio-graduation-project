@@ -117,7 +117,7 @@
         </div>
 
         <div class="profile-actions">
-          <a class="btn" href="./booking.html" data-i18n="prof_book_btn">Book Service Request</a>
+          <a class="btn" href="./booking.html" id="bookServiceBtn" data-i18n="prof_book_btn">Book Service Request</a>
           <a class="btn btn--outline" href="./messages.html" data-i18n="prof_message_btn">Message</a>
         </div>
       </div>
@@ -420,7 +420,7 @@
             <span class="avail-dot-pulse"></span>
             <span data-i18n="prof_available_today">Available Today</span>
           </div>
-          <a class="btn btn--full" href="./booking.html" data-i18n="prof_book_now">Book Now</a>
+          <a class="btn btn--full" href="./booking.html" id="bookNowBtn" data-i18n="prof_book_now">Book Now</a>
           <a class="btn btn--full btn--outline booking-msg-btn" href="./messages.html" data-i18n="prof_send_msg">Send Message</a>
           <p class="booking-trust-line">
             <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10" stroke-width="2.5"/></svg>
@@ -595,6 +595,19 @@
   <script src="../js/lang.js"></script>
   <script type="module" src="../js/main.js"></script>
   <script type="module" src="../js/html/technician-profile.js"></script>
+  <script>
+    (function() {
+      var p = new URLSearchParams(window.location.search);
+      var techId = p.get('id');
+      var svc    = p.get('service') || '';
+      if (!techId) return;
+      var href = './booking.html?worker=' + techId + (svc ? '&service=' + svc : '');
+      ['bookNowBtn', 'bookServiceBtn'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.href = href;
+      });
+    })();
+  </script>
 </body>
 </html>
 

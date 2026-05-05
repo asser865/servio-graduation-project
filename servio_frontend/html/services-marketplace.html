@@ -707,9 +707,23 @@
 
     <!-- Topbar: sits above scroller, turns opaque after hero scrolls away -->
     <div class="svc-drawer__topbar" id="svcDrawerTopbar">
-      <span class="svc-drawer__topbar-title" id="svcDrawerTopbarTitle"></span>
+      <!-- Animated shimmer line -->
+      <div class="svc-drawer__topbar-shimmer" aria-hidden="true"></div>
+
+      <!-- Left: icon + stacked text -->
+      <div class="svc-drawer__topbar-left">
+        <div class="svc-drawer__topbar-icon" id="svcDrawerTopbarIcon" aria-hidden="true">
+          <!-- SVG injected by JS based on service -->
+        </div>
+        <div class="svc-drawer__topbar-text">
+          <span class="svc-drawer__topbar-eyebrow" id="svcDrawerTopbarEyebrow">Service Detail</span>
+          <span class="svc-drawer__topbar-title" id="svcDrawerTopbarTitle"></span>
+        </div>
+      </div>
+
+      <!-- Right: close button -->
       <button class="svc-drawer__close" id="svcDrawerClose" aria-label="Close panel">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M18 6 6 18M6 6l12 12"/></svg>
       </button>
     </div>
 
@@ -822,31 +836,109 @@
     /* ── Topbar (always visible, opaque after scroll) ── */
     .svc-drawer__topbar {
       position: absolute; top: 0; left: 0; right: 0;
-      height: 56px; z-index: 10;
+      height: 62px; z-index: 10;
       display: flex; align-items: center; justify-content: space-between;
-      padding: 0 14px 0 22px;
+      padding: 0 14px 0 16px;
       background: transparent;
       border-radius: 22px 22px 0 0;
-      transition: background 0.25s ease;
+      transition: background 0.32s cubic-bezier(0.4,0,0.2,1),
+                  backdrop-filter 0.32s ease,
+                  box-shadow 0.32s ease;
+      overflow: hidden;
     }
+
+    /* Shimmer sweep line */
+    .svc-drawer__topbar-shimmer {
+      position: absolute; top: 0; left: -100%; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent);
+      opacity: 0;
+      transition: opacity 0.3s ease 0.1s;
+      pointer-events: none;
+    }
+
+    /* Solid state (after scroll) */
     .svc-drawer__topbar.is-solid {
-      background: var(--color-primary, #222831);
+      background: linear-gradient(135deg,
+        rgba(34,40,49,0.92) 0%,
+        rgba(50,60,75,0.88) 50%,
+        rgba(154,140,115,0.18) 100%);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      box-shadow: 0 4px 24px rgba(22,26,32,0.28),
+                  inset 0 1px 0 rgba(255,255,255,0.10),
+                  inset 0 -1px 0 rgba(0,0,0,0.12);
+    }
+    .svc-drawer__topbar.is-solid .svc-drawer__topbar-shimmer {
+      opacity: 1;
+      animation: topbar-shimmer 1.8s ease forwards;
+    }
+    @keyframes topbar-shimmer {
+      0%   { left: -100%; opacity: 1; }
+      60%  { left: 100%; opacity: 1; }
+      100% { left: 100%; opacity: 0; }
+    }
+
+    /* Left slot */
+    .svc-drawer__topbar-left {
+      display: flex; align-items: center; gap: 10px;
+      min-width: 0; flex: 1;
+      opacity: 0; transform: translateX(-6px);
+      transition: opacity 0.28s ease, transform 0.28s ease;
+    }
+    .svc-drawer__topbar.is-solid .svc-drawer__topbar-left {
+      opacity: 1; transform: translateX(0);
+    }
+
+    /* Service icon bubble */
+    .svc-drawer__topbar-icon {
+      width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
+      background: rgba(154,140,115,0.25);
+      border: 1px solid rgba(154,140,115,0.35);
+      display: grid; place-items: center;
+      backdrop-filter: blur(8px);
+    }
+    .svc-drawer__topbar-icon svg {
+      width: 15px; height: 15px;
+      stroke: rgba(255,255,255,0.90);
+      stroke-width: 2; fill: none;
+      stroke-linecap: round; stroke-linejoin: round;
+    }
+
+    /* Stacked text */
+    .svc-drawer__topbar-text {
+      display: flex; flex-direction: column; min-width: 0;
+    }
+    .svc-drawer__topbar-eyebrow {
+      font-size: 9px; font-weight: 600; letter-spacing: 0.13em;
+      text-transform: uppercase;
+      color: var(--color-accent, #9A8C73);
+      line-height: 1; margin-bottom: 2px;
     }
     .svc-drawer__topbar-title {
       font-family: var(--font-heading, 'Poppins', sans-serif);
-      font-size: 16px; font-weight: 700; color: white;
-      opacity: 0; transition: opacity 0.2s ease;
+      font-size: 14px; font-weight: 700; color: white;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      line-height: 1.2;
     }
-    .svc-drawer__topbar.is-solid .svc-drawer__topbar-title { opacity: 1; }
+
+    /* Close button */
     .svc-drawer__close {
-      width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
-      background: rgba(255,255,255,0.14);
-      border: 1px solid rgba(255,255,255,0.22);
+      width: 36px; height: 36px; border-radius: 12px; flex-shrink: 0;
+      background: rgba(255,255,255,0.10);
+      border: 1px solid rgba(255,255,255,0.18);
       cursor: pointer; display: grid; place-items: center; color: white;
-      backdrop-filter: blur(8px); transition: background 0.2s;
+      backdrop-filter: blur(10px);
+      transition: background 0.2s ease, border-color 0.2s ease,
+                  box-shadow 0.2s ease, transform 0.15s ease;
     }
-    .svc-drawer__close:hover { background: rgba(255,255,255,0.28); }
+    .svc-drawer__close:hover {
+      background: rgba(255,255,255,0.22);
+      border-color: rgba(255,255,255,0.35);
+      box-shadow: 0 0 14px rgba(154,140,115,0.35);
+      transform: scale(1.05);
+    }
+    .svc-drawer__close:active { transform: scale(0.93); }
 
     /* ── Single Scroller (hero + body together) ── */
     .svc-drawer__scroller {

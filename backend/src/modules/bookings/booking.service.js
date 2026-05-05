@@ -23,7 +23,7 @@ const TRANSITION_RULES = {
  * HOW:  Checks if worker and service are valid/active before creating.
  */
 const createBooking = async (userId, data) => {
-  const { workerId, serviceId, scheduledDate, address, description, images } = data;
+  const { workerId, serviceId, scheduledDate, scheduledTime, address, description, images } = data;
 
   // Verify the worker exists and is an active, verified worker
   const worker = await User.findOne({ _id: workerId, role: 'worker', isActive: true, isVerified: true });
@@ -55,10 +55,11 @@ const createBooking = async (userId, data) => {
     worker: workerId,
     service: serviceId,
     scheduledDate,
+    scheduledTime: scheduledTime || '',
     address,
     description,
     images,
-    totalPrice: service.basePrice, // initial estimate; can be adjusted
+    totalPrice: service.basePrice,
   });
 
   return booking.populate(['user', 'worker', 'service']);

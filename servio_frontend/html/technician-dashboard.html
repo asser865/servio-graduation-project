@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>SERVIO | Technician Dashboard</title>
     <meta name="description" content="Manage your job queue, earnings, availability, and profile." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <script src="../js/config.js"></script>
     <script src="../js/theme-init.js"></script>
     <script src="../js/lang-init.js"></script>
@@ -655,37 +657,109 @@
               <p class="dash-panel__subtitle" data-i18n="tech_avail_sub">Set your working hours and service area so customers can find you.</p>
             </div>
 
-            <div class="availability-panel" data-reveal>
-              <div class="avail-toggle-row">
-                <div>
-                  <span class="avail-toggle-label" data-i18n="tech_available_now">Available Now</span>
-                  <p style="font-size:0.75rem;color:var(--color-text-light);margin:2px 0 0;" data-i18n="tech_avail_hint">Toggle off to pause new requests.</p>
+            <!-- ── Available Now card ── -->
+            <div class="avail-now-card" data-reveal id="avail-now-card">
+              <div class="avail-now-card__left">
+                <div class="avail-now-card__icon" id="avail-now-icon">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <polyline points="12 6 12 12 16 14"/>
+                  </svg>
                 </div>
-                <label class="avail-toggle" aria-label="Toggle availability" data-i18n-aria-label="tech_avail_toggle_aria">
-                  <input type="checkbox" data-avail-toggle checked />
-                  <span class="avail-toggle__track"><span class="avail-toggle__thumb"></span></span>
-                </label>
+                <div class="avail-now-card__text">
+                  <div class="avail-now-card__title-row">
+                    <span class="avail-now-card__label" data-i18n="tech_available_now">Available Now</span>
+                    <span class="avail-now-status-pill" id="avail-now-pill">Offline</span>
+                  </div>
+                  <p class="avail-now-card__hint" data-i18n="tech_avail_hint">Toggle on to appear in search results and accept new bookings.</p>
+                </div>
+              </div>
+              <label class="avail-toggle-switch" aria-label="Toggle availability" data-i18n-aria-label="tech_avail_toggle_aria">
+                <input type="checkbox" id="avail-now-toggle" data-avail-toggle />
+                <span class="avail-toggle-switch__track">
+                  <span class="avail-toggle-switch__thumb"></span>
+                </span>
+              </label>
+            </div>
+
+            <!-- ── Weekly Schedule ── -->
+            <div class="avail-section-card" data-reveal>
+              <div class="avail-section-card__header">
+                <div class="avail-section-card__header-left">
+                  <div class="avail-section-card__icon">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  </div>
+                  <div>
+                    <h2 class="avail-section-card__title" data-i18n="tech_weekly_schedule">Weekly Schedule</h2>
+                    <p class="avail-section-card__sub">Define your working hours for each day of the week.</p>
+                  </div>
+                </div>
+                <button type="button" class="btn btn--ghost btn--sm" id="avail-clear-schedule">Clear All</button>
+              </div>
+              <div class="avail-schedule-grid" id="avail-schedule"></div>
+              
+              <div class="avail-save-row" style="margin-top: 20px;" data-reveal>
+                <button class="btn btn--primary avail-save-btn" type="button" id="save-schedule">
+                  <span class="avail-save-btn__icon">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                  </span>
+                  <span class="avail-save-btn__label" data-i18n="tech_save_schedule">Save Schedule</span>
+                </button>
+                <div class="avail-save-feedback" id="avail-schedule-feedback" hidden>
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#22A05A" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span data-i18n="tech_schedule_saved_msg">Schedule saved successfully!</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- ── Service Area & Categories ── -->
+            <div class="avail-section-card" data-reveal>
+              <div class="avail-section-card__header">
+                <div class="avail-section-card__header-left">
+                  <div class="avail-section-card__icon">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                  </div>
+                  <div>
+                    <h2 class="avail-section-card__title">Service Coverage</h2>
+                    <p class="avail-section-card__sub">Where you work and what services you offer.</p>
+                  </div>
+                </div>
               </div>
 
-              <h2 class="settings-section-title" style="margin:24px 0 12px;" data-i18n="tech_weekly_schedule">Weekly Schedule</h2>
-              <div class="avail-schedule" id="avail-schedule"></div>
-
-              <div class="form-field" style="margin-top:20px;">
-                <label class="form-label" for="service-area" data-i18n="tech_service_area_lbl">Service Area</label>
-                <input class="form-input" type="text" id="service-area" name="serviceArea" placeholder="e.g. Cairo, Giza" data-i18n-placeholder="tech_service_area_ph" />
+              <div class="avail-coverage-grid">
+                <div class="form-field">
+                  <label class="form-label" for="service-area" data-i18n="tech_service_area_lbl">Service Area</label>
+                  <div class="field-icon-wrap">
+                    <svg class="field-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    <input class="form-input form-input--icon" type="text" id="service-area" name="serviceArea" placeholder="e.g. Cairo, Giza, Heliopolis" data-i18n-placeholder="tech_service_area_ph" />
+                  </div>
+                  <p class="form-hint">Separate multiple areas with commas</p>
+                </div>
               </div>
 
-              <fieldset class="avail-categories">
-                <legend class="form-label" data-i18n="tech_service_cats_lbl">Service Categories</legend>
+              <fieldset class="avail-categories" style="margin-top: 20px;">
+                <legend class="avail-categories__legend">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                  <span data-i18n="tech_service_cats_lbl">Service Categories</span>
+                </legend>
                 <div class="avail-categories__grid" id="categories-grid"></div>
               </fieldset>
+              
+              <div class="avail-save-row" style="margin-top: 24px;" data-reveal>
+                <button class="btn btn--primary avail-save-btn" type="button" id="save-coverage">
+                  <span class="avail-save-btn__icon">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                  </span>
+                  <span class="avail-save-btn__label" data-i18n="tech_save_coverage">Save Coverage</span>
+                </button>
+                <div class="avail-save-feedback" id="avail-coverage-feedback" hidden>
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#22A05A" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span data-i18n="tech_coverage_saved_msg">Coverage saved successfully!</span>
+                </div>
+              </div>
+            </div>
+          </section>
 
-              <div style="margin-top:20px;display:flex;align-items:center;gap:12px;">
-                <button class="btn" type="button" id="save-availability" data-i18n="tech_save_availability">Save Availability</button>
-                <span class="settings-save-msg" data-avail-save-msg data-i18n="tech_saved_msg" hidden>Saved!</span>
-          </div>
-        </div>
-      </section>
 
           <!-- ── Reviews panel ── -->
           <section class="dash-panel" id="panel-reviews" role="tabpanel" aria-labelledby="tab-reviews" data-panel="reviews" hidden>

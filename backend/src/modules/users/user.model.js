@@ -187,6 +187,19 @@ const userSchema = new mongoose.Schema(
       default: '',
     },
 
+    // Real-time availability toggle — when false the worker is hidden from search and booking
+    isAvailable: {
+      type:    Boolean,
+      default: false,
+    },
+
+    // Human-readable service area for the availability panel (e.g. 'Cairo, Giza')
+    serviceArea: {
+      type:    String,
+      trim:    true,
+      default: '',
+    },
+
     // Specific skills (e.g. ['pipe repair', 'drain cleaning'])
     skills: {
       type:    [String],
@@ -254,6 +267,10 @@ userSchema.index({ location: '2dsphere' });
 // ── Service index ─────────────────────────────────────────────────────────────
 // Speeds up worker-discovery queries filtered by a specific service ID.
 userSchema.index({ services: 1 });
+
+// ── Availability index ────────────────────────────────────────────────────────
+// Allows fast filtering of available workers in listing + booking flows.
+userSchema.index({ isAvailable: 1, isActive: 1, isVerified: 1 });
 
 // ── Pre-save hook — password hashing ─────────────────────────────────────────
 // Only re-hash if the password field was actually modified (prevents double

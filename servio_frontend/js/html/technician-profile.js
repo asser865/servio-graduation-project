@@ -302,11 +302,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       renderReviews(reviews, lang);
     });
 
-    // Book Now button — link to booking page
+    // Wire all Book Now buttons
+    const bookingHref = `./booking.html?worker=${techId}${serviceKey ? '&service=' + serviceKey : ''}`;
+    const bookNowBtn = document.getElementById('bookNowBtn');
+    const bookServiceBtn = document.getElementById('bookServiceBtn');
+    if (bookNowBtn) bookNowBtn.href = bookingHref;
+    if (bookServiceBtn) bookServiceBtn.href = bookingHref;
     const bookBtn = el('book-btn') || document.querySelector('[data-book-btn]') || document.querySelector('.profile-cta__btn');
-    if (bookBtn) {
-      bookBtn.href = `./booking.html?worker=${techId}&service=${serviceKey}`;
-    }
+    if (bookBtn) bookBtn.href = bookingHref;
 
     runAnimations();
     initCounters();

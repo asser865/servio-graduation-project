@@ -61,6 +61,12 @@ const bookingSchema = new mongoose.Schema(
       min:   [0, 'Price cannot be negative'],
     },
 
+    scheduledTime: {
+      type:    String,
+      trim:    true,
+      default: '',
+    },
+
     // Worker can add notes on completion (e.g., materials used)
     workerNotes: {
       type:  String,

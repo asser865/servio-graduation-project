@@ -48,7 +48,7 @@ const emailUpdateValidation = [
 ];
 
 const availabilityValidation = [
-  body('availability').isArray({ min: 1 }).withMessage('Availability must be an array'),
+  body('availability').isArray().withMessage('Availability must be an array'),
   body('availability.*.day')
     .isIn(['monday','tuesday','wednesday','thursday','friday','saturday','sunday'])
     .withMessage('Invalid day'),
@@ -78,6 +78,14 @@ router.patch('/me/password', protect, userController.updatePassword);
 
 // DELETE /api/v1/users/me — delete own profile
 router.delete('/me', protect, userController.deleteMe);
+
+// PATCH /api/v1/users/me/available — worker toggles their Available Now status
+router.patch(
+  '/me/available',
+  protect,
+  authorize('worker'),
+  userController.toggleAvailableNow
+);
 
 // PATCH /api/v1/users/me/availability — worker updates availability
 router.patch(

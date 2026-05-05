@@ -4,7 +4,7 @@
 import { revealAll } from '../components/scroll-reveal.js';
 import { showToast } from '../components/toast.js';
 import { getInitials } from '../utils/string.js';
-import { getMe, updateMe, updatePassword, updateEmail, deleteMe } from '../api/users.js';
+import { getMe, updateMe, updatePassword, updateEmail, deleteMe, updateAvailability, toggleAvailableNow } from '../api/users.js';
 import { uploadPublicFile } from '../api/uploads.js';
 
 const TAB_KEY = 'servio_activeTab_technician';
@@ -341,41 +341,230 @@ function populateStats() {
   updateTopbarBadge(2);
 }
 
-function initAvailabilitySchedule() {
-  const container = document.getElementById('avail-schedule');
-  if (!container) return;
-  const T = typeof window.t === 'function' ? window.t.bind(window) : (k) => k;
-  const toLabel = T('avail_to');
-  const offLabel = T('avail_off');
-  DAYS_KEYS.forEach(dayKey => {
-    const day = T(dayKey);
-    const row = document.createElement('div');
-    row.className = 'avail-day-row';
-    row.innerHTML = `
-      <span class="avail-day-row__label">${day}</span>
-      <input type="time" value="09:00" aria-label="${day} start time" />
-      <span style="color:var(--color-text-light);font-size:0.8rem;">${toLabel}</span>
-      <input type="time" value="17:00" aria-label="${day} end time" />
-      <label class="avail-day-off-label">
-        <input type="checkbox" aria-label="${day} day off" /> ${offLabel}
-      </label>
-    `;
-    container.appendChild(row);
+// ── Available Now Toggle ──────────────────────────────────────────────────────
+// Connects the toggle to PATCH /users/me/available with debounce + UI feedback
+function initAvailableNowToggle(initialState) {
+  const toggle  = document.getElementById('avail-now-toggle');
+  const card    = document.getElementById('avail-now-card');
+  const pill    = document.getElementById('avail-now-pill');
+  const icon    = document.getElementById('avail-now-icon');
+  if (!toggle) return;
+
+  const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
+
+  function applyUIState(isOn) {
+    const safeT = (k, def) => { 
+      const r = _t(k); 
+      return (r === k || !r) ? def : r; 
+    };
+    toggle.checked = isOn;
+    if (card)  card.classList.toggle('is-active', isOn);
+    if (pill) {
+      pill.textContent = isOn ? safeT('avail_status_online', 'Online') : safeT('avail_status_offline', 'Offline');
+      pill.classList.toggle('is-online', isOn);
+    }
+  }
+
+  // Seed from API state
+  applyUIState(!!initialState);
+
+  let debounceTimer = null;
+  toggle.addEventListener('change', () => {
+    const isOn = toggle.checked;
+    applyUIState(isOn);
+
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(async () => {
+      toggle.disabled = true;
+      try {
+        await toggleAvailableNow(isOn);
+        // Persist to session
+        try {
+          const s = JSON.parse(localStorage.getItem('servio_session') || '{}');
+          s.isAvailable = isOn;
+          localStorage.setItem('servio_session', JSON.stringify(s));
+        } catch (_) {}
+        const msg = isOn
+          ? (_t('toast_avail_on')  || 'You are now visible and accepting bookings.')
+          : (_t('toast_avail_off') || 'You are now offline. New bookings are paused.');
+        showToast(msg, isOn ? 'success' : 'info');
+      } catch (err) {
+        // Revert on error
+        applyUIState(!isOn);
+        showToast(err?.message || 'Failed to update availability.', 'error');
+      } finally {
+        toggle.disabled = false;
+      }
+    }, 350);
   });
 }
 
-function initCategories() {
+// ── Weekly Schedule Builder ────────────────────────────────────────────────────
+// Renders structured day rows with AM/PM dropdowns, on/off chip, and validation
+function initAvailabilitySchedule(savedSlots) {
+  const container = document.getElementById('avail-schedule');
+  if (!container) return;
+  const T = typeof window.t === 'function' ? window.t.bind(window) : (k) => k;
+
+  const DAY_CONFIGS = [
+    { key: 'monday',    label: T('avail_day_mon') || 'Monday',    abbr: 'MON', defaultFrom: '09:00', defaultTo: '17:00' },
+    { key: 'tuesday',   label: T('avail_day_tue') || 'Tuesday',   abbr: 'TUE', defaultFrom: '09:00', defaultTo: '17:00' },
+    { key: 'wednesday', label: T('avail_day_wed') || 'Wednesday', abbr: 'WED', defaultFrom: '09:00', defaultTo: '17:00' },
+    { key: 'thursday',  label: T('avail_day_thu') || 'Thursday',  abbr: 'THU', defaultFrom: '09:00', defaultTo: '17:00' },
+    { key: 'friday',    label: T('avail_day_fri') || 'Friday',    abbr: 'FRI', defaultFrom: '09:00', defaultTo: '17:00' },
+    { key: 'saturday',  label: T('avail_day_sat') || 'Saturday',  abbr: 'SAT', defaultFrom: '10:00', defaultTo: '15:00' },
+    { key: 'sunday',    label: T('avail_day_sun') || 'Sunday',    abbr: 'SUN', defaultFrom: '10:00', defaultTo: '15:00' },
+  ];
+
+  // Build half-hour time options for dropdown
+  function buildTimeOptions() {
+    const opts = [];
+    for (let h = 6; h <= 23; h++) {
+      for (const m of [0, 30]) {
+        const pad  = n => String(n).padStart(2, '0');
+        const val  = `${pad(h)}:${pad(m)}`;
+        const h12  = h === 0 ? 12 : h > 12 ? h - 12 : h;
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        const lbl  = `${h12}:${pad(m)} ${ampm}`;
+        opts.push({ val, lbl });
+      }
+    }
+    return opts;
+  }
+  const TIME_OPTIONS = buildTimeOptions();
+
+  function makeSelect(id, selectedVal) {
+    const sel = document.createElement('select');
+    sel.className = 'avail-time-select';
+    sel.id = id;
+    sel.setAttribute('aria-label', id);
+    TIME_OPTIONS.forEach(({ val, lbl }) => {
+      const opt = document.createElement('option');
+      opt.value = val;
+      opt.textContent = lbl;
+      if (val === selectedVal) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    return sel;
+  }
+
+  function validateRow(fromSel, toSel) {
+    const fromVal = fromSel.value;
+    const toVal   = toSel.value;
+    const isValid = toVal > fromVal;
+    toSel.classList.toggle('is-error', !isValid);
+    return isValid;
+  }
+
+  container.innerHTML = '';
+
+  DAY_CONFIGS.forEach(day => {
+    const savedSlot = (savedSlots || []).find(s => s.day === day.key);
+    const isActive  = !!savedSlot;
+    const fromVal   = savedSlot?.from || day.defaultFrom;
+    const toVal     = savedSlot?.to   || day.defaultTo;
+
+    const row = document.createElement('div');
+    row.className = `avail-day-row${isActive ? '' : ' is-off'}`;
+    row.dataset.day = day.key;
+
+    // Day name
+    const nameEl = document.createElement('span');
+    nameEl.className = 'avail-day-row__name';
+    nameEl.textContent = day.abbr;
+    nameEl.title = day.label;
+
+    // Time selects
+    const timesDiv = document.createElement('div');
+    timesDiv.className = 'avail-day-row__times';
+    const fromSel = makeSelect(`avail-from-${day.key}`, fromVal);
+    const sep     = document.createElement('span');
+    sep.className = 'avail-day-row__sep';
+    sep.textContent = T('avail_to') || 'to';
+    const toSel = makeSelect(`avail-to-${day.key}`, toVal);
+    timesDiv.append(fromSel, sep, toSel);
+
+    // Validate on change
+    function onTimeChange() { validateRow(fromSel, toSel); }
+    fromSel.addEventListener('change', onTimeChange);
+    toSel.addEventListener('change', onTimeChange);
+
+    // On/Off chip
+    const chip = document.createElement('button');
+    const safeT = (k, def) => { 
+      const v = T(k); 
+      return (v === k || !v) ? def : v; 
+    };
+    chip.type = 'button';
+    chip.className = `avail-day-toggle-chip${isActive ? ' is-on' : ''}`;
+    chip.textContent = isActive ? safeT('avail_working', 'Working') : safeT('avail_day_off', 'Not Available');
+    chip.setAttribute('aria-pressed', String(isActive));
+    chip.addEventListener('click', () => {
+      const nowOn = !chip.classList.contains('is-on');
+      chip.classList.toggle('is-on', nowOn);
+      chip.textContent = nowOn ? safeT('avail_working', 'Working') : safeT('avail_day_off', 'Not Available');
+      chip.setAttribute('aria-pressed', String(nowOn));
+      row.classList.toggle('is-off', !nowOn);
+      timesDiv.style.visibility = nowOn ? '' : 'hidden';
+    });
+    if (!isActive) timesDiv.style.visibility = 'hidden';
+
+    row.append(nameEl, timesDiv, chip);
+    container.appendChild(row);
+  });
+
+  // Clear All handler
+  document.getElementById('avail-clear-schedule')?.addEventListener('click', () => {
+    const safeT = (k, def) => { 
+      const v = T(k); 
+      return (v === k || !v) ? def : v; 
+    };
+    container.querySelectorAll('.avail-day-row').forEach(row => {
+      row.classList.add('is-off');
+      const chip = row.querySelector('.avail-day-toggle-chip');
+      if (chip) {
+        chip.classList.remove('is-on');
+        chip.textContent = safeT('avail_day_off', 'Not Available');
+        chip.setAttribute('aria-pressed', 'false');
+      }
+      const times = row.querySelector('.avail-day-row__times');
+      if (times) times.style.visibility = 'hidden';
+    });
+  });
+}
+
+function initCategories(savedSkills) {
   const grid = document.getElementById('categories-grid');
   if (!grid) return;
-  const account = getAccount();
-  const saved = account?.skills || [];
+  const savedSet = new Set((savedSkills || []).map(s => s.toLowerCase()));
   const T2 = typeof window.t === 'function' ? window.t.bind(window) : (k) => k;
-  SKILLS_KEYS.forEach(skillKey => {
-    const skill = T2(skillKey);
-    const label = document.createElement('label');
-    const checked = saved.includes(skill) ? 'checked' : '';
-    label.innerHTML = `<input type="checkbox" ${checked} /><span>${skill}</span>`;
-    grid.appendChild(label);
+  const SKILL_DATA = [
+    { key: 'skill_plumbing',   icon: '🔧' },
+    { key: 'skill_electrical', icon: '⚡' },
+    { key: 'skill_hvac',       icon: '❄️' },
+    { key: 'skill_painting',   icon: '🖌️' },
+    { key: 'skill_carpentry',  icon: '🪚' },
+    { key: 'skill_cleaning',   icon: '🧹' },
+    { key: 'skill_roofing',    icon: '🏠' },
+    { key: 'skill_flooring',   icon: '🪵' },
+    { key: 'skill_appliance',  icon: '🔌' },
+    { key: 'skill_landscaping',icon: '🌿' },
+    { key: 'skill_general',    icon: '🛠️' },
+  ];
+  SKILL_DATA.forEach(({ key, icon }) => {
+    const label = T2(key);
+    const isSelected = savedSet.has(label.toLowerCase()) || savedSet.has(key.replace('skill_', '').toLowerCase());
+    const chip = document.createElement('label');
+    chip.className = `avail-category-chip${isSelected ? ' is-selected' : ''}`;
+    chip.dataset.skill = label;
+    chip.innerHTML = `<input type="checkbox" ${isSelected ? 'checked' : ''} /><span>${icon} ${label}</span>`;
+    chip.addEventListener('click', (e) => {
+      e.preventDefault();
+      chip.classList.toggle('is-selected');
+      const cb = chip.querySelector('input[type="checkbox"]');
+      if (cb) cb.checked = chip.classList.contains('is-selected');
+    });
+    grid.appendChild(chip);
   });
 }
 
@@ -608,12 +797,105 @@ function initSettingsForm() {
     });
   }
 
-  const saveAvailBtn = document.getElementById('save-availability');
-  const availSaveMsg = document.querySelector('[data-avail-save-msg]');
-  if (saveAvailBtn && availSaveMsg) {
-    saveAvailBtn.addEventListener('click', () => {
-      availSaveMsg.hidden = false;
-      setTimeout(() => { availSaveMsg.hidden = true; }, 2500);
+  const saveScheduleBtn = document.getElementById('save-schedule');
+  const scheduleFeedback = document.getElementById('avail-schedule-feedback');
+  if (saveScheduleBtn) {
+    saveScheduleBtn.addEventListener('click', async () => {
+      const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
+      const slots = [];
+      let hasTimeError = false;
+      document.querySelectorAll('#avail-schedule .avail-day-row').forEach(row => {
+        const dayKey  = row.dataset.day;
+        const isOff   = row.classList.contains('is-off');
+        if (isOff) return;
+        const fromSel = row.querySelector(`#avail-from-${dayKey}`);
+        const toSel   = row.querySelector(`#avail-to-${dayKey}`);
+        if (!fromSel || !toSel) return;
+        const from = fromSel.value;
+        const to   = toSel.value;
+        if (to <= from) {
+          toSel.classList.add('is-error');
+          hasTimeError = true;
+          return;
+        }
+        toSel.classList.remove('is-error');
+        slots.push({ day: dayKey, from, to });
+      });
+
+      if (hasTimeError) {
+        showToast(_t('toast_avail_time_error') || 'End time must be after start time.', 'error');
+        return;
+      }
+
+      const origLabel = saveScheduleBtn.querySelector('.avail-save-btn__label');
+      if (origLabel) origLabel.textContent = _t('tech_saving') || 'Saving…';
+      const iconSpan = saveScheduleBtn.querySelector('.avail-save-btn__icon');
+      if (iconSpan) iconSpan.innerHTML = '<span class="spinner"></span>';
+      saveScheduleBtn.disabled = true;
+      if (scheduleFeedback) scheduleFeedback.hidden = true;
+
+      try {
+        await updateAvailability(slots);
+        try {
+          const acc = JSON.parse(localStorage.getItem('servio_account') || '{}');
+          acc.availability = slots;
+          localStorage.setItem('servio_account', JSON.stringify(acc));
+        } catch (_) {}
+
+        if (scheduleFeedback) { scheduleFeedback.hidden = false; setTimeout(() => { scheduleFeedback.hidden = true; }, 3500); }
+        showToast(_t('tech_schedule_saved_msg') || 'Schedule saved successfully!', 'success');
+      } catch (err) {
+        showToast(err?.message || 'Failed to save schedule.', 'error');
+      } finally {
+        saveScheduleBtn.disabled = false;
+        if (origLabel) origLabel.textContent = _t('tech_save_schedule') || 'Save Schedule';
+        if (iconSpan) iconSpan.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>`;
+      }
+    });
+  }
+
+  const saveCoverageBtn = document.getElementById('save-coverage');
+  const coverageFeedback = document.getElementById('avail-coverage-feedback');
+  if (saveCoverageBtn) {
+    saveCoverageBtn.addEventListener('click', async () => {
+      const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
+      const serviceAreaInput = document.getElementById('service-area');
+      const serviceArea = serviceAreaInput?.value.trim() || '';
+      const selectedSkills = [];
+      document.querySelectorAll('#categories-grid .avail-category-chip.is-selected').forEach(chip => {
+        selectedSkills.push(chip.dataset.skill || chip.querySelector('span')?.textContent || '');
+      });
+
+      const origLabel = saveCoverageBtn.querySelector('.avail-save-btn__label');
+      if (origLabel) origLabel.textContent = _t('tech_saving') || 'Saving…';
+      const iconSpan = saveCoverageBtn.querySelector('.avail-save-btn__icon');
+      if (iconSpan) iconSpan.innerHTML = '<span class="spinner"></span>';
+      saveCoverageBtn.disabled = true;
+      if (coverageFeedback) coverageFeedback.hidden = true;
+
+      try {
+        const profileUpdate = {};
+        profileUpdate.serviceArea = serviceArea; // allow empty to clear
+        profileUpdate.skills = selectedSkills; // allow empty array to clear
+        await updateMe(profileUpdate);
+
+        try {
+          const acc = JSON.parse(localStorage.getItem('servio_account') || '{}');
+          acc.serviceArea = serviceArea;
+          acc.skills = selectedSkills;
+          acc.specialty = selectedSkills.join(', ');
+          localStorage.setItem('servio_account', JSON.stringify(acc));
+        } catch (_) {}
+
+        if (coverageFeedback) { coverageFeedback.hidden = false; setTimeout(() => { coverageFeedback.hidden = true; }, 3500); }
+        showToast(_t('tech_coverage_saved_msg') || 'Coverage saved successfully!', 'success');
+      } catch (err) {
+        showToast(err?.message || 'Failed to save coverage.', 'error');
+      } finally {
+        saveCoverageBtn.disabled = false;
+        if (origLabel) origLabel.textContent = _t('tech_save_coverage') || 'Save Coverage';
+        if (iconSpan) iconSpan.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>`;
+      }
     });
   }
 }
@@ -1200,37 +1482,70 @@ function initNotifPanel() {
   });
 }
 
-populateProfile();
-populateStats();
-updateWelcomeText();
-initTabs();
-initTopbarAvatar();
-initAvailabilitySchedule();
-initCategories();
-initJobQueue();
-initSettingsForm();
-initPasswordToggles();
-initSettingsValidation();
-initSettingsTabs();
-initTechSecurityForm();
-initPasswordStrengthMeter();
-initSettingToggles();
-initLanguageCards();
-initThemeCards();
-initAccountTab();
-initDashLogout();
-initNotifPanel();
-initPhase2();
-initVerificationTab();
-initPendingGuard();
+// ── Top-level async initialization ───────────────────────────────────────────────
+// Fetches live user data first, then seeds the availability UI with real data
+async function initDashboard() {
+  populateProfile();
+  populateStats();
+  updateWelcomeText();
+  initTabs();
+  initTopbarAvatar();
+  initJobQueue();
+  initSettingsForm();
+  initPasswordToggles();
+  initSettingsValidation();
+  initSettingsTabs();
+  initTechSecurityForm();
+  initPasswordStrengthMeter();
+  initSettingToggles();
+  initLanguageCards();
+  initThemeCards();
+  initAccountTab();
+  initDashLogout();
+  initNotifPanel();
+  initPhase2();
+  initVerificationTab();
+  initPendingGuard();
+
+  // Fetch live availability data and seed the panel
+  let liveAvailability = null;
+  let liveIsAvailable = false;
+  let liveSkills = null;
+  let liveServiceArea = '';
+  try {
+    const res = await getMe();
+    const user = res?.user || res?.data?.user || res?.data || res;
+    liveAvailability = user?.availability || null;
+    liveIsAvailable  = user?.isAvailable   || false;
+    liveSkills       = user?.skills        || null;
+    liveServiceArea  = user?.serviceArea   || '';
+    // Populate service area input
+    const saInput = document.getElementById('service-area');
+    if (saInput && liveServiceArea) saInput.value = liveServiceArea;
+  } catch (_) {
+    // Fall back to cached data
+    const acc = getAccount();
+    liveAvailability = acc?.availability || null;
+    liveIsAvailable  = acc?.isAvailable  || false;
+    liveSkills       = acc?.skills       || null;
+    liveServiceArea  = acc?.serviceArea  || '';
+  }
+
+  initAvailableNowToggle(liveIsAvailable);
+  initAvailabilitySchedule(liveAvailability);
+  initCategories(liveSkills);
+}
+
+initDashboard().catch(err => console.error('[Dashboard init error]', err));
 
 /* Re-render dynamic grids and welcome text on language change */
 document.addEventListener('langchange', () => {
   updateWelcomeText();
+  const acc = getAccount();
   const scheduleContainer = document.getElementById('avail-schedule');
-  if (scheduleContainer) { scheduleContainer.innerHTML = ''; initAvailabilitySchedule(); }
+  if (scheduleContainer) { scheduleContainer.innerHTML = ''; initAvailabilitySchedule(acc?.availability || null); }
   const categoriesGrid = document.getElementById('categories-grid');
-  if (categoriesGrid) { categoriesGrid.innerHTML = ''; initCategories(); }
+  if (categoriesGrid) { categoriesGrid.innerHTML = ''; initCategories(acc?.skills || null); }
 });
 
 /* ── Phase 2: Job Board, Proposals, Arrival Flow ── */
