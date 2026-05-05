@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../api/api_client.dart';
 import '../api/api_exception.dart';
 import '../api/auth_api.dart';
+import '../api/users_api.dart';
 import '../models/booking_model.dart';
 import '../models/message_model.dart';
 import '../models/user_account.dart';
@@ -24,6 +25,7 @@ class SessionProvider extends ChangeNotifier {
   final StorageService _storage;
   final ApiClient _apiClient;
   late final AuthApi _authApi = AuthApi(_apiClient);
+  late final UsersApi _usersApi = UsersApi(_apiClient);
 
   UserAccount? _account;
 
@@ -35,6 +37,15 @@ class SessionProvider extends ChangeNotifier {
   void _loadFromStorage() {
     final json = _storage.getJson(_kKeySession);
     if (json == null) return;
+    // Defensive guard: clear any previously-saved session whose stored role is
+    // 'admin'. This can happen if an older version of the app persisted an admin
+    // session before the login block was in place.
+    if (json['role'] == 'admin') {
+      _storage.remove(_kKeySession);
+      _storage.remove(_kKeyAccount);
+      _storage.removeSecureString(StorageService.keyAuthToken);
+      return;
+    }
     try {
       _account = UserAccount.fromJson(json);
     } catch (_) {}
@@ -48,7 +59,8 @@ class SessionProvider extends ChangeNotifier {
     try {
       final session = await _authApi.login(email: email, password: password);
       _account = session.user;
-      await _storage.setSecureString(StorageService.keyAuthToken, session.token);
+      await _storage.setSecureString(
+          StorageService.keyAuthToken, session.token);
       await _storage.setJson(_kKeySession, session.user.toJson());
       await _storage.setJson(_kKeyAccount, session.user.toJson());
       if (rememberEmail) {
@@ -81,7 +93,8 @@ class SessionProvider extends ChangeNotifier {
         city: city,
       );
       _account = session.user;
-      await _storage.setSecureString(StorageService.keyAuthToken, session.token);
+      await _storage.setSecureString(
+          StorageService.keyAuthToken, session.token);
       await _storage.setJson(_kKeySession, session.user.toJson());
       await _storage.setJson(_kKeyAccount, session.user.toJson());
       notifyListeners();
@@ -115,7 +128,8 @@ class SessionProvider extends ChangeNotifier {
         availabilityType: availabilityType,
       );
       _account = session.user;
-      await _storage.setSecureString(StorageService.keyAuthToken, session.token);
+      await _storage.setSecureString(
+          StorageService.keyAuthToken, session.token);
       await _storage.setJson(_kKeySession, session.user.toJson());
       await _storage.setJson(_kKeyAccount, session.user.toJson());
       notifyListeners();
@@ -138,9 +152,46 @@ class SessionProvider extends ChangeNotifier {
     }
   }
 
+  Future<String?> updateProfile(Map<String, dynamic> fields) async {
+    try {
+      await _usersApi.updateProfile(fields);
+      final refreshed = await _authApi.getMe();
+      _account = refreshed;
+      await _storage.setJson(_kKeySession, refreshed.toJson());
+      await _storage.setJson(_kKeyAccount, refreshed.toJson());
+      notifyListeners();
+      return null;
+    } on ApiException catch (e) {
+      return e.message;
+    } catch (_) {
+      return 'Could not save profile. Check your connection.';
+    }
+  }
+
+  Future<String?> updateAvailability(
+    List<Map<String, dynamic>> availability,
+  ) async {
+    try {
+      await _usersApi.updateAvailability(<String, dynamic>{
+        'availability': availability,
+      });
+      final refreshed = await _authApi.getMe();
+      _account = refreshed;
+      await _storage.setJson(_kKeySession, refreshed.toJson());
+      await _storage.setJson(_kKeyAccount, refreshed.toJson());
+      notifyListeners();
+      return null;
+    } on ApiException catch (e) {
+      return e.message;
+    } catch (_) {
+      return 'Could not save availability. Check your connection.';
+    }
+  }
+
   Future<void> logout() async {
     _account = null;
     await _storage.remove(_kKeySession);
+    await _storage.remove(_kKeyAccount);
     await _storage.removeSecureString(StorageService.keyAuthToken);
     notifyListeners();
   }
@@ -215,11 +266,15 @@ class BookingsProvider extends ChangeNotifier {
   List<BookingModel> get all => List<BookingModel>.unmodifiable(_bookings);
 
   List<BookingModel> get upcoming => _bookings
-      .where((b) => b.status == BookingStatus.upcoming || b.status == BookingStatus.inProgress)
+      .where((b) =>
+          b.status == BookingStatus.upcoming ||
+          b.status == BookingStatus.inProgress)
       .toList();
 
   List<BookingModel> get past => _bookings
-      .where((b) => b.status == BookingStatus.completed || b.status == BookingStatus.cancelled)
+      .where((b) =>
+          b.status == BookingStatus.completed ||
+          b.status == BookingStatus.cancelled)
       .toList();
 
   void _load() {
@@ -282,9 +337,7 @@ class MessagesProvider extends ChangeNotifier {
               isMe: true,
               time: '10:30 AM'),
           const ChatMessage(
-              text: 'I\'ll be there by 10 AM.',
-              isMe: false,
-              time: '10:32 AM'),
+              text: 'I\'ll be there by 10 AM.', isMe: false, time: '10:32 AM'),
         ],
       ),
       ConversationModel(
@@ -300,7 +353,9 @@ class MessagesProvider extends ChangeNotifier {
               isMe: false,
               time: 'Yesterday 2:00 PM'),
           const ChatMessage(
-              text: 'How long will that take to source?', isMe: true, time: 'Yesterday 2:10 PM'),
+              text: 'How long will that take to source?',
+              isMe: true,
+              time: 'Yesterday 2:10 PM'),
           const ChatMessage(
               text: 'Parts ordered, will call when ready.',
               isMe: false,
@@ -350,7 +405,13 @@ class MessagesProvider extends ChangeNotifier {
     final existing = _conversations.where((c) => c.id == id).firstOrNull;
     if (existing != null) return existing;
 
-    final initials = technicianName.trim().split(' ').take(2).map((w) => w[0]).join().toUpperCase();
+    final initials = technicianName
+        .trim()
+        .split(' ')
+        .take(2)
+        .map((w) => w[0])
+        .join()
+        .toUpperCase();
     final conv = ConversationModel(
       id: id,
       contactName: technicianName,
@@ -378,7 +439,9 @@ class MessagesProvider extends ChangeNotifier {
     if (lower.contains('time') || lower.contains('when')) {
       return 'I\'ll let you know as soon as I can confirm the schedule.';
     }
-    if (lower.contains('price') || lower.contains('cost') || lower.contains('how much')) {
+    if (lower.contains('price') ||
+        lower.contains('cost') ||
+        lower.contains('how much')) {
       return 'I\'ll send you a detailed quote shortly.';
     }
     if (lower.contains('thank')) {

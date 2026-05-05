@@ -1,4 +1,4 @@
-# servio-graduation-project
+# Servio
 AI-powered home maintenance and finishing services platform (Graduation Project)
 
 ## Project Structure

@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/state/app_state.dart';
-import '../../features/auth/role_selection_screen.dart';
-import '../../features/customer/customer_dashboard_screen.dart';
-import '../../features/technician/technician_dashboard_screen.dart';
 import '../../core/models/user_account.dart';
+import '../../design_system/servio_tokens.dart';
+import '../auth/auth_landing_screen.dart';
+import '../customer/customer_dashboard_screen.dart';
+import '../technician/technician_dashboard_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -14,37 +15,46 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _progressAnimation;
-  final String _word = 'SERVIO';
-  
+class _SplashScreenState extends State<SplashScreen>
+    with TickerProviderStateMixin {
+  late final AnimationController _logoController;
+  late final AnimationController _progressController;
+  late final AnimationController _fadeOutController;
+
+  static const String _word = 'SERVIO';
+
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
+
+    _logoController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2500),
+      duration: const Duration(milliseconds: 1800),
     );
 
-    _progressAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.5, 1.0, curve: Curves.easeInOut),
-      ),
+    _progressController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
     );
 
-    _controller.forward().then((_) {
-      _navigateToNextScreen();
+    _fadeOutController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+
+    _logoController.forward().then((_) {
+      _progressController.forward().then((_) {
+        _navigateToNextScreen();
+      });
     });
   }
-  
+
   void _navigateToNextScreen() {
     if (!mounted) return;
-    
+
     final session = context.read<SessionProvider>();
-    Widget nextScreen = const RoleSelectionScreen();
-    
+    Widget nextScreen = const AuthLandingScreen();
+
     if (session.isLoggedIn) {
       if (session.account!.role == UserRole.technician) {
         nextScreen = const TechnicianDashboardScreen();
@@ -53,92 +63,159 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       }
     }
 
-    Navigator.of(context).pushReplacement(
-      PageRouteBuilder(
-        transitionDuration: const Duration(milliseconds: 600),
-        pageBuilder: (_, __, ___) => nextScreen,
-        transitionsBuilder: (_, animation, __, child) {
-          return FadeTransition(opacity: animation, child: child);
-        },
-      ),
-    );
+    _fadeOutController.forward().then((_) {
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        PageRouteBuilder(
+          transitionDuration: ServioMotion.page,
+          pageBuilder: (_, __, ___) => nextScreen,
+          transitionsBuilder: (_, animation, __, child) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+        ),
+      );
+    });
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _logoController.dispose();
+    _progressController.dispose();
+    _fadeOutController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    
-    return Scaffold(
-      backgroundColor: colorScheme.surface,
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(_word.length, (index) {
-                final startInterval = index * 0.08;
-                final endInterval = startInterval + 0.2;
-                
-                final animation = Tween<double>(begin: 0, end: 1).animate(
-                  CurvedAnimation(
-                    parent: _controller,
-                    curve: Interval(
-                      startInterval, 
-                      endInterval > 1.0 ? 1.0 : endInterval, 
-                      curve: Curves.easeOutBack,
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return AnimatedBuilder(
+      animation: _fadeOutController,
+      builder: (BuildContext context, Widget? child) {
+        return Opacity(
+          opacity: 1.0 - _fadeOutController.value,
+          child: child,
+        );
+      },
+      child: Scaffold(
+        backgroundColor: isDark
+            ? ServioColors.backgroundDark
+            : ServioColors.backgroundLight,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              // ── Animated word "SERVIO" ────────────────────
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List<Widget>.generate(_word.length, (int index) {
+                  final double start = index * 0.10;
+                  final double end = (start + 0.35).clamp(0.0, 1.0);
+
+                  final Animation<double> letterAnim =
+                      Tween<double>(begin: 0, end: 1).animate(
+                    CurvedAnimation(
+                      parent: _logoController,
+                      curve: Interval(start, end, curve: ServioMotion.spring),
                     ),
-                  ),
-                );
-                
-                return AnimatedBuilder(
-                  animation: animation,
-                  builder: (context, child) {
-                    return Transform.scale(
-                      scale: animation.value,
-                      child: Opacity(
-                        opacity: animation.value.clamp(0.0, 1.0),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 2.0),
-                          child: Text(
-                            _word[index],
-                            style: TextStyle(
-                              fontSize: 48,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 2.0,
-                              color: colorScheme.primary,
-                            ),
+                  );
+
+                  return AnimatedBuilder(
+                    animation: letterAnim,
+                    builder: (BuildContext context, Widget? child) {
+                      return Transform.translate(
+                        offset: Offset(0, 12 * (1 - letterAnim.value)),
+                        child: Transform.scale(
+                          scale: 0.6 + 0.4 * letterAnim.value,
+                          child: Opacity(
+                            opacity: letterAnim.value.clamp(0.0, 1.0),
+                            child: child,
+                          ),
+                        ),
+                      );
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 1.5),
+                      child: ShaderMask(
+                        shaderCallback: (Rect bounds) =>
+                            ServioGradients.brand.createShader(bounds),
+                        blendMode: BlendMode.srcIn,
+                        child: Text(
+                          _word[index],
+                          style: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 44,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 3.0,
+                            color: Colors.white,
                           ),
                         ),
                       ),
-                    );
-                  },
-                );
-              }),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: 150,
-              height: 4,
-              child: AnimatedBuilder(
-                animation: _progressAnimation,
-                builder: (context, child) {
-                  return LinearProgressIndicator(
-                    value: _progressAnimation.value,
-                    backgroundColor: colorScheme.surfaceContainerHighest,
-                    valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
-                    borderRadius: BorderRadius.circular(2),
+                    ),
+                  );
+                }),
+              ),
+
+              const SizedBox(height: 10),
+
+              // ── Tagline ──────────────────────────────────
+              AnimatedBuilder(
+                animation: _logoController,
+                builder: (BuildContext context, Widget? child) {
+                  final double opacity = CurvedAnimation(
+                    parent: _logoController,
+                    curve: const Interval(0.6, 1.0, curve: Curves.easeIn),
+                  ).value;
+                  return Opacity(opacity: opacity, child: child);
+                },
+                child: Text(
+                  'Premium Home Services',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 2.0,
+                    color: isDark
+                        ? ServioColors.textSecondaryDark
+                        : ServioColors.textSecondaryLight,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 36),
+
+              // ── Gradient progress bar ────────────────────
+              AnimatedBuilder(
+                animation: _progressController,
+                builder: (BuildContext context, Widget? _) {
+                  return SizedBox(
+                    width: 160,
+                    height: 3,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(2),
+                      child: Stack(
+                        children: <Widget>[
+                          Container(
+                            color: isDark
+                                ? ServioColors.backgroundSoftDark
+                                : ServioColors.backgroundSoftLight,
+                          ),
+                          FractionallySizedBox(
+                            widthFactor: _progressController.value,
+                            child: Container(
+                              decoration: const BoxDecoration(
+                                gradient: ServioGradients.loader,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   );
                 },
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

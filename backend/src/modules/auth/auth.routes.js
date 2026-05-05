@@ -38,6 +38,14 @@ const registerValidation = [
   body('role')
     .optional()
     .isIn(['user', 'worker', 'customer', 'technician']).withMessage('Role must be either user or worker'),
+
+  body('services')
+    .optional()
+    .isArray().withMessage('Services must be an array'),
+
+  body('services.*')
+    .optional()
+    .isMongoId().withMessage('Each service must be a valid MongoDB ObjectId'),
 ];
 
 const loginValidation = [

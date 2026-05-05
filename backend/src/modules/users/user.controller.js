@@ -10,6 +10,7 @@ const Review          = require('../reviews/review.model');
 const Booking         = require('../bookings/booking.model');
 const Payment         = require('../payments/payment.model');
 const Dispute         = require('../payments/dispute.model');
+const Service         = require('../services/service.model');
 const ApiError        = require('../../utils/ApiError');
 const ApiResponse     = require('../../utils/ApiResponse');
 const { logEvent }    = require('../admin/audit.service');
@@ -28,19 +29,27 @@ const getMe = async (req, res) => {
 
 // ── GET WORKERS (Public) ─────────────────────────────────────────────────────
 // WHAT: Returns a list of all active and verified workers.
-// HOW:  Optional ?category filter. Supports pagination (?page, ?limit).
+// HOW:  Optional ?serviceId (canonical) or ?category (legacy) filter.
+//       serviceId takes priority when both are provided.
 const getWorkers = async (req, res) => {
-  const { category, page = 1, limit = 10 } = req.query;
+  const { serviceId, category, page = 1, limit = 10 } = req.query;
 
   const filter = { role: 'worker', isActive: true, isVerified: true };
-  // Workers can belong to multiple categories — use $in for array field
-  if (category) filter.categories = { $in: [category] };
+
+  if (serviceId) {
+    // Canonical filter: match workers whose services array contains this ObjectId
+    filter.services = serviceId;
+  } else if (category) {
+    // Legacy filter: keep backward compatibility with category string filter
+    filter.categories = { $in: [category] };
+  }
 
   const skip = (Number(page) - 1) * Number(limit);
 
   const [workers, total] = await Promise.all([
     User.find(filter)
-      .select('name profileImage categories skills averageRating totalReviews location locationLabel hourlyRate isVerified availability')
+      .select('name profileImage categories services skills averageRating totalReviews location locationLabel hourlyRate isVerified availability')
+      .populate('services', 'title category')
       .sort({ averageRating: -1 })
       .skip(skip)
       .limit(Number(limit)),
@@ -74,13 +83,12 @@ const getWorkerProfile = async (req, res) => {
 };
 
 // ── UPDATE OWN PROFILE (Authenticated) ───────────────────────────────────────
-// WHAT: Allows any logged-in user to update their name, phone, or photo.
+// WHAT: Allows any logged-in user to update non-sensitive profile details.
 // HOW:  PATCH /api/v1/users/me
 const updateProfile = async (req, res) => {
   // Prevent users from changing their role via this endpoint
   const allowedFields = [
     'name',
-    'email',
     'bio',
     'phone',
     'profileImage',
@@ -88,6 +96,10 @@ const updateProfile = async (req, res) => {
     'locationLabel',
     'hourlyRate',
     'skills',
+    'yearsExperience',
+    'availabilityType',
+    'categories',
+    'services',
     'idFrontUrl',
     'idFrontName',
     'idBackUrl',
@@ -102,6 +114,22 @@ const updateProfile = async (req, res) => {
   allowedFields.forEach((field) => {
     if (req.body[field] !== undefined) updates[field] = req.body[field];
   });
+
+  // Only workers may update their service assignments
+  if (updates.services !== undefined && req.user?.role !== 'worker') {
+    delete updates.services;
+  }
+
+  const user = await User.findById(req.user.id);
+  if (!user) throw new ApiError(StatusCodes.NOT_FOUND, 'User not found.');
+
+  // Validate submitted service IDs for workers
+  if (updates.services !== undefined && Array.isArray(updates.services) && updates.services.length > 0) {
+    const count = await Service.countDocuments({ _id: { $in: updates.services }, isActive: true });
+    if (count !== updates.services.length) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'One or more selected services are invalid or inactive.');
+    }
+  }
 
   if (req.user?.role === 'worker') {
     const verificationFields = [
@@ -126,11 +154,87 @@ const updateProfile = async (req, res) => {
     }
   }
 
-  const user = await User.findByIdAndUpdate(req.user.id, updates, {
-    new: true, runValidators: true,
+  Object.entries(updates).forEach(([field, value]) => {
+    user.set(field, value);
   });
 
+  try {
+    await user.save({ validateModifiedOnly: true });
+  } catch (err) {
+    if (err.code === 11000 && (err.keyPattern?.email || err.keyValue?.email)) {
+      throw new ApiError(StatusCodes.CONFLICT, 'An account with this email already exists.');
+    }
+    throw err;
+  }
+
   return ApiResponse.success(res, StatusCodes.OK, 'Profile updated successfully.', user);
+};
+
+// ── UPDATE OWN EMAIL (Authenticated) ─────────────────────────────────────────
+// WHAT: Isolated sensitive flow for changing email.
+// HOW:  Verifies current password, relies on the unique email index, then
+// atomically updates email + authVersion so the current JWT is invalidated.
+const updateEmail = async (req, res) => {
+  const requestedEmail = String(req.body.newEmail || '').trim().toLowerCase();
+  const currentPassword = String(req.body.currentPassword || '');
+
+  if (!requestedEmail || !currentPassword) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'New email and current password are required.');
+  }
+
+  const user = await User.findById(req.user.id).select('+password email authVersion');
+  if (!user) throw new ApiError(StatusCodes.NOT_FOUND, 'User not found.');
+
+  if (requestedEmail === user.email) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'New email must be different from your current email.');
+  }
+
+  const passwordMatches = await user.comparePassword(currentPassword);
+  if (!passwordMatches) {
+    throw new ApiError(StatusCodes.UNAUTHORIZED, 'Incorrect current password.');
+  }
+
+  const existingUser = await User.findOne({
+    email: requestedEmail,
+    _id: { $ne: user._id },
+  }).select('_id');
+  if (existingUser) {
+    throw new ApiError(StatusCodes.CONFLICT, 'An account with this email already exists.');
+  }
+
+  let updatedUser;
+  try {
+    updatedUser = await User.findOneAndUpdate(
+      { _id: user._id, email: user.email },
+      {
+        $set: { email: requestedEmail },
+        $inc: { authVersion: 1 },
+      },
+      { new: true, runValidators: true }
+    );
+  } catch (err) {
+    if (err.code === 11000 && (err.keyPattern?.email || err.keyValue?.email)) {
+      throw new ApiError(StatusCodes.CONFLICT, 'An account with this email already exists.');
+    }
+    throw err;
+  }
+
+  if (!updatedUser) {
+    throw new ApiError(StatusCodes.CONFLICT, 'Email could not be updated because the profile changed. Please reload and try again.');
+  }
+
+  logEvent({
+    req,
+    type: 'user',
+    action: 'User email updated',
+    target: requestedEmail,
+    actorEmail: requestedEmail,
+  });
+
+  return ApiResponse.success(res, StatusCodes.OK, 'Email updated successfully. Please log in again using your new email address.', {
+    email: updatedUser.email,
+    reauthRequired: true,
+  });
 };
 
 // ── UPDATE WORKER AVAILABILITY (Worker Only) ──────────────────────────────────
@@ -372,6 +476,7 @@ module.exports = {
   getMe,
   deleteMe,
   updateProfile,
+  updateEmail,
   updateAvailability,
   updatePassword,
   getAllUsers,

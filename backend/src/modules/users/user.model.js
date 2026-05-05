@@ -65,6 +65,12 @@ const userSchema = new mongoose.Schema(
       default: true,
     },
 
+    authVersion: {
+      type:    Number,
+      default: 0,
+      min:     0,
+    },
+
     // workers must be verified by admin before appearing in listings
     isVerified: {
       type:    Boolean,
@@ -101,9 +107,22 @@ const userSchema = new mongoose.Schema(
 
     // ── Worker-specific ──────────────────────────────────────────────────────
     // Categories the worker operates in (mirrors Service.category enum)
+    // Kept for backward compatibility — prefer `services` (ObjectId refs) going forward.
     categories: {
       type: [String],
       enum: ['plumbing', 'electrical', 'painting', 'flooring', 'carpentry', 'cleaning', 'hvac', 'other'],
+    },
+
+    // Canonical service references — the source of truth for which services this worker offers.
+    // Populated from the admin-managed `services` collection.
+    services: {
+      type: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref:  'Service',
+        },
+      ],
+      default: [],
     },
 
     // GeoJSON Point for location-based worker search
@@ -231,6 +250,10 @@ const userSchema = new mongoose.Schema(
 // ── Geospatial index ──────────────────────────────────────────────────────────
 // Required for $near and $geoWithin queries used in worker search.
 userSchema.index({ location: '2dsphere' });
+
+// ── Service index ─────────────────────────────────────────────────────────────
+// Speeds up worker-discovery queries filtered by a specific service ID.
+userSchema.index({ services: 1 });
 
 // ── Pre-save hook — password hashing ─────────────────────────────────────────
 // Only re-hash if the password field was actually modified (prevents double

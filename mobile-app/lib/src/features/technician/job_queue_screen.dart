@@ -37,6 +37,10 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
   }
 
   Future<void> _fetchJobs() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     final client = context.read<ApiClient>();
     try {
       final jobs = await BookingsApi(client).getWorkerBookings();
@@ -57,7 +61,7 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
   List<BackendBooking> _jobsForTab(int tab) {
     const statusMap = <int, String>{
       0: 'pending',
-      1: 'confirmed',
+      1: 'accepted',
       2: 'in_progress',
       3: 'completed',
     };
@@ -192,10 +196,36 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
                   : _error != null
-                      ? Center(child: Text(_error!))
+                      ? Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: <Widget>[
+                              Text(
+                                'Something went wrong',
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                              const SizedBox(height: 12),
+                              OutlinedButton(
+                                onPressed: _fetchJobs,
+                                child: const Text('Retry'),
+                              ),
+                            ],
+                          ),
+                        )
                       : Builder(
                           builder: (context) {
                             final filteredJobs = _jobsForTab(_tabIndex);
+                            if (filteredJobs.isEmpty) {
+                              return Center(
+                                child: Text(
+                                  'No jobs in this category',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(color: servio.textSecondary),
+                                ),
+                              );
+                            }
                             return ListView.separated(
                               itemCount: filteredJobs.length,
                               separatorBuilder: (BuildContext context, int index) =>
@@ -212,7 +242,7 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
                                     );
                                   },
                                   onAccept: _tabIndex == 0
-                                      ? () => _updateJobStatus(job.id, 'confirmed')
+                                      ? () => _updateJobStatus(job.id, 'accepted')
                                       : null,
                                   onDecline: _tabIndex == 0
                                       ? () => _updateJobStatus(job.id, 'cancelled')
@@ -247,7 +277,7 @@ class _JobCard extends StatelessWidget {
     switch (status) {
       case 'pending':
         return ServioStatusChipType.warning;
-      case 'confirmed':
+      case 'accepted':
         return ServioStatusChipType.info;
       case 'in_progress':
         return ServioStatusChipType.info;
@@ -262,7 +292,7 @@ class _JobCard extends StatelessWidget {
     switch (status) {
       case 'pending':
         return 'Pending';
-      case 'confirmed':
+      case 'accepted':
         return 'Confirmed';
       case 'in_progress':
         return 'In Progress';
@@ -270,6 +300,8 @@ class _JobCard extends StatelessWidget {
         return 'Completed';
       case 'cancelled':
         return 'Cancelled';
+      case 'rejected':
+        return 'Rejected';
       default:
         return status;
     }
@@ -306,11 +338,15 @@ class _JobCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(job.serviceName, style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 4),
-                    Text(
-                      job.addressCity,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: servio.textSecondary),
-                    ),
+                    const SizedBox(height: 2),
+                    if (job.customerName.isNotEmpty)
+                      Text(
+                        job.customerName,
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: servio.textSecondary),
+                      ),
                   ],
                 ),
               ),

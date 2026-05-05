@@ -23,8 +23,11 @@ const protect = async (req, res, next) => {
   const user = await User.findById(decoded.id);
   if (!user) throw new ApiError(StatusCodes.UNAUTHORIZED, 'User no longer exists.');
   if (!user.isActive) throw new ApiError(StatusCodes.FORBIDDEN, 'Account has been deactivated.');
+  if ((decoded.authVersion ?? 0) !== (user.authVersion ?? 0)) {
+    throw new ApiError(StatusCodes.UNAUTHORIZED, 'Session expired. Please log in again.');
+  }
 
-  req.user = { id: user._id, role: user.role };
+  req.user = { id: user._id, role: user.role, email: user.email };
   next();
 };
 

@@ -2,6 +2,7 @@ import { api } from './client.js';
 
 export const getMe          = ()            => api.get('/users/me');
 export const updateMe       = (data)        => api.patch('/users/me', data);
+export const updateEmail    = (data)        => api.patch('/users/me/email', data);
 export const updatePassword = (data)        => api.patch('/users/me/password', data);
 export const deleteMe           = ()                   => api.delete('/users/me');
 export const updateAvailability = (availability)       => api.patch('/users/me/availability', { availability });

@@ -79,7 +79,7 @@
         </div>
       </div>
       <nav class="admin-nav">
-        <button class="admin-nav__btn is-active" data-tab="overview">
+        <button class="admin-nav__btn" data-tab="overview">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
           <span data-i18n="admin_nav_overview">Overview</span>
         </button>
@@ -141,7 +141,7 @@
 
 
       <!-- ── Panel: Overview ───────────────────── -->
-      <section class="admin-panel is-active" data-panel="overview">
+      <section class="admin-panel" data-panel="overview">
 
         <!-- Row 1: heading + date + export -->
         <div class="admin-panel__header">
@@ -2102,6 +2102,28 @@
       </form>
     </div>
   </div>
+
+  <script>
+    // Immediate tab restoration to prevent flicker
+    (function() {
+      try {
+        const savedTab = sessionStorage.getItem('servio_admin_active_tab') || 'overview';
+        const btn = document.querySelector('.admin-nav__btn[data-tab="' + savedTab + '"]');
+        const panel = document.querySelector('.admin-panel[data-panel="' + savedTab + '"]');
+        if (btn && panel) {
+          btn.classList.add('is-active');
+          panel.classList.add('is-active');
+          // Update header title if possible
+          const headerTitle = document.getElementById('admin-header-title');
+          const labelEl = btn.querySelector('span[data-i18n]');
+          if (headerTitle && labelEl) {
+            headerTitle.textContent = labelEl.textContent;
+            headerTitle.setAttribute('data-i18n', labelEl.getAttribute('data-i18n'));
+          }
+        }
+      } catch (e) { console.error('Flicker prevention failed', e); }
+    })();
+  </script>
 
   <script src="../js/lang.js"></script>
   <script type="module" src="../js/main.js"></script>

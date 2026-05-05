@@ -20,6 +20,24 @@ document.addEventListener('DOMContentLoaded', () => {
   const paginationNext   = document.getElementById('paginationNext');
   const paginationPages  = document.getElementById('paginationPages');
 
+  // ── Drawer Refs ───────────────────────────────────────────────────────────
+  const svcDrawerOverlay      = document.getElementById('svcDrawerOverlay');
+  const svcDrawer             = document.getElementById('svcDrawer');
+  const svcDrawerClose        = document.getElementById('svcDrawerClose');
+  const svcDrawerTopbar       = document.getElementById('svcDrawerTopbar');
+  const svcDrawerTopbarTitle  = document.getElementById('svcDrawerTopbarTitle');
+  const svcDrawerScroller     = document.getElementById('svcDrawerScroller');
+  const svcDrawerImg          = document.getElementById('svcDrawerImg');
+  const svcDrawerCategory     = document.getElementById('svcDrawerCategory');
+  const svcDrawerTitle        = document.getElementById('svcDrawerTitle');
+  const svcDrawerStats        = document.getElementById('svcDrawerStats');
+  const svcDrawerFeatures     = document.getElementById('svcDrawerFeatures');
+  const svcDrawerPricing      = document.getElementById('svcDrawerPricing');
+  const svcDrawerReviewText   = document.getElementById('svcDrawerReviewText');
+  const svcDrawerReviewerName = document.getElementById('svcDrawerReviewerName');
+  const svcDrawerAvatar       = document.getElementById('svcDrawerAvatar');
+  const svcDrawerCta          = document.getElementById('svcDrawerCta');
+
   // Custom Dropdown & Panel Refs
   const sortDropdown     = document.getElementById('sort-dropdown');
   const sortTrigger      = sortDropdown?.querySelector('.dropdown-trigger');
@@ -163,14 +181,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Primary: professional category label (always shown)
     const categoryMeta = {
-      plumbing:   { label: 'Emergency Ready', labelAr: 'جاهز للطوارئ',  cls: 'tag--danger',    i18n: 'badge_emergency_ready' },
-      electrical: { label: 'Licensed Pro',    labelAr: 'محترف مرخّص',    cls: 'tag--secondary', i18n: 'badge_licensed_pro'    },
-      hvac:       { label: 'Climate Expert',  labelAr: 'خبير مناخي',     cls: 'tag--secondary', i18n: 'badge_climate_expert'  },
-      cleaning:   { label: 'Deep Clean Pro',  labelAr: 'تنظيف عميق',     cls: 'tag--success',   i18n: 'badge_deep_clean'      },
-      painting:   { label: 'Master Finish',   labelAr: 'دهان محترف',     cls: 'tag--paint',     i18n: 'badge_master_finish'   },
-      carpentry:  { label: 'Custom Craft',    labelAr: 'نجارة مخصصة',    cls: 'tag--wood',      i18n: 'badge_custom_craft'    },
-      flooring:   { label: 'Floor Expert',    labelAr: 'خبير أرضيات',    cls: 'tag--outline',   i18n: 'badge_floor_expert'    },
-      other:      { label: 'Specialist',      labelAr: 'متخصص',          cls: 'tag--outline',   i18n: 'badge_specialist'      },
+      plumbing:      { label: 'Emergency Ready', labelAr: 'جاهز للطوارئ',    cls: 'tag--danger',    i18n: 'badge_emergency_ready'  },
+      electrical:    { label: 'Licensed Pro',    labelAr: 'محترف مرخّص',      cls: 'tag--secondary', i18n: 'badge_licensed_pro'     },
+      hvac:          { label: 'Climate Expert',  labelAr: 'خبير مناخي',       cls: 'tag--secondary', i18n: 'badge_climate_expert'   },
+      cleaning:      { label: 'Deep Clean Pro',  labelAr: 'تنظيف عميق',       cls: 'tag--success',   i18n: 'badge_deep_clean'       },
+      painting:      { label: 'Master Finish',   labelAr: 'دهان محترف',       cls: 'tag--paint',     i18n: 'badge_master_finish'    },
+      carpentry:     { label: 'Custom Craft',    labelAr: 'نجارة مخصصة',      cls: 'tag--wood',      i18n: 'badge_custom_craft'     },
+      flooring:      { label: 'Floor Expert',    labelAr: 'خبير أرضيات',      cls: 'tag--outline',   i18n: 'badge_floor_expert'     },
+      appliance:     { label: 'Appliance Pro',   labelAr: 'متخصص أجهزة',      cls: 'tag--secondary', i18n: 'badge_appliance_pro'    },
+      handyman:      { label: 'All-Round Fix',   labelAr: 'إصلاح متكامل',     cls: 'tag--outline',   i18n: 'badge_all_round'        },
+      renovation:    { label: 'Full Reno',       labelAr: 'تجديد شامل',       cls: 'tag--danger',    i18n: 'badge_full_reno'        },
+      drywall:       { label: 'Wall Expert',     labelAr: 'خبير جدران',       cls: 'tag--outline',   i18n: 'badge_wall_expert'      },
+      roofing:       { label: 'Roof Specialist', labelAr: 'متخصص أسطح',       cls: 'tag--secondary', i18n: 'badge_roof_specialist'  },
+      'pest-control':{ label: 'Eco Safe',        labelAr: 'آمن بيئياً',        cls: 'tag--success',   i18n: 'badge_eco_safe'         },
+      landscaping:   { label: 'Garden Pro',      labelAr: 'خبير حدائق',       cls: 'tag--success',   i18n: 'badge_garden_pro'       },
+      installation:  { label: 'Precision Fit',   labelAr: 'تركيب دقيق',       cls: 'tag--outline',   i18n: 'badge_precision_fit'    },
+      other:         { label: 'Specialist',      labelAr: 'متخصص',            cls: 'tag--outline',   i18n: 'badge_specialist'       },
     };
     const primary = categoryMeta[category] || categoryMeta.other;
 
@@ -203,42 +229,33 @@ document.addEventListener('DOMContentLoaded', () => {
     const descKey      = nameKey + '_desc';
 
     const icons = {
-      plumbing:   `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"/><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"/></svg>`,
-      electrical: `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>`,
-      hvac:       `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20"/><path d="M12 2v20"/><path d="m20 16-4-4 4-4"/><path d="m4 8 4 4-4 4"/><path d="m16 4-4 4-4-4"/><path d="m8 20 4-4 4 4"/></svg>`,
-      cleaning:   `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4.5 8-11.8A8 8 0 0 0 12 2a8 8 0 0 0-8 8.2c0 7.3 8 11.8 8 11.8z"/><circle cx="12" cy="10" r="3"/></svg>`,
-      painting:   `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>`,
-      carpentry:  `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 12-8.373 8.373a1 1 0 1 1-3-3L12 9"/><path d="m18 15 4-4"/><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172V7l-2.26-2.26a6 6 0 0 0-4.202-1.756L9 2.96l.92.82A6.18 6.18 0 0 1 12 8.4V10l2 2h1.172a2 2 0 0 1 1.414.586L18 14"/></svg>`,
-      flooring:   `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>`,
-      other:      `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`,
+      plumbing:      `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"/><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"/></svg>`,
+      electrical:    `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>`,
+      hvac:          `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20"/><path d="M12 2v20"/><path d="m20 16-4-4 4-4"/><path d="m4 8 4 4-4 4"/><path d="m16 4-4 4-4-4"/><path d="m8 20 4-4 4 4"/></svg>`,
+      cleaning:      `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4.5 8-11.8A8 8 0 0 0 12 2a8 8 0 0 0-8 8.2c0 7.3 8 11.8 8 11.8z"/><circle cx="12" cy="10" r="3"/></svg>`,
+      painting:      `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>`,
+      carpentry:     `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 12-8.373 8.373a1 1 0 1 1-3-3L12 9"/><path d="m18 15 4-4"/><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172V7l-2.26-2.26a6 6 0 0 0-4.202-1.756L9 2.96l.92.82A6.18 6.18 0 0 1 12 8.4V10l2 2h1.172a2 2 0 0 1 1.414.586L18 14"/></svg>`,
+      flooring:      `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>`,
+      appliance:     `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="15" x="2" y="4" rx="2"/><path d="M8 4v15M16 4v15M2 9h20M2 14h20"/></svg>`,
+      handyman:      `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`,
+      renovation:    `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
+      drywall:       `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M2 9h20M2 15h20M8 3v6M16 3v6M8 15v6M16 15v6"/></svg>`,
+      roofing:       `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7"/><path d="M3 9v13h18V9"/><path d="M9 22V12h6v10"/></svg>`,
+      'pest-control':`<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12h8M12 8v8"/><circle cx="12" cy="12" r="9"/><path d="M4.93 4.93l14.14 14.14"/></svg>`,
+      landscaping:   `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-7l-2-2"/><path d="M17 8v.8A6 6 0 0 1 13.8 20v0H10v0A6.5 6.5 0 0 1 7 8h0a5 5 0 0 1 10 0z"/><path d="m14 14-2 2-2-2"/></svg>`,
+      installation:  `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>`,
+      other:         `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`,
     };
 
     const iconClass = ['plumbing','hvac','electrical'].includes(category)
       ? 'product-card__icon--primary'
       : 'product-card__icon--secondary';
 
-    const { primary, secondary } = resolveServiceBadges(svc);
-    const primaryLabel    = isAr ? primary.labelAr    : primary.label;
-    const secondaryLabel  = secondary ? (isAr ? secondary.labelAr : secondary.label) : null;
-
-    const priceUnitMeta = {
-      per_hour: { en: '/hr',  ar: '/ساعة', prefixEn: 'From ', prefixAr: 'من ' },
-      per_sqm:  { en: '/m²',  ar: '/م²',   prefixEn: 'From ', prefixAr: 'من ' },
-      fixed:    { en: 'flat', ar: 'ثابت',  prefixEn: '',      prefixAr: ''    },
-    };
-    const priceMeta = priceUnitMeta[svc.priceUnit] || priceUnitMeta.fixed;
-    const priceText = isAr
-      ? `<span class="price-amount">${priceMeta.prefixAr}${svc.basePrice || 0} ج.م</span><span class="price-unit">${priceMeta.ar}</span>`
-      : `<span class="price-amount">${priceMeta.prefixEn}${svc.basePrice || 0} EGP</span><span class="price-unit">${priceMeta.en}</span>`;
+    const price     = svc.basePrice || 0;
+    const priceUnit = { per_hour: '/hr', per_sqm: '/m²', fixed: '' }[svc.priceUnit] || '';
 
     const rating  = parseFloat(svc.averageRating) || 0;
     const reviews = parseInt(svc.totalReviews)    || 0;
-    const ratingBubble = rating > 0
-      ? `<span class="metric-bubble metric-bubble--rating" aria-label="Rating ${rating.toFixed(1)}">
-           <svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-           <strong>${rating.toFixed(1)}</strong>${reviews > 0 ? `<span class="rating-count">(${reviews})</span>` : ''}
-         </span>`
-      : '';
 
     const article = document.createElement('article');
     article.className = 'product-card';
@@ -249,40 +266,173 @@ document.addEventListener('DOMContentLoaded', () => {
     article.style.cursor     = 'pointer';
     article.dataset.reveal   = '';
 
+    const responseTime = {
+      plumbing: '~45 min', electrical: '~30 min', hvac: '~60 min',
+      cleaning: '~20 min', painting: '~50 min', carpentry: '~70 min',
+      flooring: '~90 min', appliance: '~40 min', roofing: '~120 min',
+      landscaping: '~60 min', handyman: '~25 min', renovation: '~120 min',
+      drywall: '~80 min', installation: '~35 min',
+    }[category] || '~45 min';
+
+    const ratingHtml = rating > 0
+      ? `<span class="product-card__rating" aria-label="Rating ${rating.toFixed(1)}">
+           <svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+           ${rating.toFixed(1)}<span class="product-card__rating-count">${reviews > 0 ? ` (${reviews})` : ''}</span>
+         </span>`
+      : '';
+
+    const priceLabel = price > 0
+      ? `from <strong>${price} EGP${priceUnit}</strong>`
+      : '<strong>On Request</strong>';
+
     article.innerHTML = `
-      <div class="product-card__header">
-        <div class="product-card__icon ${iconClass}">${icons[category] || icons.other}</div>
-        <div class="product-card__tags">
-          <span class="product-card__tag ${primary.cls}" data-i18n="${primary.i18n}">${primaryLabel}</span>
-          ${secondaryLabel ? `<span class="product-card__tag ${secondary.cls}" data-i18n="${secondary.i18n}">${secondaryLabel}</span>` : ''}
-        </div>
-      </div>
+      <div class="product-card__icon ${iconClass}">${icons[category] || icons.other}</div>
       <h4 class="product-card__title" data-i18n="${nameKey}">${displayTitle}</h4>
       <p class="product-card__desc" data-i18n="${descKey}">${svc.description || ''}</p>
-      <div class="product-card__metrics">
-        <span class="metric-bubble" aria-label="Instant Booking">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          <strong data-i18n="smp_instant">Instant</strong>
-        </span>
-        ${ratingBubble}
-        <span class="metric-bubble" aria-label="Price" style="flex: 1; justify-content: center;">
-          ${priceText}
+      <div class="product-card__info">
+        ${ratingHtml}
+        <span class="product-card__response">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          ${responseTime}
         </span>
       </div>
       <div class="product-card__footer">
-        <a class="product-card__action" href="./service-details.html?service=${category}">
-          <span data-i18n="smp_view_techs">View Technicians →</span>
-        </a>
+        <span class="product-card__price">${priceLabel}</span>
+        <button class="product-card__action" type="button">View Details →</button>
       </div>
     `;
 
-    article.addEventListener('click', e => {
-      if (e.target.closest('a')) return;
-      window.location.href = `./service-details.html?service=${category}`;
-    });
+    article.addEventListener('click', () => openServiceDrawer(svc));
 
     return article;
   }
+
+  // ── Drawer Data & Logic ───────────────────────────────────────────────────
+  const DRAWER_FEATURES = {
+    plumbing:    ['Pipe Repair & Replacement', 'Drain Cleaning', 'Fixture Installation', 'Water Heater Service', 'Leak Detection', 'Full Inspections'],
+    electrical:  ['Panel Upgrades', 'Outlet Installation', 'Wiring & Rewiring', 'Safety Inspections', 'Smart Home Setup', 'Emergency Repairs'],
+    hvac:        ['AC Installation', 'System Maintenance', 'Filter Replacement', 'Duct Cleaning', 'Thermostat Setup', 'Full Diagnostics'],
+    cleaning:    ['Full Home Deep Clean', 'Kitchen Degreasing', 'Bathroom Sanitizing', 'Post-Construction', 'Move In/Out Clean', 'Window Cleaning'],
+    painting:    ['Interior Painting', 'Exterior Painting', 'Wall Preparation', 'Priming & Sealing', 'Color Consultation', 'Trim & Detail Work'],
+    carpentry:   ['Custom Furniture', 'Door Fitting', 'Shelving & Storage', 'Flooring Install', 'Wood Repair', 'Kitchen Cabinetry'],
+    flooring:    ['Hardwood Installation', 'Tile & Stone Work', 'Laminate Flooring', 'Subfloor Repair', 'Sanding & Refinishing', 'Grout & Sealing'],
+    appliance:   ['Washer & Dryer Repair', 'Refrigerator Service', 'Oven & Stove Repair', 'Dishwasher Fix', 'Installation & Setup', 'Warranty Support'],
+    roofing:     ['Roof Inspection', 'Leak Repair', 'Shingle Replacement', 'Gutter Cleaning', 'Waterproofing', 'Full Roof Replacement'],
+    landscaping: ['Lawn Mowing & Edging', 'Tree Trimming', 'Garden Design', 'Irrigation Setup', 'Pest Control', 'Seasonal Cleanup'],
+    default:     ['Professional Service', 'Licensed Technicians', 'Quality Guarantee', 'Transparent Pricing', 'Background Checked', 'Fully Insured'],
+  };
+
+  const DRAWER_REVIEWS = {
+    plumbing:   { text: 'Fixed our burst pipe within an hour. Incredibly professional and transparent pricing — no surprises.', reviewer: 'Sara M.', avatarId: 12 },
+    electrical: { text: 'Had our entire kitchen rewired safely and on time. Explained every step clearly — highly recommend.', reviewer: 'Karim A.', avatarId: 33 },
+    hvac:       { text: 'Diagnosed and fixed our AC in under 2 hours during the hottest week of summer. Lifesavers!', reviewer: 'Nour H.', avatarId: 47 },
+    cleaning:   { text: 'Transformed our apartment before move-in. Every surface spotless — even cleaned inside the cabinets.', reviewer: 'Dina F.', avatarId: 21 },
+    painting:   { text: 'Clean lines, no mess, perfect finish. The color consultation alone was worth it.', reviewer: 'Omar T.', avatarId: 68 },
+    carpentry:  { text: 'Built us a stunning custom bookcase. Precise craftsmanship and a great eye for detail.', reviewer: 'Layla R.', avatarId: 56 },
+    default:    { text: 'Outstanding work from start to finish. Punctual, professional, and genuinely quality service.', reviewer: 'Ahmed K.', avatarId: 15 },
+  };
+
+  const DRAWER_HERO_IMGS = {
+    plumbing:    'https://images.unsplash.com/photo-1585771724684-38269d6639fd?q=70&w=900&auto=format&fit=crop',
+    electrical:  'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=70&w=900&auto=format&fit=crop',
+    hvac:        'https://images.unsplash.com/photo-1497366216548-37526070297c?q=70&w=900&auto=format&fit=crop',
+    cleaning:    'https://images.unsplash.com/photo-1581578731548-c64695cc6952?q=70&w=900&auto=format&fit=crop',
+    painting:    'https://images.unsplash.com/photo-1562259949-e8e7689d7828?q=70&w=900&auto=format&fit=crop',
+    carpentry:   'https://images.unsplash.com/photo-1504148455328-c376907d081c?q=70&w=900&auto=format&fit=crop',
+    flooring:    'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?q=70&w=900&auto=format&fit=crop',
+    roofing:     'https://images.unsplash.com/photo-1632759145355-8b8a6d018a34?q=70&w=900&auto=format&fit=crop',
+    landscaping: 'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?q=70&w=900&auto=format&fit=crop',
+    default:     'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?q=70&w=900&auto=format&fit=crop',
+  };
+
+  function openServiceDrawer(svc) {
+    if (!svcDrawer) return;
+    const category = (svc.category || 'other').toLowerCase();
+    const title     = svc.title ? (svc.title.charAt(0).toUpperCase() + svc.title.slice(1)) : 'Service';
+    const rating    = parseFloat(svc.averageRating) || 0;
+    const reviews   = parseInt(svc.totalReviews) || 0;
+    const price     = svc.basePrice || 0;
+    const priceUnit = svc.priceUnit === 'per_hour' ? '/hr' : svc.priceUnit === 'per_sqm' ? '/m²' : '';
+
+    svcDrawerImg.src          = DRAWER_HERO_IMGS[category] || DRAWER_HERO_IMGS.default;
+    svcDrawerImg.alt          = title;
+    svcDrawerCategory.textContent = (svc.category || 'Service').charAt(0).toUpperCase() + (svc.category || 'Service').slice(1) + ' Service';
+    svcDrawerTitle.textContent    = title;
+
+    svcDrawerStats.innerHTML = [
+      { icon: '★', value: rating > 0 ? rating.toFixed(1) : '—', label: 'Rating' },
+      { icon: '💬', value: reviews > 0 ? reviews : '—', label: 'Reviews' },
+      { icon: '💰', value: price > 0 ? `${price} EGP${priceUnit}` : '—', label: 'Starting From' },
+    ].map(s => `
+      <div class="svc-drawer__stat">
+        <div class="svc-drawer__stat-icon">${s.icon}</div>
+        <div class="svc-drawer__stat-value">${s.value}</div>
+        <div class="svc-drawer__stat-label">${s.label}</div>
+      </div>
+    `).join('');
+
+    const features = DRAWER_FEATURES[category] || DRAWER_FEATURES.default;
+    svcDrawerFeatures.innerHTML = features.map(f => `
+      <div class="svc-drawer__feature-row">
+        <span class="svc-drawer__feature-check">
+          <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+        </span>
+        ${f}
+      </div>
+    `).join('');
+
+    const base = price || 50;
+    svcDrawerPricing.innerHTML = [
+      { tier: 'Basic',    amount: base,              unit: priceUnit, desc: 'Minor repairs & fixes' },
+      { tier: 'Standard', amount: Math.round(base * 1.4), unit: priceUnit, desc: 'Installations & overhauls', featured: true },
+      { tier: 'Premium',  amount: Math.round(base * 2),   unit: priceUnit, desc: 'Full renovation scope' },
+    ].map(p => `
+      <div class="svc-drawer__price-card${p.featured ? ' is-featured' : ''}">
+        <div class="svc-drawer__price-tier">${p.tier}</div>
+        <div class="svc-drawer__price-amount">${p.amount} EGP<sub>${p.unit}</sub></div>
+        <div class="svc-drawer__price-desc">${p.desc}</div>
+      </div>
+    `).join('');
+
+    const rev = DRAWER_REVIEWS[category] || DRAWER_REVIEWS.default;
+    svcDrawerReviewText.textContent   = rev.text;
+    svcDrawerReviewerName.textContent = rev.reviewer;
+    svcDrawerAvatar.src = `https://i.pravatar.cc/68?img=${rev.avatarId}`;
+
+    if (svcDrawerCta) svcDrawerCta.href = `./technician-listing.html?service=${category}`;
+
+    // Reset scroll-collapse state
+    if (svcDrawerImg)         svcDrawerImg.style.transform = 'scale(1.08) translateY(0)';
+    if (svcDrawerTopbar)      svcDrawerTopbar.classList.remove('is-solid');
+    if (svcDrawerTopbarTitle) svcDrawerTopbarTitle.textContent = title;
+    if (svcDrawerScroller)    svcDrawerScroller.scrollTop = 0;
+    svcDrawerScroller?.addEventListener('scroll', handleDrawerScroll);
+
+    svcDrawerOverlay?.classList.add('is-open');
+    svcDrawer.classList.add('is-open');
+    document.body.style.overflow = 'hidden';
+    document.querySelector('[data-chat-fab]')?.style.setProperty('display', 'none');
+  }
+
+  function closeServiceDrawer() {
+    svcDrawerOverlay?.classList.remove('is-open');
+    svcDrawer?.classList.remove('is-open');
+    document.body.style.overflow = '';
+    document.querySelector('[data-chat-fab]')?.style.removeProperty('display');
+    svcDrawerScroller?.removeEventListener('scroll', handleDrawerScroll);
+  }
+
+  // ── Drawer Hero Parallax on Scroll (GPU-only, zero reflow) ───────────────
+  function handleDrawerScroll() {
+    if (!svcDrawerScroller || !svcDrawerImg || !svcDrawerTopbar) return;
+    const scrollY = svcDrawerScroller.scrollTop;
+    svcDrawerImg.style.transform = `scale(1.08) translateY(${scrollY * 0.25}px)`;
+    svcDrawerTopbar.classList.toggle('is-solid', scrollY > 140);
+  }
+
+  svcDrawerClose?.addEventListener('click', closeServiceDrawer);
+  svcDrawerOverlay?.addEventListener('click', closeServiceDrawer);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeServiceDrawer(); });
 
   function sortServices(services) {
     const list = [...services];

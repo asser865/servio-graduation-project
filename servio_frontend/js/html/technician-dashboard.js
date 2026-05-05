@@ -4,7 +4,7 @@
 import { revealAll } from '../components/scroll-reveal.js';
 import { showToast } from '../components/toast.js';
 import { getInitials } from '../utils/string.js';
-import { getMe, updateMe } from '../api/users.js';
+import { getMe, updateMe, updatePassword, updateEmail, deleteMe } from '../api/users.js';
 import { uploadPublicFile } from '../api/uploads.js';
 
 const TAB_KEY = 'servio_activeTab_technician';
@@ -95,7 +95,7 @@ function initTabs() {
       p.hidden = !active;
       if (active) revealAll(p);
     });
-    localStorage.setItem(TAB_KEY, id);
+    sessionStorage.setItem(TAB_KEY, id);
     // Update topbar title
     const labelKey = TAB_LABEL_KEYS[id];
     const el = document.getElementById('dash-topbar-title');
@@ -123,7 +123,7 @@ function initTabs() {
   const quickAvail = document.querySelector('[data-quick-availability]');
   if (quickAvail) quickAvail.addEventListener('click', () => showTab('availability'));
 
-  const saved = localStorage.getItem(TAB_KEY) || 'overview';
+  const saved = sessionStorage.getItem(TAB_KEY) || 'overview';
   showTab(saved);
 }
 
@@ -155,19 +155,36 @@ function populateProfile() {
   // First name in welcome banner
   document.querySelectorAll('[data-dash-firstname]').forEach(el => { el.textContent = name.split(' ')[0]; });
 
-  if (account) {
-    // Map `name` → `fullName` for accounts that predate the fullName field
-    if (!account.fullName && account.name) account.fullName = account.name;
-    // Derive specialty from skills array if not explicitly set
-    if (!account.specialty && Array.isArray(account.skills) && account.skills.length) {
-      account.specialty = account.skills.join(', ');
-    }
-    document.querySelectorAll('[data-settings-field]').forEach(f => {
-      if (account[f.dataset.settingsField] != null) f.value = account[f.dataset.settingsField];
-    });
-    const serviceAreaInput = document.getElementById('service-area');
-    if (serviceAreaInput && account.serviceArea) serviceAreaInput.value = account.serviceArea;
+  // Build an effective account by merging session fields as fallback for missing account data
+  const effectiveAccount = {
+    fullName:        session.name || '',
+    name:            session.name || '',
+    email:           session.email || '',
+    phone:           session.phone || '',
+    skills:          session.skills || [],
+    specialty:       Array.isArray(session.skills) ? session.skills.join(', ') : '',
+    hourlyRate:      session.hourlyRate ?? '',
+    yearsExperience: session.yearsExperience ?? '',
+    experience:      session.yearsExperience ?? '',
+    bio:             session.bio || '',
+    ...( account || {} ),
+  };
+
+  // Normalise field aliases
+  if (!effectiveAccount.fullName && effectiveAccount.name) effectiveAccount.fullName = effectiveAccount.name;
+  if (effectiveAccount.yearsExperience != null && effectiveAccount.experience == null) {
+    effectiveAccount.experience = effectiveAccount.yearsExperience;
   }
+  if (!effectiveAccount.specialty && Array.isArray(effectiveAccount.skills) && effectiveAccount.skills.length) {
+    effectiveAccount.specialty = effectiveAccount.skills.join(', ');
+  }
+
+  document.querySelectorAll('[data-settings-field]').forEach(f => {
+    const val = effectiveAccount[f.dataset.settingsField];
+    if (val != null && val !== '') f.value = val;
+  });
+  const serviceAreaInput = document.getElementById('service-area');
+  if (serviceAreaInput && effectiveAccount.serviceArea) serviceAreaInput.value = effectiveAccount.serviceArea;
 
   // Render avatar — photo takes priority over initials
   const imgStyle = 'width:100%;height:100%;object-fit:cover;border-radius:50%;';
@@ -227,11 +244,16 @@ function populateProfile() {
 
     // Populate settings form fields from live API data
     const fieldMap = {
-      fullName:  user.name,
-      email:     user.email,
-      phone:     user.phone,
-      specialty: Array.isArray(user.skills) ? user.skills.join(', ') : (user.specialty || ''),
+      fullName:   user.name,
+      email:      user.email,
+      phone:      user.phone,
+      specialty:  Array.isArray(user.skills) ? user.skills.join(', ') : (user.specialty || ''),
       hourlyRate: user.hourlyRate,
+      experience: user.yearsExperience,
+      bio:        user.bio,
+      facebook:   user.facebook,
+      instagram:  user.instagram,
+      portfolio:  user.portfolioUrl,
     };
     Object.entries(fieldMap).forEach(([field, val]) => {
       if (val == null || val === '') return;
@@ -250,10 +272,15 @@ function populateProfile() {
     // Persist updated data locally for offline use
     try {
       const acc = getAccount() || {};
-      if (user.name)       { acc.fullName  = user.name; acc.name = user.name; }
-      if (user.phone)      acc.phone      = user.phone;
-      if (user.skills)     { acc.skills   = user.skills; acc.specialty = user.skills.join(', '); }
-      if (user.hourlyRate) acc.hourlyRate  = user.hourlyRate;
+      if (user.name)            { acc.fullName = user.name; acc.name = user.name; }
+      if (user.phone)           acc.phone       = user.phone;
+      if (user.skills)          { acc.skills = user.skills; acc.specialty = user.skills.join(', '); }
+      if (user.hourlyRate)      acc.hourlyRate   = user.hourlyRate;
+      if (user.yearsExperience != null) { acc.yearsExperience = user.yearsExperience; acc.experience = user.yearsExperience; }
+      if (user.bio)             acc.bio          = user.bio;
+      if (user.facebook)        acc.facebook     = user.facebook;
+      if (user.instagram)       acc.instagram    = user.instagram;
+      if (user.portfolioUrl)    acc.portfolio    = user.portfolioUrl;
       localStorage.setItem('servio_account', JSON.stringify(acc));
     } catch (_) {}
   }).catch(() => {});
@@ -391,21 +418,21 @@ function initSettingsValidation() {
   const newPasswordInput = document.getElementById('s-new-password');
   const confirmPasswordInput = document.getElementById('s-confirm-password');
 
+  function getContainer(input) {
+    const wrap = input.closest('.input-password-wrap');
+    return wrap ? wrap.parentElement : input.parentElement;
+  }
+
   function setFieldState(input, valid, message) {
     input.classList.toggle('is-valid', valid);
     input.classList.toggle('is-invalid', !valid);
-    let errorEl = input.parentElement.querySelector('.field-error');
+    const container = getContainer(input);
+    let errorEl = container.querySelector('.field-error');
     if (!valid && message) {
       if (!errorEl) {
         errorEl = document.createElement('span');
         errorEl.className = 'field-error';
-        // If inside .input-password-wrap, append to parent form-field
-        const wrap = input.closest('.input-password-wrap');
-        if (wrap) {
-          wrap.parentElement.appendChild(errorEl);
-        } else {
-          input.parentElement.appendChild(errorEl);
-        }
+        container.appendChild(errorEl);
       }
       errorEl.textContent = message;
     } else if (errorEl) {
@@ -415,9 +442,7 @@ function initSettingsValidation() {
 
   function clearFieldState(input) {
     input.classList.remove('is-valid', 'is-invalid');
-    const wrap = input.closest('.input-password-wrap');
-    const container = wrap ? wrap.parentElement : input.parentElement;
-    const errorEl = container.querySelector('.field-error');
+    const errorEl = getContainer(input).querySelector('.field-error');
     if (errorEl) errorEl.remove();
   }
 
@@ -440,29 +465,36 @@ function initSettingsValidation() {
     });
   }
 
-  function validatePasswordMatch() {
+  const mismatchMsg = () => typeof window.t === 'function' ? window.t('err_pw_mismatch') : 'Passwords do not match.';
+
+  function validatePasswordMatch(showError = true) {
     if (!newPasswordInput || !confirmPasswordInput) return;
-    const newVal = newPasswordInput.value;
+    const newVal     = newPasswordInput.value;
     const confirmVal = confirmPasswordInput.value;
     if (!newVal && !confirmVal) {
-      clearFieldState(newPasswordInput);
       clearFieldState(confirmPasswordInput);
       return;
     }
-    if (confirmVal && newVal !== confirmVal) {
-      setFieldState(confirmPasswordInput, false, typeof window.t === 'function' ? window.t('err_pw_mismatch') : 'Passwords do not match.');
-    } else if (confirmVal) {
+    if (!confirmVal) { clearFieldState(confirmPasswordInput); return; }
+    if (newVal === confirmVal) {
       setFieldState(confirmPasswordInput, true, '');
+    } else if (showError) {
+      setFieldState(confirmPasswordInput, false, mismatchMsg());
+    } else {
+      // While typing: clear the error if it was previously shown, don't add a new one
+      clearFieldState(confirmPasswordInput);
     }
   }
 
   if (confirmPasswordInput) {
-    confirmPasswordInput.addEventListener('blur', validatePasswordMatch);
-    confirmPasswordInput.addEventListener('input', validatePasswordMatch);
+    // Show error only after the user leaves the field
+    confirmPasswordInput.addEventListener('blur', () => validatePasswordMatch(true));
+    // While typing: only clear the error when they've matched; never add new error mid-type
+    confirmPasswordInput.addEventListener('input', () => validatePasswordMatch(false));
   }
   if (newPasswordInput) {
     newPasswordInput.addEventListener('input', () => {
-      if (confirmPasswordInput && confirmPasswordInput.value) validatePasswordMatch();
+      if (confirmPasswordInput?.value) validatePasswordMatch(false);
     });
   }
 }
@@ -567,11 +599,12 @@ function initSettingsForm() {
     }
   });
 
-  // Delete account button
+  // Delete account button — opens confirmation modal
   const deleteBtn = document.getElementById('btn-delete-account');
   if (deleteBtn) {
     deleteBtn.addEventListener('click', () => {
-      showToast(_t('toast_delete_demo') || 'Account deletion is not available in demo mode.', 'info');
+      const modal = document.getElementById('modal-delete-account');
+      if (modal) modal.style.display = 'flex';
     });
   }
 
@@ -611,7 +644,7 @@ function initSettingsTabs() {
 /* ── Profile completeness bar ────────────────────────────── */
 function updateProfileCompleteness() {
   const account = typeof getAccount === 'function' ? getAccount() : null;
-  const fields = ['fullName', 'email', 'phone', 'address', 'specialty'];
+  const fields = ['fullName', 'email', 'phone', 'specialty', 'hourlyRate'];
   const filled = fields.filter(f => account && account[f] && String(account[f]).trim()).length;
   const avatar = document.querySelector('.settings-avatar-preview img');
   const total  = fields.length + 1;
@@ -629,33 +662,42 @@ function initTechSecurityForm() {
   const form = document.getElementById('tech-security-form');
   if (!form) return;
   const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
-  form.addEventListener('submit', (e) => {
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const currentPw = form.querySelector('#s-current-password');
     const newPw     = form.querySelector('#s-new-password');
     const confirmPw = form.querySelector('#s-confirm-password');
+    const submitBtn = form.querySelector('[type="submit"]');
     if (!currentPw.value.trim()) {
-      showToast(_t('toast_enter_current_pw'), 'info');
+      showToast(_t('toast_enter_current_pw') || 'Enter your current password.', 'info');
       currentPw.focus(); return;
     }
     if (newPw.value.length < 8) {
-      showToast(_t('toast_pw_min_length'), 'info');
+      showToast(_t('toast_pw_min_length') || 'Password must be at least 8 characters.', 'info');
       newPw.focus(); return;
     }
     if (!/(?=.*[A-Za-z])(?=.*\d)/.test(newPw.value)) {
-      showToast(_t('toast_pw_needs_letter_num'), 'info');
+      showToast(_t('toast_pw_needs_letter_num') || 'Password must contain a letter and a number.', 'info');
       newPw.focus(); return;
     }
     if (newPw.value !== confirmPw.value) {
-      showToast(_t('toast_pw_mismatch'), 'info');
+      showToast(_t('toast_pw_mismatch') || 'Passwords do not match.', 'info');
       confirmPw.focus(); return;
     }
-    currentPw.value = '';
-    newPw.value = '';
-    confirmPw.value = '';
-    document.getElementById('pw-strength-wrap')?.setAttribute('hidden', '');
-    document.querySelectorAll('.pw-check').forEach(c => c.classList.remove('is-met'));
-    showToast(_t('toast_pw_updated'), 'success');
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = _t('tech_updating') || 'Updating…'; }
+    try {
+      await updatePassword({ currentPassword: currentPw.value, newPassword: newPw.value });
+      currentPw.value = '';
+      newPw.value = '';
+      confirmPw.value = '';
+      document.getElementById('pw-strength-wrap')?.setAttribute('hidden', '');
+      document.querySelectorAll('.pw-check').forEach(c => c.classList.remove('is-met'));
+      showToast(_t('toast_pw_updated') || 'Password updated successfully.', 'success');
+    } catch (err) {
+      showToast(err.message || 'Failed to update password.', 'error');
+    } finally {
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = _t('tech_update_password') || 'Update Password'; }
+    }
   });
 }
 
@@ -880,12 +922,48 @@ function initPendingGuard() {
    Reads account.uploadedDocs written by signup.js and updates
    each document row's badge and shows uploaded filenames.
 ─────────────────────────────────────────────────────────── */
+function updateVerifStatusBanner(status) {
+  const banner   = document.getElementById('verif-status-banner');
+  const textEl   = document.getElementById('verif-status-text');
+  const hintEl   = document.getElementById('verif-status-hint');
+  if (!banner || !textEl) return;
+
+  banner.className = 'verif-status';
+  if (status === 'verified' || status === 'approved') {
+    banner.classList.add('verif-status--verified');
+    textEl.textContent = 'Status: Verified ✓';
+    if (hintEl) hintEl.textContent = 'Your identity has been verified. You are now a trusted professional on SERVIO.';
+  } else if (status === 'rejected') {
+    banner.classList.add('verif-status--rejected');
+    textEl.textContent = 'Status: Rejected';
+    if (hintEl) hintEl.textContent = 'Your verification was rejected. Please re-upload your documents and try again.';
+  } else if (status === 'pending' || status === 'not_submitted') {
+    banner.classList.add('verif-status--review');
+    textEl.textContent = 'Status: Pending Submission';
+    if (hintEl) hintEl.textContent = 'Please upload your identity documents to start the verification process.';
+  } else {
+    banner.classList.add('verif-status--review');
+    textEl.textContent = 'Status: Under Review';
+    if (hintEl) hintEl.textContent = 'Your documents are being verified. This typically takes 1–2 business days.';
+  }
+}
+
+function toAbsUrl(url) {
+  if (!url) return '';
+  if (url.startsWith('http')) return url;
+  const base = (window.SERVIO_CONFIG?.API_BASE || 'http://127.0.0.1:5000/api/v1').replace('/api/v1', '');
+  return base + url;
+}
+
 function initVerificationTab() {
   const panel = document.getElementById('panel-verification');
   if (!panel) return;
 
   const account = getAccount();
   const docs    = account?.uploadedDocs || {};
+
+  // Show status from localStorage first, then refresh from API
+  updateVerifStatusBanner(account?.verificationStatus || 'pending');
 
   panel.querySelectorAll('[data-verif-doc]').forEach(row => {
     const key   = row.dataset.verifDoc;
@@ -917,9 +995,10 @@ function initVerificationTab() {
 
     // Show/wire View button
     if (viewBtn) {
-      if (uploaded && url) {
+      const absUrl = toAbsUrl(url);
+      if (uploaded && absUrl) {
         viewBtn.hidden = false;
-        viewBtn.addEventListener('click', () => window.open(url, '_blank'));
+        viewBtn.onclick = () => window.open(absUrl, '_blank');
       } else {
         viewBtn.hidden = true;
       }
@@ -945,7 +1024,7 @@ function initVerificationTab() {
         if (labelSpan) labelSpan.textContent = 'Uploading…';
         try {
           const uploads = await Promise.all(files.map(f => uploadPublicFile(f, key)));
-          const firstUrl = uploads[0]?.url || '';
+          const firstUrl = toAbsUrl(uploads[0]?.url || '');
 
           // Update badge
           if (badge) { badge.className = 'badge badge--confirmed'; badge.textContent = 'Uploaded'; }
@@ -985,6 +1064,53 @@ function initVerificationTab() {
       });
     }
   });
+
+  // Sync fresh data from API — updates status + view button URLs
+  getMe().then(user => {
+    if (!user) return;
+    updateVerifStatusBanner(user.verificationStatus || 'pending');
+
+    // Update account cache
+    const acc = getAccount() || {};
+    acc.verificationStatus = user.verificationStatus;
+    if (!acc.uploadedDocs) acc.uploadedDocs = {};
+
+    const apiDocMap = {
+      idFront:  { url: user.idFrontUrl,  name: user.idFrontName  },
+      idBack:   { url: user.idBackUrl,   name: user.idBackName   },
+      idSelfie: { url: user.idSelfieUrl, name: user.idSelfieName },
+      cvFile:   { url: user.cvUrl,       name: user.cvName       },
+    };
+
+    Object.entries(apiDocMap).forEach(([key, { url, name }]) => {
+      if (!url) return;
+      const absUrl = toAbsUrl(url);
+      acc.uploadedDocs[key] = { uploaded: true, url: absUrl, name: name || '' };
+
+      // Update view button in DOM
+      const row = panel.querySelector(`[data-verif-doc="${key}"]`);
+      if (!row) return;
+      const vBtn = row.querySelector('[data-verif-view]');
+      const badge = row.querySelector('[data-verif-badge]');
+      if (vBtn) { vBtn.hidden = false; vBtn.onclick = () => window.open(absUrl, '_blank'); }
+      if (badge) { badge.className = 'badge badge--confirmed'; badge.textContent = 'Uploaded'; }
+    });
+
+    // Portfolio
+    if (user.portfolioFiles?.length) {
+      const absFirst = toAbsUrl(user.portfolioFiles[0]?.url || '');
+      acc.uploadedDocs.portfolio = { uploaded: true, count: user.portfolioFiles.length, files: user.portfolioFiles.map(f => ({ url: toAbsUrl(f.url), name: f.name || '' })) };
+      const row = panel.querySelector('[data-verif-doc="portfolio"]');
+      if (row) {
+        const vBtn = row.querySelector('[data-verif-view]');
+        const badge = row.querySelector('[data-verif-badge]');
+        if (vBtn && absFirst) { vBtn.hidden = false; vBtn.onclick = () => window.open(absFirst, '_blank'); }
+        if (badge) { badge.className = 'badge badge--confirmed'; badge.textContent = 'Uploaded'; }
+      }
+    }
+
+    localStorage.setItem('servio_account', JSON.stringify(acc));
+  }).catch(() => {});
 }
 
 /* ── Notification panel ─────────────────────────────────── */
@@ -1534,8 +1660,156 @@ function updateActionNeededDates() {
   });
 }
 
+/* ── Profile read-only / edit mode ────────────────────────── */
+function initProfileReadOnly() {
+  const form       = document.querySelector('[data-readonly-form]');
+  const editBtn    = document.getElementById('btn-edit-profile');
+  const cancelBtn  = document.getElementById('btn-cancel-profile');
+  const actionsRow = document.getElementById('profile-edit-actions');
+  if (!form || !editBtn) return;
+
+  // Snapshot values so Cancel can restore them
+  let _snapshot = {};
+
+  function getEditableInputs() {
+    return [...form.querySelectorAll('input:not([type="file"]):not([id="s-email"]), textarea')];
+  }
+
+  function enableEdit() {
+    _snapshot = {};
+    getEditableInputs().forEach(el => {
+      _snapshot[el.id || el.name] = el.value;
+      el.removeAttribute('readonly');
+    });
+    if (actionsRow) actionsRow.style.display = 'flex';
+    editBtn.style.display = 'none';
+  }
+
+  function disableEdit() {
+    getEditableInputs().forEach(el => el.setAttribute('readonly', ''));
+    if (actionsRow) actionsRow.style.display = 'none';
+    editBtn.style.display = '';
+  }
+
+  editBtn.addEventListener('click', enableEdit);
+
+  cancelBtn?.addEventListener('click', () => {
+    getEditableInputs().forEach(el => {
+      const key = el.id || el.name;
+      if (key in _snapshot) el.value = _snapshot[key];
+    });
+    disableEdit();
+  });
+
+  // After a successful save, return to read-only
+  form.addEventListener('submit', async () => {
+    // Small delay so the submit handler runs first
+    setTimeout(disableEdit, 100);
+  }, { capture: true });
+}
+
+/* ── Email change modal ────────────────────────────────────── */
+function initEmailChange() {
+  const modal      = document.getElementById('modal-change-email-tech');
+  const openBtn    = document.getElementById('btn-change-email-tech');
+  const closeBtn   = document.getElementById('btn-close-change-email-tech');
+  const cancelBtn  = document.getElementById('btn-change-email-tech-cancel');
+  const form       = document.getElementById('change-email-tech-form');
+  const newEmailEl = document.getElementById('change-email-tech-new');
+  const pwEl       = document.getElementById('change-email-tech-password');
+  const errorEl    = document.getElementById('change-email-tech-error');
+  const submitBtn  = document.getElementById('btn-change-email-tech-confirm');
+  if (!modal || !openBtn || !form) return;
+
+  function openModal() { modal.removeAttribute('hidden'); newEmailEl?.focus(); }
+  function closeModal() { modal.setAttribute('hidden', ''); form.reset(); if (errorEl) errorEl.hidden = true; }
+
+  openBtn.addEventListener('click', openModal);
+  closeBtn?.addEventListener('click', closeModal);
+  cancelBtn?.addEventListener('click', closeModal);
+  modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (errorEl) errorEl.hidden = true;
+    const newEmail = newEmailEl?.value?.trim();
+    const currentPassword = pwEl?.value;
+    if (!newEmail) { if (errorEl) { errorEl.textContent = 'Please enter a new email address.'; errorEl.hidden = false; } return; }
+    if (!currentPassword) { if (errorEl) { errorEl.textContent = 'Please enter your current password.'; errorEl.hidden = false; } return; }
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Updating…'; }
+    try {
+      await updateEmail({ newEmail, currentPassword });
+      const sess = getSession();
+      if (sess) { sess.email = newEmail; localStorage.setItem('servio_session', JSON.stringify(sess)); }
+      const acc = getAccount() || {};
+      acc.email = newEmail;
+      localStorage.setItem('servio_account', JSON.stringify(acc));
+      const emailInput = document.getElementById('s-email');
+      if (emailInput) emailInput.value = newEmail;
+      closeModal();
+      showToast('Email updated successfully. Please log in again.', 'success');
+      setTimeout(() => { localStorage.removeItem('servio_session'); window.location.href = './login.html'; }, 2000);
+    } catch (err) {
+      if (errorEl) { errorEl.textContent = err.message || 'Failed to update email.'; errorEl.hidden = false; }
+    } finally {
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Update Email'; }
+    }
+  });
+}
+
+/* ── Delete Account Modal ──────────────────────────────────── */
+function initDeleteAccount() {
+  const modal     = document.getElementById('modal-delete-account');
+  const cancelBtn = document.getElementById('btn-delete-account-cancel');
+  const confirmBtn= document.getElementById('btn-delete-account-confirm');
+  const inputEl   = document.getElementById('delete-account-confirm-input');
+  const errorEl   = document.getElementById('delete-account-error');
+  if (!modal || !confirmBtn) return;
+
+  function closeModal() {
+    modal.style.display = 'none';
+    if (inputEl) inputEl.value = '';
+    if (errorEl) { errorEl.textContent = ''; errorEl.hidden = true; }
+    if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.textContent = 'Delete My Account'; }
+  }
+
+  cancelBtn?.addEventListener('click', closeModal);
+  document.getElementById('btn-delete-account-cancel-footer')?.addEventListener('click', closeModal);
+  modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+
+  // Enable confirm button only when user types DELETE
+  if (inputEl) {
+    inputEl.addEventListener('input', () => {
+      confirmBtn.disabled = inputEl.value.trim() !== 'DELETE';
+    });
+  }
+
+  confirmBtn.addEventListener('click', async () => {
+    if (inputEl && inputEl.value.trim() !== 'DELETE') return;
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Deleting…';
+    if (errorEl) { errorEl.hidden = true; }
+    try {
+      await deleteMe();
+      // Wipe all local data and redirect to home
+      localStorage.clear();
+      window.location.href = './index.html';
+    } catch (err) {
+      if (errorEl) {
+        errorEl.textContent = err.message || 'Failed to delete account. Please try again.';
+        errorEl.hidden = false;
+      }
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = 'Delete My Account';
+    }
+  });
+}
+
 // Initial update for dates
 updateActionNeededDates();
+initProfileReadOnly();
+initEmailChange();
+initDeleteAccount();
 
 // Re-run on language change
 document.addEventListener('langchange', updateActionNeededDates);

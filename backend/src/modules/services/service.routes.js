@@ -27,6 +27,9 @@ const serviceValidation = [
 router.get('/',    serviceController.getAll);
 router.get('/:id', serviceController.getOne);
 
+// GET /api/v1/services/:serviceId/technicians — list workers assigned to a service
+router.get('/:serviceId/technicians', serviceController.getTechnicians);
+
 // ── Admin-only routes ─────────────────────────────────────────────────────────
 router.post(
   '/',

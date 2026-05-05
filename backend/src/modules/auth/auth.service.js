@@ -7,6 +7,7 @@ const crypto         = require('crypto');
 const jwt            = require('jsonwebtoken');
 const { StatusCodes } = require('http-status-codes');
 const User           = require('../users/user.model');
+const Service        = require('../services/service.model');
 const ApiError       = require('../../utils/ApiError');
 const { sendPasswordResetEmail } = require('../../utils/email');
 
@@ -15,9 +16,9 @@ const { sendPasswordResetEmail } = require('../../utils/email');
  * WHAT: Creates a cryptographically signed "Passport" (JWT) for the user.
  * WHY:  Allows the client to stay logged in without sending password every time.
  */
-const generateToken = (userId, role) => {
+const generateToken = (userId, role, authVersion = 0) => {
   return jwt.sign(
-    { id: userId, role },
+    { id: userId, role, authVersion },
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
   );
@@ -52,6 +53,7 @@ const registerUser = async (data) => {
     cvUrl,
     cvName,
     portfolioFiles,
+    services,
   } = data;
 
   // Prevent duplicate accounts — give a clear message instead of letting
@@ -98,6 +100,16 @@ const registerUser = async (data) => {
   const normalizedRole = roleMap[role] || role || 'user';
   const isWorker = normalizedRole === 'worker';
 
+  // Validate submitted service IDs for workers
+  let validatedServices = [];
+  if (isWorker && Array.isArray(services) && services.length > 0) {
+    const count = await Service.countDocuments({ _id: { $in: services }, isActive: true });
+    if (count !== services.length) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'One or more selected services are invalid or inactive.');
+    }
+    validatedServices = services;
+  }
+
   // Password hashing is handled by the pre-save hook in user.model.js
   const user = await User.create({
     name, email, password, phone, address,
@@ -123,9 +135,10 @@ const registerUser = async (data) => {
     ...(cvUrl         !== undefined && { cvUrl }),
     ...(cvName        !== undefined && { cvName }),
     ...(portfolioFiles !== undefined && { portfolioFiles }),
+    ...(isWorker && validatedServices.length > 0 && { services: validatedServices }),
   });
 
-  const token = generateToken(user._id, user.role);
+  const token = generateToken(user._id, user.role, user.authVersion);
 
   return { user, token };
 };
@@ -155,7 +168,7 @@ const loginUser = async ({ email, password }) => {
     throw new ApiError(StatusCodes.UNAUTHORIZED, 'Invalid email or password.');
   }
 
-  const token = generateToken(user._id, user.role);
+  const token = generateToken(user._id, user.role, user.authVersion);
 
   return { user, token };
 };
@@ -180,7 +193,7 @@ const forgotPassword = async ({ email, clientUrl }) => {
   user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
   await user.save({ validateModifiedOnly: true });
 
-  const origin   = clientUrl || process.env.CLIENT_URL.split(',')[0].trim();
+  const origin   = process.env.FRONTEND_URL || clientUrl || process.env.CLIENT_URL.split(',')[0].trim();
   const resetUrl = `${origin}/html/reset-password.html?token=${rawToken}`;
 
   await sendPasswordResetEmail(user.email, resetUrl);
@@ -217,7 +230,7 @@ const resetPassword = async ({ token, password }) => {
   user.resetPasswordExpires = undefined;
   await user.save({ validateModifiedOnly: true });
 
-  const jwtToken = generateToken(user._id, user.role);
+  const jwtToken = generateToken(user._id, user.role, user.authVersion);
 
   return { user, token: jwtToken };
 };
