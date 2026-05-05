@@ -8,8 +8,7 @@ import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
-import '../customer/customer_dashboard_screen.dart';
-import '../customer/customer_home_screen.dart';
+import '../customer/customer_shell.dart';
 import '../customer/my_bookings_screen.dart'
     show BookingDetailsScreen, MyBookingsScreen;
 import '../messages/chat_screen.dart';
@@ -153,7 +152,7 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
                       .updateStatus(_booking.id, BookingStatus.cancelled);
                   Navigator.of(context).pushAndRemoveUntil(
                     MaterialPageRoute<void>(
-                        builder: (_) => const CustomerHomeScreen()),
+                        builder: (_) => const CustomerShell()),
                     (route) => false,
                   );
                 },
@@ -549,7 +548,7 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
                 ),
                 onPressed: () => Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute<void>(
-                    builder: (_) => const CustomerDashboardScreen(),
+                    builder: (_) => const CustomerShell(),
                   ),
                   (route) => false,
                 ),
@@ -571,7 +570,7 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
               TextButton(
                 onPressed: () => Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute<void>(
-                    builder: (_) => const CustomerHomeScreen(),
+                    builder: (_) => const CustomerShell(),
                   ),
                   (route) => false,
                 ),

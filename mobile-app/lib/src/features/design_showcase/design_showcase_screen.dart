@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
-import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
 import '../../design_system/widgets/servio_bottom_sheet.dart';
 import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
@@ -20,33 +19,6 @@ class DesignShowcaseScreen extends StatelessWidget {
     final servio = context.servio;
 
     return Scaffold(
-      bottomNavigationBar: ServioBottomNavigationBar(
-        items: const <ServioBottomNavItem>[
-          ServioBottomNavItem(
-            icon: Icons.home_rounded,
-            label: 'Home',
-          ),
-          ServioBottomNavItem(
-            icon: Icons.grid_view_rounded,
-            label: 'Services',
-          ),
-          ServioBottomNavItem(
-            icon: Icons.auto_awesome_rounded,
-            label: 'Smart Match',
-            highlighted: true,
-          ),
-          ServioBottomNavItem(
-            icon: Icons.calendar_month_rounded,
-            label: 'Bookings',
-          ),
-          ServioBottomNavItem(
-            icon: Icons.person_rounded,
-            label: 'Profile',
-          ),
-        ],
-        currentIndex: 2,
-        onTap: (_) {},
-      ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.symmetric(horizontal: ServioSpacing.screenPadding),

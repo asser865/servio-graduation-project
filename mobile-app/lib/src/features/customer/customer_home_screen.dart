@@ -6,20 +6,17 @@ import '../../core/state/app_state.dart';
 import '../../core/state/workers_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
-import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
 import '../../design_system/widgets/servio_card.dart';
 
 import '../../design_system/widgets/servio_section_heading.dart';
 import '../../design_system/widgets/servio_status_chip.dart';
+import '../../design_system/widgets/servio_tab_shell.dart';
 import 'ai_smart_match_screen.dart';
-
-import 'customer_profile_screen.dart';
 import 'my_bookings_screen.dart';
 import 'service_detail_screen.dart';
 import 'services_marketplace_screen.dart';
 import 'technician_listing_screen.dart';
 import 'technician_profile_screen.dart';
-import '../messages/messages_screen.dart';
 import '../shared/notifications_screen.dart';
 import '../shared/search_results_screen.dart';
 
@@ -28,57 +25,8 @@ class CustomerHomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final unreadMessages = context.watch<MessagesProvider>().totalUnread;
-
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      bottomNavigationBar: ServioBottomNavigationBar(
-        items: <ServioBottomNavItem>[
-          const ServioBottomNavItem(icon: Icons.home_rounded, label: 'Home'),
-          const ServioBottomNavItem(
-              icon: Icons.grid_view_rounded, label: 'Services'),
-          const ServioBottomNavItem(
-            icon: Icons.auto_awesome_rounded,
-            label: 'Smart Match',
-            highlighted: true,
-          ),
-          ServioBottomNavItem(
-            icon: Icons.chat_bubble_outline_rounded,
-            label: 'Messages',
-            badgeCount: unreadMessages,
-          ),
-          const ServioBottomNavItem(
-              icon: Icons.person_rounded, label: 'Profile'),
-        ],
-        currentIndex: 0,
-        onTap: (int index) {
-          if (index == 1) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const ServicesMarketplaceScreen(),
-              ),
-            );
-          } else if (index == 2) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const AiSmartMatchScreen(),
-              ),
-            );
-          } else if (index == 3) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const MessagesScreen(),
-              ),
-            );
-          } else if (index == 4) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const CustomerProfileScreen(),
-              ),
-            );
-          }
-        },
-      ),
       body: const _HomeBody(),
     );
   }
@@ -111,6 +59,7 @@ class _HomeBodyState extends State<_HomeBody> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final servio = context.servio;
+    final bottomInset = ServioTabShell.bottomOverlayInsetOf(context);
     
     final userName = context.watch<SessionProvider>().account?.name ?? 'there';
     final firstName = userName.split(' ').first;
@@ -388,6 +337,7 @@ class _HomeBodyState extends State<_HomeBody> {
                             ],
                           ),
                         ),
+                        SizedBox(height: 40 + bottomInset),
                       ],
                     ),
                   ),

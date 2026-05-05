@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
-import '../customer/customer_home_screen.dart';
+import '../customer/customer_shell.dart';
 
 class ErrorScreen extends StatefulWidget {
   const ErrorScreen({
@@ -168,7 +168,7 @@ class _ErrorScreenState extends State<ErrorScreen>
                       onPressed: () {
                         Navigator.of(context).pushAndRemoveUntil(
                           MaterialPageRoute<void>(
-                              builder: (_) => const CustomerHomeScreen()),
+                              builder: (_) => const CustomerShell()),
                           (Route<dynamic> route) => false,
                         );
                       },

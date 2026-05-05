@@ -6,14 +6,10 @@ import '../../core/api/bookings_api.dart';
 import '../../core/models/backend_booking_model.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
-import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
 import '../../design_system/widgets/servio_card.dart';
+import '../../design_system/widgets/servio_tab_shell.dart';
 import '../../design_system/widgets/servio_status_chip.dart';
-import 'availability_manager_screen.dart';
-import 'earnings_screen.dart';
 import 'job_details_screen.dart';
-import 'technician_dashboard_screen.dart';
-import 'technician_profile_screen.dart';
 
 class JobQueueScreen extends StatefulWidget {
   const JobQueueScreen({super.key});
@@ -81,45 +77,9 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
   @override
   Widget build(BuildContext context) {
     final servio = context.servio;
+    final bottomInset = ServioTabShell.bottomOverlayInsetOf(context);
 
     return Scaffold(
-      bottomNavigationBar: ServioBottomNavigationBar(
-        items: const <ServioBottomNavItem>[
-          ServioBottomNavItem(icon: Icons.bar_chart_rounded, label: 'Dashboard'),
-          ServioBottomNavItem(icon: Icons.work_outline_rounded, label: 'Jobs'),
-          ServioBottomNavItem(icon: Icons.account_balance_wallet_outlined, label: 'Earnings'),
-          ServioBottomNavItem(icon: Icons.schedule_rounded, label: 'Availability'),
-          ServioBottomNavItem(icon: Icons.person_rounded, label: 'Profile'),
-        ],
-        currentIndex: 1,
-        onTap: (int index) {
-          if (index == 0) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const TechnicianDashboardScreen(),
-              ),
-            );
-          } else if (index == 2) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const EarningsScreen(),
-              ),
-            );
-          } else if (index == 3) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const AvailabilityManagerScreen(),
-              ),
-            );
-          } else if (index == 4) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const TechnicianSettingsProfileScreen(),
-              ),
-            );
-          }
-        },
-      ),
       appBar: AppBar(
         title: const Text('Job Queue'),
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -227,6 +187,7 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
                               );
                             }
                             return ListView.separated(
+                              padding: EdgeInsets.only(bottom: bottomInset),
                               itemCount: filteredJobs.length,
                               separatorBuilder: (BuildContext context, int index) =>
                                   const SizedBox(height: 12),

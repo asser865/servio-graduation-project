@@ -4,17 +4,13 @@ import 'package:provider/provider.dart';
 import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
-import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
 import '../../design_system/widgets/servio_card.dart';
+import '../../design_system/widgets/servio_tab_shell.dart';
 import '../auth/auth_landing_screen.dart';
 import '../marketing/about_screen.dart';
 import '../marketing/contact_screen.dart';
 import '../marketing/privacy_policy_screen.dart';
 import '../marketing/terms_of_service_screen.dart';
-import 'availability_manager_screen.dart';
-import 'earnings_screen.dart';
-import 'job_queue_screen.dart';
-import 'technician_dashboard_screen.dart';
 import 'technician_settings_screen.dart';
 import 'verification_upload_screen.dart';
 
@@ -24,6 +20,7 @@ class TechnicianSettingsProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final account = context.watch<SessionProvider>().account;
+    final bottomInset = ServioTabShell.bottomOverlayInsetOf(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -31,46 +28,6 @@ class TechnicianSettingsProfileScreen extends StatelessWidget {
         backgroundColor: ServioColors.deepBrown,
         foregroundColor: Colors.white,
         elevation: 0,
-      ),
-      bottomNavigationBar: ServioBottomNavigationBar(
-        items: const <ServioBottomNavItem>[
-          ServioBottomNavItem(
-              icon: Icons.bar_chart_rounded, label: 'Dashboard'),
-          ServioBottomNavItem(icon: Icons.work_outline_rounded, label: 'Jobs'),
-          ServioBottomNavItem(
-              icon: Icons.account_balance_wallet_outlined, label: 'Earnings'),
-          ServioBottomNavItem(
-              icon: Icons.schedule_rounded, label: 'Availability'),
-          ServioBottomNavItem(icon: Icons.person_rounded, label: 'Profile'),
-        ],
-        currentIndex: 4,
-        onTap: (int index) {
-          if (index == 0) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const TechnicianDashboardScreen(),
-              ),
-            );
-          } else if (index == 1) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const JobQueueScreen(),
-              ),
-            );
-          } else if (index == 2) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const EarningsScreen(),
-              ),
-            );
-          } else if (index == 3) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const AvailabilityManagerScreen(),
-              ),
-            );
-          }
-        },
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -203,7 +160,7 @@ class TechnicianSettingsProfileScreen extends StatelessWidget {
                       }
                     },
                   ),
-                  const SizedBox(height: 24),
+                  SizedBox(height: 24 + bottomInset),
                 ],
               ),
             ),

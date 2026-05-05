@@ -9,7 +9,6 @@ import '../../core/models/booking_model.dart';
 import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
-import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
 import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
 import '../../design_system/widgets/servio_section_heading.dart';
@@ -17,12 +16,9 @@ import '../../design_system/widgets/servio_status_chip.dart';
 import '../booking/booking_flow_data.dart';
 import '../booking/booking_step_one_screen.dart';
 import '../messages/chat_screen.dart';
-import '../messages/messages_screen.dart';
 import '../shared/notifications_screen.dart';
-import 'ai_smart_match_screen.dart';
 import 'customer_profile_screen.dart';
 import 'my_bookings_screen.dart';
-import 'services_marketplace_screen.dart';
 
 enum _DashboardSection { overview, bookings, history, favourites }
 
@@ -66,59 +62,12 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final servio = context.servio;
-    final unreadMessages = context.watch<MessagesProvider>().totalUnread;
     final bookings = _bookings;
-    
+
     final userName = context.watch<SessionProvider>().account?.name.split(' ').first ?? 'Customer';
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      bottomNavigationBar: ServioBottomNavigationBar(
-        items: <ServioBottomNavItem>[
-          const ServioBottomNavItem(icon: Icons.home_rounded, label: 'Home'),
-          const ServioBottomNavItem(
-              icon: Icons.grid_view_rounded, label: 'Services'),
-          const ServioBottomNavItem(
-            icon: Icons.auto_awesome_rounded,
-            label: 'Smart Match',
-            highlighted: true,
-          ),
-          ServioBottomNavItem(
-            icon: Icons.chat_bubble_outline_rounded,
-            label: 'Messages',
-            badgeCount: unreadMessages,
-          ),
-          const ServioBottomNavItem(
-              icon: Icons.person_rounded, label: 'Profile'),
-        ],
-        currentIndex: 0,
-        onTap: (int index) {
-          if (index == 1) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const ServicesMarketplaceScreen(),
-              ),
-            );
-          } else if (index == 2) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const AiSmartMatchScreen(),
-              ),
-            );
-          } else if (index == 3) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const MessagesScreen()),
-            );
-          } else if (index == 4) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const CustomerProfileScreen(),
-              ),
-            );
-          }
-        },
-      ),
       body: Stack(
         children: <Widget>[
           // 1. Dynamic Parallax Background
@@ -182,7 +131,7 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
               ),
             ),
           ),
-          
+
           // 2. Foreground Scrolling Content
           CustomScrollView(
             controller: _scrollController,
@@ -297,7 +246,7 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                   ),
                 ),
               ),
-              
+
               // Bottom Layered Sheet Section
               SliverToBoxAdapter(
                 child: Container(
