@@ -321,6 +321,15 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                     duration: ServioMotion.tabSwitch,
                     switchInCurve: ServioMotion.spring,
                     switchOutCurve: ServioMotion.standard,
+                    layoutBuilder: (Widget? currentChild, List<Widget> previousChildren) {
+                      return Stack(
+                        alignment: Alignment.topCenter,
+                        children: <Widget>[
+                          ...previousChildren,
+                          if (currentChild != null) currentChild,
+                        ],
+                      );
+                    },
                     child: switch (_section) {
                       _DashboardSection.overview => _OverviewSection(
                           key: const ValueKey<String>('overview'),
