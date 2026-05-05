@@ -700,51 +700,64 @@ class _DashboardSegmentedControl extends StatelessWidget {
     return Container(
       height: 48,
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(ServioRadius.full),
+        border: Border(
+          bottom: BorderSide(
+            color: Colors.white.withValues(alpha: 0.2),
+            width: 1,
+          ),
+        ),
       ),
-      padding: const EdgeInsets.all(4),
-      child: Row(
-        children: _labels.entries.map((entry) {
-          final section = entry.key;
-          final label = entry.value;
-          final active = section == current;
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: _labels.entries.map((entry) {
+            final section = entry.key;
+            final label = entry.value;
+            final active = section == current;
+            final isLast = entry.key == _labels.keys.last;
 
-          return Expanded(
-            child: GestureDetector(
+            return GestureDetector(
               onTap: () => onChanged(section),
               behavior: HitTestBehavior.opaque,
-              child: AnimatedContainer(
-                duration: ServioMotion.micro,
-                curve: ServioMotion.spring,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: active ? Colors.white : Colors.transparent,
-                  borderRadius: BorderRadius.circular(ServioRadius.full),
-                  boxShadow: active
-                      ? <BoxShadow>[
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.08),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          )
-                        ]
-                      : null,
-                ),
-                child: Text(
-                  label,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: active ? ServioColors.navyDark : Colors.white,
-                    fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                    letterSpacing: 0.3,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+              child: Container(
+                margin: EdgeInsets.only(right: isLast ? 0 : 32),
+                child: Stack(
+                  alignment: Alignment.center,
+                  clipBehavior: Clip.none,
+                  children: [
+                    AnimatedDefaultTextStyle(
+                      duration: ServioMotion.fast,
+                      style: theme.textTheme.labelLarge!.copyWith(
+                        color: active ? Colors.white : Colors.white.withValues(alpha: 0.6),
+                        fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                        letterSpacing: 0.3,
+                      ),
+                      child: Text(label),
+                    ),
+                    Positioned(
+                      bottom: -1,
+                      left: 0,
+                      right: 0,
+                      child: AnimatedOpacity(
+                        duration: ServioMotion.fast,
+                        opacity: active ? 1.0 : 0.0,
+                        child: Container(
+                          height: 3,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.vertical(top: Radius.circular(3)),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-          );
-        }).toList(),
+            );
+          }).toList(),
+        ),
       ),
     );
   }
