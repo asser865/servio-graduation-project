@@ -6,6 +6,7 @@ import '../../core/api/payments_api.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
+import '../../design_system/widgets/servio_tab_shell.dart';
 
 class EarningsScreen extends StatefulWidget {
   const EarningsScreen({super.key});
@@ -43,6 +44,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
     final theme = Theme.of(context);
     final earnings = _summary?.totalEarnings ?? 0.0;
     final pending = _summary?.pendingPayout ?? 0.0;
+    final bottomInset = ServioTabShell.bottomOverlayInsetOf(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -50,7 +52,12 @@ class _EarningsScreenState extends State<EarningsScreen> {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(ServioSpacing.screenPadding),
+        padding: EdgeInsets.fromLTRB(
+          ServioSpacing.screenPadding,
+          ServioSpacing.screenPadding,
+          ServioSpacing.screenPadding,
+          ServioSpacing.screenPadding + bottomInset,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
@@ -156,6 +163,10 @@ class _EarningsScreenState extends State<EarningsScreen> {
               amount: '420 EGP',
               released: true,
             ),
+            const SizedBox(height: 12),
+            _PayoutSummaryCard(
+              pendingAmount: pending,
+            ),
           ],
         ),
       ),
@@ -193,6 +204,63 @@ class _BarColumn extends StatelessWidget {
           style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.servio.textSecondary),
         ),
       ],
+    );
+  }
+}
+
+class _PayoutSummaryCard extends StatelessWidget {
+  const _PayoutSummaryCard({
+    required this.pendingAmount,
+  });
+
+  final double pendingAmount;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+
+    return ServioCard(
+      backgroundColor: servio.backgroundSoft,
+      borderColor: servio.border,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: ServioColors.tint(servio.accent),
+                  borderRadius: BorderRadius.circular(ServioRadius.sm),
+                ),
+                child: Icon(
+                  Icons.account_balance_wallet_outlined,
+                  size: 20,
+                  color: servio.accent,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text('Payout summary', style: theme.textTheme.titleMedium),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Pending release: ${pendingAmount.toStringAsFixed(0)} EGP',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: servio.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

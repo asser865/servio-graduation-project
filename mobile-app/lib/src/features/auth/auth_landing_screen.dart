@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
 import 'login_screen.dart';
@@ -35,7 +34,6 @@ class _AuthLandingScreenState extends State<AuthLandingScreen>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final servio = context.servio;
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
@@ -48,7 +46,8 @@ class _AuthLandingScreenState extends State<AuthLandingScreen>
             height: MediaQuery.of(context).padding.top + 360,
             child: Container(
               decoration: BoxDecoration(
-                gradient: isDark ? ServioGradients.brandDark : ServioGradients.brand,
+                gradient:
+                    isDark ? ServioGradients.brandDark : ServioGradients.brand,
               ),
             ),
           ),
@@ -67,8 +66,8 @@ class _AuthLandingScreenState extends State<AuthLandingScreen>
                       end: Offset.zero,
                     ).animate(CurvedAnimation(
                       parent: _entranceController,
-                      curve: const Interval(0.0, 0.5,
-                          curve: ServioMotion.spring),
+                      curve:
+                          const Interval(0.0, 0.5, curve: ServioMotion.spring),
                     )),
                     child: FadeTransition(
                       opacity: CurvedAnimation(
@@ -81,9 +80,8 @@ class _AuthLandingScreenState extends State<AuthLandingScreen>
                             'SERVIO',
                             textAlign: TextAlign.center,
                             style: theme.textTheme.headlineLarge?.copyWith(
-                              color: isDark
-                                  ? ServioColors.navyDark
-                                  : Colors.white,
+                              color:
+                                  isDark ? ServioColors.navyDark : Colors.white,
                               fontWeight: FontWeight.w800,
                               letterSpacing: 3,
                             ),
@@ -112,8 +110,8 @@ class _AuthLandingScreenState extends State<AuthLandingScreen>
                       end: Offset.zero,
                     ).animate(CurvedAnimation(
                       parent: _entranceController,
-                      curve: const Interval(0.2, 0.7,
-                          curve: ServioMotion.spring),
+                      curve:
+                          const Interval(0.2, 0.7, curve: ServioMotion.spring),
                     )),
                     child: FadeTransition(
                       opacity: CurvedAnimation(
@@ -126,9 +124,8 @@ class _AuthLandingScreenState extends State<AuthLandingScreen>
                             'Welcome.',
                             textAlign: TextAlign.center,
                             style: theme.textTheme.headlineLarge?.copyWith(
-                              color: isDark
-                                  ? ServioColors.navyDark
-                                  : Colors.white,
+                              color:
+                                  isDark ? ServioColors.navyDark : Colors.white,
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -154,8 +151,8 @@ class _AuthLandingScreenState extends State<AuthLandingScreen>
                       end: Offset.zero,
                     ).animate(CurvedAnimation(
                       parent: _entranceController,
-                      curve: const Interval(0.4, 0.9,
-                          curve: ServioMotion.spring),
+                      curve:
+                          const Interval(0.4, 0.9, curve: ServioMotion.spring),
                     )),
                     child: FadeTransition(
                       opacity: CurvedAnimation(

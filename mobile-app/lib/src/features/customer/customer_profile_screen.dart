@@ -5,6 +5,7 @@ import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
+import '../../design_system/widgets/servio_tab_shell.dart';
 import '../auth/auth_landing_screen.dart';
 import '../marketing/about_screen.dart';
 import '../marketing/contact_screen.dart';
@@ -20,6 +21,7 @@ class CustomerProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final account = context.watch<SessionProvider>().account;
+    final bottomInset = ServioTabShell.bottomOverlayInsetOf(context);
 
     return Scaffold(
       // AppBar shares the header gradient top colour for a seamless look.
@@ -173,7 +175,7 @@ class CustomerProfileScreen extends StatelessWidget {
                       }
                     },
                   ),
-                  const SizedBox(height: 24),
+                  SizedBox(height: 24 + bottomInset),
                 ],
               ),
             ),

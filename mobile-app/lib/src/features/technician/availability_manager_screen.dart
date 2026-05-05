@@ -8,6 +8,7 @@ import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
 import '../../design_system/widgets/servio_status_chip.dart';
+import '../../design_system/widgets/servio_tab_shell.dart';
 
 class AvailabilityManagerScreen extends StatefulWidget {
   const AvailabilityManagerScreen({super.key});
@@ -188,6 +189,7 @@ class _AvailabilityManagerScreenState extends State<AvailabilityManagerScreen> {
     final locale = context.watch<LocaleProvider>().languageCode;
     final account = context.watch<SessionProvider>().account;
     final canSave = !_saving && _hasWorkingDays;
+    final bottomInset = ServioTabShell.bottomOverlayInsetOf(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -198,11 +200,11 @@ class _AvailabilityManagerScreenState extends State<AvailabilityManagerScreen> {
       body: SafeArea(
         top: false,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(
+          padding: EdgeInsets.fromLTRB(
             ServioSpacing.screenPadding,
             8,
             ServioSpacing.screenPadding,
-            ServioSpacing.screenPadding,
+            ServioSpacing.screenPadding + bottomInset,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,

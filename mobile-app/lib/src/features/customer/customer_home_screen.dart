@@ -10,6 +10,7 @@ import '../../design_system/widgets/servio_card.dart';
 
 import '../../design_system/widgets/servio_section_heading.dart';
 import '../../design_system/widgets/servio_status_chip.dart';
+import '../../design_system/widgets/servio_tab_shell.dart';
 import 'ai_smart_match_screen.dart';
 import 'my_bookings_screen.dart';
 import 'service_detail_screen.dart';
@@ -39,6 +40,7 @@ class _HomeBody extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final servio = context.servio;
+    final bottomInset = ServioTabShell.bottomOverlayInsetOf(context);
     
     final userName = context.watch<SessionProvider>().account?.name ?? 'there';
     final firstName = userName.split(' ').first;
@@ -243,7 +245,7 @@ class _HomeBody extends StatelessWidget {
                         const SizedBox(height: 16),
                         _FeaturedProfessionals(featuredTechs: featuredTechs),
                         
-                        const SizedBox(height: 40),
+                        SizedBox(height: 40 + bottomInset),
                       ],
                     ),
                   ),

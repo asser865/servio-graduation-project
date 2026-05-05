@@ -7,6 +7,7 @@ import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
 import '../../design_system/widgets/servio_status_chip.dart';
+import '../../design_system/widgets/servio_tab_shell.dart';
 import 'service_detail_screen.dart';
 import 'services_marketplace_screen.dart';
 import 'technician_profile_screen.dart';
@@ -76,11 +77,17 @@ class _AiSmartMatchScreenState extends State<AiSmartMatchScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
+    final bottomInset = ServioTabShell.bottomOverlayInsetOf(context);
 
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(ServioSpacing.screenPadding),
+          padding: EdgeInsets.fromLTRB(
+            ServioSpacing.screenPadding,
+            ServioSpacing.screenPadding,
+            ServioSpacing.screenPadding,
+            ServioSpacing.screenPadding + bottomInset,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[

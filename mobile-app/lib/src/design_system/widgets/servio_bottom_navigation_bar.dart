@@ -14,8 +14,10 @@ class ServioBottomNavItem {
   final IconData icon;
   final String label;
 
-  /// When true the active state uses the accent gradient instead of a
-  /// plain background fill — used for the Smart Match AI tab.
+  /// Marks feature tabs such as Smart Match.
+  ///
+  /// All selected tabs now use the same accent gradient treatment so the
+  /// bottom bar stays visually consistent.
   final bool highlighted;
 
   /// When > 0 a red dot badge is shown on the icon.
@@ -27,11 +29,10 @@ class ServioBottomNavItem {
 /// Design spec:
 /// - Floating pill: horizontal margin 16, bottom margin 12 (above safe area).
 /// - Surface background + border-radius 24 + elevated shadow.
-/// - Active tab: accent-coloured icon + label, subtle backgroundSoft pill.
-/// - Active highlighted tab: accent gradient pill (AI feature).
+/// - Active tab: accent gradient pill with high-contrast icon + label.
 /// - Inactive: textSecondary icon + label.
 /// - Height: 64dp content area.
-/// - Spring animation on active state transition.
+/// - Static selected state so the persistent bar does not animate on tab change.
 ///
 /// This widget is always rendered inside a [Positioned] at the bottom of a
 /// [Stack] in the shell scaffold. It does NOT include safe-area handling or
@@ -55,7 +56,8 @@ class ServioBottomNavigationBar extends StatelessWidget {
     final surface =
         isDark ? servio.surfaceRaised : Theme.of(context).colorScheme.surface;
 
-    final shadows = isDark ? ServioShadows.elevatedDark : ServioShadows.elevated;
+    final shadows =
+        isDark ? ServioShadows.elevatedDark : ServioShadows.elevated;
 
     return Container(
       height: 64,
@@ -100,60 +102,50 @@ class _NavTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final iconColor = isActive
-        ? (item.highlighted ? Colors.white : servio.accent)
-        : servio.textSecondary;
+    final iconColor = isActive ? ServioColors.deepBrown : servio.textSecondary;
     final labelColor = iconColor;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
       child: Container(
         decoration: BoxDecoration(
-          gradient:
-              isActive && item.highlighted ? ServioGradients.accent : null,
-          color: isActive && !item.highlighted
-              ? servio.backgroundSoft
-              : Colors.transparent,
+          gradient: isActive ? ServioGradients.accent : null,
+          color: Colors.transparent,
           borderRadius: BorderRadius.circular(ServioRadius.navItem),
         ),
         padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 3),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            AnimatedScale(
-              scale: isActive ? 1.0 : 0.92,
-              duration: ServioMotion.tabSwitch,
-              curve: ServioMotion.spring,
-              child: item.badgeCount > 0
-                  ? Stack(
-                      clipBehavior: Clip.none,
-                      children: <Widget>[
-                        Icon(item.icon, size: 22, color: iconColor),
-                        Positioned(
-                          top: -4,
-                          right: -6,
-                          child: Container(
-                            width: 14,
-                            height: 14,
-                            decoration: const BoxDecoration(
-                              color: ServioColors.danger,
-                              shape: BoxShape.circle,
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              item.badgeCount > 9 ? '9+' : '${item.badgeCount}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 8,
-                                fontWeight: FontWeight.w700,
-                              ),
+            item.badgeCount > 0
+                ? Stack(
+                    clipBehavior: Clip.none,
+                    children: <Widget>[
+                      Icon(item.icon, size: 22, color: iconColor),
+                      Positioned(
+                        top: -4,
+                        right: -6,
+                        child: Container(
+                          width: 14,
+                          height: 14,
+                          decoration: const BoxDecoration(
+                            color: ServioColors.danger,
+                            shape: BoxShape.circle,
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            item.badgeCount > 9 ? '9+' : '${item.badgeCount}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 8,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
-                      ],
-                    )
-                  : Icon(item.icon, size: 22, color: iconColor),
-            ),
+                      ),
+                    ],
+                  )
+                : Icon(item.icon, size: 22, color: iconColor),
             const SizedBox(height: 4),
             SizedBox(
               height: 13,

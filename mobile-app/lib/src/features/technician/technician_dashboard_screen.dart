@@ -7,6 +7,7 @@ import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_section_heading.dart';
 import '../../design_system/widgets/servio_status_chip.dart';
+import '../../design_system/widgets/servio_tab_shell.dart';
 import 'earnings_screen.dart';
 import 'job_queue_screen.dart';
 import 'technician_profile_screen.dart';
@@ -23,6 +24,7 @@ class TechnicianDashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final account = context.watch<SessionProvider>().account;
     final firstName = (account?.name ?? 'Ahmed').split(' ').first;
+    final bottomInset = ServioTabShell.bottomOverlayInsetOf(context);
 
     return Scaffold(
       body: SafeArea(
@@ -31,7 +33,12 @@ class TechnicianDashboardScreen extends StatelessWidget {
           onRefresh: () async => Future<void>.delayed(const Duration(seconds: 1)),
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(ServioSpacing.screenPadding),
+            padding: EdgeInsets.fromLTRB(
+              ServioSpacing.screenPadding,
+              ServioSpacing.screenPadding,
+              ServioSpacing.screenPadding,
+              ServioSpacing.screenPadding + bottomInset,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[

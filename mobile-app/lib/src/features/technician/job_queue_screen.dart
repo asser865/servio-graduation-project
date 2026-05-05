@@ -7,6 +7,7 @@ import '../../core/models/backend_booking_model.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
+import '../../design_system/widgets/servio_tab_shell.dart';
 import '../../design_system/widgets/servio_status_chip.dart';
 import 'job_details_screen.dart';
 
@@ -76,6 +77,7 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
   @override
   Widget build(BuildContext context) {
     final servio = context.servio;
+    final bottomInset = ServioTabShell.bottomOverlayInsetOf(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -185,6 +187,7 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
                               );
                             }
                             return ListView.separated(
+                              padding: EdgeInsets.only(bottom: bottomInset),
                               itemCount: filteredJobs.length,
                               separatorBuilder: (BuildContext context, int index) =>
                                   const SizedBox(height: 12),
