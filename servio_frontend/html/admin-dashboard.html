@@ -530,7 +530,6 @@
           <table class="bk-table" id="usersTable" style="min-width: 900px;">
             <thead>
               <tr>
-                <th data-i18n="admin_th_user_id">User ID</th>
                 <th data-i18n="admin_th_name">Name</th>
                 <th data-i18n="admin_th_email">Email</th>
                 <th data-i18n="admin_th_join_date">Join Date</th>
@@ -540,7 +539,7 @@
               </tr>
             </thead>
             <tbody id="usersTable">
-              <tr><td colspan="7" class="center-align" style="padding:2rem; color:var(--color-text-muted);">Loading users…</td></tr>
+              <tr><td colspan="6" class="center-align" style="padding:2rem; color:var(--color-text-muted);">Loading users…</td></tr>
             </tbody>
           </table>
 
@@ -639,7 +638,6 @@
             <table class="bk-table" id="allTechsTable">
               <thead>
                 <tr>
-                  <th data-i18n="admin_th_tech_id">Tech ID</th>
                   <th data-i18n="admin_th_name">Name</th>
                   <th data-i18n="admin_th_skills">Skills</th>
                   <th data-i18n="admin_th_area">Area</th>
@@ -647,6 +645,7 @@
                   <th class="center-align" data-i18n="admin_th_jobs">Completed Jobs</th>
                   <th class="right-align" data-i18n="admin_th_revenue">Revenue</th>
                   <th data-i18n="admin_th_status">Status</th>
+                  <th data-i18n="admin_th_availability">Availability</th>
                   <th data-i18n="admin_th_actions" class="center-align">Actions</th>
                 </tr>
               </thead>
@@ -746,7 +745,6 @@
           <table class="bk-table" style="min-width: 960px;">
             <thead>
               <tr>
-                <th data-i18n="admin_th_id">ID</th>
                 <th data-i18n="admin_th_customer">Customer</th>
                 <th data-i18n="admin_th_technician">Technician</th>
                 <th data-i18n="admin_th_service">Service</th>
@@ -761,7 +759,6 @@
             <tbody>
               <!-- Row 1 -->
               <tr class="booking-row" data-status="Active">
-                <td><span style="font-family:monospace; font-weight:700; color:var(--color-text);">#S-2848</span></td>
                 <td><div style="font-weight:600;">Ahmed Yasser</div></td>
                 <td><div style="color:var(--color-text-muted);">Hassan Ali</div></td>
                 <td data-i18n="home_cat_hvac">HVAC</td>
@@ -777,7 +774,6 @@
               </tr>
               <!-- Row 2 -->
               <tr class="booking-row" data-status="Active">
-                <td><span style="font-family:monospace; font-weight:700; color:var(--color-text);">#S-2849</span></td>
                 <td><div style="font-weight:600;">Ahmed Yasser</div></td>
                 <td><div style="color:var(--color-text-muted);">Mahmoud Ibrahim</div></td>
                 <td data-i18n="home_cat_electrical">Electrical</td>
@@ -793,7 +789,6 @@
               </tr>
               <!-- Row 3 -->
               <tr class="booking-row" data-status="Completed">
-                <td><span style="font-family:monospace; font-weight:700; color:var(--color-text);">#S-2847</span></td>
                 <td><div style="font-weight:600;">Ahmed Yasser</div></td>
                 <td><div style="color:var(--color-text-muted);">Khaled Mohamed</div></td>
                 <td data-i18n="home_cat_plumbing">Plumbing</td>
@@ -809,7 +804,6 @@
               </tr>
               <!-- Row 4 -->
               <tr class="booking-row" data-status="Disputed">
-                <td><span style="font-family:monospace; font-weight:700; color:var(--color-text);">#S-2801</span></td>
                 <td><div style="font-weight:600;">Sara Mohamed</div></td>
                 <td><div style="color:var(--color-text-muted);">Youssef Samir</div></td>
                 <td data-i18n="home_cat_painting">Painting</td>
@@ -825,7 +819,6 @@
               </tr>
               <!-- Row 5 -->
               <tr class="booking-row" data-status="Completed">
-                <td><span style="font-family:monospace; font-weight:700; color:var(--color-text);">#S-2780</span></td>
                 <td><div style="font-weight:600;">Omar Tarek</div></td>
                 <td><div style="color:var(--color-text-muted);">Hassan Ali</div></td>
                 <td data-i18n="home_cat_hvac">HVAC</td>
@@ -841,7 +834,6 @@
               </tr>
               <!-- Row 6 -->
               <tr class="booking-row" data-status="Completed">
-                <td><span style="font-family:monospace; font-weight:700; color:var(--color-text);">#S-2831</span></td>
                 <td><div style="font-weight:600;">Ahmed Yasser</div></td>
                 <td><div style="color:var(--color-text-muted);">Amr Gamal</div></td>
                 <td data-i18n="home_cat_carpentry">Carpentry</td>
@@ -857,7 +849,6 @@
               </tr>
               <!-- Row 7 -->
               <tr class="booking-row" data-status="Disputed">
-                <td><span style="font-family:monospace; font-weight:700; color:var(--color-text);">#S-2795</span></td>
                 <td><div style="font-weight:600;">Karim Adel</div></td>
                 <td><div style="color:var(--color-text-muted);">Mahmoud Ibrahim</div></td>
                 <td data-i18n="home_cat_electrical">Electrical</td>
@@ -873,7 +864,6 @@
               </tr>
               <!-- Row 8 -->
               <tr class="booking-row" data-status="Disputed">
-                <td><span style="font-family:monospace; font-weight:700; color:var(--color-text);">#S-2788</span></td>
                 <td><div style="font-weight:600;">Nour Hassan</div></td>
                 <td><div style="color:var(--color-text-muted);">Amr Gamal</div></td>
                 <td data-i18n="home_cat_carpentry">Carpentry</td>
@@ -889,7 +879,6 @@
               </tr>
               <!-- Row 9 -->
               <tr class="booking-row" data-status="Completed">
-                <td><span style="font-family:monospace; font-weight:700; color:var(--color-text);">#S-2760</span></td>
                 <td><div style="font-weight:600;">Sara Mohamed</div></td>
                 <td><div style="color:var(--color-text-muted);">Hassan Ali</div></td>
                 <td data-i18n="home_cat_cleaning">Cleaning</td>

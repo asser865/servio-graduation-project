@@ -1568,14 +1568,13 @@ async function loadAdminData() {
     const usersRoot = document.querySelector('#usersTable tbody');
     if (usersRoot) {
       if (users.length === 0) {
-        usersRoot.innerHTML = '<tr><td colspan="7" class="center-align" style="padding: 2rem;">No customers found.</td></tr>';
+        usersRoot.innerHTML = '<tr><td colspan="6" class="center-align" style="padding: 2rem;">No customers found.</td></tr>';
       } else {
         usersRoot.innerHTML = users.map(u => {
           const status = u.isActive ? 'active' : 'suspended';
           const badgeClass = u.isActive ? 'bk-badge--completed' : 'bk-badge--overdue';
           const date = u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '—';
           return `<tr class="user-row" data-user-id="${u._id}" data-status="${status}">
-            <td><span style="font-family:monospace;font-weight:600;color:var(--color-text);">#U-${u._id.slice(-4)}</span></td>
             <td><div class="user-name" style="font-weight:600;">${u.name || '—'}</div></td>
             <td><div class="user-email" style="color:var(--color-text-muted);">${u.email || '—'}</div></td>
             <td>${date}</td>
@@ -1652,7 +1651,6 @@ async function loadAdminData() {
           const badgeClass = getTechStatusBadgeClass(u);
           return `
           <tr class="booking-row" data-status="${status}">
-            <td style="white-space:nowrap;"><span style="font-family:monospace;font-weight:700;color:var(--color-text);">#T-${u._id.slice(-4)}</span></td>
             <td><div class="t-name" style="font-weight:600;">${escapeHtml(u.name || '—')}</div></td>
             <td class="t-specialty">${escapeHtml((u.skills || []).join(', ') || (u.categories || []).join(', ') || 'General')}</td>
             <td><div style="color:var(--color-text-muted);text-transform:capitalize;">${escapeHtml(u.locationLabel || '—')}</div></td>
@@ -1660,6 +1658,12 @@ async function loadAdminData() {
             <td class="center-align" style="font-weight:700;color:var(--color-text);">${u.completedJobs ?? '—'}</td>
             <td class="bk-amount">— EGP</td>
             <td style="white-space:nowrap;"><span class="bk-badge ${badgeClass} status-badge">${status}</span></td>
+            <td style="white-space:nowrap;">
+              ${u.isAvailable
+                ? '<span class="bk-badge bk-badge--completed" style="background:#dcfce7;color:#166534;border:1px solid #bbf7d0;">● Live</span>'
+                : '<span class="bk-badge" style="background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb;">○ Offline</span>'
+              }
+            </td>
             <td>
               <div class="table-actions">
                 <button class="bk-action-btn bk-action-btn--xs view-tech-link" data-id="${u._id}">Profile</button>
@@ -1750,13 +1754,12 @@ async function loadAdminData() {
     const bkRoot = document.querySelector('[data-panel="bookings"] tbody');
     if (bkRoot) {
       if (bookings.length === 0) {
-        bkRoot.innerHTML = '<tr><td colspan="7" class="center-align" style="padding: 2rem;">No bookings found.</td></tr>';
+        bkRoot.innerHTML = '<tr><td colspan="6" class="center-align" style="padding: 2rem;">No bookings found.</td></tr>';
       } else {
         bkRoot.innerHTML = bookings.slice(0, 50).map(b => {
           const sc = { pending:'bk-badge--active', accepted:'bk-badge--active', in_progress:'bk-badge--active', completed:'bk-badge--completed', cancelled:'bk-badge--cancelled', disputed:'bk-badge--overdue' }[b.status] || '';
           const date = b.scheduledDate ? new Date(b.scheduledDate).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '—';
           return `<tr class="booking-row" data-status="${b.status}">
-            <td class="bk-id"><span style="font-family:monospace;font-weight:600;">#BK-${b._id.slice(-4)}</span></td>
             <td class="bk-cust">${b.user?.name || '—'}</td>
             <td class="bk-tech">${b.worker?.name || '—'}</td>
             <td>${b.service?.title || b.serviceKey || '—'}</td>
