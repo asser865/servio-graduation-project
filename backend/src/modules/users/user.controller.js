@@ -14,6 +14,7 @@ const Service         = require('../services/service.model');
 const ApiError        = require('../../utils/ApiError');
 const ApiResponse     = require('../../utils/ApiResponse');
 const { logEvent }    = require('../admin/audit.service');
+const { dispatchAvailabilityMatches } = require('../notifications/notify.service');
 
 function normalizeWorkerDecision(body) {
   if (body?.decision === 'approved' || body?.isVerified === true) return 'approved';
@@ -253,6 +254,14 @@ const toggleAvailableNow = async (req, res) => {
     { new: true, runValidators: true }
   );
   if (!user) throw new ApiError(StatusCodes.NOT_FOUND, 'User not found.');
+
+  if (isAvailable) {
+    const baseUrl = process.env.FRONTEND_URL || 'http://127.0.0.1:5502/temp_repo/servio_frontend';
+    dispatchAvailabilityMatches(user, baseUrl).catch(err =>
+      console.error('[notify] dispatchAvailabilityMatches error:', err.message)
+    );
+  }
+
   return ApiResponse.success(res, StatusCodes.OK, `Availability ${isAvailable ? 'enabled' : 'disabled'}.`, { isAvailable: user.isAvailable });
 };
 
