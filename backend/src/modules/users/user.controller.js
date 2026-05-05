@@ -34,7 +34,7 @@ const getMe = async (req, res) => {
 const getWorkers = async (req, res) => {
   const { serviceId, category, page = 1, limit = 10 } = req.query;
 
-  const filter = { role: 'worker', isActive: true, isVerified: true };
+  const filter = { role: 'worker', isActive: true, isVerified: true, isAvailable: true };
 
   if (serviceId) {
     // Canonical filter: match workers whose services array contains this ObjectId
@@ -48,7 +48,7 @@ const getWorkers = async (req, res) => {
 
   const [workers, total] = await Promise.all([
     User.find(filter)
-      .select('name profileImage categories services skills averageRating totalReviews location locationLabel hourlyRate isVerified availability')
+      .select('name profileImage categories services skills averageRating totalReviews location locationLabel hourlyRate isVerified isAvailable serviceArea availability completedJobs yearsExperience bio')
       .populate('services', 'title category')
       .sort({ averageRating: -1 })
       .skip(skip)
@@ -100,6 +100,8 @@ const updateProfile = async (req, res) => {
     'availabilityType',
     'categories',
     'services',
+    'isAvailable',
+    'serviceArea',
     'idFrontUrl',
     'idFrontName',
     'idBackUrl',
@@ -235,6 +237,23 @@ const updateEmail = async (req, res) => {
     email: updatedUser.email,
     reauthRequired: true,
   });
+};
+
+// ── TOGGLE AVAILABLE NOW (Worker Only) ──────────────────────────────────────
+// WHAT: Immediately flips the worker's isAvailable flag.
+// HOW:  PATCH /api/v1/users/me/available  { "isAvailable": true | false }
+const toggleAvailableNow = async (req, res) => {
+  const { isAvailable } = req.body;
+  if (typeof isAvailable !== 'boolean') {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'isAvailable must be a boolean.');
+  }
+  const user = await User.findByIdAndUpdate(
+    req.user.id,
+    { isAvailable },
+    { new: true, runValidators: true }
+  );
+  if (!user) throw new ApiError(StatusCodes.NOT_FOUND, 'User not found.');
+  return ApiResponse.success(res, StatusCodes.OK, `Availability ${isAvailable ? 'enabled' : 'disabled'}.`, { isAvailable: user.isAvailable });
 };
 
 // ── UPDATE WORKER AVAILABILITY (Worker Only) ──────────────────────────────────
@@ -477,6 +496,7 @@ module.exports = {
   deleteMe,
   updateProfile,
   updateEmail,
+  toggleAvailableNow,
   updateAvailability,
   updatePassword,
   getAllUsers,
