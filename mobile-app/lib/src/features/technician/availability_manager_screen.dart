@@ -5,14 +5,9 @@ import '../../core/models/user_account.dart';
 import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
-import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
 import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
 import '../../design_system/widgets/servio_status_chip.dart';
-import 'earnings_screen.dart';
-import 'job_queue_screen.dart';
-import 'technician_dashboard_screen.dart';
-import 'technician_profile_screen.dart';
 
 class AvailabilityManagerScreen extends StatefulWidget {
   const AvailabilityManagerScreen({super.key});
@@ -195,58 +190,6 @@ class _AvailabilityManagerScreenState extends State<AvailabilityManagerScreen> {
     final canSave = !_saving && _hasWorkingDays;
 
     return Scaffold(
-      bottomNavigationBar: ServioBottomNavigationBar(
-        items: <ServioBottomNavItem>[
-          ServioBottomNavItem(
-            icon: Icons.bar_chart_rounded,
-            label: _copy(locale, en: 'Dashboard', ar: 'الرئيسية'),
-          ),
-          ServioBottomNavItem(
-            icon: Icons.work_outline_rounded,
-            label: _copy(locale, en: 'Jobs', ar: 'الوظائف'),
-          ),
-          ServioBottomNavItem(
-            icon: Icons.account_balance_wallet_outlined,
-            label: _copy(locale, en: 'Earnings', ar: 'الأرباح'),
-          ),
-          ServioBottomNavItem(
-            icon: Icons.schedule_rounded,
-            label: _copy(locale, en: 'Availability', ar: 'التوفر'),
-          ),
-          ServioBottomNavItem(
-            icon: Icons.person_rounded,
-            label: _copy(locale, en: 'Profile', ar: 'الملف'),
-          ),
-        ],
-        currentIndex: 3,
-        onTap: (int index) {
-          if (index == 0) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const TechnicianDashboardScreen(),
-              ),
-            );
-          } else if (index == 1) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const JobQueueScreen(),
-              ),
-            );
-          } else if (index == 2) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const EarningsScreen(),
-              ),
-            );
-          } else if (index == 4) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const TechnicianSettingsProfileScreen(),
-              ),
-            );
-          }
-        },
-      ),
       appBar: AppBar(
         title: Text(_copy(locale, en: 'Availability', ar: 'التوفر')),
         backgroundColor: theme.scaffoldBackgroundColor,

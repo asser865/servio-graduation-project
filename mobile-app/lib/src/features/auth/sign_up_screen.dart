@@ -9,7 +9,7 @@ import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
-import '../customer/customer_home_screen.dart';
+import '../customer/customer_shell.dart';
 import '../technician/verification_upload_screen.dart';
 import 'auth_role.dart';
 import 'login_screen.dart';
@@ -187,7 +187,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     }
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute<void>(builder: (_) => const CustomerHomeScreen()),
+      MaterialPageRoute<void>(builder: (_) => const CustomerShell()),
       (_) => false,
     );
   }

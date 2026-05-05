@@ -5,11 +5,8 @@ import '../../core/models/backend_service_model.dart';
 import '../../core/state/services_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
-import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
 import '../../design_system/widgets/servio_card.dart';
 import 'ai_smart_match_screen.dart';
-import 'customer_profile_screen.dart';
-import 'my_bookings_screen.dart';
 import 'service_detail_screen.dart';
 import '../shared/search_results_screen.dart';
 
@@ -54,43 +51,6 @@ class _ServicesMarketplaceScreenState extends State<ServicesMarketplaceScreen> {
             .toList();
 
     return Scaffold(
-      bottomNavigationBar: ServioBottomNavigationBar(
-        items: const <ServioBottomNavItem>[
-          ServioBottomNavItem(icon: Icons.home_rounded, label: 'Home'),
-          ServioBottomNavItem(icon: Icons.grid_view_rounded, label: 'Services'),
-          ServioBottomNavItem(
-            icon: Icons.auto_awesome_rounded,
-            label: 'Smart Match',
-            highlighted: true,
-          ),
-          ServioBottomNavItem(icon: Icons.calendar_month_rounded, label: 'Bookings'),
-          ServioBottomNavItem(icon: Icons.person_rounded, label: 'Profile'),
-        ],
-        currentIndex: 1,
-        onTap: (int index) {
-          if (index == 0) {
-            Navigator.of(context).popUntil((route) => route.isFirst);
-          } else if (index == 2) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const AiSmartMatchScreen(),
-              ),
-            );
-          } else if (index == 3) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const MyBookingsScreen(),
-              ),
-            );
-          } else if (index == 4) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const CustomerProfileScreen(),
-              ),
-            );
-          }
-        },
-      ),
       body: SafeArea(
         child: CustomScrollView(
           slivers: <Widget>[

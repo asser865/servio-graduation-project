@@ -7,8 +7,8 @@ import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
-import '../customer/customer_home_screen.dart';
-import '../technician/technician_dashboard_screen.dart';
+import '../customer/customer_shell.dart';
+import '../technician/technician_shell.dart';
 import 'forgot_password_screen.dart';
 import 'role_selection_screen.dart';
 
@@ -91,8 +91,8 @@ class _LoginScreenState extends State<LoginScreen>
     }
 
     final Widget destination = account.role == UserRole.customer
-        ? const CustomerHomeScreen()
-        : const TechnicianDashboardScreen();
+        ? const CustomerShell()
+        : const TechnicianShell();
 
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute<void>(builder: (_) => destination),

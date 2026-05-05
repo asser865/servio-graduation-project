@@ -11,11 +11,8 @@ import '../marketing/contact_screen.dart';
 import '../marketing/privacy_policy_screen.dart';
 import '../marketing/terms_of_service_screen.dart';
 import '../messages/messages_screen.dart';
-import 'ai_smart_match_screen.dart';
 import 'customer_settings_screen.dart';
 import 'my_bookings_screen.dart';
-import 'services_marketplace_screen.dart';
-import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
 
 class CustomerProfileScreen extends StatelessWidget {
   const CustomerProfileScreen({super.key});
@@ -31,43 +28,6 @@ class CustomerProfileScreen extends StatelessWidget {
         backgroundColor: ServioColors.deepBrown,
         foregroundColor: Colors.white,
         elevation: 0,
-      ),
-      bottomNavigationBar: ServioBottomNavigationBar(
-        items: const <ServioBottomNavItem>[
-          ServioBottomNavItem(icon: Icons.home_rounded, label: 'Home'),
-          ServioBottomNavItem(icon: Icons.grid_view_rounded, label: 'Services'),
-          ServioBottomNavItem(
-              icon: Icons.auto_awesome_rounded,
-              label: 'Smart Match',
-              highlighted: true),
-          ServioBottomNavItem(
-              icon: Icons.calendar_month_rounded, label: 'Bookings'),
-          ServioBottomNavItem(icon: Icons.person_rounded, label: 'Profile'),
-        ],
-        currentIndex: 4,
-        onTap: (int index) {
-          if (index == 0) {
-            Navigator.of(context).popUntil((route) => route.isFirst);
-          } else if (index == 1) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const ServicesMarketplaceScreen(),
-              ),
-            );
-          } else if (index == 2) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const AiSmartMatchScreen(),
-              ),
-            );
-          } else if (index == 3) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const MyBookingsScreen(),
-              ),
-            );
-          }
-        },
       ),
       body: SingleChildScrollView(
         child: Column(

@@ -8,8 +8,8 @@ import '../../core/models/user_account.dart';
 import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
-import '../customer/customer_dashboard_screen.dart';
-import '../technician/technician_dashboard_screen.dart';
+import '../customer/customer_shell.dart';
+import '../technician/technician_shell.dart';
 
 import 'chat_screen.dart';
 
@@ -50,8 +50,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute<void>(
         builder: (_) => isTechnician
-            ? const TechnicianDashboardScreen()
-            : const CustomerDashboardScreen(),
+            ? const TechnicianShell()
+            : const CustomerShell(),
       ),
       (Route<dynamic> route) => false,
     );

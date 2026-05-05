@@ -22,16 +22,20 @@ class ServioBottomNavItem {
   final int badgeCount;
 }
 
-/// SERVIO bottom navigation bar.
+/// SERVIO floating bottom navigation bar.
 ///
 /// Design spec:
-/// - Edge-to-edge, no horizontal floating margin.
-/// - Surface background + 1px top border (matches web nav separator).
+/// - Floating pill: horizontal margin 16, bottom margin 12 (above safe area).
+/// - Surface background + border-radius 24 + elevated shadow.
 /// - Active tab: accent-coloured icon + label, subtle backgroundSoft pill.
 /// - Active highlighted tab: accent gradient pill (AI feature).
 /// - Inactive: textSecondary icon + label.
-/// - Height: 56dp content + SafeArea bottom inset.
+/// - Height: 64dp content area.
 /// - Spring animation on active state transition.
+///
+/// This widget is always rendered inside a [Positioned] at the bottom of a
+/// [Stack] in the shell scaffold. It does NOT include safe-area handling or
+/// positioning margins — those are owned by the shell.
 class ServioBottomNavigationBar extends StatelessWidget {
   const ServioBottomNavigationBar({
     required this.items,
@@ -51,43 +55,34 @@ class ServioBottomNavigationBar extends StatelessWidget {
     final surface =
         isDark ? servio.surfaceRaised : Theme.of(context).colorScheme.surface;
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        // 1px top divider — matches web nav border
-        Divider(
-          height: 1,
-          thickness: 1,
-          color: servio.border.withValues(alpha: isDark ? 0.35 : 0.7),
-        ),
-        ColoredBox(
-          color: surface,
-          child: SafeArea(
-            top: false,
-            child: SizedBox(
-              height: 64,
-              child: Row(
-                children: List<Widget>.generate(items.length, (int index) {
-                  final item = items[index];
-                  final isActive = index == currentIndex;
+    final shadows = isDark ? ServioShadows.elevatedDark : ServioShadows.elevated;
 
-                  return Expanded(
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () => onTap(index),
-                      child: _NavTab(
-                        item: item,
-                        isActive: isActive,
-                        servio: servio,
-                      ),
-                    ),
-                  );
-                }),
+    return Container(
+      height: 64,
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: shadows,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Row(
+        children: List<Widget>.generate(items.length, (int index) {
+          final item = items[index];
+          final isActive = index == currentIndex;
+
+          return Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => onTap(index),
+              child: _NavTab(
+                item: item,
+                isActive: isActive,
+                servio: servio,
               ),
             ),
-          ),
-        ),
-      ],
+          );
+        }),
+      ),
     );
   }
 }

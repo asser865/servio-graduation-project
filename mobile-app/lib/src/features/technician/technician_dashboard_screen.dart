@@ -4,11 +4,9 @@ import 'package:provider/provider.dart';
 import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
-import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
 import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_section_heading.dart';
 import '../../design_system/widgets/servio_status_chip.dart';
-import 'availability_manager_screen.dart';
 import 'earnings_screen.dart';
 import 'job_queue_screen.dart';
 import 'technician_profile_screen.dart';
@@ -27,35 +25,6 @@ class TechnicianDashboardScreen extends StatelessWidget {
     final firstName = (account?.name ?? 'Ahmed').split(' ').first;
 
     return Scaffold(
-      bottomNavigationBar: ServioBottomNavigationBar(
-        items: const <ServioBottomNavItem>[
-          ServioBottomNavItem(icon: Icons.bar_chart_rounded, label: 'Dashboard'),
-          ServioBottomNavItem(icon: Icons.work_outline_rounded, label: 'Jobs'),
-          ServioBottomNavItem(icon: Icons.account_balance_wallet_outlined, label: 'Earnings'),
-          ServioBottomNavItem(icon: Icons.schedule_rounded, label: 'Availability'),
-          ServioBottomNavItem(icon: Icons.person_rounded, label: 'Profile'),
-        ],
-        currentIndex: 0,
-        onTap: (int index) {
-          if (index == 1) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const JobQueueScreen()),
-            );
-          } else if (index == 2) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const EarningsScreen()),
-            );
-          } else if (index == 3) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const AvailabilityManagerScreen()),
-            );
-          } else if (index == 4) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const TechnicianSettingsProfileScreen()),
-            );
-          }
-        },
-      ),
       body: SafeArea(
         child: RefreshIndicator(
           color: ServioColors.accent,
