@@ -37,6 +37,15 @@ class SessionProvider extends ChangeNotifier {
   void _loadFromStorage() {
     final json = _storage.getJson(_kKeySession);
     if (json == null) return;
+    // Defensive guard: clear any previously-saved session whose stored role is
+    // 'admin'. This can happen if an older version of the app persisted an admin
+    // session before the login block was in place.
+    if (json['role'] == 'admin') {
+      _storage.remove(_kKeySession);
+      _storage.remove(_kKeyAccount);
+      _storage.removeSecureString(StorageService.keyAuthToken);
+      return;
+    }
     try {
       _account = UserAccount.fromJson(json);
     } catch (_) {}
