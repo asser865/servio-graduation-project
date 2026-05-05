@@ -27,6 +27,7 @@ const messageRoutes  = require('./modules/messages/message.routes');
 const paymentRoutes  = require('./modules/payments/payment.routes');
 const adminRoutes    = require('./modules/admin/audit.routes');
 const uploadRoutes   = require('./modules/uploads/upload.routes');
+const notifyRoutes   = require('./modules/notifications/notify.routes');
 
 // ── Global error middleware ───────────────────────────────────────────────────
 const { notFound, errorHandler } = require('./middleware/error.middleware');
@@ -129,6 +130,7 @@ app.use(`${API_PREFIX}/ai`,       aiRoutes);
 app.use(`${API_PREFIX}/messages`, messageRoutes);
 app.use(`${API_PREFIX}/admin`,    adminRoutes);
 app.use(`${API_PREFIX}/uploads`,  uploadRoutes);
+app.use(`${API_PREFIX}/notify`,   notifyRoutes);
 // Note: payment routes are already mounted above express.json() for webhook support
 
 // ── 404 + error handlers ──────────────────────────────────────────────────────
