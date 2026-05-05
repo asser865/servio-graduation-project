@@ -301,6 +301,7 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
               // Bottom Layered Sheet Section
               SliverToBoxAdapter(
                 child: Container(
+                  width: double.infinity,
                   constraints: BoxConstraints(
                     minHeight: MediaQuery.of(context).size.height * 0.6,
                   ),
@@ -320,6 +321,7 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                     duration: ServioMotion.tabSwitch,
                     switchInCurve: ServioMotion.spring,
                     switchOutCurve: ServioMotion.standard,
+                    alignment: Alignment.topCenter,
                     child: switch (_section) {
                       _DashboardSection.overview => _OverviewSection(
                           key: const ValueKey<String>('overview'),
@@ -554,7 +556,7 @@ class _BookingsSection extends StatelessWidget {
           selected: filter,
           onSelected: onFilterChanged,
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
         if (filtered.isEmpty)
           const _EmptyDashboardState(message: 'No bookings match this filter.')
         else
@@ -637,7 +639,7 @@ class _HistorySection extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
         _HorizontalChips(
           items: _filters,
           selected: filter,
@@ -645,13 +647,13 @@ class _HistorySection extends StatelessWidget {
             value == 'Clear All' ? 'All' : value,
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
         if (completed.isEmpty)
           const _EmptyDashboardState(message: 'No completed bookings yet.')
         else
           ...completed.map(
             (booking) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.only(bottom: 16),
               child: _HistoryBookingTile(booking: booking),
             ),
           ),
@@ -669,7 +671,7 @@ class _FavouritesSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         ServioSectionHeading(title: 'Saved Technicians'),
-        SizedBox(height: 24),
+        SizedBox(height: 16),
         _EmptyDashboardState(message: 'Save technicians from their profile to see them here.'),
       ],
     );
@@ -2028,18 +2030,28 @@ class _EmptyDashboardState extends StatelessWidget {
     final servio = context.servio;
 
     return Container(
-      padding: const EdgeInsets.all(24),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: servio.backgroundSoft,
         borderRadius: BorderRadius.circular(ServioRadius.lg),
-        border: Border.all(color: servio.border),
+        border: Border.all(color: servio.border.withValues(alpha: 0.5)),
       ),
-      child: Text(
-        message,
-        textAlign: TextAlign.center,
-        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: servio.textSecondary,
+      child: Row(
+        children: <Widget>[
+          Icon(Icons.info_outline_rounded, color: servio.textSecondary, size: 24),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              message,
+              textAlign: TextAlign.left,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: servio.textSecondary,
+                    height: 1.5,
+                  ),
             ),
+          ),
+        ],
       ),
     );
   }
