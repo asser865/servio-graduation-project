@@ -13,7 +13,7 @@ class AuthCard extends StatelessWidget {
   });
 
   final Widget child;
-  final EdgeInsets padding;
+  final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) {
