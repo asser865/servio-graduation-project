@@ -177,23 +177,27 @@ class _AuthBackButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: ServioSpacing.tapTarget,
-        height: ServioSpacing.tapTarget,
-        alignment: Alignment.center,
+    return Semantics(
+      label: 'Go back',
+      button: true,
+      child: GestureDetector(
+        onTap: onTap,
         child: Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.10),
-            shape: BoxShape.circle,
-            border: Border.all(
-                color: Colors.white.withValues(alpha: 0.15), width: 1),
+          width: ServioSpacing.tapTarget,
+          height: ServioSpacing.tapTarget,
+          alignment: Alignment.center,
+          child: Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.10),
+              shape: BoxShape.circle,
+              border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.15), width: 1),
+            ),
+            child: const Icon(Icons.arrow_back_rounded,
+                size: 18, color: Colors.white),
           ),
-          child: const Icon(Icons.arrow_back_rounded,
-              size: 18, color: Colors.white),
         ),
       ),
     );
