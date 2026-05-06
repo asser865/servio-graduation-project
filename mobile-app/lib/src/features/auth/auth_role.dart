@@ -6,15 +6,15 @@ enum AuthRole {
 extension AuthRoleX on AuthRole {
   String get title {
     return switch (this) {
-      AuthRole.customer => 'I need a service',
-      AuthRole.technician => "I'm a technician",
+      AuthRole.customer => 'I Need Services',
+      AuthRole.technician => "I'm a Technician",
     };
   }
 
   String get subtitle {
     return switch (this) {
-      AuthRole.customer => 'Book trusted home professionals',
-      AuthRole.technician => 'Offer your skills and earn',
+      AuthRole.customer => 'Browse and book verified home service professionals.',
+      AuthRole.technician => 'Manage jobs, earn money, grow your reputation.',
     };
   }
 }
