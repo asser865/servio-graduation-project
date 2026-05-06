@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
-import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
 import 'auth_role.dart';
 import 'sign_up_screen.dart';
+import 'widgets/auth_background.dart';
 
 class RoleSelectionScreen extends StatefulWidget {
   const RoleSelectionScreen({super.key});
@@ -36,12 +35,8 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
 
   void _continue() {
     if (_selectedRole == null) return;
-
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => SignUpScreen(role: _selectedRole!),
-      ),
-    );
+    Navigator.of(context).push(MaterialPageRoute<void>(
+        builder: (_) => SignUpScreen(role: _selectedRole!)));
   }
 
   @override
@@ -50,19 +45,12 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
+      backgroundColor:
+          isDark ? const Color(0xFF1E2633) : ServioColors.backgroundLight,
       body: Stack(
         children: <Widget>[
-          // Gradient background top
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: MediaQuery.of(context).padding.top + 260,
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: isDark ? ServioGradients.brandDark : ServioGradients.brand,
-              ),
-            ),
+          const Positioned.fill(
+            child: AuthBackground(lightHeaderHeight: 210),
           ),
           SafeArea(
             child: Padding(
@@ -71,115 +59,84 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  const SizedBox(height: 36),
-                  // Brand
-                  SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(0, 0.4),
-                      end: Offset.zero,
-                    ).animate(CurvedAnimation(
-                      parent: _entranceController,
-                      curve: const Interval(0.0, 0.5,
-                          curve: ServioMotion.spring),
-                    )),
-                    child: FadeTransition(
-                      opacity: CurvedAnimation(
-                        parent: _entranceController,
-                        curve: const Interval(0.0, 0.4),
-                      ),
-                      child: Column(
-                        children: <Widget>[
-                          Text(
-                            'SERVIO',
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.headlineLarge?.copyWith(
-                              color: isDark ? ServioColors.navyDark : Colors.white,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 3,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Premium Home Services',
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: (isDark ? ServioColors.navyDark : Colors.white)
-                                  .withValues(alpha: 0.7),
-                              letterSpacing: 1.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 40),
-                  // Question
+                  const SizedBox(height: 16),
+
+                  // ── Back button ──────────────────────────────
+                  _AuthBackButton(onTap: () => Navigator.of(context).pop()),
+
+                  const SizedBox(height: 20),
+
+                  // ── Heading ──────────────────────────────────
                   SlideTransition(
                     position: Tween<Offset>(
                       begin: const Offset(0, 0.25),
                       end: Offset.zero,
                     ).animate(CurvedAnimation(
                       parent: _entranceController,
-                      curve: const Interval(0.15, 0.65,
+                      curve: const Interval(0.0, 0.55,
                           curve: ServioMotion.spring),
                     )),
                     child: FadeTransition(
                       opacity: CurvedAnimation(
-                        parent: _entranceController,
-                        curve: const Interval(0.15, 0.55),
-                      ),
+                          parent: _entranceController,
+                          curve: const Interval(0.0, 0.45)),
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
                           Text(
-                            'How will you use SERVIO?',
-                            textAlign: TextAlign.center,
+                            'How will you\nuse SERVIO?',
                             style: theme.textTheme.headlineLarge?.copyWith(
-                              color: isDark ? ServioColors.navyDark : Colors.white,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                              height: 1.15,
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 6),
                           Text(
-                            'Choose your role to create your account.',
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: (isDark ? ServioColors.navyDark : Colors.white)
-                                  .withValues(alpha: 0.7),
+                            'Choose your role to get started.',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: Colors.white.withValues(alpha: 0.45),
                             ),
                           ),
                         ],
                       ),
                     ),
                   ),
-                  const SizedBox(height: 36),
-                  // Cards
+
+                  const SizedBox(height: 32),
+
+                  // ── Role cards ───────────────────────────────
                   SlideTransition(
                     position: Tween<Offset>(
                       begin: const Offset(0, 0.15),
                       end: Offset.zero,
                     ).animate(CurvedAnimation(
                       parent: _entranceController,
-                      curve: const Interval(0.3, 0.85,
+                      curve: const Interval(0.2, 0.75,
                           curve: ServioMotion.spring),
                     )),
                     child: FadeTransition(
                       opacity: CurvedAnimation(
-                        parent: _entranceController,
-                        curve: const Interval(0.3, 0.75),
-                      ),
+                          parent: _entranceController,
+                          curve: const Interval(0.2, 0.65)),
                       child: Column(
                         children: <Widget>[
-                          _RoleOptionCard(
-                            role: AuthRole.customer,
-                            isSelected: _selectedRole == AuthRole.customer,
+                          _RoleCard(
                             icon: Icons.home_repair_service_rounded,
+                            title: 'I need a service',
+                            subtitle: 'Book trusted home professionals',
+                            isSelected: _selectedRole == AuthRole.customer,
+                            isDark: isDark,
                             onTap: () => setState(
                                 () => _selectedRole = AuthRole.customer),
                           ),
-                          const SizedBox(height: 16),
-                          _RoleOptionCard(
-                            role: AuthRole.technician,
-                            isSelected: _selectedRole == AuthRole.technician,
+                          const SizedBox(height: 14),
+                          _RoleCard(
                             icon: Icons.handyman_rounded,
+                            title: "I'm a technician",
+                            subtitle: 'Offer your skills and earn',
+                            isSelected: _selectedRole == AuthRole.technician,
+                            isDark: isDark,
                             onTap: () => setState(
                                 () => _selectedRole = AuthRole.technician),
                           ),
@@ -187,16 +144,19 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                       ),
                     ),
                   ),
+
                   const Spacer(),
+
                   AnimatedOpacity(
-                    opacity: _selectedRole == null ? 0.5 : 1.0,
+                    opacity: _selectedRole == null ? 0.45 : 1.0,
                     duration: ServioMotion.micro,
                     child: ServioPrimaryButton(
                       label: 'Continue',
                       onPressed: _selectedRole == null ? null : _continue,
                     ),
                   ),
-                  const SizedBox(height: 20),
+
+                  const SizedBox(height: 28),
                 ],
               ),
             ),
@@ -207,99 +167,149 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
   }
 }
 
-class _RoleOptionCard extends StatelessWidget {
-  const _RoleOptionCard({
-    required this.role,
-    required this.isSelected,
+// ─────────────────────────────────────────────────────────────────────────────
+// Frosted back button
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _AuthBackButton extends StatelessWidget {
+  const _AuthBackButton({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: ServioSpacing.tapTarget,
+        height: ServioSpacing.tapTarget,
+        alignment: Alignment.center,
+        child: Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.10),
+            shape: BoxShape.circle,
+            border: Border.all(
+                color: Colors.white.withValues(alpha: 0.15), width: 1),
+          ),
+          child: const Icon(Icons.arrow_back_rounded,
+              size: 18, color: Colors.white),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Role selection card
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _RoleCard extends StatelessWidget {
+  const _RoleCard({
     required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.isSelected,
+    required this.isDark,
     required this.onTap,
   });
 
-  final AuthRole role;
-  final bool isSelected;
   final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool isSelected;
+  final bool isDark;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final servio = context.servio;
+    final cardColor = isDark
+        ? (isSelected
+            ? ServioColors.accentLight.withValues(alpha: 0.12)
+            : Colors.white.withValues(alpha: 0.06))
+        : (isSelected
+            ? ServioColors.accent.withValues(alpha: 0.07)
+            : Colors.white);
+    final borderColor = isDark
+        ? (isSelected
+            ? ServioColors.accentLight.withValues(alpha: 0.55)
+            : Colors.white.withValues(alpha: 0.10))
+        : (isSelected ? ServioColors.accent : ServioColors.borderLight);
+    final titleColor = isDark
+        ? Colors.white.withValues(alpha: isSelected ? 0.95 : 0.75)
+        : (isSelected ? ServioColors.deepBrown : ServioColors.textPrimaryLight);
+    final subtitleColor = isDark
+        ? Colors.white.withValues(alpha: 0.40)
+        : ServioColors.textSecondaryLight;
+    final checkColor =
+        isDark ? ServioColors.accentLight : ServioColors.accent;
 
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: ServioMotion.micro,
-        curve: ServioMotion.curve,
+        curve: ServioMotion.spring,
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          gradient: isSelected ? ServioGradients.brand : null,
+          color: cardColor,
+          border: Border.all(color: borderColor),
           borderRadius: BorderRadius.circular(ServioRadius.lg),
         ),
-        child: ServioCard(
-          radius: ServioRadius.lg,
-          elevated: isSelected,
-          backgroundColor: isSelected ? Colors.transparent : null,
-          borderColor: isSelected ? Colors.transparent : servio.border,
-          child: Row(
-            children: <Widget>[
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
+        child: Row(
+          children: <Widget>[
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: isDark
+                    ? ServioColors.accentLight.withValues(alpha: 0.18)
+                    : ServioColors.accent.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon,
+                  size: 22,
+                  color:
+                      isDark ? ServioColors.accentLight : ServioColors.accent),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(title,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                          color: titleColor, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 3),
+                  Text(subtitle,
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: subtitleColor)),
+                ],
+              ),
+            ),
+            AnimatedContainer(
+              duration: ServioMotion.micro,
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isSelected
+                    ? checkColor.withValues(alpha: 0.18)
+                    : Colors.transparent,
+                border: Border.all(
                   color: isSelected
-                      ? Colors.white.withValues(alpha: 0.14)
-                      : servio.backgroundSoft,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Icon(
-                  icon,
-                  size: 32,
-                  color: isSelected ? Colors.white : servio.accent,
+                      ? checkColor
+                      : (isDark
+                          ? Colors.white.withValues(alpha: 0.20)
+                          : ServioColors.borderLight),
+                  width: 1.5,
                 ),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      role.title,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: isSelected ? Colors.white : null,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      role.subtitle,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: isSelected
-                            ? Colors.white.withValues(alpha: 0.82)
-                            : servio.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              AnimatedContainer(
-                duration: ServioMotion.micro,
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isSelected ? Colors.white : servio.border,
-                    width: 2,
-                  ),
-                  color: isSelected
-                      ? Colors.white.withValues(alpha: 0.3)
-                      : Colors.transparent,
-                ),
-                child: isSelected
-                    ? const Icon(Icons.check_rounded,
-                        size: 14, color: Colors.white)
-                    : null,
-              ),
-            ],
-          ),
+              child: isSelected
+                  ? Icon(Icons.check_rounded, size: 12, color: checkColor)
+                  : null,
+            ),
+          ],
         ),
       ),
     );
