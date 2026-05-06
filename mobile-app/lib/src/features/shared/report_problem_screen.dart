@@ -17,6 +17,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
   final _descriptionController = TextEditingController();
 
   String? _selectedCategory;
+  String? _screenshotFileName;
   bool _isSubmitting = false;
   String? _successMessage;
   String? _errorMessage;
@@ -51,8 +52,17 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
       _successMessage =
           'Report submitted. Our team will investigate and follow up if needed.';
       _selectedCategory = null;
+      _screenshotFileName = null;
       _descriptionController.clear();
     });
+  }
+
+  void _attachScreenshot() {
+    setState(() => _screenshotFileName = 'problem_screenshot.png');
+  }
+
+  void _removeScreenshot() {
+    setState(() => _screenshotFileName = null);
   }
 
   @override
@@ -79,11 +89,14 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
                       formKey: _formKey,
                       descriptionController: _descriptionController,
                       selectedCategory: _selectedCategory,
+                      screenshotFileName: _screenshotFileName,
                       isSubmitting: _isSubmitting,
                       successMessage: _successMessage,
                       errorMessage: _errorMessage,
                       onCategoryChanged: (val) =>
                           setState(() => _selectedCategory = val),
+                      onAttachScreenshot: _attachScreenshot,
+                      onRemoveScreenshot: _removeScreenshot,
                       onSubmit: _submit,
                     ),
                   ],
@@ -108,7 +121,8 @@ class _ReportHero extends StatelessWidget {
     final servio = context.servio;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(ServioSpacing.screenPadding, 42, ServioSpacing.screenPadding, 38),
+      padding: const EdgeInsets.fromLTRB(
+          ServioSpacing.screenPadding, 42, ServioSpacing.screenPadding, 38),
       color: servio.warning,
       child: Stack(
         clipBehavior: Clip.none,
@@ -133,14 +147,15 @@ class _ReportHero extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               Center(
-                child: _HeroKicker(icon: Icons.flag_outlined, label: 'Report an issue'),
+                child: _HeroKicker(
+                    icon: Icons.flag_outlined, label: 'Report an issue'),
               ),
               const SizedBox(height: 18),
               Text(
                 'Report a Problem',
                 textAlign: TextAlign.center,
-                style: theme.textTheme.displayLarge
-                    ?.copyWith(color: Colors.white),
+                style:
+                    theme.textTheme.displayLarge?.copyWith(color: Colors.white),
               ),
               const SizedBox(height: 16),
               Text(
@@ -196,7 +211,10 @@ class _HeroKicker extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             label,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(color: Colors.white),
+            style: Theme.of(context)
+                .textTheme
+                .labelMedium
+                ?.copyWith(color: Colors.white),
           ),
         ],
       ),
@@ -211,8 +229,11 @@ class _ReportFormCard extends StatelessWidget {
     required this.formKey,
     required this.descriptionController,
     required this.selectedCategory,
+    required this.screenshotFileName,
     required this.isSubmitting,
     required this.onCategoryChanged,
+    required this.onAttachScreenshot,
+    required this.onRemoveScreenshot,
     required this.onSubmit,
     this.successMessage,
     this.errorMessage,
@@ -221,10 +242,13 @@ class _ReportFormCard extends StatelessWidget {
   final GlobalKey<FormState> formKey;
   final TextEditingController descriptionController;
   final String? selectedCategory;
+  final String? screenshotFileName;
   final bool isSubmitting;
   final String? successMessage;
   final String? errorMessage;
   final ValueChanged<String?> onCategoryChanged;
+  final VoidCallback onAttachScreenshot;
+  final VoidCallback onRemoveScreenshot;
   final VoidCallback onSubmit;
 
   static const List<String> _categories = <String>[
@@ -287,7 +311,8 @@ class _ReportFormCard extends StatelessWidget {
                 prefixIcon: Icon(Icons.category_outlined),
               ),
               items: _categories
-                  .map((c) => DropdownMenuItem<String>(value: c, child: Text(c)))
+                  .map(
+                      (c) => DropdownMenuItem<String>(value: c, child: Text(c)))
                   .toList(),
               onChanged: onCategoryChanged,
               validator: _categoryValidator,
@@ -304,6 +329,12 @@ class _ReportFormCard extends StatelessWidget {
                 alignLabelWithHint: true,
               ),
               validator: _descriptionValidator,
+            ),
+            const SizedBox(height: 14),
+            _ScreenshotUploadArea(
+              fileName: screenshotFileName,
+              onAttach: onAttachScreenshot,
+              onRemove: onRemoveScreenshot,
             ),
             if (successMessage != null || errorMessage != null) ...<Widget>[
               const SizedBox(height: 14),
@@ -340,8 +371,108 @@ class _ReportFormCard extends StatelessWidget {
   }
 }
 
-// ── Inline message banner ────────────────────────────────────────────────────
+// Optional screenshot upload area.
 
+class _ScreenshotUploadArea extends StatelessWidget {
+  const _ScreenshotUploadArea({
+    required this.fileName,
+    required this.onAttach,
+    required this.onRemove,
+  });
+
+  final String? fileName;
+  final VoidCallback onAttach;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+    final hasFile = fileName != null;
+    final accent = hasFile ? servio.success : servio.warning;
+
+    return Semantics(
+      button: !hasFile,
+      label: hasFile
+          ? 'Attached screenshot ${fileName!}'
+          : 'Attach optional screenshot',
+      child: InkWell(
+        onTap: hasFile ? null : onAttach,
+        borderRadius: BorderRadius.circular(ServioRadius.sm),
+        child: AnimatedContainer(
+          duration: ServioMotion.micro,
+          curve: ServioMotion.spring,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: hasFile
+                ? ServioColors.tint(servio.success)
+                : servio.backgroundSoft,
+            borderRadius: BorderRadius.circular(ServioRadius.sm),
+            border: Border.all(
+              color: hasFile
+                  ? servio.success.withValues(alpha: 0.35)
+                  : servio.border.withValues(alpha: 0.85),
+            ),
+          ),
+          child: Row(
+            children: <Widget>[
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(ServioRadius.sm),
+                ),
+                child: Icon(
+                  hasFile
+                      ? Icons.image_outlined
+                      : Icons.add_photo_alternate_outlined,
+                  color: accent,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'Screenshot (optional)',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      hasFile
+                          ? fileName!
+                          : 'Tap to attach a screenshot if it helps explain the issue.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: hasFile ? servio.success : servio.textSecondary,
+                        fontWeight: hasFile ? FontWeight.w600 : null,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (hasFile)
+                IconButton(
+                  onPressed: onRemove,
+                  icon: const Icon(Icons.close_rounded),
+                  color: servio.textSecondary,
+                  tooltip: 'Remove screenshot',
+                )
+              else
+                Icon(Icons.upload_file_outlined, color: servio.textSecondary),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// Inline message banner.
 class _InlineMessage extends StatelessWidget {
   const _InlineMessage({
     required this.message,

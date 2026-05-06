@@ -27,7 +27,26 @@ void main() {
 
     expect(find.text('Problem Category'), findsOneWidget);
     expect(find.text('Description'), findsOneWidget);
+    expect(find.text('Screenshot (optional)'), findsOneWidget);
+    expect(find.textContaining('Tap to attach a screenshot'), findsOneWidget);
     expect(find.text('Submit Report'), findsOneWidget);
+  });
+
+  testWidgets('allows optional screenshot attachment marker', (tester) async {
+    await tester.pumpWidget(wrap(const ReportProblemScreen()));
+
+    await tester.ensureVisible(find.text('Screenshot (optional)'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.textContaining('Tap to attach a screenshot'));
+    await tester.pump();
+
+    expect(find.text('problem_screenshot.png'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Remove screenshot'));
+    await tester.pump();
+
+    expect(find.text('problem_screenshot.png'), findsNothing);
   });
 
   testWidgets('shows error banner when submitting empty form', (tester) async {
@@ -61,6 +80,13 @@ void main() {
     );
     await tester.pump();
 
+    await tester.ensureVisible(find.text('Screenshot (optional)'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('Tap to attach a screenshot'));
+    await tester.pump();
+
+    expect(find.text('problem_screenshot.png'), findsOneWidget);
+
     await tester.ensureVisible(find.text('Submit Report'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Submit Report'));
@@ -89,6 +115,13 @@ void main() {
     );
     await tester.pump();
 
+    await tester.ensureVisible(find.text('Screenshot (optional)'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('Tap to attach a screenshot'));
+    await tester.pump();
+
+    expect(find.text('problem_screenshot.png'), findsOneWidget);
+
     await tester.ensureVisible(find.text('Submit Report'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Submit Report'));
@@ -107,6 +140,7 @@ void main() {
       find.text('The payment screen crashes when I try to pay.'),
       findsNothing,
     );
+    expect(find.text('problem_screenshot.png'), findsNothing);
   });
 
   testWidgets('renders correctly in dark mode', (tester) async {
