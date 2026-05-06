@@ -69,6 +69,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
         top: false,
         child: CustomScrollView(
           slivers: <Widget>[
+            const SliverToBoxAdapter(child: _ReportHero()),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(20, 28, 20, 40),
               sliver: SliverList(
@@ -85,8 +86,6 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
                           setState(() => _selectedCategory = val),
                       onSubmit: _submit,
                     ),
-                    const SizedBox(height: 24),
-                    const _ReportHero(),
                   ],
                 ),
               ),
