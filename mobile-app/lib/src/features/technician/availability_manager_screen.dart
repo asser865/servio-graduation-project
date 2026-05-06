@@ -5,14 +5,10 @@ import '../../core/models/user_account.dart';
 import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
-import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
 import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
 import '../../design_system/widgets/servio_status_chip.dart';
-import 'earnings_screen.dart';
-import 'job_queue_screen.dart';
-import 'technician_dashboard_screen.dart';
-import 'technician_profile_screen.dart';
+import '../../design_system/widgets/servio_tab_shell.dart';
 
 class AvailabilityManagerScreen extends StatefulWidget {
   const AvailabilityManagerScreen({super.key});
@@ -193,60 +189,9 @@ class _AvailabilityManagerScreenState extends State<AvailabilityManagerScreen> {
     final locale = context.watch<LocaleProvider>().languageCode;
     final account = context.watch<SessionProvider>().account;
     final canSave = !_saving && _hasWorkingDays;
+    final bottomInset = ServioTabShell.bottomOverlayInsetOf(context);
 
     return Scaffold(
-      bottomNavigationBar: ServioBottomNavigationBar(
-        items: <ServioBottomNavItem>[
-          ServioBottomNavItem(
-            icon: Icons.bar_chart_rounded,
-            label: _copy(locale, en: 'Dashboard', ar: 'الرئيسية'),
-          ),
-          ServioBottomNavItem(
-            icon: Icons.work_outline_rounded,
-            label: _copy(locale, en: 'Jobs', ar: 'الوظائف'),
-          ),
-          ServioBottomNavItem(
-            icon: Icons.account_balance_wallet_outlined,
-            label: _copy(locale, en: 'Earnings', ar: 'الأرباح'),
-          ),
-          ServioBottomNavItem(
-            icon: Icons.schedule_rounded,
-            label: _copy(locale, en: 'Availability', ar: 'التوفر'),
-          ),
-          ServioBottomNavItem(
-            icon: Icons.person_rounded,
-            label: _copy(locale, en: 'Profile', ar: 'الملف'),
-          ),
-        ],
-        currentIndex: 3,
-        onTap: (int index) {
-          if (index == 0) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const TechnicianDashboardScreen(),
-              ),
-            );
-          } else if (index == 1) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const JobQueueScreen(),
-              ),
-            );
-          } else if (index == 2) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const EarningsScreen(),
-              ),
-            );
-          } else if (index == 4) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const TechnicianSettingsProfileScreen(),
-              ),
-            );
-          }
-        },
-      ),
       appBar: AppBar(
         title: Text(_copy(locale, en: 'Availability', ar: 'التوفر')),
         backgroundColor: theme.scaffoldBackgroundColor,
@@ -255,20 +200,15 @@ class _AvailabilityManagerScreenState extends State<AvailabilityManagerScreen> {
       body: SafeArea(
         top: false,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(
+          padding: EdgeInsets.fromLTRB(
             ServioSpacing.screenPadding,
             8,
             ServioSpacing.screenPadding,
-            ServioSpacing.screenPadding,
+            ServioSpacing.screenPadding + bottomInset,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              Text(
-                _copy(locale, en: 'Availability', ar: 'التوفر'),
-                style: theme.textTheme.headlineLarge,
-              ),
-              const SizedBox(height: 6),
               Text(
                 _copy(
                   locale,
@@ -471,7 +411,7 @@ class _ScheduleDayCard extends StatelessWidget {
 
     return ServioCard(
       radius: ServioRadius.sm,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       backgroundColor:
           day.enabled ? theme.colorScheme.surface : servio.surfaceAlt,
       borderColor:
@@ -479,89 +419,78 @@ class _ScheduleDayCard extends StatelessWidget {
       child: AnimatedOpacity(
         duration: ServioMotion.fast,
         opacity: saving ? 0.65 : 1,
-        child: Column(
+        child: Row(
           children: <Widget>[
-            Row(
-              children: <Widget>[
-                _DayBadge(label: day.definition.label(locale)),
-                const Spacer(),
-                InkWell(
-                  borderRadius: BorderRadius.circular(ServioRadius.full),
-                  onTap: saving ? null : () => onOffChanged(day.enabled),
-                  child: Padding(
-                    padding: const EdgeInsetsDirectional.fromSTEB(8, 2, 0, 2),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        Checkbox(
-                          value: !day.enabled,
-                          activeColor: servio.accent,
-                          visualDensity: VisualDensity.compact,
-                          onChanged: saving
-                              ? null
-                              : (value) => onOffChanged(value ?? false),
-                        ),
-                        Text(
-                          _copy(locale, en: 'Off', ar: 'إجازة'),
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            color: servio.textSecondary,
-                            fontWeight: FontWeight.w700,
+            _DayBadge(label: day.definition.label(locale)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: AnimatedSwitcher(
+                duration: ServioMotion.normal,
+                switchInCurve: ServioMotion.spring,
+                switchOutCurve: ServioMotion.standard,
+                child: day.enabled
+                    ? Row(
+                        key: ValueKey<String>('times-${day.definition.apiDay}'),
+                        children: <Widget>[
+                          Expanded(
+                            child: _CompactTimePill(
+                              label: _copy(
+                                locale,
+                                en: 'From',
+                                ar: '\u0645\u0646',
+                              ),
+                              time: day.start.format(context),
+                              enabled: enabled,
+                              onTap: onStartTap,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: _CompactTimePill(
+                              label: _copy(
+                                locale,
+                                en: 'Until',
+                                ar: '\u062d\u062a\u0649',
+                              ),
+                              time: day.end.format(context),
+                              enabled: enabled,
+                              onTap: onEndTap,
+                            ),
+                          ),
+                        ],
+                      )
+                    : _DayOffSummary(
+                        key: ValueKey<String>('off-${day.definition.apiDay}'),
+                        locale: locale,
+                      ),
+              ),
             ),
-            const SizedBox(height: 12),
-            AnimatedSwitcher(
-              duration: ServioMotion.normal,
-              switchInCurve: ServioMotion.spring,
-              switchOutCurve: ServioMotion.standard,
-              child: day.enabled
-                  ? Row(
-                      key: ValueKey<String>('times-${day.definition.apiDay}'),
-                      children: <Widget>[
-                        Expanded(
-                          child: _TimePill(
-                            label: _copy(
-                              locale,
-                              en: 'From',
-                              ar: 'من',
-                            ),
-                            time: day.start.format(context),
-                            enabled: enabled,
-                            onTap: onStartTap,
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                          child: Text(
-                            _copy(locale, en: 'to', ar: 'إلى'),
-                            style: theme.textTheme.labelLarge?.copyWith(
-                              color: servio.textSecondary,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: _TimePill(
-                            label: _copy(
-                              locale,
-                              en: 'Until',
-                              ar: 'حتى',
-                            ),
-                            time: day.end.format(context),
-                            enabled: enabled,
-                            onTap: onEndTap,
-                          ),
-                        ),
-                      ],
-                    )
-                  : _DayOffSummary(
-                      key: ValueKey<String>('off-${day.definition.apiDay}'),
-                      locale: locale,
+            const SizedBox(width: 8),
+            InkWell(
+              borderRadius: BorderRadius.circular(ServioRadius.full),
+              onTap: saving ? null : () => onOffChanged(day.enabled),
+              child: Padding(
+                padding: const EdgeInsetsDirectional.fromSTEB(4, 2, 0, 2),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Checkbox(
+                      value: !day.enabled,
+                      activeColor: servio.accent,
+                      visualDensity: VisualDensity.compact,
+                      onChanged:
+                          saving ? null : (value) => onOffChanged(value ?? false),
                     ),
+                    Text(
+                      _copy(locale, en: 'Off', ar: '\u0625\u062c\u0627\u0632\u0629'),
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: servio.textSecondary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
@@ -570,8 +499,8 @@ class _ScheduleDayCard extends StatelessWidget {
   }
 }
 
-class _TimePill extends StatelessWidget {
-  const _TimePill({
+class _CompactTimePill extends StatelessWidget {
+  const _CompactTimePill({
     required this.label,
     required this.time,
     required this.enabled,
@@ -597,43 +526,32 @@ class _TimePill extends StatelessWidget {
         onTap: enabled ? onTap : null,
         child: Container(
           constraints: const BoxConstraints(minHeight: ServioSpacing.tapTarget),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           decoration: BoxDecoration(
             border: Border.all(color: servio.border.withValues(alpha: 0.75)),
             borderRadius: radius,
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
-              Icon(
-                Icons.access_time_rounded,
-                size: 16,
-                color: enabled ? servio.accent : servio.textSecondary,
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: servio.textSecondary,
+                ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: servio.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: AlignmentDirectional.centerStart,
-                      child: Text(
-                        time,
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ],
+              const SizedBox(height: 1),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: AlignmentDirectional.centerStart,
+                child: Text(
+                  time,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
             ],

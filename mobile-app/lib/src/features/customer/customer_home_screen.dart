@@ -6,20 +6,17 @@ import '../../core/state/app_state.dart';
 import '../../core/state/workers_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
-import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
 import '../../design_system/widgets/servio_card.dart';
 
 import '../../design_system/widgets/servio_section_heading.dart';
 import '../../design_system/widgets/servio_status_chip.dart';
+import '../../design_system/widgets/servio_tab_shell.dart';
 import 'ai_smart_match_screen.dart';
-
-import 'customer_profile_screen.dart';
 import 'my_bookings_screen.dart';
 import 'service_detail_screen.dart';
 import 'services_marketplace_screen.dart';
 import 'technician_listing_screen.dart';
 import 'technician_profile_screen.dart';
-import '../messages/messages_screen.dart';
 import '../shared/notifications_screen.dart';
 import '../shared/search_results_screen.dart';
 
@@ -28,70 +25,41 @@ class CustomerHomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final unreadMessages = context.watch<MessagesProvider>().totalUnread;
-
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      bottomNavigationBar: ServioBottomNavigationBar(
-        items: <ServioBottomNavItem>[
-          const ServioBottomNavItem(icon: Icons.home_rounded, label: 'Home'),
-          const ServioBottomNavItem(
-              icon: Icons.grid_view_rounded, label: 'Services'),
-          const ServioBottomNavItem(
-            icon: Icons.auto_awesome_rounded,
-            label: 'Smart Match',
-            highlighted: true,
-          ),
-          ServioBottomNavItem(
-            icon: Icons.chat_bubble_outline_rounded,
-            label: 'Messages',
-            badgeCount: unreadMessages,
-          ),
-          const ServioBottomNavItem(
-              icon: Icons.person_rounded, label: 'Profile'),
-        ],
-        currentIndex: 0,
-        onTap: (int index) {
-          if (index == 1) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const ServicesMarketplaceScreen(),
-              ),
-            );
-          } else if (index == 2) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const AiSmartMatchScreen(),
-              ),
-            );
-          } else if (index == 3) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const MessagesScreen(),
-              ),
-            );
-          } else if (index == 4) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const CustomerProfileScreen(),
-              ),
-            );
-          }
-        },
-      ),
       body: const _HomeBody(),
     );
   }
 }
 
-class _HomeBody extends StatelessWidget {
+class _HomeBody extends StatefulWidget {
   const _HomeBody();
+
+  @override
+  State<_HomeBody> createState() => _HomeBodyState();
+}
+
+class _HomeBodyState extends State<_HomeBody> {
+  late ScrollController _scrollController;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final servio = context.servio;
+    final bottomInset = ServioTabShell.bottomOverlayInsetOf(context);
     
     final userName = context.watch<SessionProvider>().account?.name ?? 'there';
     final firstName = userName.split(' ').first;
@@ -99,7 +67,6 @@ class _HomeBody extends StatelessWidget {
     final featuredTechs = context.watch<WorkersProvider>().workers.take(4).toList();
     final locale = context.watch<LocaleProvider>().locale.languageCode;
 
-    // Greeting logic
     final hour = DateTime.now().hour;
     String greeting = 'Good evening';
     if (hour < 12) {
@@ -110,27 +77,74 @@ class _HomeBody extends StatelessWidget {
 
     return Stack(
       children: <Widget>[
-        // Background Hero Gradient
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          height: MediaQuery.of(context).padding.top + 280,
+        AnimatedBuilder(
+          animation: _scrollController,
+          builder: (BuildContext context, Widget? child) {
+            double offset = 0;
+            if (_scrollController.hasClients) {
+              offset = _scrollController.offset;
+              if (offset < 0) offset = 0;
+            }
+            return Positioned(
+              top: -offset * 0.4,
+              left: 0,
+              right: 0,
+              height: MediaQuery.of(context).size.height * 0.55,
+              child: child!,
+            );
+          },
           child: Container(
             decoration: BoxDecoration(
               gradient: isDark ? ServioGradients.brandDark : ServioGradients.brand,
             ),
+            child: Stack(
+              children: <Widget>[
+                Positioned(
+                  top: -40,
+                  right: -60,
+                  child: Container(
+                    width: 280,
+                    height: 280,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: <Color>[
+                          Colors.white.withValues(alpha: 0.12),
+                          Colors.white.withValues(alpha: 0.0),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  bottom: 40,
+                  left: -80,
+                  child: Container(
+                    width: 320,
+                    height: 320,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: <Color>[
+                          Colors.white.withValues(alpha: 0.08),
+                          Colors.white.withValues(alpha: 0.0),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-        // Scrollable Content
         RefreshIndicator(
           color: servio.accent,
           onRefresh: () async => Future<void>.delayed(const Duration(seconds: 1)),
           child: SingleChildScrollView(
+            controller: _scrollController,
             physics: const AlwaysScrollableScrollPhysics(),
             child: Column(
               children: <Widget>[
-                // Top Header inside SafeArea
                 SafeArea(
                   bottom: false,
                   child: Padding(
@@ -138,7 +152,6 @@ class _HomeBody extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        // Top Row: Greeting, Location, Notification
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: <Widget>[
@@ -162,7 +175,6 @@ class _HomeBody extends StatelessWidget {
                                 ],
                               ),
                             ),
-                            // Location Selector
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                               decoration: BoxDecoration(
@@ -194,7 +206,6 @@ class _HomeBody extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 12),
-                            // Notification Bell
                             GestureDetector(
                               onTap: () {
                                 Navigator.of(context).push(
@@ -234,69 +245,99 @@ class _HomeBody extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(height: 32),
-                        // Search Bar embedded in hero
                         _HeroSearchBar(isDark: isDark),
-                        const SizedBox(height: 60), // Space for overlap
+                        const SizedBox(height: 8),
                       ],
                     ),
                   ),
                 ),
-                // Overlapping Content
-                Transform.translate(
-                  offset: const Offset(0, -42),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: ServioSpacing.screenPadding),
+                Container(
+                  margin: const EdgeInsets.only(top: 48),
+                  decoration: BoxDecoration(
+                    color: theme.scaffoldBackgroundColor,
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+                    boxShadow: <BoxShadow>[
+                      BoxShadow(
+                        color: isDark ? Colors.black.withValues(alpha: 0.4) : Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 24,
+                        offset: const Offset(0, -8),
+                      ),
+                    ],
+                  ),
+                  child: Transform.translate(
+                    offset: const Offset(0, -48),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        // Floating Active Booking Card
-                        if (recentBookings.isNotEmpty)
-                          _FloatingBookingCard(booking: recentBookings.first, locale: locale)
-                        else
-                          const _FloatingEmptyBookingCard(),
-                        
-                        const SizedBox(height: ServioSpacing.sectionGap),
-                        
-                        // Categories Grid
-                        ServioSectionHeading(
-                          title: locale == 'ar' ? 'الخدمات' : 'Services',
-                          actionLabel: locale == 'ar' ? 'عرض الكل' : 'See All',
-                          onActionTap: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(builder: (_) => const ServicesMarketplaceScreen()),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: ServioSpacing.screenPadding),
+                          child: recentBookings.isNotEmpty
+                              ? _FloatingBookingCard(booking: recentBookings.first, locale: locale)
+                              : const _FloatingEmptyBookingCard(),
+                        ),
+                        const SizedBox(height: 24),
+                        Container(
+                          color: isDark ? Colors.white.withValues(alpha: 0.015) : servio.backgroundSoft,
+                          padding: const EdgeInsets.symmetric(horizontal: ServioSpacing.screenPadding, vertical: 32),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              ServioSectionHeading(
+                                title: locale == 'ar' ? 'الخدمات' : 'Services',
+                                actionLabel: locale == 'ar' ? 'عرض الكل' : 'See All',
+                                onActionTap: () => Navigator.of(context).push(
+                                  MaterialPageRoute<void>(builder: (_) => const ServicesMarketplaceScreen()),
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              _CategoriesGrid(locale: locale),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        _CategoriesGrid(locale: locale),
-                        
-                        const SizedBox(height: ServioSpacing.sectionGap),
-
-                        // AI Features Banner
-                        _HeroBannerCard(
-                          badgeLabel: 'NEW FEATURE',
-                          title: 'AI Smart Match',
-                          body: 'Snap a photo and let AI find the perfect pro.',
-                          ctaLabel: 'Try AI Assistant',
-                          icon: Icons.auto_awesome_rounded,
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute<void>(builder: (_) => const AiSmartMatchScreen()),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: ServioSpacing.sectionGap),
-
-                        // Featured Professionals
-                        ServioSectionHeading(
-                          title: locale == 'ar' ? 'موصى بهم لك' : 'Recommended For You',
-                          actionLabel: locale == 'ar' ? 'عرض الكل' : 'See All',
-                          onActionTap: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(builder: (_) => const TechnicianListingScreen()),
+                        Container(
+                          color: theme.scaffoldBackgroundColor,
+                          padding: const EdgeInsets.symmetric(horizontal: ServioSpacing.screenPadding, vertical: 32),
+                          child: _HeroBannerCard(
+                            badgeLabel: 'NEW FEATURE',
+                            title: 'AI Smart Match',
+                            body: 'Snap a photo and let AI find the perfect pro.',
+                            ctaLabel: 'Try AI Assistant',
+                            icon: Icons.auto_awesome_rounded,
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute<void>(builder: (_) => const AiSmartMatchScreen()),
+                              );
+                            },
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        _FeaturedProfessionals(featuredTechs: featuredTechs),
-                        
-                        const SizedBox(height: 40),
+                        Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: isDark ? Colors.white.withValues(alpha: 0.01) : servio.backgroundSoft.withValues(alpha: 0.5),
+                            border: Border(
+                              top: BorderSide(color: servio.border.withValues(alpha: 0.3)),
+                            ),
+                          ),
+                          padding: const EdgeInsets.fromLTRB(ServioSpacing.screenPadding, 32, 0, 48),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Padding(
+                                padding: const EdgeInsets.only(right: ServioSpacing.screenPadding),
+                                child: ServioSectionHeading(
+                                  title: locale == 'ar' ? 'موصى بهم لك' : 'Recommended For You',
+                                  actionLabel: locale == 'ar' ? 'عرض الكل' : 'See All',
+                                  onActionTap: () => Navigator.of(context).push(
+                                    MaterialPageRoute<void>(builder: (_) => const TechnicianListingScreen()),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              _FeaturedProfessionals(featuredTechs: featuredTechs),
+                            ],
+                          ),
+                        ),
+                        SizedBox(height: 40 + bottomInset),
                       ],
                     ),
                   ),

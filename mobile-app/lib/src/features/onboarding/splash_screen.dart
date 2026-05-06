@@ -4,9 +4,9 @@ import 'package:provider/provider.dart';
 import '../../core/state/app_state.dart';
 import '../../core/models/user_account.dart';
 import '../../design_system/servio_tokens.dart';
-import '../auth/role_selection_screen.dart';
-import '../customer/customer_dashboard_screen.dart';
-import '../technician/technician_dashboard_screen.dart';
+import '../auth/auth_landing_screen.dart';
+import '../customer/customer_shell.dart';
+import '../technician/technician_shell.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -53,13 +53,13 @@ class _SplashScreenState extends State<SplashScreen>
     if (!mounted) return;
 
     final session = context.read<SessionProvider>();
-    Widget nextScreen = const RoleSelectionScreen();
+    Widget nextScreen = const AuthLandingScreen();
 
     if (session.isLoggedIn) {
       if (session.account!.role == UserRole.technician) {
-        nextScreen = const TechnicianDashboardScreen();
+        nextScreen = const TechnicianShell();
       } else {
-        nextScreen = const CustomerDashboardScreen();
+        nextScreen = const CustomerShell();
       }
     }
 
