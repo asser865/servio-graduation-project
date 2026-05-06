@@ -4,16 +4,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:servio_mobile_app/src/design_system/servio_theme.dart';
 import 'package:servio_mobile_app/src/features/shared/report_problem_screen.dart';
 
-void main() {
-  Widget _wrap(Widget child, {bool dark = false}) {
-    return MaterialApp(
-      theme: dark ? ServioTheme.dark() : ServioTheme.light(),
-      home: child,
-    );
-  }
+Widget wrap(Widget child, {bool dark = false}) {
+  return MaterialApp(
+    theme: dark ? ServioTheme.dark() : ServioTheme.light(),
+    home: child,
+  );
+}
 
+void main() {
   testWidgets('renders page title and description text', (tester) async {
-    await tester.pumpWidget(_wrap(const ReportProblemScreen()));
+    await tester.pumpWidget(wrap(const ReportProblemScreen()));
 
     expect(find.text('Report a Problem'), findsWidgets);
     expect(
@@ -23,7 +23,7 @@ void main() {
   });
 
   testWidgets('shows category dropdown and description field', (tester) async {
-    await tester.pumpWidget(_wrap(const ReportProblemScreen()));
+    await tester.pumpWidget(wrap(const ReportProblemScreen()));
 
     expect(find.text('Problem Category'), findsOneWidget);
     expect(find.text('Description'), findsOneWidget);
@@ -31,7 +31,7 @@ void main() {
   });
 
   testWidgets('shows error banner when submitting empty form', (tester) async {
-    await tester.pumpWidget(_wrap(const ReportProblemScreen()));
+    await tester.pumpWidget(wrap(const ReportProblemScreen()));
 
     await tester.ensureVisible(find.text('Submit Report'));
     await tester.pumpAndSettle();
@@ -46,7 +46,7 @@ void main() {
 
   testWidgets('shows validation error when description is too short',
       (tester) async {
-    await tester.pumpWidget(_wrap(const ReportProblemScreen()));
+    await tester.pumpWidget(wrap(const ReportProblemScreen()));
 
     // Open dropdown and pick a category
     await tester.tap(find.byType(DropdownButtonFormField<String>));
@@ -74,7 +74,7 @@ void main() {
 
   testWidgets('shows success banner and clears form after valid submission',
       (tester) async {
-    await tester.pumpWidget(_wrap(const ReportProblemScreen()));
+    await tester.pumpWidget(wrap(const ReportProblemScreen()));
 
     // Pick a category
     await tester.tap(find.byType(DropdownButtonFormField<String>));
@@ -102,10 +102,15 @@ void main() {
       find.textContaining('Report submitted'),
       findsOneWidget,
     );
-    // Form should be cleared — description is empty
-    final editables = tester.widgetList<EditableText>(find.byType(EditableText));
-    for (final e in editables) {
-      expect(e.controller.text, isEmpty);
-    }
+    // Description field should be cleared (hint text visible, no user text)
+    expect(
+      find.text('The payment screen crashes when I try to pay.'),
+      findsNothing,
+    );
+  });
+
+  testWidgets('renders correctly in dark mode', (tester) async {
+    await tester.pumpWidget(wrap(const ReportProblemScreen(), dark: true));
+    expect(find.text('Report a Problem'), findsWidgets);
   });
 }

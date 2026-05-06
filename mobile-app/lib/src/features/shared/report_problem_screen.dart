@@ -108,7 +108,7 @@ class _ReportHero extends StatelessWidget {
     final servio = context.servio;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 42, 20, 38),
+      padding: const EdgeInsets.fromLTRB(ServioSpacing.screenPadding, 42, ServioSpacing.screenPadding, 38),
       color: servio.warning,
       child: Stack(
         clipBehavior: Clip.none,
@@ -116,40 +116,24 @@ class _ReportHero extends StatelessWidget {
           PositionedDirectional(
             top: -52,
             start: -42,
-            child: _SoftDisc(
-                size: 142, color: Colors.white.withValues(alpha: 0.08)),
+            child: IgnorePointer(
+              child: _SoftDisc(
+                  size: 142, color: Colors.white.withValues(alpha: 0.08)),
+            ),
           ),
           PositionedDirectional(
             bottom: -58,
             end: -46,
-            child: _SoftDisc(
-                size: 160, color: Colors.white.withValues(alpha: 0.06)),
+            child: IgnorePointer(
+              child: _SoftDisc(
+                  size: 160, color: Colors.white.withValues(alpha: 0.06)),
+            ),
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               Center(
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(ServioRadius.full),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      const Icon(Icons.flag_outlined,
-                          color: Colors.white, size: 16),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Report an issue',
-                        style: theme.textTheme.labelMedium
-                            ?.copyWith(color: Colors.white),
-                      ),
-                    ],
-                  ),
-                ),
+                child: _HeroKicker(icon: Icons.flag_outlined, label: 'Report an issue'),
               ),
               const SizedBox(height: 18),
               Text(
@@ -187,6 +171,35 @@ class _SoftDisc extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+    );
+  }
+}
+
+class _HeroKicker extends StatelessWidget {
+  const _HeroKicker({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(ServioRadius.full),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Icon(icon, color: Colors.white, size: 16),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(color: Colors.white),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -277,8 +290,7 @@ class _ReportFormCard extends StatelessWidget {
                   .map((c) => DropdownMenuItem<String>(value: c, child: Text(c)))
                   .toList(),
               onChanged: onCategoryChanged,
-              validator: (val) =>
-                  val == null ? 'Please select a category.' : null,
+              validator: _categoryValidator,
             ),
             const SizedBox(height: 14),
             TextFormField(
@@ -291,15 +303,7 @@ class _ReportFormCard extends StatelessWidget {
                 hintText: 'Describe the issue in detail…',
                 alignLabelWithHint: true,
               ),
-              validator: (val) {
-                if (val == null || val.trim().isEmpty) {
-                  return 'Description is required.';
-                }
-                if (val.trim().length < 20) {
-                  return 'Please provide at least 20 characters.';
-                }
-                return null;
-              },
+              validator: _descriptionValidator,
             ),
             if (successMessage != null || errorMessage != null) ...<Widget>[
               const SizedBox(height: 14),
@@ -321,6 +325,18 @@ class _ReportFormCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  static String? _categoryValidator(String? value) {
+    if (value == null) return 'Please select a category.';
+    return null;
+  }
+
+  static String? _descriptionValidator(String? value) {
+    final trimmed = value?.trim() ?? '';
+    if (trimmed.isEmpty) return 'Description is required.';
+    if (trimmed.length < 20) return 'Please provide at least 20 characters.';
+    return null;
   }
 }
 
