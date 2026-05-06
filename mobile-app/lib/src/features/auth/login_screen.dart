@@ -5,7 +5,6 @@ import '../../core/models/user_account.dart';
 import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
-import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
 import '../customer/customer_shell.dart';
 import '../technician/technician_shell.dart';
