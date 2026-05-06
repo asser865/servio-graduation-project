@@ -55,7 +55,7 @@ class _AuthLandingScreenState extends State<AuthLandingScreen>
                   const SizedBox(height: 48),
 
                   // ── Brand ──────────────────────────────────────
-                  _BrandMark(controller: _entranceController),
+                  _BrandMark(controller: _entranceController, isDark: isDark),
 
                   const SizedBox(height: 36),
 
@@ -141,8 +141,9 @@ class _AuthLandingScreenState extends State<AuthLandingScreen>
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _BrandMark extends StatelessWidget {
-  const _BrandMark({required this.controller});
+  const _BrandMark({required this.controller, required this.isDark});
   final AnimationController controller;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -202,7 +203,7 @@ class _TrustPill extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.isDark,
-  });
+  }) : assert(intervalStart + 0.3 <= 1.0, 'intervalStart must be ≤ 0.70');
   final AnimationController controller;
   final double intervalStart;
   final IconData icon;
