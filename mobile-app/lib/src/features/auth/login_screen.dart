@@ -11,6 +11,8 @@ import '../customer/customer_shell.dart';
 import '../technician/technician_shell.dart';
 import 'forgot_password_screen.dart';
 import 'role_selection_screen.dart';
+import 'widgets/auth_background.dart';
+import 'widgets/auth_card.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -124,23 +126,14 @@ class _LoginScreenState extends State<LoginScreen>
     final theme = Theme.of(context);
     final servio = context.servio;
     final isDark = theme.brightness == Brightness.dark;
-    final onGradient = isDark ? ServioColors.navyDark : Colors.white;
 
     return Scaffold(
+      backgroundColor:
+          isDark ? const Color(0xFF1E2633) : ServioColors.backgroundLight,
       body: Stack(
         children: <Widget>[
-          // ── Gradient header ───────────────────────────────────
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: MediaQuery.of(context).padding.top + 280,
-            child: Container(
-              decoration: BoxDecoration(
-                gradient:
-                    isDark ? ServioGradients.brandDark : ServioGradients.brand,
-              ),
-            ),
+          const Positioned.fill(
+            child: AuthBackground(lightHeaderHeight: 210),
           ),
 
           SafeArea(
@@ -161,13 +154,13 @@ class _LoginScreenState extends State<LoginScreen>
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.15),
+                          color: Colors.white.withValues(alpha: 0.10),
                           borderRadius:
                               BorderRadius.circular(ServioRadius.full),
                         ),
-                        child: Icon(
+                        child: const Icon(
                           Icons.arrow_back_rounded,
-                          color: onGradient,
+                          color: Colors.white,
                           size: 20,
                         ),
                       ),
@@ -194,10 +187,10 @@ class _LoginScreenState extends State<LoginScreen>
                             width: 1.5,
                           ),
                         ),
-                        child: Icon(
+                        child: const Icon(
                           Icons.person_outline_rounded,
                           size: 28,
-                          color: onGradient,
+                          color: Colors.white,
                         ),
                       ),
                     ),
@@ -226,7 +219,8 @@ class _LoginScreenState extends State<LoginScreen>
                             'Welcome back',
                             textAlign: TextAlign.center,
                             style: theme.textTheme.displayLarge?.copyWith(
-                              color: onGradient,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
                               height: 1.1,
                             ),
                           ),
@@ -235,7 +229,7 @@ class _LoginScreenState extends State<LoginScreen>
                             'Sign in to continue.',
                             textAlign: TextAlign.center,
                             style: theme.textTheme.bodyMedium?.copyWith(
-                              color: onGradient.withValues(alpha: 0.7),
+                              color: Colors.white.withValues(alpha: 0.45),
                             ),
                           ),
                         ],
@@ -260,10 +254,8 @@ class _LoginScreenState extends State<LoginScreen>
                         parent: _entranceController,
                         curve: const Interval(0.25, 0.75),
                       ),
-                      child: ServioCard(
-                        elevated: true,
-                        radius: ServioRadius.xl,
-                        padding: const EdgeInsets.all(24),
+                      child: AuthCard(
+                        padding: const EdgeInsets.all(20),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: <Widget>[
@@ -279,14 +271,20 @@ class _LoginScreenState extends State<LoginScreen>
                                 Text(
                                   'YOUR CREDENTIALS',
                                   style: theme.textTheme.labelSmall?.copyWith(
-                                    color: servio.textSecondary,
+                                    color: isDark
+                                        ? ServioColors.accentLight.withValues(alpha: 0.65)
+                                        : ServioColors.accent,
                                     letterSpacing: 0.8,
                                   ),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 10),
-                            Divider(color: servio.border),
+                            Divider(
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.10)
+                                  : ServioColors.borderLight,
+                            ),
                             const SizedBox(height: 18),
 
                             // Error banner
@@ -382,7 +380,13 @@ class _LoginScreenState extends State<LoginScreen>
                   // ── Social auth ────────────────────────────────
                   Row(
                     children: <Widget>[
-                      Expanded(child: Divider(color: servio.border)),
+                      Expanded(
+                        child: Divider(
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.10)
+                              : ServioColors.borderLight,
+                        ),
+                      ),
                       Padding(
                         padding:
                             const EdgeInsets.symmetric(horizontal: 16),
@@ -392,7 +396,13 @@ class _LoginScreenState extends State<LoginScreen>
                               ?.copyWith(color: servio.textSecondary),
                         ),
                       ),
-                      Expanded(child: Divider(color: servio.border)),
+                      Expanded(
+                        child: Divider(
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.10)
+                              : ServioColors.borderLight,
+                        ),
+                      ),
                     ],
                   ),
 
@@ -403,6 +413,15 @@ class _LoginScreenState extends State<LoginScreen>
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: () {},
+                          style: isDark
+                              ? OutlinedButton.styleFrom(
+                                  side: const BorderSide(
+                                      color: Color(0x1CFFFFFF)),
+                                  backgroundColor: const Color(0x0DFFFFFF),
+                                  foregroundColor:
+                                      Colors.white.withValues(alpha: 0.60),
+                                )
+                              : null,
                           icon: const Icon(Icons.g_mobiledata_rounded,
                               size: 22),
                           label: const Text('Google'),
@@ -412,6 +431,15 @@ class _LoginScreenState extends State<LoginScreen>
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: () {},
+                          style: isDark
+                              ? OutlinedButton.styleFrom(
+                                  side: const BorderSide(
+                                      color: Color(0x1CFFFFFF)),
+                                  backgroundColor: const Color(0x0DFFFFFF),
+                                  foregroundColor:
+                                      Colors.white.withValues(alpha: 0.60),
+                                )
+                              : null,
                           icon: const Icon(Icons.apple_rounded, size: 22),
                           label: const Text('Apple'),
                         ),
@@ -420,7 +448,11 @@ class _LoginScreenState extends State<LoginScreen>
                   ),
 
                   const SizedBox(height: 20),
-                  Divider(color: servio.border),
+                  Divider(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.10)
+                        : ServioColors.borderLight,
+                  ),
 
                   // ── Sign-up row ────────────────────────────────
                   Row(
@@ -428,8 +460,11 @@ class _LoginScreenState extends State<LoginScreen>
                     children: <Widget>[
                       Text(
                         'New to SERVIO?',
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(color: servio.textSecondary),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.35)
+                              : ServioColors.textSecondaryLight,
+                        ),
                       ),
                       TextButton(
                         onPressed: () {
