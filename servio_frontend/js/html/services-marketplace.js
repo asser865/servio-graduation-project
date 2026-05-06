@@ -1,5 +1,6 @@
 import { getServices } from '../api/services.js';
 import { initScrollReveal } from '../components/scroll-reveal.js';
+import { initShowcaseAtmosphere } from '../components/showcase-atmosphere.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   // ── DOM refs ──────────────────────────────────────────────────────────────
@@ -20,12 +21,17 @@ document.addEventListener('DOMContentLoaded', () => {
   const paginationNext   = document.getElementById('paginationNext');
   const paginationPages  = document.getElementById('paginationPages');
 
+  // ── Atmosphere Background ──
+  initShowcaseAtmosphere('.hero-marketplace', 450);
+
   // ── Drawer Refs ───────────────────────────────────────────────────────────
   const svcDrawerOverlay      = document.getElementById('svcDrawerOverlay');
   const svcDrawer             = document.getElementById('svcDrawer');
   const svcDrawerClose        = document.getElementById('svcDrawerClose');
   const svcDrawerTopbar       = document.getElementById('svcDrawerTopbar');
   const svcDrawerTopbarTitle  = document.getElementById('svcDrawerTopbarTitle');
+  const svcDrawerTopbarEyebrow = document.getElementById('svcDrawerTopbarEyebrow');
+  const svcDrawerTopbarIcon   = document.getElementById('svcDrawerTopbarIcon');
   const svcDrawerScroller     = document.getElementById('svcDrawerScroller');
   const svcDrawerImg          = document.getElementById('svcDrawerImg');
   const svcDrawerCategory     = document.getElementById('svcDrawerCategory');
@@ -52,12 +58,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const filterCountBadge = document.getElementById('active-filter-count');
 
   // ── State ─────────────────────────────────────────────────────────────────
-  let state = { 
-    query: '', 
-    filter: 'all', 
+  let state = {
+    query: '',
+    filter: 'all',
     sort: 'featured',
     view: 'grid',
     page: 1,
+    browseCategory: null, // null = category grid; string = drill-down into that category
     advanced: {
       category: [],
       scope: [],
@@ -67,6 +74,51 @@ document.addEventListener('DOMContentLoaded', () => {
     apiServices: [] // Full list from API
   };
   const PAGE_SIZE = 6;
+
+  // ── Category metadata ─────────────────────────────────────────────────────
+  const CATEGORY_LABELS = {
+    plumbing: 'Plumbing', electrical: 'Electrical', hvac: 'HVAC & Climate',
+    cleaning: 'Cleaning', painting: 'Painting', carpentry: 'Carpentry',
+    flooring: 'Flooring', appliance: 'Appliance Repair', handyman: 'Handyman',
+    renovation: 'Renovation', drywall: 'Drywall & Plastering', roofing: 'Roofing',
+    'pest-control': 'Pest Control', landscaping: 'Landscaping', installation: 'Installation',
+  };
+
+  const CATEGORY_ICONS = {
+    plumbing:      `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"/><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"/></svg>`,
+    electrical:    `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>`,
+    hvac:          `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20"/><path d="M12 2v20"/><path d="m20 16-4-4 4-4"/><path d="m4 8 4 4-4 4"/><path d="m16 4-4 4-4-4"/><path d="m8 20 4-4 4 4"/></svg>`,
+    cleaning:      `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4.5 8-11.8A8 8 0 0 0 12 2a8 8 0 0 0-8 8.2c0 7.3 8 11.8 8 11.8z"/><circle cx="12" cy="10" r="3"/></svg>`,
+    painting:      `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>`,
+    carpentry:     `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 12-8.373 8.373a1 1 0 1 1-3-3L12 9"/><path d="m18 15 4-4"/><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172V7l-2.26-2.26a6 6 0 0 0-4.202-1.756L9 2.96l.92.82A6.18 6.18 0 0 1 12 8.4V10l2 2h1.172a2 2 0 0 1 1.414.586L18 14"/></svg>`,
+    flooring:      `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>`,
+    appliance:     `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="15" x="2" y="4" rx="2"/><path d="M8 4v15M16 4v15M2 9h20M2 14h20"/></svg>`,
+    handyman:      `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`,
+    renovation:    `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
+    drywall:       `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M2 9h20M2 15h20M8 3v6M16 3v6M8 15v6M16 15v6"/></svg>`,
+    roofing:       `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7"/><path d="M3 9v13h18V9"/><path d="M9 22V12h6v10"/></svg>`,
+    'pest-control':`<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12h8M12 8v8"/><circle cx="12" cy="12" r="9"/><path d="M4.93 4.93l14.14 14.14"/></svg>`,
+    landscaping:   `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-7l-2-2"/><path d="M17 8v.8A6 6 0 0 1 13.8 20v0H10v0A6.5 6.5 0 0 1 7 8h0a5 5 0 0 1 10 0z"/><path d="m14 14-2 2-2-2"/></svg>`,
+    installation:  `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>`,
+    other:         `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`,
+  };
+
+  const SERVICE_ICON_MAP = {
+    refrigerator: `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 2h14a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><path d="M3 10h18"/><path d="M7 6h1"/><path d="M7 14h1"/></svg>`,
+    washer: `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="20" x="3" y="2" rx="2"/><circle cx="12" cy="13" r="5"/><path d="M12 10a3 3 0 0 1 3 3"/></svg>`,
+    oven: `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M6 6h.01"/><path d="M10 6h.01"/><path d="M14 6h.01"/><circle cx="12" cy="14" r="3"/></svg>`,
+    ac: `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M2 12h20"/><path d="m4.93 4.93 14.14 14.14"/><path d="m4.93 19.07 14.14-14.14"/></svg>`,
+    leak: `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5s-3 3.5-3 5.5a7 7 0 0 0 7 7z"/></svg>`,
+    toilet: `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 12h10l1 7H6l1-7Z"/><path d="M7 12V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v7"/><path d="M12 5V3"/><path d="M5 19h14"/></svg>`,
+    light: `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1.3.5 2.6 1.5 3.5.8.8 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>`,
+    bolt: `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>`,
+    sparkle: `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>`,
+    bug: `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="14" x="8" y="6" rx="4"/><path d="m19 7-3 2"/><path d="m5 7 3 2"/><path d="m19 19-3-2"/><path d="m5 19 3-2"/><path d="M20 13h-4"/><path d="M4 13h4"/><path d="m12 20v2"/></svg>`,
+    garden: `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/><path d="M5 19h14"/></svg>`,
+    hammer: `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 12-8.373 8.373a1 1 0 1 1-3-3L12 9"/><path d="m18 15 4-4"/><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172V7l-2.26-2.26a6 6 0 0 0-4.202-1.756L9 2.96l.92.82A6.18 6.18 0 0 1 12 8.4V10l2 2h1.172a2 2 0 0 1 1.414.586L18 14"/></svg>`,
+    roller: `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="6" x="2" y="2" rx="2"/><path d="M18 12V5a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1Z"/><path d="M2 17h20"/><path d="M6 8v9"/><path d="M10 8v9"/><path d="M14 8v9"/></svg>`,
+    sofa: `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v3"/><rect width="16" height="6" x="4" y="9" rx="2"/><path d="M2 13h20"/><path d="M4 19v2"/><path d="M20 19v2"/></svg>`,
+  };
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   function toggleDropdown(dropdown, force) {
@@ -116,6 +168,37 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
     return items;
+  }
+
+  function getBestIcon(svc) {
+    const title = (svc.title || '').toLowerCase();
+    const desc = (svc.description || '').toLowerCase();
+    const category = (svc.category || '').toLowerCase();
+    
+    const findKeyword = (text) => {
+      if (text.includes('refrigerator') || text.includes('fridge')) return 'refrigerator';
+      if (text.includes('wash') || text.includes('dryer') || text.includes('laundry')) return 'washer';
+      if (text.includes('oven') || text.includes('stove') || text.includes('range')) return 'oven';
+      if (text.includes('ac ') || text.includes('air cond') || text.includes('hvac')) return 'ac';
+      if (text.includes('fan')) return 'ac';
+      if (text.includes('leak') || text.includes('pipe') || text.includes('faucet') || text.includes('toilet') || text.includes('sink')) return 'leak';
+      if (text.includes('light') || text.includes('wiring') || text.includes('outlet') || text.includes('circuit')) return 'light';
+      if (text.includes('deep clean') || text.includes('maid') || text.includes('janitor') || text.includes('sparkle')) return 'sparkle';
+      if (text.includes('pest') || text.includes('bug') || text.includes('insect') || text.includes('ant') || text.includes('termite')) return 'bug';
+      if (text.includes('garden') || text.includes('mowing') || text.includes('landscap') || text.includes('grass')) return 'garden';
+      if (text.includes('paint') || text.includes('roller')) return 'roller';
+      if (text.includes('furniture') || text.includes('cabinet') || text.includes('sofa') || text.includes('table')) return 'sofa';
+      if (text.includes('tv') || text.includes('mount') || text.includes('install')) return 'hammer';
+      if (text.includes('door') || text.includes('lock')) return 'hammer';
+      return null;
+    };
+
+    const keyword = findKeyword(title) || findKeyword(desc);
+    if (keyword && SERVICE_ICON_MAP[keyword]) {
+      return SERVICE_ICON_MAP[keyword];
+    }
+    
+    return CATEGORY_ICONS[category] || CATEGORY_ICONS.other;
   }
 
   function scrollMarketplaceToTop() {
@@ -219,7 +302,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return { primary, secondary };
   }
 
-  function generateServiceCard(svc) {
+  function generateServiceCard(svc, index = 0) {
     const title    = svc.title || 'Untitled Service';
     const category = (svc.category || 'other').toLowerCase();
     const isAr     = (window.__lang || document.documentElement.lang) === 'ar';
@@ -228,24 +311,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const nameKey      = 'svc_' + title.toLowerCase().replace(/ /g, '_');
     const descKey      = nameKey + '_desc';
 
-    const icons = {
-      plumbing:      `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"/><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"/></svg>`,
-      electrical:    `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>`,
-      hvac:          `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20"/><path d="M12 2v20"/><path d="m20 16-4-4 4-4"/><path d="m4 8 4 4-4 4"/><path d="m16 4-4 4-4-4"/><path d="m8 20 4-4 4 4"/></svg>`,
-      cleaning:      `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4.5 8-11.8A8 8 0 0 0 12 2a8 8 0 0 0-8 8.2c0 7.3 8 11.8 8 11.8z"/><circle cx="12" cy="10" r="3"/></svg>`,
-      painting:      `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>`,
-      carpentry:     `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 12-8.373 8.373a1 1 0 1 1-3-3L12 9"/><path d="m18 15 4-4"/><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172V7l-2.26-2.26a6 6 0 0 0-4.202-1.756L9 2.96l.92.82A6.18 6.18 0 0 1 12 8.4V10l2 2h1.172a2 2 0 0 1 1.414.586L18 14"/></svg>`,
-      flooring:      `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>`,
-      appliance:     `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="15" x="2" y="4" rx="2"/><path d="M8 4v15M16 4v15M2 9h20M2 14h20"/></svg>`,
-      handyman:      `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`,
-      renovation:    `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
-      drywall:       `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M2 9h20M2 15h20M8 3v6M16 3v6M8 15v6M16 15v6"/></svg>`,
-      roofing:       `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7"/><path d="M3 9v13h18V9"/><path d="M9 22V12h6v10"/></svg>`,
-      'pest-control':`<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12h8M12 8v8"/><circle cx="12" cy="12" r="9"/><path d="M4.93 4.93l14.14 14.14"/></svg>`,
-      landscaping:   `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-7l-2-2"/><path d="M17 8v.8A6 6 0 0 1 13.8 20v0H10v0A6.5 6.5 0 0 1 7 8h0a5 5 0 0 1 10 0z"/><path d="m14 14-2 2-2-2"/></svg>`,
-      installation:  `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>`,
-      other:         `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`,
-    };
+    const icons = CATEGORY_ICONS;
 
     const iconClass = ['plumbing','hvac','electrical'].includes(category)
       ? 'product-card__icon--primary'
@@ -253,9 +319,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const price     = svc.basePrice || 0;
     const priceUnit = { per_hour: '/hr', per_sqm: '/m²', fixed: '' }[svc.priceUnit] || '';
-
-    const rating  = parseFloat(svc.averageRating) || 0;
-    const reviews = parseInt(svc.totalReviews)    || 0;
 
     const article = document.createElement('article');
     article.className = 'product-card';
@@ -265,37 +328,31 @@ document.addEventListener('DOMContentLoaded', () => {
     article.dataset.price    = svc.basePrice || 0;
     article.style.cursor     = 'pointer';
     article.dataset.reveal   = '';
+    article.dataset.revealDelay = index * 60;
 
-    const responseTime = {
-      plumbing: '~45 min', electrical: '~30 min', hvac: '~60 min',
-      cleaning: '~20 min', painting: '~50 min', carpentry: '~70 min',
-      flooring: '~90 min', appliance: '~40 min', roofing: '~120 min',
-      landscaping: '~60 min', handyman: '~25 min', renovation: '~120 min',
-      drywall: '~80 min', installation: '~35 min',
-    }[category] || '~45 min';
-
-    const ratingHtml = rating > 0
-      ? `<span class="product-card__rating" aria-label="Rating ${rating.toFixed(1)}">
-           <svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-           ${rating.toFixed(1)}<span class="product-card__rating-count">${reviews > 0 ? ` (${reviews})` : ''}</span>
-         </span>`
-      : '';
+    const finalIcon = getBestIcon(svc);
 
     const priceLabel = price > 0
       ? `from <strong>${price} EGP${priceUnit}</strong>`
       : '<strong>On Request</strong>';
 
     article.innerHTML = `
-      <div class="product-card__icon ${iconClass}">${icons[category] || icons.other}</div>
+      <div class="product-card__icon ${iconClass}">${finalIcon}</div>
       <h4 class="product-card__title" data-i18n="${nameKey}">${displayTitle}</h4>
       <p class="product-card__desc" data-i18n="${descKey}">${svc.description || ''}</p>
+      
       <div class="product-card__info">
-        ${ratingHtml}
+        <span class="product-card__rating">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          ${svc.averageRating || '4.5'}
+          <span class="product-card__rating-count">(${svc.totalReviews || '0'})</span>
+        </span>
         <span class="product-card__response">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          ${responseTime}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          ~30 min
         </span>
       </div>
+
       <div class="product-card__footer">
         <span class="product-card__price">${priceLabel}</span>
         <button class="product-card__action" type="button">View Details →</button>
@@ -405,6 +462,28 @@ document.addEventListener('DOMContentLoaded', () => {
     if (svcDrawerImg)         svcDrawerImg.style.transform = 'scale(1.08) translateY(0)';
     if (svcDrawerTopbar)      svcDrawerTopbar.classList.remove('is-solid');
     if (svcDrawerTopbarTitle) svcDrawerTopbarTitle.textContent = title;
+    if (svcDrawerTopbarEyebrow) {
+      const cat = (svc.category || 'service');
+      svcDrawerTopbarEyebrow.textContent = cat.charAt(0).toUpperCase() + cat.slice(1) + ' · SERVIO';
+    }
+    if (svcDrawerTopbarIcon) {
+      const TOPBAR_ICONS = {
+        plumbing:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"/><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"/></svg>`,
+        electrical:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>`,
+        hvac:        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20"/><path d="M12 2v20"/><path d="m20 16-4-4 4-4"/><path d="m4 8 4 4-4 4"/><path d="m16 4-4 4-4-4"/><path d="m8 20 4-4 4 4"/></svg>`,
+        cleaning:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>`,
+        painting:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>`,
+        carpentry:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 12-8.373 8.373a1 1 0 1 1-3-3L12 9"/><path d="m18 15 4-4"/><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172V7l-2.26-2.26a6 6 0 0 0-4.202-1.756L9 2.96l.92.82A6.18 6.18 0 0 1 12 8.4V10l2 2h1.172a2 2 0 0 1 1.414.586L18 14"/></svg>`,
+        flooring:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>`,
+        appliance:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="20" x="3" y="2" rx="2"/><circle cx="12" cy="13" r="5"/><path d="M6 6h.01"/><path d="M9 6h.01"/></svg>`,
+        handyman:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`,
+        renovation:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
+        roofing:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7"/><path d="M3 9v13h18V9"/><path d="M9 22V12h6v10"/></svg>`,
+        landscaping: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-7l-2-2"/><path d="M17 8v.8A6 6 0 0 1 13.8 20v0H10v0A6.5 6.5 0 0 1 7 8h0a5 5 0 0 1 10 0z"/><path d="m14 14-2 2-2-2"/></svg>`,
+        installation:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>`,
+      };
+      svcDrawerTopbarIcon.innerHTML = TOPBAR_ICONS[category] || `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`;
+    }
     if (svcDrawerScroller)    svcDrawerScroller.scrollTop = 0;
     svcDrawerScroller?.addEventListener('scroll', handleDrawerScroll);
 
@@ -515,6 +594,246 @@ document.addEventListener('DOMContentLoaded', () => {
     if (maxInput) maxInput.value = state.advanced.price.max || '';
   }
 
+  // ── Category-first browsing ───────────────────────────────────────────────
+  const CATEGORY_DESCRIPTIONS = {
+    plumbing:      'Pipes, drains, fixtures, and water heater services.',
+    electrical:    'Wiring, panels, outlets, and safe electrical work.',
+    hvac:          'AC installation, maintenance, and climate control.',
+    cleaning:      'Deep cleaning, sanitizing, and move-in/out cleans.',
+    painting:      'Interior and exterior painting with pro finishes.',
+    carpentry:     'Custom woodwork, furniture, and door fitting.',
+    flooring:      'Tile, hardwood, laminate, and floor restoration.',
+    appliance:     'Repair and install washers, dryers, ovens, and more.',
+    handyman:      'All-in-one fixes for everyday home maintenance.',
+    renovation:    'Full room and property renovation projects.',
+    drywall:       'Wall patching, plastering, and drywall installation.',
+    roofing:       'Leak repair, shingle work, and full roof services.',
+    'pest-control':'Safe elimination of insects, rodents, and pests.',
+    landscaping:   'Lawn care, gardening, and outdoor space design.',
+    installation:  'TV mounts, shelves, fixtures, and equipment setup.',
+  };
+
+  const CATEGORY_RESPONSE_TIMES = {
+    plumbing: '~45 min', electrical: '~30 min', hvac: '~60 min',
+    cleaning: '~20 min', painting: '~50 min', carpentry: '~70 min',
+    flooring: '~90 min', appliance: '~40 min', roofing: '~120 min',
+    landscaping: '~60 min', handyman: '~25 min', renovation: '~120 min',
+    drywall: '~80 min', installation: '~35 min',
+  };
+
+  function generateCategoryCard(catKey, services, index = 0) {
+    const label      = CATEGORY_LABELS[catKey] || catKey.charAt(0).toUpperCase() + catKey.slice(1);
+    const count      = services.length;
+    const prices     = services.map(s => s.basePrice).filter(Boolean);
+    const minPrice   = prices.length ? Math.min(...prices) : 0;
+    const priceStr   = minPrice > 0 ? `from <strong>${minPrice} EGP</strong>` : '<strong>On Request</strong>';
+    const desc       = CATEGORY_DESCRIPTIONS[catKey] || 'Professional home services.';
+    const responseTime = CATEGORY_RESPONSE_TIMES[catKey] || '~45 min';
+
+    const iconClass = ['plumbing','hvac','electrical'].includes(catKey)
+      ? 'product-card__icon--primary'
+      : 'product-card__icon--secondary';
+
+    const article = document.createElement('article');
+    article.className = 'product-card smp-category-card';
+    article.dataset.category = catKey;
+    article.style.cursor = 'pointer';
+    article.dataset.reveal = '';
+    article.dataset.revealDelay = index * 60;
+
+    article.innerHTML = `
+      <div class="product-card__header">
+        <div class="product-card__icon ${iconClass}">${CATEGORY_ICONS[catKey] || CATEGORY_ICONS.other}</div>
+        <span class="product-card__tag tag--outline">${catKey.toUpperCase()}</span>
+      </div>
+      <h4 class="product-card__title">${label}</h4>
+      <p class="product-card__desc">${desc}</p>
+      
+      <div class="product-card__metrics">
+        <span class="metric-bubble">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="4" rx="1"/><path d="M7 6H5a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-2"/><path d="M9 12h6M9 16h4"/></svg>
+          ${count} Services
+        </span>
+        <span class="metric-bubble">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          ${responseTime}
+        </span>
+      </div>
+
+      <div class="product-card__footer">
+        <span class="product-card__price">${priceStr}</span>
+        <button class="product-card__action" type="button">Explore →</button>
+      </div>
+    `;
+
+    article.addEventListener('click', () => {
+      state.browseCategory = catKey;
+      const url = new URL(window.location);
+      url.searchParams.set('category', catKey);
+      window.history.pushState({ category: catKey }, '', url);
+      applyFilters();
+      scrollMarketplaceToTop();
+    });
+
+    return article;
+  }
+
+  function renderCategoryGrid() {
+    if (!resultsContainer) return;
+    resultsContainer.innerHTML = '';
+
+    const catMap = {};
+    (state.apiServices || []).forEach(svc => {
+      const cat = (svc.category || 'other').toLowerCase();
+      if (!catMap[cat]) catMap[cat] = [];
+      catMap[cat].push(svc);
+    });
+    
+    const totalCatCount = Object.keys(catMap).length;
+
+    if (pagination) pagination.hidden = true;
+
+    // Defined groups and ordering
+    const categoryGroups = [
+      {
+        id: 'maintenance',
+        title: 'Home Maintenance & Repair',
+        i18n: 'smp_heading_maintenance',
+        categories: ['plumbing', 'electrical', 'hvac', 'carpentry', 'appliance', 'handyman']
+      },
+      {
+        id: 'improvement',
+        title: '✨ Home Improvement & Finishing',
+        i18n: 'smp_heading_improvement',
+        categories: ['renovation', 'painting', 'flooring', 'drywall', 'roofing']
+      },
+      {
+        id: 'specialty',
+        title: '🌟 Specialized & Exterior Services',
+        i18n: 'smp_heading_specialty',
+        categories: ['pest-control', 'cleaning', 'landscaping', 'installation']
+      }
+    ];
+
+    categoryGroups.forEach(group => {
+      const activeCategories = group.categories.filter(cat => catMap[cat]);
+      
+      if (activeCategories.length > 0) {
+        const groupDiv = document.createElement('div');
+        groupDiv.className = 'category-group';
+        groupDiv.dataset.group = group.id;
+
+        const heading = document.createElement('h3');
+        heading.className = 'category-heading';
+        if (group.i18n) heading.dataset.i18n = group.i18n;
+        heading.dataset.reveal = '';
+        heading.textContent = group.title;
+
+        const grid = document.createElement('div');
+        grid.className = 'product-grid';
+
+        activeCategories.forEach((catKey, index) => {
+          grid.appendChild(generateCategoryCard(catKey, catMap[catKey], index));
+          delete catMap[catKey]; // Remove so we know what's left
+        });
+
+        groupDiv.appendChild(heading);
+        groupDiv.appendChild(grid);
+        resultsContainer.appendChild(groupDiv);
+      }
+    });
+
+    // Handle any leftover categories
+    const leftoverKeys = Object.keys(catMap);
+    if (leftoverKeys.length > 0) {
+      const groupDiv = document.createElement('div');
+      groupDiv.className = 'category-group';
+      groupDiv.dataset.group = 'specialty';
+
+      const heading = document.createElement('h3');
+      heading.className = 'category-heading';
+      heading.dataset.reveal = '';
+      heading.textContent = 'Other Services';
+
+      const grid = document.createElement('div');
+      grid.className = 'product-grid';
+
+      leftoverKeys.sort().forEach((catKey, index) => {
+        grid.appendChild(generateCategoryCard(catKey, catMap[catKey], index));
+      });
+
+      groupDiv.appendChild(heading);
+      groupDiv.appendChild(grid);
+      resultsContainer.appendChild(groupDiv);
+    }
+
+    if (resultCount) animateCount(resultCount, totalCatCount);
+    if (resultLabel) resultLabel.textContent = `categor${totalCatCount !== 1 ? 'ies' : 'y'} available`;
+
+    updateFilterTokens();
+
+    setTimeout(() => {
+      if (typeof window.initScrollReveal === 'function') {
+        window.initScrollReveal();
+      } else {
+        document.querySelectorAll('[data-reveal]').forEach(el => el.classList.add('is-visible'));
+      }
+    }, 50);
+  }
+
+  function renderCategoryServices(catKey) {
+    if (!resultsContainer) return;
+    resultsContainer.innerHTML = '';
+
+    const label = CATEGORY_LABELS[catKey] || catKey.charAt(0).toUpperCase() + catKey.slice(1);
+
+    const header = document.createElement('div');
+    header.className = 'cat-browse-header';
+    header.innerHTML = `
+      <button type="button" class="cat-back-btn" id="catBackBtn">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        All Categories
+      </button>
+      <h3 class="cat-browse-title">${label}</h3>
+    `;
+    resultsContainer.appendChild(header);
+
+    document.getElementById('catBackBtn').addEventListener('click', () => {
+      state.browseCategory = null;
+      const url = new URL(window.location);
+      url.searchParams.delete('category');
+      window.history.pushState({ category: null }, '', url);
+      applyFilters();
+      scrollMarketplaceToTop();
+    });
+
+    const services = (state.apiServices || []).filter(svc => (svc.category || '').toLowerCase() === catKey);
+
+    if (pagination) pagination.hidden = true;
+
+    const grid = document.createElement('div');
+    grid.className = 'product-grid';
+    if (state.view === 'list') grid.classList.add('is-list-view');
+
+    services.forEach((svc, index) => grid.appendChild(generateServiceCard(svc, index)));
+    resultsContainer.appendChild(grid);
+
+    const total = services.length;
+    if (resultCount) animateCount(resultCount, total);
+    if (resultLabel) resultLabel.textContent = `service${total !== 1 ? 's' : ''} in ${label}`;
+
+    updateFilterTokens();
+
+    setTimeout(() => {
+      if (typeof window.initScrollReveal === 'function') {
+        window.initScrollReveal();
+      } else {
+        document.querySelectorAll('[data-reveal]').forEach(el => el.classList.add('is-visible'));
+      }
+      if (typeof window.translatePage === 'function') window.translatePage();
+    }, 50);
+  }
+
   // ── Main Filter Application ────────────────────────────────────────────────
   function applyFilters() {
     const hasAdvancedFilters = (state.advanced.category && state.advanced.category.length > 0)
@@ -524,7 +843,20 @@ document.addEventListener('DOMContentLoaded', () => {
       || state.advanced.price.max !== null;
     const isFiltering = state.query !== '' || state.filter !== 'all' || hasAdvancedFilters;
 
+    // When the user starts filtering/searching, exit category drill-down
+    if (isFiltering) state.browseCategory = null;
+
     if (featuredSection) featuredSection.style.display = isFiltering ? 'none' : '';
+
+    // Category-first browsing: no active filters → show category grid or drill-down
+    if (!isFiltering) {
+      if (state.browseCategory) {
+        renderCategoryServices(state.browseCategory);
+      } else {
+        renderCategoryGrid();
+      }
+      return;
+    }
 
     const filtered = (state.apiServices || []).filter(svc => {
       const title = (svc.title || '').toLowerCase();
@@ -616,8 +948,8 @@ document.addEventListener('DOMContentLoaded', () => {
           grid.className = 'product-grid';
           if (state.view === 'list') grid.classList.add('is-list-view');
           
-          groups[master].services.forEach(svc => {
-            grid.appendChild(generateServiceCard(svc));
+          groups[master].services.forEach((svc, index) => {
+            grid.appendChild(generateServiceCard(svc, index));
           });
           
           groupDiv.appendChild(heading);
@@ -816,12 +1148,26 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Pre-fill from URL
-  const urlQuery = new URLSearchParams(window.location.search).get('q');
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlQuery = urlParams.get('q');
   if (urlQuery && searchInput) {
     searchInput.value = urlQuery;
     state.query = urlQuery.toLowerCase().trim();
     if (searchClear) searchClear.hidden = false;
   }
+  
+  const urlCategory = urlParams.get('category');
+  if (urlCategory) {
+    state.browseCategory = urlCategory.toLowerCase();
+  }
+
+  // Handle Browser Back/Forward
+  window.addEventListener('popstate', (e) => {
+    const params = new URLSearchParams(window.location.search);
+    const cat = params.get('category');
+    state.browseCategory = cat;
+    applyFilters();
+  });
 
   // Init
   fetchServices();

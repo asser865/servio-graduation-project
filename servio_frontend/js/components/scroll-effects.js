@@ -92,13 +92,20 @@ export function initScrollEffects() {
         const doc = document.documentElement;
         const max = Math.max(1, doc.scrollHeight - doc.clientHeight);
         const pct = Math.min(1, Math.max(0, doc.scrollTop / max));
-        progress.style.width = `${(pct * 100).toFixed(2)}%`;
-        progress.style.opacity = pct > 0.02 ? "0.95" : "0";
+        const newWidth = `${(pct * 100).toFixed(2)}%`;
+        const newOpacity = pct > 0.02 ? '0.95' : '0';
+        // Only update when value actually changes to avoid spurious repaints
+        if (progress.style.width !== newWidth) progress.style.width = newWidth;
+        if (progress.style.opacity !== newOpacity) progress.style.opacity = newOpacity;
       }
 
       if (header) {
         const elevated = window.scrollY > 8;
-        header.classList.toggle("is-elevated", elevated);
+        // Guard: only toggle class if state changed to prevent forced style recalculations
+        const wasElevated = header.classList.contains('is-elevated');
+        if (elevated !== wasElevated) {
+          header.classList.toggle('is-elevated', elevated);
+        }
       }
 
       updateFx();

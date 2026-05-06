@@ -14,4 +14,7 @@ export const getAllBookings  = (params = {}) => {
   const qs = new URLSearchParams(params).toString();
   return api.get(`/bookings${qs ? '?' + qs : ''}`);
 };
-export const cancelBooking  = (id)          => api.patch(`/bookings/${id}/status`, { status: 'cancelled' });
+export const cancelBooking        = (id)           => api.patch(`/bookings/${id}/status`, { status: 'cancelled' });
+export const updateBookingStatus  = (id, status)   => api.patch(`/bookings/${id}/status`, { status });
+export const getWorkerBookedSlots = (workerId, date) =>
+  api.get(`/bookings/worker/${workerId}/slots?date=${date}`);

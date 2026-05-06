@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>SERVIO | Technician Dashboard</title>
     <meta name="description" content="Manage your job queue, earnings, availability, and profile." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <script src="../js/config.js"></script>
     <script src="../js/theme-init.js"></script>
     <script src="../js/lang-init.js"></script>
@@ -76,63 +78,9 @@
 
                 <p class="notif-panel__group-label" data-i18n="tech_notif_today">Today</p>
 
-                <div class="notif-item is-unread" data-notif-id="1">
-                  <span class="notif-item__dot"></span>
-                  <span class="notif-item__icon notif-item__icon--job">
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-                  </span>
-                  <div class="notif-item__body">
-                    <p class="notif-item__msg" data-i18n="tech_notif_job_req" data-i18n-html data-i18n-job="tech_v_ac_repair" data-i18n-loc="tech_v_maadi">New job request: <strong>AC Repair</strong> in Maadi</p>
-                    <span class="notif-item__time" data-i18n="notif_time_min" data-i18n-n="2">2 min ago</span>
-                  </div>
+                <div id="notif-items-list">
+                <!-- Populated dynamically from API -->
                 </div>
-
-                <div class="notif-item is-unread" data-notif-id="2">
-                  <span class="notif-item__dot"></span>
-                  <span class="notif-item__icon notif-item__icon--payment">
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-                  </span>
-                  <div class="notif-item__body">
-                    <p class="notif-item__msg" data-i18n="tech_notif_payment" data-i18n-html data-i18n-amt="EGP 450" data-i18n-job="tech_v_plumbing">Payment of <strong>EGP 450</strong> received for Plumbing job</p>
-                    <span class="notif-item__time" data-i18n="notif_time_hr" data-i18n-n="1">1 hr ago</span>
-                  </div>
-                </div>
-
-                <p class="notif-panel__group-label" data-i18n="tech_notif_earlier">Earlier</p>
-
-                <div class="notif-item" data-notif-id="3">
-                  <span class="notif-item__dot"></span>
-                  <span class="notif-item__icon notif-item__icon--review">
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                  </span>
-                  <div class="notif-item__body">
-                    <p class="notif-item__msg" data-i18n="tech_notif_review" data-i18n-html data-i18n-name="Sara M."><strong>Sara M.</strong> left you a 5-star review</p>
-                    <span class="notif-item__time" data-i18n="notif_time_yesterday">Yesterday</span>
-                  </div>
-                </div>
-
-                <div class="notif-item" data-notif-id="4">
-                  <span class="notif-item__dot"></span>
-                  <span class="notif-item__icon notif-item__icon--message">
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                  </span>
-                  <div class="notif-item__body">
-                    <p class="notif-item__msg" data-i18n="tech_notif_msg" data-i18n-html data-i18n-name="Ahmed K." data-i18n-job="tech_v_electrical">New message from <strong>Ahmed K.</strong> about Electrical job</p>
-                    <span class="notif-item__time" data-i18n="notif_time_yesterday">Yesterday</span>
-                  </div>
-                </div>
-
-                <div class="notif-item" data-notif-id="5">
-                  <span class="notif-item__dot"></span>
-                  <span class="notif-item__icon notif-item__icon--system">
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                  </span>
-                  <div class="notif-item__body">
-                    <p class="notif-item__msg" data-i18n="tech_notif_verif_complete" data-i18n-html>Your profile verification is <strong>complete</strong></p>
-                    <span class="notif-item__time" data-i18n="notif_time_days" data-i18n-n="2">2 days ago</span>
-                  </div>
-                </div>
-
                 <p class="notif-panel__empty" id="notif-empty" hidden data-i18n="tech_notif_empty">You're all caught up!</p>
               </div>
             </div>
@@ -295,39 +243,39 @@
                 <div class="tech-stat-card__icon tech-stat-card__icon--accent">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#9A8C73" stroke-width="2" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
                 </div>
-                <div class="tech-stat-card__value" data-stat="total-jobs">47</div>
+                <div class="tech-stat-card__value" data-stat="total-jobs">—</div>
                 <div class="tech-stat-card__label" data-i18n="tech_stat_total_jobs">Total Jobs</div>
-                <div class="tech-stat-card__change" data-i18n="tech_stat_jobs_change">+3 this month</div>
+                <div class="tech-stat-card__change" data-stat-sub="total-jobs-month">—</div>
               </div>
               <div class="tech-stat-card">
                 <div class="tech-stat-card__icon tech-stat-card__icon--green">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#22A05A" stroke-width="2" aria-hidden="true"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
                 </div>
-                <div class="tech-stat-card__value" data-stat="month-earnings">EGP 3,200</div>
+                <div class="tech-stat-card__value" data-stat="month-earnings">—</div>
                 <div class="tech-stat-card__label" data-i18n="tech_stat_this_month">This Month</div>
-                <div class="tech-stat-card__change" data-i18n="tech_stat_earnings_change">+EGP 800 vs last</div>
+                <div class="tech-stat-card__change" data-stat-sub="month-earnings-change">—</div>
               </div>
               <div class="tech-stat-card">
                 <div class="tech-stat-card__icon tech-stat-card__icon--amber">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#F59E0B" stroke-width="2" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
                 </div>
-                <div class="tech-stat-card__value" data-stat="avg-rating">4.8</div>
+                <div class="tech-stat-card__value" data-stat="avg-rating">—</div>
                 <div class="tech-stat-card__label" data-i18n="tech_stat_avg_rating">Avg Rating</div>
-                <div class="tech-stat-card__change" data-i18n="tech_stat_rating_reviews">Based on 24 reviews</div>
+                <div class="tech-stat-card__change" data-stat-sub="avg-rating-count">—</div>
               </div>
               <div class="tech-stat-card">
                 <div class="tech-stat-card__icon tech-stat-card__icon--purple">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#6E56CF" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                 </div>
-                <div class="tech-stat-card__value" data-stat="pending-requests">2</div>
+                <div class="tech-stat-card__value" data-stat="pending-requests">—</div>
                 <div class="tech-stat-card__label" data-i18n="tech_stat_pending_req">Pending Requests</div>
-                <div class="tech-stat-card__change" data-i18n="tech_action_needed">Action needed</div>
+                <div class="tech-stat-card__change" data-stat-sub="pending-requests-note">—</div>
               </div>
               <div class="tech-stat-card">
                 <div class="tech-stat-card__icon tech-stat-card__icon--amber">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
                 </div>
-                <div class="tech-stat-card__value">2</div>
+                <div class="tech-stat-card__value" data-stat="pending-proposals">—</div>
                 <div class="tech-stat-card__label" data-i18n="tech_stat_pending_prop">Pending Proposals</div>
                 <div class="tech-stat-card__change" style="color:var(--color-text-muted)" data-i18n="tech_stat_awaiting_review">Awaiting review</div>
               </div>
@@ -335,9 +283,9 @@
                 <div class="tech-stat-card__icon" style="background:rgba(217,119,6,0.1); color:#d97706;">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
                 </div>
-                <div class="tech-stat-card__value tech-stat-card__value--currency" style="color:#d97706;">1,350 <span data-i18n="currency_egp">EGP</span></div>
+                <div class="tech-stat-card__value tech-stat-card__value--currency" style="color:#d97706;" data-stat="outstanding-balance">— <span data-i18n="currency_egp">EGP</span></div>
                 <div class="tech-stat-card__label" data-i18n="tech_stat_outstanding">Outstanding Balance</div>
-                <div class="tech-stat-card__change" style="color:#d97706;" data-i18n="tech_stat_due_date" data-i18n-params='{"date": "31 Mar"}'>Due 31 Mar</div>
+                <div class="tech-stat-card__change" style="color:#d97706;" data-stat-sub="outstanding-due">—</div>
               </div>
             </div>
 
@@ -353,34 +301,8 @@
                   <button class="dash-overview-card__link" type="button" data-tab-link="job-queue" data-i18n="tech_view_all">View all →</button>
                 </div>
 
-                <div class="job-card-v2">
-                  <div class="job-card-v2__icon">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#9A8C73" stroke-width="2" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-                  </div>
-                  <div class="job-card-v2__body">
-                    <h4 class="job-card-v2__title" data-i18n="tech_job_plumbing_burst">Plumbing — Burst Pipe</h4>
-                    <p class="job-card-v2__meta">
-                      <span>Ahmed Hassan</span><span class="job-card-v2__sep">·</span>
-                      <span>Cairo, Maadi</span><span class="job-card-v2__sep">·</span>
-                      <span class="job-card-v2__price">~EGP 350</span>
-                    </p>
-                  </div>
-                  <span class="badge badge--pending" data-i18n="status_new">New</span>
-                </div>
-
-                <div class="job-card-v2">
-                  <div class="job-card-v2__icon">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#9A8C73" stroke-width="2" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                  </div>
-                  <div class="job-card-v2__body">
-                    <h4 class="job-card-v2__title" data-i18n="tech_job_electrical_panel">Electrical — Panel Upgrade</h4>
-                    <p class="job-card-v2__meta">
-                      <span>Sara Mohamed</span><span class="job-card-v2__sep">·</span>
-                      <span>Heliopolis</span><span class="job-card-v2__sep">·</span>
-                      <span class="job-card-v2__price">~EGP 600</span>
-                    </p>
-                  </div>
-                  <span class="badge badge--pending" data-i18n="status_new">New</span>
+                <div id="overview-incoming-list">
+                  <!-- Populated dynamically from API -->
                 </div>
 
               </div>
@@ -390,51 +312,8 @@
                 <div class="dash-overview-card__header">
                   <h3 class="dash-overview-card__title" data-i18n="tech_upcoming_schedule">Upcoming Schedule</h3>
                 </div>
-                <div class="dash-schedule-list">
-                  <div class="dash-schedule-item">
-                    <div class="dash-schedule-date">
-                      <span class="dash-schedule-day">29</span>
-                      <span class="dash-schedule-month" data-i18n="month_mar_short">MAR</span>
-                    </div>
-                    <div class="dash-schedule-content">
-                      <h4 class="dash-schedule-title" data-i18n="tech_job_plumbing_burst">Plumbing — Burst Pipe</h4>
-                      <p class="dash-schedule-info">
-                        <span class="dash-schedule-time">10:00 AM</span>
-                        <span class="dash-schedule-sep">·</span>
-                        <span class="dash-schedule-loc">Maadi</span>
-                      </p>
-                    </div>
-                  </div>
-
-                  <div class="dash-schedule-item">
-                    <div class="dash-schedule-date">
-                      <span class="dash-schedule-day">30</span>
-                      <span class="dash-schedule-month" data-i18n="month_mar_short">MAR</span>
-                    </div>
-                    <div class="dash-schedule-content">
-                      <h4 class="dash-schedule-title" data-i18n="tech_job_electrical_panel">Electrical — Panel Upgrade</h4>
-                      <p class="dash-schedule-info">
-                        <span class="dash-schedule-time">02:30 PM</span>
-                        <span class="dash-schedule-sep">·</span>
-                        <span class="dash-schedule-loc">Nasr City</span>
-                      </p>
-                    </div>
-                  </div>
-
-                  <div class="dash-schedule-item">
-                    <div class="dash-schedule-date">
-                      <span class="dash-schedule-day">02</span>
-                      <span class="dash-schedule-month" data-i18n="month_apr_short">APR</span>
-                    </div>
-                    <div class="dash-schedule-content">
-                      <h4 class="dash-schedule-title" data-i18n="home_cat_ac">Air Conditioning</h4>
-                      <p class="dash-schedule-info">
-                        <span class="dash-schedule-time">09:00 AM</span>
-                        <span class="dash-schedule-sep">·</span>
-                        <span class="dash-schedule-loc">Heliopolis</span>
-                      </p>
-                    </div>
-                  </div>
+                <div class="dash-schedule-list" id="overview-schedule-list">
+                  <!-- Populated dynamically from API -->
                 </div>
               </div>
 
@@ -449,122 +328,7 @@
             </div>
 
             <div id="job-queue-list">
-
-              <!-- Card S-2849: Electrical — pending state -->
-              <article class="jq-card" id="jq-S-2849" data-reveal>
-                <div class="jq-card__header">
-                  <div class="jq-card__info-group">
-                    <span class="jq-service-badge" data-i18n="home_cat_electrical">Electrical</span>
-                    <span class="jq-booking-id">#S-2849</span>
-                  </div>
-                  <span class="jq-status" data-i18n="tech_status_pending_acceptance">Pending Acceptance</span>
-                </div>
-                <div class="jq-card__body">
-                  <div class="jq-customer-row">
-                    <span>👤 Ahmed Yasser</span>
-                    <span class="dot-sep"></span>
-                    <span>📍 Nasr City</span>
-                  </div>
-                  <div class="jq-details-row">
-                    <div class="jq-detail-item">📅 28 Mar 2026</div>
-                    <div class="jq-detail-item">💰 500 EGP</div>
-                    <div class="jq-detail-item">💳 <span data-i18n="booking_cash">Cash</span></div>
-                  </div>
-                  <div class="gps-banner" data-dismissible>
-                    <span>📍 <span data-i18n="jq_gps_required">GPS Required — Enable location before traveling.</span></span>
-                    <button class="gps-banner__dismiss" aria-label="Dismiss" data-i18n-aria-label="tech_dismiss_aria">&times;</button>
-                  </div>
-                </div>
-                <div class="jq-card__actions">
-                  <div class="arrival-flow" data-booking-id="S-2849" data-pin="2916">
-                    <div class="arrival-state" data-state="pending">
-                      <button class="btn btn--primary btn--sm" data-flow-action="accept" data-i18n="tech_accept_job">Accept Job</button>
-                      <button class="btn btn--outline btn--sm btn--danger-outline" data-flow-action="decline" data-i18n="tech_decline">Decline</button>
-                    </div>
-                    <div class="arrival-state" data-state="accepted" hidden>
-                      <button class="btn btn--primary btn--sm" data-flow-action="on-my-way" data-i18n="tech_on_my_way">On My Way</button>
-                    </div>
-                    <div class="arrival-state" data-state="en-route" hidden>
-                      <button class="btn btn--primary btn--sm" data-flow-action="arrived" data-i18n="tech_arrived">Arrived at Location</button>
-                    </div>
-                    <div class="arrival-state" data-state="arrived" hidden>
-                      <div class="pin-entry" style="display:flex;gap:8px;align-items:center;">
-                        <input type="text" maxlength="4" class="form-input pin-input" placeholder="Enter PIN" data-i18n-placeholder="tech_enter_pin" style="width:100px;text-align:center;" />
-                        <button class="btn btn--primary btn--sm" data-flow-action="start-job" data-i18n="tech_start">Start</button>
-                      </div>
-                    </div>
-                    <div class="arrival-state" data-state="in-progress" hidden>
-                      <div class="job-timer" id="timer-S-2849">00:00:00</div>
-                      <button class="btn btn--sm btn--danger-outline" data-flow-action="complete" data-i18n="tech_complete">Complete</button>
-                    </div>
-                  </div>
-                  <a href="./messages.html" class="btn btn--outline btn--sm" data-i18n="tech_message_customer">Message Customer</a>
-                </div>
-              </article>
-
-              <!-- Card S-2848: HVAC — in-progress state -->
-              <article class="jq-card jq-card--in-progress" id="jq-S-2848" data-reveal>
-                <div class="jq-card__header">
-                  <div class="jq-card__info-group">
-                    <span class="jq-service-badge" data-i18n="home_cat_ac">HVAC</span>
-                    <span class="jq-booking-id">#S-2848</span>
-                  </div>
-                  <span class="jq-status" data-i18n="tech_status_in_progress">In Progress</span>
-                </div>
-                <div class="jq-card__body">
-                  <div class="jq-customer-row">
-                    <span>👤 Ahmed Yasser</span>
-                    <span class="dot-sep"></span>
-                    <span>📍 Maadi</span>
-                  </div>
-                  <div class="jq-details-row">
-                    <div class="jq-detail-item">📅 22 Mar 2026</div>
-                    <div class="jq-detail-item">💰 900 EGP</div>
-                    <div class="jq-detail-item">💳 <span data-i18n="cust_hist_credit">Credit Card</span></div>
-                  </div>
-                </div>
-                <div class="jq-card__actions">
-                  <div class="arrival-flow" data-booking-id="S-2848" data-pin="7364">
-                    <div class="arrival-state" data-state="in-progress">
-                      <div class="job-timer" id="timer-S-2848">00:00:00</div>
-                      <button class="btn btn--sm btn--danger-outline" data-flow-action="complete" style="color:var(--color-danger);border-color:var(--color-danger);" data-i18n="tech_mark_complete">Mark Complete</button>
-                    </div>
-                    <div class="arrival-state" data-state="complete" hidden>
-                      <div class="upload-zone" data-i18n="tech_upload_photos">Click to upload Job Photos</div>
-                      <button class="btn btn--primary btn--sm" data-flow-action="submit-complete" data-i18n="tech_finish_job">Finish Job</button>
-                    </div>
-                  </div>
-                  <a href="./messages.html" class="btn btn--outline btn--sm" data-i18n="tech_message_customer">Message Customer</a>
-                </div>
-              </article>
-
-              <!-- Card S-2847: Plumbing — complete state -->
-              <article class="jq-card jq-card--completed" id="jq-S-2847" data-reveal>
-                <div class="jq-card__header">
-                  <div class="jq-card__info-group">
-                    <span class="jq-service-badge" data-i18n="home_cat_plumbing">Plumbing</span>
-                    <span class="jq-booking-id">#S-2847</span>
-                  </div>
-                  <span class="jq-status" style="color:#22A05A;" data-i18n="tech_status_completed">Completed</span>
-                </div>
-                <div class="jq-card__body">
-                  <div class="jq-customer-row">
-                    <span>👤 Ahmed Yasser</span>
-                    <span class="dot-sep"></span>
-                    <span>📍 Maadi</span>
-                  </div>
-                  <div class="jq-details-row">
-                    <div class="jq-detail-item">📅 15 Mar 2026</div>
-                    <div class="jq-detail-item">💰 650 EGP</div>
-                    <div class="jq-detail-item">💳 <span data-i18n="cust_hist_credit">Credit Card</span></div>
-                  </div>
-                </div>
-                <div class="jq-card__actions">
-                   <p class="cash-note" data-i18n="tech_job_billed">Job successfully billed. Earnings added to your wallet.</p>
-                   <a href="./messages.html" class="btn btn--outline btn--sm" data-i18n="tech_message_customer">Message Customer</a>
-                </div>
-              </article>
-
+              <!-- Populated dynamically from API -->
             </div>
           </section>
 
@@ -575,76 +339,70 @@
               <p class="dash-panel__subtitle" data-i18n="tech_earnings_sub">Your income overview and recent job payouts.</p>
             </div>
 
-            <div class="liability-card" id="liabilityCard">
-              <div class="liability-card__header">
-                <h3 data-i18n="tech_outstanding_cash">Outstanding Cash Balance</h3>
-                <span class="liability-amount" id="liabilityAmount">1,350 EGP</span>
+            <div class="jq-premium-balance-card" id="liabilityCard">
+              <div class="jq-premium-balance-header">
+                <div class="jq-premium-balance-title">
+                  <h3 data-i18n="tech_outstanding_cash">Outstanding Cash Balance</h3>
+                  <div class="jq-premium-balance-amount" id="liabilityAmount">— <span>EGP</span></div>
+                </div>
+                <button class="btn-premium btn-premium--primary btn-premium--sm" id="payLiabilityBtn" data-i18n="tech_pay_now">Pay Now</button>
               </div>
-              <div class="liability-items">
-                <div class="liability-item"><span>#S-2847 <span data-i18n="tech_liability_commission">commission</span></span><span>65 EGP</span></div>
-                <div class="liability-item"><span>#S-2780 <span data-i18n="tech_liability_commission">commission</span></span><span>110 EGP</span></div>
-                <div class="liability-item"><span data-i18n="tech_liability_prev">Previous period jobs</span><span>1,175 EGP</span></div>
+              
+              <div class="liability-items" id="liability-items-list" style="margin-bottom: 24px;">
+                <!-- Populated dynamically -->
               </div>
-              <div class="liability-footer">
-                <span class="liability-settlement"><span data-i18n="tech_next_settlement">Next Settlement:</span> 31 Mar 2026</span>
-                <button class="btn btn--primary btn--sm" id="payLiabilityBtn" data-i18n="tech_pay_now">Pay Now</button>
+
+              <div class="jq-premium-settlement-info">
+                <div class="jq-premium-next-date">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  <span data-i18n="tech_next_settlement">Next Settlement:</span>
+                  <strong id="liability-settlement-date">—</strong>
+                </div>
               </div>
             </div>
+
             <div class="liability-warning" id="liabilityWarning" data-i18n="tech_liability_warning" hidden>
               ⚠️ Maximum liability reached — You may only accept online payment jobs above 2,000 EGP
             </div>
 
-            <div class="earn-stat-grid" data-reveal>
-              <div class="earn-stat-card">
-                <div class="earn-stat-card__label" data-i18n="tech_total_earned">Total Earned</div>
-                <div class="earn-stat-card__value">EGP 12,400</div>
-                <div class="earn-stat-card__sub" data-i18n="tech_since_joining">Since joining SERVIO</div>
+            <div class="jq-premium-earn-grid" data-reveal>
+              <div class="jq-premium-earn-card">
+                <div class="jq-premium-earn-label" data-i18n="tech_total_earned">Total Earned</div>
+                <div class="jq-premium-earn-value" id="earn-total">—</div>
+                <div class="jq-premium-earn-sub">
+                   <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                   <span data-i18n="tech_since_joining">Since joining SERVIO</span>
+                </div>
               </div>
-              <div class="earn-stat-card">
-                <div class="earn-stat-card__label" data-i18n="tech_stat_this_month">This Month</div>
-                <div class="earn-stat-card__value">EGP 3,200</div>
-                <div class="earn-stat-card__sub" data-i18n="tech_vs_last_month">+EGP 800 vs last month</div>
+              
+              <div class="jq-premium-earn-card">
+                <div class="jq-premium-earn-label" data-i18n="tech_stat_this_month">This Month</div>
+                <div class="jq-premium-earn-value" id="earn-month">—</div>
+                <div class="jq-premium-earn-sub" id="earn-month-sub">
+                  <span class="jq-earn-trend-up">↑ 12%</span> vs last month
+                </div>
               </div>
-              <div class="earn-stat-card">
-                <div class="earn-stat-card__label" data-i18n="tech_pending_payout">Pending Payout</div>
-                <div class="earn-stat-card__value">EGP 800</div>
-                <div class="earn-stat-card__sub" data-i18n="tech_releases_days">Releases in 2 business days</div>
+
+              <div class="jq-premium-earn-card">
+                <div class="jq-premium-earn-label" data-i18n="tech_pending_payout">Completed Jobs</div>
+                <div class="jq-premium-earn-value" id="earn-completed-count">—</div>
+                <div class="jq-premium-earn-sub">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                  <span>Lifetime Total</span>
+                </div>
               </div>
             </div>
 
-            <p class="dash-section-title" data-reveal data-i18n="tech_recent_jobs">Recent Jobs</p>
-
-            <div class="earn-row" data-reveal>
-              <div class="earn-row__icon">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#22A05A" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+            <div class="jq-premium-divider" style="margin: 32px 0 24px;">
+              <div class="jq-divider-line"></div>
+              <div class="jq-divider-content" style="background: transparent; border: none; box-shadow: none;">
+                <span data-i18n="tech_recent_jobs">Recent Jobs</span>
               </div>
-              <div class="earn-row__body">
-                <p class="earn-row__title" data-i18n="tech_earn_job_plumbing_heater">Plumbing — Water Heater Installation</p>
-                <p class="earn-row__date">15 Mar 2026</p>
-              </div>
-              <div class="earn-row__amount">+EGP 450</div>
+              <div class="jq-divider-line"></div>
             </div>
 
-            <div class="earn-row" data-reveal>
-              <div class="earn-row__icon">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#22A05A" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
-              </div>
-              <div class="earn-row__body">
-                <p class="earn-row__title" data-i18n="tech_earn_job_ac_service">General Maintenance — AC Service</p>
-                <p class="earn-row__date">10 Mar 2026</p>
-              </div>
-              <div class="earn-row__amount">+EGP 320</div>
-            </div>
-
-            <div class="earn-row" data-reveal>
-              <div class="earn-row__icon">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#22A05A" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
-              </div>
-              <div class="earn-row__body">
-                <p class="earn-row__title" data-i18n="tech_earn_job_elec_wiring">Electrical — Wiring Inspection</p>
-                <p class="earn-row__date">3 Mar 2026</p>
-              </div>
-              <div class="earn-row__amount">+EGP 200</div>
+            <div id="earnings-recent-list" class="jq-premium-recent-list">
+              <!-- Populated dynamically -->
             </div>
           </section>
 
@@ -655,37 +413,150 @@
               <p class="dash-panel__subtitle" data-i18n="tech_avail_sub">Set your working hours and service area so customers can find you.</p>
             </div>
 
-            <div class="availability-panel" data-reveal>
-              <div class="avail-toggle-row">
-                <div>
-                  <span class="avail-toggle-label" data-i18n="tech_available_now">Available Now</span>
-                  <p style="font-size:0.75rem;color:var(--color-text-light);margin:2px 0 0;" data-i18n="tech_avail_hint">Toggle off to pause new requests.</p>
+            <!-- ── Available Now card ── -->
+            <div class="avail-now-card" data-reveal id="avail-now-card">
+              <div class="avail-now-card__left">
+                <div class="avail-now-card__icon" id="avail-now-icon">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <polyline points="12 6 12 12 16 14"/>
+                  </svg>
                 </div>
-                <label class="avail-toggle" aria-label="Toggle availability" data-i18n-aria-label="tech_avail_toggle_aria">
-                  <input type="checkbox" data-avail-toggle checked />
-                  <span class="avail-toggle__track"><span class="avail-toggle__thumb"></span></span>
-                </label>
+                <div class="avail-now-card__text">
+                  <div class="avail-now-card__title-row">
+                    <span class="avail-now-card__label" data-i18n="tech_available_now">Available Now</span>
+                    <span class="avail-now-status-pill" id="avail-now-pill">Offline</span>
+                  </div>
+                  <p class="avail-now-card__hint" data-i18n="tech_avail_hint">Toggle on to appear in search results and accept new bookings.</p>
+                </div>
+              </div>
+              <label class="avail-toggle-switch" aria-label="Toggle availability" data-i18n-aria-label="tech_avail_toggle_aria">
+                <input type="checkbox" id="avail-now-toggle" data-avail-toggle />
+                <span class="avail-toggle-switch__track">
+                  <span class="avail-toggle-switch__thumb"></span>
+                </span>
+              </label>
+            </div>
+
+            <!-- ── Weekly Schedule ── -->
+            <div class="avail-section-card" data-reveal>
+              <div class="avail-section-card__header">
+                <div class="avail-section-card__header-left">
+                  <div class="avail-section-card__icon">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  </div>
+                  <div>
+                    <h2 class="avail-section-card__title" data-i18n="tech_weekly_schedule">Weekly Schedule</h2>
+                    <p class="avail-section-card__sub">Define your working hours for each day of the week.</p>
+                  </div>
+                </div>
+                <button type="button" class="btn btn--ghost btn--sm" id="avail-clear-schedule">Clear All</button>
+              </div>
+              <div class="avail-schedule-grid" id="avail-schedule"></div>
+              
+              <div class="avail-save-row" style="margin-top: 20px;" data-reveal>
+                <button class="btn btn--primary avail-save-btn" type="button" id="save-schedule">
+                  <span class="avail-save-btn__icon">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                  </span>
+                  <span class="avail-save-btn__label" data-i18n="tech_save_schedule">Save Schedule</span>
+                </button>
+                <div class="avail-save-feedback" id="avail-schedule-feedback" hidden>
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#22A05A" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span data-i18n="tech_schedule_saved_msg">Schedule saved successfully!</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- ── Time Off / Blocked Dates ── -->
+  <div class="avail-section-card" data-reveal id="blocked-dates-card">
+    <div class="avail-section-card__header">
+      <div class="avail-section-card__header-left">
+        <div class="avail-section-card__icon">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="15" x2="16" y2="15"/><line x1="12" y1="11" x2="12" y2="19"/></svg>
+        </div>
+        <div>
+          <h2 class="avail-section-card__title">Time Off</h2>
+          <p class="avail-section-card__sub">Click any day to mark it as unavailable. Customers won't see time slots on blocked days.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="blocked-cal" id="blockedCal">
+      <div class="blocked-cal__nav">
+        <button type="button" id="blockedCalPrev" class="cal-nav-btn">&#8249;</button>
+        <span id="blockedCalLabel" class="cal-month-label"></span>
+        <button type="button" id="blockedCalNext" class="cal-nav-btn">&#8250;</button>
+      </div>
+      <div class="blocked-cal__dow">
+        <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+      </div>
+      <div class="blocked-cal__grid" id="blockedCalGrid"></div>
+    </div>
+
+    <div class="blocked-legend" style="margin-top:10px;display:flex;gap:16px;font-size:0.75rem;color:var(--color-text-light,#9A8C73);">
+      <span style="display:flex;align-items:center;gap:4px;"><span style="width:12px;height:12px;border-radius:3px;background:rgba(231,76,60,0.25);display:inline-block;"></span> Blocked</span>
+      <span style="display:flex;align-items:center;gap:4px;"><span style="width:12px;height:12px;border-radius:3px;background:rgba(154,140,115,0.2);display:inline-block;"></span> Working day</span>
+      <span style="display:flex;align-items:center;gap:4px;"><span style="width:12px;height:12px;border-radius:3px;background:rgba(154,140,115,0.05);display:inline-block;border:1px solid #393E46;"></span> Off-schedule</span>
+    </div>
+
+    <div class="avail-save-row" style="margin-top:16px;">
+      <p style="font-size:0.8rem;color:var(--color-text-light,#9A8C73);margin:0 0 8px;">Click days to toggle blocked/available. Changes save immediately.</p>
+      <div class="avail-save-feedback" id="blocked-dates-feedback" hidden>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#22A05A" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+        <span>Updated.</span>
+      </div>
+    </div>
+  </div>
+
+            <!-- ── Service Area & Categories ── -->
+            <div class="avail-section-card" data-reveal>
+              <div class="avail-section-card__header">
+                <div class="avail-section-card__header-left">
+                  <div class="avail-section-card__icon">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                  </div>
+                  <div>
+                    <h2 class="avail-section-card__title">Service Coverage</h2>
+                    <p class="avail-section-card__sub">Where you work and what services you offer.</p>
+                  </div>
+                </div>
               </div>
 
-              <h2 class="settings-section-title" style="margin:24px 0 12px;" data-i18n="tech_weekly_schedule">Weekly Schedule</h2>
-              <div class="avail-schedule" id="avail-schedule"></div>
-
-              <div class="form-field" style="margin-top:20px;">
-                <label class="form-label" for="service-area" data-i18n="tech_service_area_lbl">Service Area</label>
-                <input class="form-input" type="text" id="service-area" name="serviceArea" placeholder="e.g. Cairo, Giza" data-i18n-placeholder="tech_service_area_ph" />
+              <div class="avail-coverage-grid">
+                <div class="form-field">
+                  <label class="form-label" for="service-area" data-i18n="tech_service_area_lbl">Service Area</label>
+                  <div class="field-icon-wrap">
+                    <svg class="field-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    <input class="form-input form-input--icon" type="text" id="service-area" name="serviceArea" placeholder="e.g. Cairo, Giza, Heliopolis" data-i18n-placeholder="tech_service_area_ph" />
+                  </div>
+                  <p class="form-hint">Separate multiple areas with commas</p>
+                </div>
               </div>
 
-              <fieldset class="avail-categories">
-                <legend class="form-label" data-i18n="tech_service_cats_lbl">Service Categories</legend>
+              <fieldset class="avail-categories" style="margin-top: 20px;">
+                <legend class="avail-categories__legend">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                  <span data-i18n="tech_service_cats_lbl">Service Categories</span>
+                </legend>
                 <div class="avail-categories__grid" id="categories-grid"></div>
               </fieldset>
+              
+              <div class="avail-save-row" style="margin-top: 24px;" data-reveal>
+                <button class="btn btn--primary avail-save-btn" type="button" id="save-coverage">
+                  <span class="avail-save-btn__icon">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                  </span>
+                  <span class="avail-save-btn__label" data-i18n="tech_save_coverage">Save Coverage</span>
+                </button>
+                <div class="avail-save-feedback" id="avail-coverage-feedback" hidden>
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#22A05A" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span data-i18n="tech_coverage_saved_msg">Coverage saved successfully!</span>
+                </div>
+              </div>
+            </div>
+          </section>
 
-              <div style="margin-top:20px;display:flex;align-items:center;gap:12px;">
-                <button class="btn" type="button" id="save-availability" data-i18n="tech_save_availability">Save Availability</button>
-                <span class="settings-save-msg" data-avail-save-msg data-i18n="tech_saved_msg" hidden>Saved!</span>
-          </div>
-        </div>
-      </section>
 
           <!-- ── Reviews panel ── -->
           <section class="dash-panel" id="panel-reviews" role="tabpanel" aria-labelledby="tab-reviews" data-panel="reviews" hidden>
@@ -1366,35 +1237,24 @@
             ══════════════════════════════════════════ -->
             <div class="stab-pane" id="stab-services" role="tabpanel" aria-labelledby="stab-btn-services" hidden>
 
-              <!-- Skills & Certifications -->
+              <!-- Services Offered -->
               <div class="settings-section">
                 <h2 class="settings-section__heading">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-                  <span data-i18n="tech_skills_title">Skills &amp; Certifications</span>
+                  <span>Services Offered</span>
                 </h2>
-                <p class="settings-section__desc" data-i18n="tech_skills_desc">Tick the skills you offer. Add any certifications or licenses below.</p>
-                <div class="skill-tags" id="skill-tags" role="group" aria-label="Skills">
-                  <button type="button" class="skill-tag" data-skill="Boilers" aria-pressed="false">Boilers</button>
-                  <button type="button" class="skill-tag" data-skill="Gas Lines" aria-pressed="false">Gas Lines</button>
-                  <button type="button" class="skill-tag" data-skill="Water Heaters" aria-pressed="false">Water Heaters</button>
-                  <button type="button" class="skill-tag" data-skill="Solar Panels" aria-pressed="false">Solar Panels</button>
-                  <button type="button" class="skill-tag" data-skill="AC Installation" aria-pressed="false">AC Installation</button>
-                  <button type="button" class="skill-tag" data-skill="Electrical Wiring" aria-pressed="false">Electrical Wiring</button>
-                  <button type="button" class="skill-tag" data-skill="Tiling" aria-pressed="false">Tiling</button>
-                  <button type="button" class="skill-tag" data-skill="Painting" aria-pressed="false">Painting</button>
-                  <button type="button" class="skill-tag" data-skill="Carpentry" aria-pressed="false">Carpentry</button>
-                  <button type="button" class="skill-tag" data-skill="Roofing" aria-pressed="false">Roofing</button>
-                  <button type="button" class="skill-tag" data-skill="Pest Control" aria-pressed="false">Pest Control</button>
-                  <button type="button" class="skill-tag" data-skill="Cleaning" aria-pressed="false">Cleaning</button>
+                <p class="settings-section__desc">Select the specific services you provide. These appear on your profile and filter customer booking requests.</p>
+                <div id="services-catalog">
+                  <p style="color:var(--color-secondary,#9A8C73);font-size:0.875rem;">Loading services&hellip;</p>
                 </div>
                 <div class="form-field" style="margin-top:16px;">
-                  <label class="form-label" for="s-certifications" data-i18n="tech_cert_label">Certifications / Licenses</label>
-                  <textarea class="form-input form-textarea" id="s-certifications" name="certifications" data-settings-field="certifications" rows="3" placeholder="e.g. Egyptian Syndicate of Engineers — No. 12345" data-i18n-placeholder="tech_cert_ph"></textarea>
-                  <span class="form-hint" data-i18n="tech_cert_hint">One per line.</span>
+                  <label class="form-label" for="s-certifications">Certifications / Licenses</label>
+                  <textarea class="form-input form-textarea" id="s-certifications" name="certifications" rows="3" placeholder="e.g. Egyptian Syndicate of Engineers — No. 12345"></textarea>
+                  <span class="form-hint">One per line.</span>
                 </div>
                 <div class="settings-submit-row">
-                  <button class="btn btn--primary" type="button" id="btn-save-skills" data-i18n="tech_save_changes">Save Changes</button>
-                  <span class="settings-save-msg" id="skills-save-msg" hidden data-i18n="tech_saved_msg">Saved!</span>
+                  <button class="btn btn--primary" type="button" id="btn-save-skills">Save Changes</button>
+                  <span class="settings-save-msg" id="skills-save-msg" hidden>Saved!</span>
                 </div>
               </div>
 
