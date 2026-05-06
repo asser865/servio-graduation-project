@@ -7,6 +7,8 @@
   <title>SERVIO | Premium Home Services</title>
   <meta name="description"
     content="SERVIO connects you with elite professionals for home maintenance, design, and repair." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <script src="../js/config.js"></script>
   <script src="../js/theme-init.js"></script>
   <script src="../js/lang-init.js"></script>
@@ -304,6 +306,7 @@
           </div>
         </div>
       </div>
+      <div class="why-servio__bottom-blend"></div>
     </section>
 
     <!-- 2. CATEGORIES CAROUSEL -->
@@ -897,6 +900,20 @@
   <script type="module" src="../js/main.js"></script>
   <script type="module" src="../js/html/home.js"></script>
   <script src="../js/html/home-luxe.js"></script>
+  <script src="../js/html/home-fallback.js"></script>
+  <script>
+    // Last-resort fallback: keep the page readable if both module and classic motion scripts fail.
+    setTimeout(function () {
+      if (document.body.classList.contains('is-loading')) {
+        document.body.classList.remove('is-loading');
+      }
+      if (!document.querySelector('[data-reveal].is-visible')) {
+        document.querySelectorAll('[data-reveal]').forEach(function (el) {
+          el.classList.add('is-visible');
+        });
+      }
+    }, 4000);
+  </script>
 </body>
 
 </html>

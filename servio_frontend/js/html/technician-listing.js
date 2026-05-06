@@ -6,6 +6,8 @@
 import { initScrollReveal } from '../components/scroll-reveal.js';
 import { SERVICES } from '../data/services-data.js';
 import { getWorkers } from '../api/users.js';
+import { subscribeNotify }  from '../api/notify.js';
+import { getSession }       from '../api/client.js';
 
 // Module-level cache so langchange re-renders without re-fetching
 let _cachedWorkers = [];
@@ -25,8 +27,19 @@ function getParam(key) {
   return new URLSearchParams(window.location.search).get(key);
 }
 
-const BADGE_VERIFIED_SVG = `<span class="badge-verified"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></span>`;
+const BADGE_VERIFIED_SVG = `<span class="badge-verified" title="Verified Professional"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 12.5l2 2 4-4m-3-9l2.39 4.84L20 7.27l-3.64 3.55.86 5.01L12 13.27l-4.22 2.22.86-5.01L5 6.73l5.61-.43L12 2z"/></svg> Verified</span>`;
 const LOC_SVG = `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>`;
+
+function buildStars(rating) {
+  const full = Math.floor(rating);
+  const half = rating - full >= 0.5;
+  const empty = 5 - full - (half ? 1 : 0);
+  let stars = '';
+  for (let i = 0; i < full; i++)  stars += `<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" class="star star--full"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
+  if (half)                        stars += `<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" class="star star--half"><defs><linearGradient id="hg"><stop offset="50%" stop-color="currentColor"/><stop offset="50%" stop-color="transparent"/></linearGradient></defs><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" fill="url(#hg)" stroke="currentColor" stroke-width="1"/></svg>`;
+  for (let i = 0; i < empty; i++) stars += `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" class="star star--empty"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
+  return stars;
+}
 
 // ── Render hero ───────────────────────────────────────────────────────────────
 
@@ -56,24 +69,41 @@ function buildCardFromAPI(worker, serviceKey, lang, delay) {
   const isAr = lang === 'ar';
   const id = worker._id;
   const name = escapeHtml(worker.name || 'Technician');
-  const rating = worker.averageRating?.toFixed(1) || '0.0';
+  const ratingNum = parseFloat(worker.averageRating) || 0;
+  const rating = ratingNum.toFixed(1);
   const reviewCount = worker.totalReviews || 0;
-  const ratingLabel = isAr ? `${rating} تقييم` : `${rating} Avg`;
-  const avatar = worker.profileImage || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(worker.name || 'T') + '&background=0d6efd&color=fff&size=128';
+  const price = worker.hourlyRate || 0;
+  const avatar = worker.profileImage || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(worker.name || 'T') + '&background=6366f1&color=fff&size=128';
   const profileHref = `./technician-profile.html?id=${id}&service=${serviceKey}`;
-  const viewLabel = isAr ? 'عرض الملف الشخصي' : 'View Profile';
-  const availLabel = worker.availability?.length
-    ? (isAr ? 'متاح' : 'Available')
-    : (isAr ? 'حدد الوقت' : 'By Appointment');
 
-  const categories = (worker.categories || [])
-    .map(c => `<span class="tech-card__category-tag">${escapeHtml(c)}</span>`)
-    .join('');
+  // Labels
+  const viewLabel      = isAr ? 'عرض الملف الشخصي' : 'View Profile';
+  const startingLabel  = isAr ? 'ابتداءً من' : 'STARTING';
+  const currencyLabel  = isAr ? 'جنيه' : 'EGP';
+  const priceUnit      = isAr ? '/ساعة' : '/hr';
+  const ratingLabel    = isAr ? `${rating} تقييم` : `${rating} Avg`;
+
+  const isAvail    = worker.isAvailable === true;
+  const availLabel = isAvail
+    ? (isAr ? 'متاح الآن' : 'AVAILABLE NOW')
+    : (isAr ? 'غير متاح' : 'OFFLINE');
+
+  // Build a short bio from categories if no bio exists
+  const bio = worker.bio || worker.about || '';
+  const descText = bio
+    ? escapeHtml(bio)
+    : (worker.categories?.length
+        ? escapeHtml(`Specialist in ${worker.categories.slice(0, 2).join(' & ')}.`)
+        : '');
 
   return `
-    <article class="tech-card" data-reveal data-reveal-delay="${delay}" data-avail="${availLabel.toLowerCase()}" data-tech-id="${id}">
+    <article class="tech-card" data-reveal data-reveal-delay="${delay}"
+             data-avail="${availLabel.toLowerCase()}"
+             data-price="${price}"
+             data-tech-id="${id}">
       <div class="tech-card__top">
-        <img class="tech-card__avatar" src="${avatar}" alt="${name}" onerror="this.src='https://ui-avatars.com/api/?name=T&background=0d6efd&color=fff&size=128'">
+        <img class="tech-card__avatar" src="${avatar}" alt="${name}"
+             onerror="this.src='https://ui-avatars.com/api/?name=T&background=6366f1&color=fff&size=128'">
         <div class="tech-card__info">
           <h3 class="tech-card__name">
             ${name}
@@ -81,18 +111,61 @@ function buildCardFromAPI(worker, serviceKey, lang, delay) {
           </h3>
           <div class="tech-card__trust">
             <span class="tech-card__rating">${ratingLabel}</span>
-            <span>(${reviewCount})</span>
+            <span class="tech-card__reviews">(${reviewCount})</span>
           </div>
-          <div class="tech-card__categories">${categories}</div>
         </div>
       </div>
+
+      ${descText ? `<p class="tech-card__desc">${descText}</p>` : ''}
+
       <div class="tech-card__footer">
+        <div class="tech-card__price-blurb">
+          <span class="tech-card__price-label">${startingLabel}</span>
+          <div class="tech-card__price">${price} ${currencyLabel}<span>${priceUnit}</span></div>
+        </div>
         <div>
           <div class="tech-card__availability">${availLabel}</div>
-          <a class="tech-card__action" href="${profileHref}">${viewLabel}</a>
+          <div class="tech-card__actions">
+            <a class="tech-card__action" href="${profileHref}">${viewLabel}</a>
+          </div>
         </div>
       </div>
     </article>`;
+}
+
+// ── Notify Me ─────────────────────────────────────────────────────────────────
+
+function initNotifyMe(serviceKey) {
+  const btn     = document.getElementById('notify-me-btn');
+  const confirm = document.getElementById('notify-me-confirm');
+  if (!btn) return;
+
+  btn.addEventListener('click', async () => {
+    const session = getSession();
+    if (!session?.email) {
+      window.location.href = `./login.html?redirect=${encodeURIComponent(window.location.href)}`;
+      return;
+    }
+
+    btn.disabled    = true;
+    btn.textContent = 'Subscribing…';
+
+    try {
+      await subscribeNotify(serviceKey);
+      btn.style.display = 'none';
+      if (confirm) confirm.style.display = 'block';
+    } catch (err) {
+      btn.disabled    = false;
+      btn.textContent = 'Notify Me';
+      const alreadySubscribed = err?.message?.toLowerCase().includes('already');
+      if (confirm && alreadySubscribed) {
+        btn.style.display   = 'none';
+        confirm.style.display = 'block';
+      } else {
+        alert('Could not subscribe. Please try again.');
+      }
+    }
+  });
 }
 
 // ── Render cards ──────────────────────────────────────────────────────────────
@@ -115,11 +188,16 @@ async function renderCards(serviceKey, lang) {
   }
 
   if (!workers.length) {
-    techGrid.innerHTML = '<p style="padding:2rem;text-align:center">No technicians available for this service yet.</p>';
+    const noOnlineState = document.getElementById('no-online-state');
+    const filterEmptyState = document.getElementById('empty-state');
+    if (noOnlineState)     noOnlineState.style.display  = 'flex';
+    if (filterEmptyState)  filterEmptyState.style.display = 'none';
     const resultCount = document.getElementById('result-count');
     if (resultCount) resultCount.textContent = '0';
     return;
   }
+  const noOnlineState = document.getElementById('no-online-state');
+  if (noOnlineState) noOnlineState.style.display = 'none';
 
   _cachedWorkers = workers;
   techGrid.innerHTML = workers.map((worker, i) => buildCardFromAPI(worker, serviceKey, lang, i * 50)).join('');
@@ -141,7 +219,7 @@ async function renderCards(serviceKey, lang) {
 
 // ── Filter / sort (existing logic, preserved) ──────────────────────────────────
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   const serviceKey = getParam('service');
   const svc = serviceKey && SERVICES[serviceKey];
 
@@ -153,7 +231,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const getLang = () => window.__lang || document.documentElement.lang || 'en';
 
   renderHero(svc, serviceKey, getLang());
-  renderCards(serviceKey, getLang());
+  await renderCards(serviceKey, getLang());
+  initNotifyMe(serviceKey);
 
   document.addEventListener('langchange', async e => {
     const lang = e.detail?.lang || getLang();
@@ -265,9 +344,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const matchesSearch = !state.query || name.includes(state.query) || desc.includes(state.query);
 
       let matchesFilter = true;
-      if (state.filter === 'top-rated')         matchesFilter = rating >= 4.8;
-      else if (state.filter === 'available-today') matchesFilter = avail.includes('today');
-      else if (state.filter === 'verified')     matchesFilter = isVerified(card);
+      if (state.filter === 'top-rated')            matchesFilter = rating >= 4.8;
+      else if (state.filter === 'available-today') matchesFilter = avail.includes('available');
+      else if (state.filter === 'verified')        matchesFilter = isVerified(card);
 
       const matchesDistance = state.distance === 'any' || dist <= parseInt(state.distance);
       const matchesPrice    = price >= state.priceMin && price <= state.priceMax;
@@ -275,11 +354,11 @@ document.addEventListener('DOMContentLoaded', () => {
       let matchesAvail = true;
       if (state.advancedApplied) {
         if (state.availToday && state.availWeek) {
-          matchesAvail = avail.includes('today') || avail.includes('week') || avail.includes('tomorrow');
+          matchesAvail = avail.includes('available') || avail.includes('week') || avail.includes('tomorrow');
         } else if (state.availToday) {
-          matchesAvail = avail.includes('today');
+          matchesAvail = avail.includes('available');
         } else if (state.availWeek) {
-          matchesAvail = avail.includes('week') || avail.includes('today') || avail.includes('tomorrow');
+          matchesAvail = avail.includes('available') || avail.includes('week') || avail.includes('tomorrow');
         }
       }
 
@@ -298,7 +377,11 @@ document.addEventListener('DOMContentLoaded', () => {
     visible.forEach(card => { card.style.display = 'flex'; techGrid.appendChild(card); });
 
     if (resultCount) animateCount(resultCount, visible.length);
-    if (emptyState)  emptyState.style.display = visible.length === 0 ? 'block' : 'none';
+    if (emptyState) {
+      const noOnlineEl = document.getElementById('no-online-state');
+      const noOnlineVisible = noOnlineEl && noOnlineEl.style.display !== 'none';
+      emptyState.style.display = (!noOnlineVisible && visible.length === 0) ? 'block' : 'none';
+    }
 
     updateFilterBadge();
   }

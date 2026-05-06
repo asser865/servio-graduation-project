@@ -22,10 +22,24 @@ const bookingSchema = new mongoose.Schema(
       required: [true, 'Worker is required'],
     },
 
+    // Specific sub-service (optional — null for general category bookings)
     service: {
-      type:     mongoose.Schema.Types.ObjectId,
-      ref:      'Service',
-      required: [true, 'Service is required'],
+      type: mongoose.Schema.Types.ObjectId,
+      ref:  'Service',
+    },
+
+    // Main category string (e.g. 'plumbing') — always set, required
+    serviceCategory: {
+      type:     String,
+      trim:     true,
+      required: [true, 'Service category is required'],
+    },
+
+    // Human-readable name shown in reviews, receipts, notifications
+    serviceName: {
+      type:  String,
+      trim:  true,
+      default: '',
     },
 
     status: {
@@ -61,6 +75,18 @@ const bookingSchema = new mongoose.Schema(
       min:   [0, 'Price cannot be negative'],
     },
 
+    scheduledTime: {
+      type:    String,
+      trim:    true,
+      default: '',
+    },
+
+    // 4-digit PIN generated at booking creation — customer shows this to worker to start the job
+    pin: {
+      type:    String,
+      default: () => String(Math.floor(1000 + Math.random() * 9000)),
+    },
+
     // Worker can add notes on completion (e.g., materials used)
     workerNotes: {
       type:  String,
@@ -79,6 +105,12 @@ const bookingSchema = new mongoose.Schema(
 // ── Indexes for common queries ────────────────────────────────────────────────
 bookingSchema.index({ user:   1, status: 1 });
 bookingSchema.index({ worker: 1, status: 1 });
+
+// Prevents double-booking at the DB level (application-layer findOne is not atomic)
+bookingSchema.index(
+  { worker: 1, scheduledDate: 1, scheduledTime: 1 },
+  { unique: true, partialFilterExpression: { status: { $in: ['pending', 'accepted', 'in_progress'] } } }
+);
 
 const Booking = mongoose.model('Booking', bookingSchema);
 

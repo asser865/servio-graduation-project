@@ -8,8 +8,6 @@
     window.location.href = './login.html?redirect=' + redirectUrl;
     throw new Error('Unauthenticated — redirecting to login');
   }
-
-  // ── Role Guard ──────────────────────────────────────────
   if (session.role === 'admin') {
     window.location.href = './admin-dashboard.html';
     throw new Error('Role redirect — admin');
@@ -19,335 +17,250 @@
   }
 })();
 
-/**
- * booking.js — Multi-step booking flow with Motion One animations
- * Uses Motion One (vanilla JS Framer Motion) for smooth step transitions
- */
-
 import { animate, stagger } from 'https://cdn.jsdelivr.net/npm/motion@12.38.0/+esm';
-import { createBooking } from '../api/bookings.js';
-import { getServices } from '../api/services.js';
-import { getWorker, getWorkers } from '../api/users.js';
-import { createPaymentIntent } from '../api/payments.js';
+import { getWorker, getMe }  from '../api/users.js';
+import { getServices }       from '../api/services.js';
+import { createBooking, getWorkerBookedSlots } from '../api/bookings.js';
 
-// ─── URL Params ───────────────────────────────────────────────────────────────
-function getParam(key) {
-  return new URLSearchParams(window.location.search).get(key);
-}
-const _workerIdFromUrl   = getParam('worker')  || '';
-const _serviceKeyFromUrl = getParam('service') || '';
+// ─── URL params ───────────────────────────────────────────────────────────────
+
+const params     = new URLSearchParams(window.location.search);
+const workerId   = params.get('worker') || '';
+const serviceIdParam = params.get('service') || '';
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
 const state = {
   currentStep: 1,
   totalSteps: 3,
+  worker: null,
   selectedTime: null,
   selectedPayment: 'online',
-  worker: null,
-  services: [],
   data: {
-    serviceType: '',
     serviceId: '',
+    serviceCategory: '',
+    serviceType: '',
     date: '',
     time: '',
     address: '',
     notes: '',
     payment: 'online',
   },
+  addresses: [], // List of { id, label, street, city, state, full }
 };
-
-const MONGO_ID_RE = /^[a-f\d]{24}$/i;
-const LEGACY_SERVICE_CATEGORY = {
-  'pipe-repair': 'plumbing',
-  'drain-cleaning': 'plumbing',
-  'fixture-install': 'plumbing',
-  'water-heater': 'plumbing',
-  'full-inspection': 'plumbing',
-  emergency: 'plumbing',
-  plumbing: 'plumbing',
-  electrical: 'electrical',
-  painting: 'painting',
-  flooring: 'flooring',
-  carpentry: 'carpentry',
-  cleaning: 'cleaning',
-  hvac: 'hvac',
-  ac: 'hvac',
-  'ac-maintenance': 'hvac',
-  other: 'other',
-};
-
-function isMongoId(value) {
-  return MONGO_ID_RE.test(String(value || ''));
-}
-
-function normalizeKey(value) {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/&/g, ' and ')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
-
-function categoryFromKey(value) {
-  return LEGACY_SERVICE_CATEGORY[normalizeKey(value)] || '';
-}
-
-function formatBookingError(err) {
-  const validation = err?.data?.errors;
-  if (Array.isArray(validation) && validation.length) {
-    return validation
-      .map((item) => item?.message)
-      .filter(Boolean)
-      .join('\n');
-  }
-  return err?.message || 'Booking failed. Please try again.';
-}
-
-function findServiceForKey(key, services = state.services) {
-  if (!key || !services.length) return null;
-  if (isMongoId(key)) {
-    return services.find((service) => service._id === key || service.id === key) || null;
-  }
-
-  const normalized = normalizeKey(key);
-  const category = categoryFromKey(key);
-  return services.find((service) => {
-    const serviceId = service._id || service.id || '';
-    const title = normalizeKey(service.title || service.name || '');
-    const titleAr = normalizeKey(service.titleAr || '');
-    return serviceId === key ||
-      service.category === key ||
-      (category && service.category === category) ||
-      title === normalized ||
-      titleAr === normalized;
-  }) || null;
-}
-
-async function ensureServicesLoaded() {
-  if (state.services.length) return state.services;
-  const svcRes = await getServices({ limit: 50, _: Date.now().toString() });
-  state.services = svcRes.services || svcRes.data?.services || [];
-  return state.services;
-}
-
-function renderServiceOptions(services) {
-  if (!serviceType) return;
-
-  if (!services.length) {
-    serviceType.innerHTML = `<option value="" selected>${t('booking_svc_unavailable')}</option>`;
-    serviceType.value = '';
-    serviceType.disabled = true;
-    return;
-  }
-
-  serviceType.disabled = false;
-  const requested = _serviceKeyFromUrl || serviceType.value || '';
-  const selectedService = findServiceForKey(requested, services);
-  serviceType.innerHTML =
-    `<option value="" disabled>${t('booking_svc_select_ph')}</option>` +
-    services.map((service) => {
-      const id = service._id || service.id;
-      const title = service.title || service.name || 'Service';
-      const category = service.category || '';
-      return `<option value="${id}" data-category="${category}">${title}</option>`;
-    }).join('') +
-    `<option value="other">${t('booking_svc_other')}</option>`;
-
-  serviceType.value = selectedService?._id || selectedService?.id || '';
-}
-
-async function resolveSelectedService() {
-  const services = await ensureServicesLoaded();
-  if (!services.length) {
-    throw new Error(t('booking_err_no_services'));
-  }
-
-  const selectedOption = serviceType?.options[serviceType.selectedIndex];
-  const selectedValue = serviceType?.value || '';
-  const lookupValue = selectedValue === 'other'
-    ? 'other'
-    : selectedValue || _serviceKeyFromUrl || selectedOption?.dataset.category || '';
-  const service = findServiceForKey(lookupValue, services) ||
-    findServiceForKey(selectedOption?.dataset.category, services);
-
-  if (!service?._id && !service?.id) {
-    throw new Error(t('booking_err_service_catalog'));
-  }
-
-  return service;
-}
-
-async function resolveSelectedWorker(service) {
-  const existingWorkerId = _workerIdFromUrl || state.worker?._id || state.worker?.id || '';
-  if (isMongoId(existingWorkerId)) return existingWorkerId;
-
-  const category = service?.category ||
-    serviceType?.options[serviceType.selectedIndex]?.dataset.category ||
-    categoryFromKey(_serviceKeyFromUrl);
-  const workerRes = await getWorkers({
-    limit: 1,
-    ...(category ? { category } : {}),
-  });
-  const workers = workerRes.workers || workerRes.data?.workers || [];
-  const worker = workers.find((item) => isMongoId(item._id || item.id));
-
-  if (!worker) {
-    throw new Error(t('booking_err_no_worker'));
-  }
-
-  state.worker = worker;
-  updateWorkerUI(worker);
-  return worker._id || worker.id;
-}
-
-// ─── Initialize ─────────────────────────────────────────────────────────────
-async function init() {
-  if (isMongoId(_workerIdFromUrl)) {
-    try {
-      const res = await getWorker(_workerIdFromUrl);
-      state.worker = res.worker || res;
-      updateWorkerUI(state.worker);
-    } catch (err) {
-      console.error('Failed to fetch worker:', err);
-    }
-  }
-
-  // Populate services list if possible
-  try {
-     const svcs = await ensureServicesLoaded();
-     renderServiceOptions(svcs);
-  } catch(e) {
-    console.warn('Failed to load services:', e);
-  }
-}
-init();
-
-function updateWorkerUI(w) {
-  if (!w) return;
-  // Hero elements
-  const heroName = document.querySelector('.tech-hero-card__name');
-  const heroService = document.querySelector('.tech-hero-card__service');
-  const heroAvatar = document.querySelector('.tech-hero-card__avatar');
-  const heroRating = document.querySelector('.hero-rating-num');
-  
-  if (heroName) heroName.textContent = w.name;
-  if (heroService) heroService.textContent = w.category || 'Professional';
-  if (heroAvatar) {
-     if (w.profileImage) {
-        heroAvatar.innerHTML = `<img src="${w.profileImage}" alt="${w.name}" style="width:100%;height:100%;border-radius:inherit;object-fit:cover;">`;
-     } else {
-        heroAvatar.textContent = w.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
-     }
-  }
-  if (heroRating) heroRating.textContent = (w.averageRating || 4.9).toFixed(1);
-
-  // Strip
-  const stripName = document.querySelector('.service-strip__name');
-  const stripRate = document.querySelector('.service-strip__rate');
-  const stripAvatar = document.querySelector('.service-strip__avatar');
-  if (stripName) stripName.textContent = w.name;
-  if (stripRate) stripRate.textContent = `${w.hourlyRate || 50} EGP / hr`;
-  if (stripAvatar && w.profileImage) stripAvatar.src = w.profileImage;
-
-  // Sidebar
-  const sideName = document.querySelector('.summary-tech__name');
-  const sideAvatar = document.querySelector('.summary-tech__avatar');
-  const sideBaseRate = document.querySelector('[data-i18n="booking_summary_base_rate_val"]');
-  const sideTotal = document.querySelector('[data-i18n="booking_summary_total_val"]');
-  const reviewRate = document.querySelector('[data-i18n="booking_review_base_rate_val"]');
-  const reviewTotal = document.querySelector('[data-i18n="booking_review_total_val"]');
-
-  if (sideName) sideName.textContent = w.name;
-  if (sideAvatar && w.profileImage) sideAvatar.src = w.profileImage;
-  
-  const rate = w.hourlyRate || 50;
-  const fee = (rate * 0.10);
-  const total = rate + fee;
-
-  const fmt = (n) => n.toFixed(2) + ' EGP';
-  if (sideBaseRate) sideBaseRate.textContent = fmt(rate);
-  if (sideTotal) sideTotal.textContent = fmt(total) + '+';
-  if (reviewRate) reviewRate.textContent = fmt(rate) + ' / hr';
-  if (reviewTotal) reviewTotal.textContent = fmt(total) + ' EGP+';
-}
 
 // ─── DOM refs ─────────────────────────────────────────────────────────────────
 
-const panels       = document.querySelectorAll('.step-panel');
-const stepItems    = document.querySelectorAll('.step-item');
-const timeslots    = document.querySelectorAll('.timeslot-pill');
-const paymentOpts  = document.querySelectorAll('.payment-option');
-const cardFields   = document.getElementById('cardFields');
+const stepItems   = document.querySelectorAll('.step-item');
+const paymentOpts = document.querySelectorAll('.payment-option');
 
-// Step 1
-const step1Next    = document.getElementById('step1Next');
-const serviceType  = document.getElementById('serviceType');
-const bookDate     = document.getElementById('bookDate');
-const bookAddress  = document.getElementById('bookAddress');
+const step1Next   = document.getElementById('step1Next');
+const serviceType     = document.getElementById('serviceType');
+const serviceCategory = document.getElementById('serviceCategory');
+const serviceName     = document.getElementById('serviceName');
+const bookDate    = document.getElementById('bookDate');
+const bookAddress = document.getElementById('bookAddress');
 
-// Step 2
-const step2Back    = document.getElementById('step2Back');
-const step2Next    = document.getElementById('step2Next');
+const step2Back   = document.getElementById('step2Back');
+const step2Next   = document.getElementById('step2Next');
+const step3Back   = document.getElementById('step3Back');
+const confirmBtn  = document.getElementById('confirmBtn');
+const termsCheck  = document.getElementById('termsCheck');
 
-// Step 3
-const step3Back    = document.getElementById('step3Back');
-const confirmBtn   = document.getElementById('confirmBtn');
-const termsCheck   = document.getElementById('termsCheck');
-
-// Review values
+const reviewTechName = document.getElementById('reviewTechName');
 const reviewService  = document.getElementById('reviewService');
 const reviewDate     = document.getElementById('reviewDate');
 const reviewTime     = document.getElementById('reviewTime');
 const reviewAddress  = document.getElementById('reviewAddress');
 const reviewPayment  = document.getElementById('reviewPayment');
+const reviewBaseRate = document.getElementById('reviewBaseRate');
+const reviewFee      = document.getElementById('reviewFee');
+const reviewTotal    = document.getElementById('reviewTotal');
 
-// ─── "Other" service type – show/hide problem description field ───────────────
+// otherProblemRow removed — general bookings use bookNotes textarea instead
 
-const otherProblemRow = document.getElementById('otherProblemRow');
-const otherProblem    = document.getElementById('otherProblem');
+// ─── Service picker state ─────────────────────────────────────────────────────
 
-if (serviceType && otherProblemRow && otherProblem) {
-  serviceType.addEventListener('change', () => {
-    const isOther = serviceType.value === 'other';
-    otherProblemRow.style.display = isOther ? '' : 'none';
-    otherProblem.required = isOther;
-    if (!isOther) otherProblem.value = '';
+const pickerState = { category: '', serviceId: '', label: '' };
+
+function setPickerSelection(catKey, svcId, label) {
+  pickerState.category  = catKey;
+  pickerState.serviceId = svcId;
+  pickerState.label     = label;
+  if (serviceType)     serviceType.value     = svcId || catKey;
+  if (serviceCategory) serviceCategory.value = catKey;
+  if (serviceName)     serviceName.value     = label;
+
+  const confirmed = document.getElementById('svcPickerConfirmed');
+  const lbl       = document.getElementById('svcConfirmedLabel');
+  const cats      = document.getElementById('svcPickerCats');
+  const subs      = document.getElementById('svcPickerSubs');
+  if (lbl)       lbl.textContent = label;
+  if (confirmed) confirmed.hidden = false;
+  if (cats)      cats.hidden = true;
+  if (subs)      subs.hidden = true;
+}
+
+function resetPicker() {
+  pickerState.category = pickerState.serviceId = pickerState.label = '';
+  if (serviceType)     serviceType.value     = '';
+  if (serviceCategory) serviceCategory.value = '';
+  if (serviceName)     serviceName.value     = '';
+  const confirmed = document.getElementById('svcPickerConfirmed');
+  const cats      = document.getElementById('svcPickerCats');
+  const subs      = document.getElementById('svcPickerSubs');
+  if (confirmed) confirmed.hidden = true;
+  if (cats)      cats.hidden      = false;
+  if (subs)      subs.hidden      = true;
+}
+
+// ─── Date validation helpers ──────────────────────────────────────────────────
+
+const DAY_ABBR = { monday:'Mon', tuesday:'Tue', wednesday:'Wed', thursday:'Thu', friday:'Fri', saturday:'Sat', sunday:'Sun' };
+
+function validateBookingDate(dateStr, availability) {
+  const sel   = new Date(dateStr + 'T00:00:00');
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const max   = new Date(); max.setDate(max.getDate() + 30); max.setHours(0, 0, 0, 0);
+
+  if (sel < today) return 'Please select a date that is today or in the future.';
+  if (sel > max)   return 'You can only book up to 30 days in advance.';
+
+  if (availability.length) {
+    const dayName = sel.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+    if (!availability.find(a => a.day === dayName)) {
+      const available = availability.map(a => DAY_ABBR[a.day] || a.day).join(', ');
+      return `Technician is not available on ${dayName.charAt(0).toUpperCase() + dayName.slice(1)}s. Available: ${available}.`;
+    }
+  }
+  return null;
+}
+
+function showDateError(msg) {
+  const el = document.getElementById('dateError');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.display = 'block';
+  const input = document.getElementById('bookDate');
+  if (input) input.style.borderColor = '#e74c3c';
+}
+
+function clearDateError() {
+  const el = document.getElementById('dateError');
+  if (el) { el.textContent = ''; el.style.display = 'none'; }
+}
+
+// ─── Custom calendar ──────────────────────────────────────────────────────────
+
+const calState = {
+  year:  new Date().getFullYear(),
+  month: new Date().getMonth(), // 0-based
+};
+
+function buildCalendar(availability, blockedDates) {
+  const today    = new Date(); today.setHours(0,0,0,0);
+  const maxDate  = new Date(); maxDate.setDate(maxDate.getDate() + 30); maxDate.setHours(0,0,0,0);
+  const avDays   = (availability || []).map(a => a.day);
+  const DAY_NAMES = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+
+  const grid      = document.getElementById('calGrid');
+  const monthLbl  = document.getElementById('calMonthLabel');
+  const prevBtn   = document.getElementById('calPrev');
+  const nextBtn   = document.getElementById('calNext');
+  if (!grid) return;
+
+  const firstDay  = new Date(calState.year, calState.month, 1);
+  const lastDay   = new Date(calState.year, calState.month + 1, 0);
+  const monthName = firstDay.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  if (monthLbl) monthLbl.textContent = monthName;
+
+  // Disable prev if entire prev month is before today
+  const prevMonthEnd = new Date(calState.year, calState.month, 0);
+  if (prevBtn) prevBtn.disabled = prevMonthEnd < today;
+
+  // Disable next if entire next month is after maxDate
+  const nextMonthStart = new Date(calState.year, calState.month + 1, 1);
+  if (nextBtn) nextBtn.disabled = nextMonthStart > maxDate;
+
+  // Leading empty cells
+  let html = '';
+  for (let i = 0; i < firstDay.getDay(); i++) html += '<div class="cal-day cal-day--empty"></div>';
+
+  for (let day = 1; day <= lastDay.getDate(); day++) {
+    const date    = new Date(calState.year, calState.month, day);
+    const dateStr = `${calState.year}-${String(calState.month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const isToday    = date.getTime() === today.getTime();
+    const isPast     = date < today;
+    const isFar      = date > maxDate;
+    const dayName    = DAY_NAMES[date.getDay()];
+    const isOffSched = avDays.length > 0 && !avDays.includes(dayName);
+    const isBlocked  = (blockedDates || []).includes(dateStr);
+    const isSelected = bookDate?.value === dateStr;
+
+    let cls = 'cal-day';
+    if      (isSelected)  cls += ' cal-day--selected';
+    if      (isToday)     cls += ' cal-day--today';
+    if      (isPast || isFar) cls += ' cal-day--past';
+    else if (isBlocked)   cls += ' cal-day--blocked';
+    else if (isOffSched)  cls += ' cal-day--off-schedule';
+    else                  cls += ' cal-day--available';
+
+    const clickable = !isPast && !isFar && !isBlocked && !isOffSched;
+    html += `<div class="${cls}" ${clickable ? `data-date="${dateStr}"` : ''} title="${dateStr}">${day}</div>`;
+  }
+
+  grid.innerHTML = html;
+
+  grid.querySelectorAll('.cal-day--available[data-date]').forEach(cell => {
+    cell.addEventListener('click', () => {
+      const d = cell.dataset.date;
+      if (bookDate) bookDate.value = d;
+      clearDateError();
+      buildCalendar(availability, blockedDates);
+      renderTimeSlotsForDate(d, availability);
+    });
   });
 }
 
-// ─── Date input: set min to today ─────────────────────────────────────────────
+function initCalendar(availability, blockedDates) {
+  // Start at the first valid month that contains an available date
+  const today = new Date(); today.setHours(0,0,0,0);
+  calState.year  = today.getFullYear();
+  calState.month = today.getMonth();
 
-(function setMinDate() {
-  if (!bookDate) return;
-  const today = new Date().toISOString().split('T')[0];
-  bookDate.min = today;
-})();
+  document.getElementById('calPrev')?.addEventListener('click', () => {
+    calState.month--;
+    if (calState.month < 0) { calState.month = 11; calState.year--; }
+    buildCalendar(availability, blockedDates);
+  });
+  document.getElementById('calNext')?.addEventListener('click', () => {
+    calState.month++;
+    if (calState.month > 11) { calState.month = 0; calState.year++; }
+    buildCalendar(availability, blockedDates);
+  });
 
-// ─── Time slot selection ──────────────────────────────────────────────────────
+  buildCalendar(availability, blockedDates);
+}
 
-// Use event delegation for more robustness
+// ─── Time slot selection (event delegation) ───────────────────────────────────
+
 document.addEventListener('click', (e) => {
   const pill = e.target.closest('.timeslot-pill');
   if (!pill || pill.disabled || pill.classList.contains('is-unavailable')) return;
 
-  // Toggle selection
   document.querySelectorAll('.timeslot-pill').forEach((p) => p.classList.remove('is-selected'));
   pill.classList.add('is-selected');
-  
+
   state.selectedTime = pill.dataset.time;
   state.data.time = pill.textContent.trim();
 
-  // Trigger feedback animation
   if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     animate(pill,
-      { scale: [0.94, 1.05, 1], boxShadow: ["0 0 0 rgba(0,0,0,0)", "0 8px 20px rgba(154,140,115,0.3)", "0 4px 15px rgba(154,140,115,0.3)"] },
+      { scale: [0.94, 1.05, 1], boxShadow: ['0 0 0 rgba(0,0,0,0)', '0 8px 20px rgba(154,140,115,0.3)', '0 4px 15px rgba(154,140,115,0.3)'] },
       { duration: 0.3 }
     );
   }
 });
-
 
 // ─── Payment option selection ─────────────────────────────────────────────────
 
@@ -355,136 +268,20 @@ paymentOpts.forEach((opt) => {
   opt.addEventListener('click', () => {
     paymentOpts.forEach((o) => o.classList.remove('is-selected'));
     opt.classList.add('is-selected');
-
     const val = opt.dataset.payment;
     state.selectedPayment = val;
     state.data.payment = val;
-
-    // Toggle card fields
-    if (cardFields) {
-      const show = val === 'card';
-      cardFields.classList.toggle('is-hidden', !show);
-      if (show && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        animate(cardFields, { opacity: [0, 1], y: [-8, 0] }, { duration: 0.28 });
-      }
-    }
-
-    // Selection animation
     if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       animate(opt, { scale: [0.97, 1.02, 1] }, { duration: 0.22 });
     }
   });
 });
 
-// ─── "Edit" buttons in review step ───────────────────────────────────────────
+// ─── Edit buttons in review step ─────────────────────────────────────────────
 
 document.querySelectorAll('.review-block__edit').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    const targetStep = parseInt(btn.dataset.goto, 10);
-    goToStep(targetStep);
-  });
+  btn.addEventListener('click', () => goToStep(parseInt(btn.dataset.goto, 10)));
 });
-
-// ─── Confirm button: require terms ───────────────────────────────────────────
-
-if (confirmBtn) {
-  confirmBtn.addEventListener('click', async (e) => {
-    e.preventDefault();
-    if (!termsCheck || !termsCheck.checked) {
-      animate(termsCheck?.closest('.terms-check') || confirmBtn,
-        { x: [0, -6, 6, -4, 4, 0] }, { duration: 0.4 });
-      return;
-    }
-
-    collectStep1();
-    collectStep2();
-
-    const selectedOption = serviceType?.options[serviceType?.selectedIndex];
-    const serviceName = selectedOption?.text || '';
-    const rawDate      = bookDate?.value || state.data.date || '';
-    const readableDate = formatDate(rawDate);
-    const selectedTime = state.data.time || '';
-    const paymentMethod = PAYMENT_LABELS[state.data.payment] || state.data.payment || 'Online Payment';
-
-    // Disable button to prevent double-submit
-    confirmBtn.disabled = true;
-    confirmBtn.innerHTML = `
-      <svg class="spinner" width="16" height="16" viewBox="0 0 24 24" style="margin-right:8px; animation: rotate 1s linear infinite"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="31.4 31.4"/></svg>
-      Processing...
-    `;
-
-    try {
-      const selectedService = await resolveSelectedService();
-      const workerId = await resolveSelectedWorker(selectedService);
-      const resolvedServiceId = selectedService._id || selectedService.id;
-
-      const bookingPayload = {
-        workerId:      workerId,
-        serviceId:     resolvedServiceId,
-        scheduledDate: rawDate || new Date().toISOString().split('T')[0],
-        address:       state.data.address,
-        notes:         state.data.notes || '',
-      };
-
-      const res  = await createBooking(bookingPayload);
-      const booking = res.booking || res;
-      const bookingId = booking._id;
-
-      // ── Handle Payment ──
-      if (state.data.payment === 'online') {
-        try {
-          const intentRes = await createPaymentIntent(bookingId);
-          const { clientSecret } = intentRes;
-
-          if (clientSecret && window.Stripe) {
-            const stripe = Stripe(window.SERVIO_CONFIG.STRIPE_PUBLIC_KEY || 'pk_test_placeholder');
-            // For a production app, we would mount Stripe Elements or use redirect
-            // Here we simulate the successful payment redirect if it's a test environment
-            console.log('Payment Intent Created:', clientSecret);
-            // Example: const result = await stripe.confirmCardPayment(clientSecret, { ... });
-          }
-        } catch (payErr) {
-          console.warn('Payment intent failed, proceeding as cash/pending:', payErr);
-        }
-      }
-
-      const bookingData = {
-        id:            bookingId,
-        _id:           bookingId,
-        service:       serviceName,
-        category:      serviceName,
-        payment:       state.data.payment,
-        paymentMethod: paymentMethod,
-        date:          readableDate,
-        scheduledDate: readableDate,
-        time:          selectedTime,
-        scheduledTime: selectedTime,
-        pin:           booking.pin || '—',
-        status:        'Booked',
-        timestamp:     Date.now(),
-      };
-
-      localStorage.setItem('servio_active_booking', JSON.stringify(bookingData));
-
-      animate(confirmBtn, { scale: [1, 0.95, 1.02, 1] }, { duration: 0.3 });
-      setTimeout(() => { window.location.href = './booking-confirmation.html'; }, 500);
-
-    } catch (err) {
-      confirmBtn.disabled = false;
-      confirmBtn.innerHTML = `<span>${t('booking_confirm')}</span> <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>`;
-      
-      const errEl = document.querySelector('[data-booking-error]') || document.querySelector('.booking-error');
-      const msg = formatBookingError(err);
-      if (errEl) {
-        errEl.textContent = msg;
-        errEl.hidden = false;
-        animate(errEl, { opacity: [0, 1], y: [-10, 0] });
-      } else {
-        alert(msg);
-      }
-    }
-  });
-}
 
 // ─── Step navigation ──────────────────────────────────────────────────────────
 
@@ -495,6 +292,7 @@ step1Next?.addEventListener('click', () => {
 });
 
 step2Back?.addEventListener('click', () => goToStep(1));
+
 step2Next?.addEventListener('click', () => {
   collectStep2();
   populateReview();
@@ -503,17 +301,61 @@ step2Next?.addEventListener('click', () => {
 
 step3Back?.addEventListener('click', () => goToStep(2));
 
+// ─── Confirm button ───────────────────────────────────────────────────────────
+
+confirmBtn?.addEventListener('click', (e) => {
+  e.preventDefault();
+  if (!termsCheck || !termsCheck.checked) {
+    animate(termsCheck?.closest('.terms-check') || confirmBtn,
+      { x: [0, -6, 6, -4, 4, 0] }, { duration: 0.4 }
+    );
+    return;
+  }
+  collectStep1();
+  collectStep2();
+
+  if (state.data.payment === 'online') {
+    openPaymentModal();
+  } else {
+    animate(confirmBtn, { scale: [1, 0.95, 1.02, 1] }, { duration: 0.3 });
+    setTimeout(() => finalizeBooking(), 320);
+  }
+});
+
 // ─── Validation ──────────────────────────────────────────────────────────────
 
 function validateStep1() {
   const errors = [];
 
-  if (!serviceType?.value) errors.push(serviceType);
-  if (serviceType?.value === 'other' && !otherProblem?.value.trim()) errors.push(otherProblem);
-  if (!bookDate?.value)    errors.push(bookDate);
-  if (!bookAddress?.value.trim()) errors.push(bookAddress);
+  // Service picker — must have a category selected
+  if (!pickerState.category) {
+    const picker = document.getElementById('svcPicker');
+    if (picker) {
+      picker.style.borderColor = '#e74c3c';
+      picker.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => { picker.style.borderColor = ''; }, 2000);
+    }
+    errors.push(null);
+  }
+  if (!bookDate?.value) {
+    errors.push(bookDate);
+  } else {
+    const dateErr = validateBookingDate(bookDate.value, state.worker?.availability || []);
+    if (dateErr) {
+      showDateError(dateErr);
+      errors.push(null); // date error shown via showDateError, no input to shake
+    }
+  }
+  if (!bookAddress?.value.trim()) {
+    const list = document.getElementById('savedAddressesList');
+    if (list) {
+      list.style.borderColor = '#e74c3c';
+      animate(list, { x: [0, -5, 5, -3, 3, 0] }, { duration: 0.35 });
+      list.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    errors.push(null);
+  }
   if (!state.selectedTime) {
-    // Shake timeslot grid
     const grid = document.querySelector('.timeslot-grid');
     if (grid) animate(grid, { x: [0, -5, 5, -3, 3, 0] }, { duration: 0.35 });
     errors.push(null);
@@ -524,9 +366,7 @@ function validateStep1() {
     el.style.borderColor = '#e74c3c';
     el.focus();
     animate(el, { x: [0, -5, 5, -3, 3, 0] }, { duration: 0.35 });
-    el.addEventListener('input', () => {
-      el.style.borderColor = '';
-    }, { once: true });
+    el.addEventListener('input', () => { el.style.borderColor = ''; }, { once: true });
   });
 
   return errors.length === 0;
@@ -535,13 +375,12 @@ function validateStep1() {
 // ─── Data collection ──────────────────────────────────────────────────────────
 
 function collectStep1() {
-  const svcLabel = serviceType?.options[serviceType.selectedIndex]?.text || '';
-  state.data.serviceType = serviceType?.value === 'other' && otherProblem?.value.trim()
-    ? `Other: ${otherProblem.value.trim()}`
-    : svcLabel;
-  state.data.date = bookDate?.value || '';
+  state.data.serviceId       = pickerState.serviceId;
+  state.data.serviceCategory = pickerState.category;
+  state.data.serviceType     = pickerState.label;
+  state.data.date    = bookDate?.value || '';
   state.data.address = bookAddress?.value.trim() || '';
-  state.data.time = state.data.time || '';
+  state.data.time    = state.data.time || '';
 }
 
 function collectStep2() {
@@ -551,17 +390,23 @@ function collectStep2() {
 
 // ─── Populate review step ─────────────────────────────────────────────────────
 
-const PAYMENT_LABELS = {
-  online: 'Online Payment',
-  cash: 'Cash',
-};
+const PAYMENT_LABELS = { online: 'Online Payment', cash: 'Cash on Arrival' };
 
 function populateReview() {
+  if (reviewTechName) reviewTechName.textContent = state.worker?.name || '—';
   if (reviewService)  reviewService.textContent  = state.data.serviceType || '—';
   if (reviewDate)     reviewDate.textContent      = formatDate(state.data.date);
   if (reviewTime)     reviewTime.textContent      = state.data.time || '—';
   if (reviewAddress)  reviewAddress.textContent   = state.data.address || '—';
   if (reviewPayment)  reviewPayment.textContent   = PAYMENT_LABELS[state.data.payment] || state.data.payment;
+
+  const rate = state.worker?.hourlyRate || 0;
+  const fee  = rate * 0.10;
+  const total = rate + fee;
+
+  if (reviewBaseRate) reviewBaseRate.textContent = `${rate.toFixed(2)} EGP / hr`;
+  if (reviewFee)      reviewFee.textContent      = `${fee.toFixed(2)} EGP`;
+  if (reviewTotal)    reviewTotal.textContent    = `${total.toFixed(2)} EGP+`;
 }
 
 function formatDate(raw) {
@@ -570,7 +415,784 @@ function formatDate(raw) {
   return d.toLocaleDateString('en-EG', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-// ─── Core: go to step ────────────────────────────────────────────────────────
+// ─── Date helpers ─────────────────────────────────────────────────────────────
+
+function getLocalDateStr(offset = 0) {
+  const d = new Date();
+  d.setDate(d.getDate() + offset);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function findNextAvailableDate(availability, fromDateStr) {
+  if (!availability || !availability.length) return fromDateStr;
+  const avDays = availability.map(a => a.day);
+  const DAY_NAMES = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+  for (let i = 0; i <= 13; i++) {
+    const d = new Date(fromDateStr + 'T00:00:00');
+    d.setDate(d.getDate() + i);
+    if (avDays.includes(DAY_NAMES[d.getDay()])) {
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+  }
+  return fromDateStr;
+}
+
+// ─── Dynamic time slot generation ────────────────────────────────────────────
+
+function renderTimeSlotsForDate(dateString, availability) {
+  const container = document.getElementById('timeslotContainer');
+  if (!container) return;
+
+  const dayName = new Date(dateString + 'T00:00:00')
+    .toLocaleDateString('en-US', { weekday: 'long' })
+    .toLowerCase();
+
+  const daySlot = (availability || []).find(a => a.day === dayName);
+
+  container.innerHTML = '';
+
+  if (!daySlot) {
+    container.innerHTML = `
+      <div class="timeslot-unavailable-msg">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Technician is not available on ${dayName.charAt(0).toUpperCase() + dayName.slice(1)}. Please select another date.
+      </div>`;
+    state.selectedTime = null;
+    state.data.time = '';
+    return;
+  }
+
+  const allSlots = generateHourlySlots(daySlot.from, daySlot.to);
+
+  const morningSlots   = allSlots.filter(s => { const h = parseInt(s); return h >= 6  && h < 12; });
+  const afternoonSlots = allSlots.filter(s => { const h = parseInt(s); return h >= 12 && h < 18; });
+  const eveningSlots   = allSlots.filter(s => { const h = parseInt(s); return h >= 18 && h < 22; });
+
+  const groups = [
+    { label: 'Morning (6 AM – 12 PM)',   slots: morningSlots },
+    { label: 'Afternoon (12 PM – 6 PM)', slots: afternoonSlots },
+    { label: 'Evening (6 PM – 10 PM)',   slots: eveningSlots },
+  ].filter(g => g.slots.length > 0);
+
+  if (groups.length === 0) {
+    container.innerHTML = `<div class="timeslot-unavailable-msg">No time slots available for this day.</div>`;
+    return;
+  }
+
+  const PERIOD_ICONS = {
+    'morning': `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v8"/><path d="m4.93 10.93 1.41-1.41"/><path d="M2 18h2"/><path d="M20 18h2"/><path d="m19.07 10.93-1.41-1.41"/><path d="M22 22H2"/><path d="m8 6 4-4 4 4"/><path d="M16 18a4 4 0 0 0-8 0"/></svg>`,
+    'afternoon': `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>`,
+    'evening': `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>`
+  };
+
+  groups.forEach(group => {
+    const periodKey = group.label.split(' ')[0].toLowerCase();
+    const icon = PERIOD_ICONS[periodKey] || PERIOD_ICONS['morning'];
+    const section = document.createElement('div');
+    section.className = 'timeslot-section';
+    section.innerHTML = `
+      <div class="timeslot-section__label">
+        ${icon}
+        <span>${group.label}</span>
+      </div>
+      <div class="timeslot-grid" role="group" aria-label="${group.label} time slots">
+        ${group.slots.map(slot => {
+          const label = formatTimeLabel(slot);
+          return `<button type="button" class="timeslot-pill" data-time="${slot}">${label}</button>`;
+        }).join('')}
+      </div>`;
+    container.appendChild(section);
+  });
+
+  // Fetch and mark booked slots for this date
+  if (workerId) {
+    getWorkerBookedSlots(workerId, dateString)
+      .then(res => {
+        const booked = res.data?.bookedSlots || res.bookedSlots || [];
+        booked.forEach(t => {
+          const pill = container.querySelector(`.timeslot-pill[data-time="${t}"]`);
+          if (pill) {
+            pill.classList.add('is-unavailable');
+            pill.disabled = true;
+            pill.setAttribute('aria-disabled', 'true');
+          }
+        });
+      })
+      .catch(() => {});
+  }
+
+  // Reset selection
+  state.selectedTime = null;
+  state.data.time = '';
+}
+
+function generateHourlySlots(from, to) {
+  const slots = [];
+  let [h] = from.split(':').map(Number);
+  const [endH] = to.split(':').map(Number);
+  while (h < endH) {
+    slots.push(`${String(h).padStart(2, '0')}:00`);
+    h++;
+  }
+  return slots;
+}
+
+function formatTimeLabel(slot) {
+  const [hStr] = slot.split(':');
+  const h = parseInt(hStr);
+  const suffix = h >= 12 ? 'PM' : 'AM';
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${h12}:00 ${suffix}`;
+}
+
+// ─── Worker UI population ─────────────────────────────────────────────────────
+
+function updateWorkerUI(worker) {
+  const name     = worker.name     || 'Professional';
+  const rating   = typeof worker.averageRating === 'number' ? worker.averageRating.toFixed(1) : '5.0';
+  const reviews  = worker.totalReviews || 0;
+  const years    = worker.yearsExperience;
+  const jobs     = worker.completedJobs;
+  const rate     = worker.hourlyRate || 0;
+  const specialty= (Array.isArray(worker.categories) && worker.categories[0]) || 'Home Services';
+  const location = worker.locationLabel || '';
+  const initials = name.split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2).toUpperCase() || '?';
+
+  // Page title
+  document.title = `Book Service – ${name} | SERVIO`;
+
+  // Breadcrumb
+  const breadcrumb = document.getElementById('breadcrumbTechLink');
+  const breadcrumbSep = document.getElementById('breadcrumbTechSep');
+  if (breadcrumb) {
+    breadcrumb.textContent = name;
+    breadcrumb.style.display = '';
+  }
+  if (breadcrumbSep) {
+    breadcrumbSep.style.display = '';
+  }
+
+  // Hero card
+  const avatarEl = document.getElementById('heroCardAvatar');
+  if (avatarEl) {
+    if (worker.profileImage) {
+      avatarEl.innerHTML = `<img src="${worker.profileImage}" alt="${name}" style="width:48px;height:48px;border-radius:12px;object-fit:cover;" />`;
+    } else {
+      avatarEl.textContent = initials;
+    }
+  }
+  setText('heroCardName', name);
+  setText('heroCardService', specialty);
+  setText('heroRatingNum', rating);
+  const ratingCount = document.getElementById('heroRatingCount');
+  if (ratingCount) ratingCount.textContent = `(${reviews} review${reviews !== 1 ? 's' : ''})`;
+  setText('heroStatYears', years ? `${years}+` : '—');
+  setText('heroStatJobs', jobs ? `${jobs}+` : '—');
+
+  // Service strip
+  const stripImg = document.getElementById('stripAvatar');
+  const stripInit = document.getElementById('stripAvatarInitials');
+  if (worker.profileImage && stripImg && stripInit) {
+    stripImg.src = worker.profileImage;
+    stripImg.alt = name;
+    stripImg.style.display = '';
+    stripInit.style.display = 'none';
+  } else if (stripInit) {
+    stripInit.textContent = initials;
+  }
+  setText('stripName', name);
+  setText('stripRole', [specialty, location].filter(Boolean).join(' · '));
+  setText('stripRate', `${rate} EGP / hr`);
+
+  // Sidebar
+  const sidebarImg  = document.getElementById('sidebarAvatar');
+  const sidebarInit = document.getElementById('sidebarAvatarInitials');
+  if (worker.profileImage && sidebarImg && sidebarInit) {
+    sidebarImg.src = worker.profileImage;
+    sidebarImg.alt = name;
+    sidebarImg.style.display = '';
+    sidebarInit.style.display = 'none';
+  } else if (sidebarInit) {
+    sidebarInit.textContent = initials;
+  }
+  setText('sidebarTechName', name);
+  setText('sidebarTechRole', years ? `${specialty} · ${years} yrs exp.` : specialty);
+  const sidebarRatingText = document.getElementById('sidebarRatingText');
+  if (sidebarRatingText) sidebarRatingText.textContent = `${rating} · ${reviews} reviews`;
+  const sidebarTechRating = document.getElementById('sidebarTechRating');
+  if (sidebarTechRating) sidebarTechRating.style.opacity = '1';
+
+  const fee   = rate * 0.10;
+  const total = rate + fee;
+  setText('sidebarBaseRate', `${rate.toFixed(2)} EGP`);
+  setText('sidebarFee',      `${fee.toFixed(2)} EGP`);
+  setText('sidebarTotal',    `${total.toFixed(2)} EGP+`);
+}
+
+function setText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+// ─── Two-step service picker ──────────────────────────────────────────────────
+
+const CAT_LABELS = {
+  plumbing:'Plumbing', electrical:'Electrical', hvac:'A/C & HVAC',
+  carpentry:'Carpentry', appliance:'Appliances', handyman:'Handyman',
+  renovation:'Renovation', painting:'Painting', flooring:'Flooring',
+  drywall:'Drywall', roofing:'Roofing', cleaning:'Cleaning',
+  'pest-control':'Pest Control', landscaping:'Landscaping',
+  installation:'Installation', other:'Other',
+};
+
+const CAT_ICONS = {
+  plumbing:'🔧', electrical:'⚡', hvac:'❄️', carpentry:'🪵',
+  appliance:'🏠', handyman:'🔨', renovation:'🏗️', painting:'🎨',
+  flooring:'🪨', drywall:'🧱', roofing:'🏠', cleaning:'🧹',
+  'pest-control':'🐛', landscaping:'🌿', installation:'📺', other:'⚙️',
+};
+
+async function initServicePicker(worker) {
+  const catsEl = document.getElementById('svcPickerCats');
+  const subsEl = document.getElementById('svcPickerSubs');
+  const changeBtn = document.getElementById('svcChangeBtn');
+  if (!catsEl) return;
+
+  changeBtn?.addEventListener('click', resetPicker);
+
+  let allServices = [];
+  try {
+    const res = await getServices({ limit: 200 });
+    allServices = res.data?.services || res.services || res.data || [];
+  } catch (e) {
+    catsEl.innerHTML = '<p style="color:#e74c3c;font-size:0.875rem;">Failed to load services.</p>';
+    return;
+  }
+
+  // Only show services the worker explicitly selected in their dashboard
+  const workerServiceIds = new Set((worker.services || []).map(s => (s._id || s).toString()));
+  const workerCategories = new Set(worker.categories || []);
+
+  const grouped = {};
+  allServices.forEach(svc => {
+    const id  = (svc._id || svc.id || '').toString();
+    const cat = svc.category || 'other';
+    if (!workerServiceIds.has(id)) return; // only explicitly selected services
+    if (!grouped[cat]) grouped[cat] = [];
+    grouped[cat].push(svc);
+  });
+
+  // For verified categories with no specific services selected → show category card
+  // with only the "General" option (empty array triggers auto-general path)
+  workerCategories.forEach(cat => {
+    if (!grouped[cat]) grouped[cat] = [];
+  });
+
+  // Last resort: worker has no data at all — show everything
+  if (!Object.keys(grouped).length) {
+    allServices.forEach(svc => {
+      const cat = svc.category || 'other';
+      if (!grouped[cat]) grouped[cat] = [];
+      grouped[cat].push(svc);
+    });
+  }
+
+  // Render category cards
+  catsEl.innerHTML = `
+    <p class="svc-picker-hint">What type of service do you need?</p>
+    <div class="svc-cat-cards">
+      ${Object.keys(grouped).map(cat => `
+        <button type="button" class="svc-cat-card" data-cat="${cat}">
+          <span class="svc-cat-card__icon">${CAT_ICONS[cat] || '⚙️'}</span>
+          <span class="svc-cat-card__label">${CAT_LABELS[cat] || cat}</span>
+        </button>
+      `).join('')}
+    </div>`;
+
+  catsEl.querySelectorAll('.svc-cat-card').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const cat      = btn.dataset.cat;
+      const catLabel = CAT_LABELS[cat] || cat;
+      const subs     = grouped[cat] || [];
+
+      // Auto-select if only general (no sub-services available)
+      if (!subs.length) {
+        setPickerSelection(cat, '', `General ${catLabel}`);
+        return;
+      }
+
+      subsEl.hidden = false;
+      subsEl.innerHTML = `
+        <button type="button" class="svc-back-btn" id="svcBackBtn">
+          ← Back to categories
+        </button>
+        <p class="svc-picker-hint">Select the specific service — or continue with <strong>General ${catLabel}</strong> if unsure.</p>
+        <div class="svc-sub-options">
+          <button type="button" class="svc-sub-btn svc-sub-btn--general" data-svc-id="" data-label="General ${catLabel}" data-cat="${cat}">
+            <span class="svc-sub-btn__name">General ${catLabel}</span>
+            <span class="svc-sub-btn__desc">I'll describe the issue in the notes</span>
+          </button>
+          ${subs.map(svc => {
+            const id    = (svc._id || svc.id || '').toString();
+            const price = svc.priceUnit === 'per_hour' ? `From ${svc.basePrice} EGP/hr`
+                        : svc.priceUnit === 'per_sqm'  ? `From ${svc.basePrice} EGP/m²`
+                        :                                `From ${svc.basePrice} EGP`;
+            return `<button type="button" class="svc-sub-btn" data-svc-id="${id}" data-label="${svc.title}" data-cat="${cat}">
+              <span class="svc-sub-btn__name">${svc.title}</span>
+              <span class="svc-sub-btn__price">${price}</span>
+            </button>`;
+          }).join('')}
+        </div>`;
+
+      catsEl.hidden = true;
+      document.getElementById('svcBackBtn')?.addEventListener('click', () => {
+        subsEl.hidden = true;
+        catsEl.hidden = false;
+      });
+
+      subsEl.querySelectorAll('.svc-sub-btn').forEach(subBtn => {
+        subBtn.addEventListener('click', () => {
+          setPickerSelection(subBtn.dataset.cat, subBtn.dataset.svcId, subBtn.dataset.label);
+        });
+      });
+
+      // Pre-select if URL param matches one of these subs
+      if (serviceIdParam) {
+        const match = subs.find(s => (s._id || s.id || '').toString() === serviceIdParam);
+        if (match) setPickerSelection(cat, serviceIdParam, match.title);
+      }
+    });
+  });
+
+  // Pre-select from URL param — try service ID first, then category key
+  if (serviceIdParam) {
+    const match = allServices.find(s => (s._id || s.id || '').toString() === serviceIdParam);
+    if (match) {
+      catsEl.querySelector(`[data-cat="${match.category}"]`)?.click();
+    } else {
+      // serviceIdParam is a category key (e.g. "plumbing") — click it directly
+      catsEl.querySelector(`[data-cat="${serviceIdParam}"]`)?.click();
+    }
+  }
+}
+
+// ─── Address prefill ──────────────────────────────────────────────────────────
+
+// ─── Address Management (Multiple Saved Addresses) ────────────────────────────
+
+function renderAddresses() {
+  const list = document.getElementById('savedAddressesList');
+  const hiddenInput = document.getElementById('bookAddress');
+  if (!list) return;
+
+  list.innerHTML = '';
+  state.addresses.forEach((addr) => {
+    const isSelected = state.data.address === addr.full;
+    const card = document.createElement('div');
+    card.className = `address-card ${isSelected ? 'is-selected' : ''}`;
+    card.innerHTML = `
+      <div class="address-card__label">${addr.label || 'Saved Address'}</div>
+      <div class="address-card__text">${addr.full}</div>
+    `;
+    card.addEventListener('click', () => {
+      state.data.address = addr.full;
+      if (hiddenInput) hiddenInput.value = addr.full;
+      renderAddresses();
+    });
+    list.appendChild(card);
+  });
+
+  if (hiddenInput) hiddenInput.value = state.data.address;
+}
+
+async function prefillUserAddress() {
+  try {
+    const res  = await getMe();
+    const user = res.user || res.data?.user || res;
+    const addr = user.address;
+
+    if (addr && addr.street) {
+      const full = [addr.street, addr.city, addr.state].filter(Boolean).join(', ');
+      const homeAddr = {
+        id: 'home',
+        label: 'Home',
+        street: addr.street,
+        city: addr.city,
+        state: addr.state,
+        full: full
+      };
+      
+      if (!state.addresses.some(a => a.full === full)) {
+        state.addresses.push(homeAddr);
+      }
+      
+      // Default select the first one if none selected
+      if (!state.data.address) {
+        state.data.address = full;
+      }
+      renderAddresses();
+    }
+  } catch (e) {
+    console.warn('Could not prefill address:', e);
+  }
+}
+
+// ─── Address Modal Logic ──────────────────────────────────────────────────────
+
+const addrModalOverlay = document.getElementById('addressModalOverlay');
+const addrModal        = document.getElementById('addressModal');
+const addrForm         = document.getElementById('addressForm');
+const addNewBtn        = document.getElementById('addNewAddressBtn');
+
+function openAddressModal() {
+  if (!addrModalOverlay || !addrModal) return;
+  addrModalOverlay.hidden = false;
+  document.body.style.overflow = 'hidden';
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    animate(addrModalOverlay, { opacity: [0, 1] }, { duration: 0.25 });
+    animate(addrModal, { opacity: [0, 1], y: [30, 0], scale: [0.95, 1] }, { duration: 0.35, easing: [0.22, 1, 0.36, 1] });
+  }
+}
+
+function closeAddressModal() {
+  if (!addrModalOverlay) return;
+  addrModalOverlay.hidden = true;
+  document.body.style.overflow = '';
+  addrForm?.reset();
+}
+
+addNewBtn?.addEventListener('click', openAddressModal);
+document.getElementById('addressModalClose')?.addEventListener('click', closeAddressModal);
+document.getElementById('addressModalCancel')?.addEventListener('click', closeAddressModal);
+
+addrForm?.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const street = document.getElementById('newAddrStreet').value.trim();
+  const city   = document.getElementById('newAddrCity').value.trim();
+  const stateVal = document.getElementById('newAddrState').value.trim();
+  const label  = document.getElementById('newAddrLabel').value.trim() || 'New Address';
+
+  const full = [street, city, stateVal].filter(Boolean).join(', ');
+  const newAddr = {
+    id: 'new-' + Date.now(),
+    label: label,
+    street, city, state: stateVal,
+    full
+  };
+
+  state.addresses.push(newAddr);
+  state.data.address = full;
+  
+  renderAddresses();
+  closeAddressModal();
+  
+  // Visual feedback on the newly selected card
+  setTimeout(() => {
+    const cards = document.querySelectorAll('.address-card');
+    const newCard = cards[cards.length - 1];
+    if (newCard && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      animate(newCard, { scale: [1, 1.05, 1] }, { duration: 0.3 });
+    }
+  }, 100);
+});
+
+// ─── Init: load worker data ───────────────────────────────────────────────────
+
+async function init() {
+  const layout    = document.getElementById('bookingLayout');
+  const unavail   = document.getElementById('bookingUnavailableState');
+
+  function showUnavailable(msg) {
+    if (layout) layout.style.display = 'none';
+    if (unavail) {
+      unavail.style.display = '';
+      const msgEl = document.getElementById('bookingUnavailableMsg');
+      if (msgEl) msgEl.textContent = msg;
+    }
+    setText('heroCardName', '—');
+    setText('heroCardService', '');
+    setText('heroRatingNum', '—');
+    const heroAvatar = document.getElementById('heroCardAvatar');
+    if (heroAvatar) heroAvatar.textContent = '?';
+  }
+
+  if (!workerId) {
+    window.location.replace('./technician-listing.html');
+    return;
+  }
+
+  let worker;
+  try {
+    const res = await getWorker(workerId);
+    worker = res.data?.user || res.data?.worker || res.user || res.worker || res.data || res;
+  } catch (e) {
+    showUnavailable('Could not load technician details. Please try again.');
+    return;
+  }
+
+  if (!worker || !worker.name) {
+    showUnavailable('Technician not found.');
+    return;
+  }
+
+  if (!worker.isActive) {
+    showUnavailable('This technician is currently unavailable.');
+    return;
+  }
+
+  // Real-time availability check — technician must have their toggle enabled
+  if (worker.isAvailable === false) {
+    showUnavailable('This technician is currently offline and not accepting new bookings. Please check back later or find another professional.');
+    return;
+  }
+
+  if (!worker.isVerified || worker.verificationStatus === 'pending') {
+    showUnavailable('This technician is pending verification. Please check back later or find another pro.');
+    return;
+  }
+
+  state.worker = worker;
+
+  updateWorkerUI(worker);
+
+  // Auto-select the nearest day the technician is available (local date, not UTC)
+  const todayStr   = getLocalDateStr();
+  const startDate  = findNextAvailableDate(worker.availability || [], todayStr);
+  const hint = document.getElementById('dateAvailHint');
+  if (hint && worker.availability?.length) {
+    const days = worker.availability.map(a => DAY_ABBR[a.day] || a.day).join(', ');
+    hint.textContent = `Available days: ${days}`;
+  }
+
+  const blockedDates = worker.blockedDates || [];
+  initCalendar(worker.availability || [], blockedDates);
+
+  // Pre-select the next available date
+  if (startDate && bookDate) {
+    bookDate.value = startDate;
+    const [sy, sm] = startDate.split('-').map(Number);
+    calState.year  = sy;
+    calState.month = sm - 1;
+    buildCalendar(worker.availability || [], blockedDates);
+    renderTimeSlotsForDate(startDate, worker.availability || []);
+  }
+
+  await Promise.all([
+    initServicePicker(worker),
+    prefillUserAddress(),
+  ]);
+}
+
+init().catch(err => console.error('Booking init error:', err));
+
+// ─── Payment modal ────────────────────────────────────────────────────────────
+
+function openPaymentModal() {
+  const rate  = state.worker?.hourlyRate || 0;
+  const total = (rate * 1.10).toFixed(2);
+  setText('payModalAmount', `Total: ${total} EGP`);
+
+  const overlay = document.getElementById('paymentModalOverlay');
+  const modal   = document.getElementById('paymentModal');
+  if (!overlay || !modal) return;
+
+  overlay.hidden = false;
+  document.body.style.overflow = 'hidden';
+
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    animate(overlay, { opacity: [0, 1] }, { duration: 0.25 });
+    animate(modal, { opacity: [0, 1], y: [30, 0], scale: [0.95, 1] }, { duration: 0.35, easing: [0.22, 1, 0.36, 1] });
+  }
+
+  document.getElementById('pmCardHolder')?.focus();
+}
+
+function closePaymentModal() {
+  const overlay = document.getElementById('paymentModalOverlay');
+  if (!overlay) return;
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    animate(overlay, { opacity: [1, 0] }, { duration: 0.2 }).then(() => {
+      overlay.hidden = true;
+      document.body.style.overflow = '';
+      resetPaymentModal();
+    });
+  } else {
+    overlay.hidden = true;
+    document.body.style.overflow = '';
+    resetPaymentModal();
+  }
+}
+
+function resetPaymentModal() {
+  const form       = document.getElementById('payModalForm');
+  const processing = document.getElementById('payModalProcessing');
+  const success    = document.getElementById('payModalSuccess');
+  const errorMsg   = document.getElementById('payModalErrorMsg');
+  if (form)       { form.hidden = false; }
+  if (processing) { processing.hidden = true; }
+  if (success)    { success.hidden = true; }
+  if (errorMsg)   { errorMsg.style.display = 'none'; errorMsg.textContent = ''; }
+  ['pmCardHolder', 'pmCardNumber', 'pmExpiry', 'pmCVV'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+}
+
+function validatePaymentForm() {
+  const name = document.getElementById('pmCardHolder')?.value.trim() || '';
+  const num  = (document.getElementById('pmCardNumber')?.value || '').replace(/\s/g, '');
+  const exp  = document.getElementById('pmExpiry')?.value.trim() || '';
+  const cvv  = document.getElementById('pmCVV')?.value.trim() || '';
+
+  if (!name)                                          return 'Please enter the cardholder name.';
+  if (num.length !== 16 || !/^\d+$/.test(num))       return 'Please enter a valid 16-digit card number.';
+  if (!/^\d{2}\s*\/\s*\d{2}$/.test(exp))             return 'Please enter a valid expiry (MM / YY).';
+  if (cvv.length < 3 || !/^\d+$/.test(cvv))          return 'Please enter a valid CVV.';
+  return null;
+}
+
+// Card number formatting
+document.getElementById('pmCardNumber')?.addEventListener('input', (e) => {
+  const raw = e.target.value.replace(/\D/g, '').slice(0, 16);
+  e.target.value = raw.replace(/(.{4})/g, '$1 ').trim();
+});
+
+document.getElementById('pmExpiry')?.addEventListener('input', (e) => {
+  const raw = e.target.value.replace(/\D/g, '').slice(0, 4);
+  e.target.value = raw.length > 2 ? raw.slice(0, 2) + ' / ' + raw.slice(2) : raw;
+});
+
+// Pay Now
+document.getElementById('payModalSubmit')?.addEventListener('click', async () => {
+  const error = validatePaymentForm();
+  const errorMsg = document.getElementById('payModalErrorMsg');
+  if (error) {
+    if (errorMsg) { errorMsg.textContent = error; errorMsg.style.display = 'block'; }
+    return;
+  }
+  if (errorMsg) { errorMsg.style.display = 'none'; }
+
+  const form       = document.getElementById('payModalForm');
+  const processing = document.getElementById('payModalProcessing');
+  const success    = document.getElementById('payModalSuccess');
+
+  if (form)       form.hidden = true;
+  if (processing) processing.hidden = false;
+
+  await new Promise(resolve => setTimeout(resolve, 2000));
+
+  if (processing) processing.hidden = true;
+  if (success) {
+    success.hidden = false;
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      animate(success, { opacity: [0, 1], scale: [0.9, 1] }, { duration: 0.4 });
+    }
+  }
+});
+
+document.getElementById('payModalContinue')?.addEventListener('click', async () => {
+  closePaymentModal();
+  await finalizeBooking();
+});
+
+document.getElementById('payModalClose')?.addEventListener('click', closePaymentModal);
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const overlay = document.getElementById('paymentModalOverlay');
+    if (overlay && !overlay.hidden) closePaymentModal();
+  }
+});
+
+document.getElementById('paymentModalOverlay')?.addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closePaymentModal();
+});
+
+// ─── Finalize booking ─────────────────────────────────────────────────────────
+
+async function finalizeBooking() {
+  collectStep1();
+  collectStep2();
+
+  const pin = Math.floor(1000 + Math.random() * 9000);
+  const paymentMethod = PAYMENT_LABELS[state.data.payment] || state.data.payment;
+  const readableDate  = formatDate(state.data.date);
+
+  // Try real API first
+  let bookingId = null;
+  if (workerId && state.data.serviceCategory) {
+    try {
+      const payload = {
+        workerId,
+        serviceId:       state.data.serviceId || undefined,
+        serviceCategory: state.data.serviceCategory,
+        serviceName:     state.data.serviceType,
+        scheduledDate:   state.data.date,
+        scheduledTime:   state.selectedTime || '',
+        address:         state.data.address,
+        description:     document.getElementById('bookNotes')?.value.trim() || '',
+      };
+      const res = await createBooking(payload);
+      bookingId = res.data?._id || res._id || res.data?.booking?._id || null;
+    } catch (e) {
+      const msg = e?.message || '';
+      let userMsg = 'Booking failed. Please try again.';
+      if      (msg.includes('not currently accepting'))  userMsg = 'This technician is not currently accepting bookings.';
+      else if (msg.includes('today or in the future'))   userMsg = 'Please select a valid date.';
+      else if (msg.includes('30 days in advance'))       userMsg = 'Bookings can only be made up to 30 days in advance.';
+      else if (msg.includes('outside technician'))       userMsg = 'Selected time is outside this technician\'s working hours.';
+      else if (msg.includes('not available on this day')) userMsg = 'This technician doesn\'t work on the selected day.';
+      else if (msg.includes('time slot'))                userMsg = 'Please select a valid time slot.';
+      else if (msg.includes('already booked'))           userMsg = 'This time slot was just taken — please pick another time.';
+      alert(userMsg);
+      return;
+    }
+  }
+
+  const bookingData = {
+    _id:      bookingId || null,
+    id:       bookingId || ('S-' + Math.floor(2900 + Math.random() * 100)),
+    bookingId,
+    workerId,
+    workerName: state.worker?.name || '',
+    service:    state.data.serviceType,
+    category:   state.data.serviceType,
+    payment:    state.data.payment,
+    paymentMethod,
+    date:          readableDate,
+    scheduledDate: readableDate,
+    time:          state.data.time,
+    scheduledTime: state.selectedTime || state.data.time,
+    address:       state.data.address,
+    pin,
+    status:    'Booked',
+    timestamp: Date.now(),
+    technician: {
+      name:     state.worker?.name     || '—',
+      initials: (state.worker?.name || 'T').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase(),
+      specialty:(state.worker?.categories || state.worker?.skills || [])[0] || '—',
+      rating:   state.worker?.averageRating != null ? Number(state.worker.averageRating).toFixed(1) : '—',
+      phone:    state.worker?.phone || '',
+    },
+    rate:              state.worker?.hourlyRate || state.worker?.rate || state.worker?.baseRate || null,
+    workerLocation:    state.worker?.location || state.worker?.city || state.worker?.area || '',
+    workerReviewCount: state.worker?.reviewCount || state.worker?.totalReviews || 0,
+    workerAvatar:      state.worker?.avatar || state.worker?.photo || state.worker?.profileImage || null,
+  };
+
+  localStorage.setItem('servio_active_booking', JSON.stringify(bookingData));
+  const existing = JSON.parse(localStorage.getItem('servio_bookings') || '[]');
+  existing.push(bookingData);
+  if (existing.length > 50) existing.splice(0, existing.length - 50);
+  localStorage.setItem('servio_bookings', JSON.stringify(existing));
+
+  window.location.href = './booking-confirmation.html';
+}
+
+// ─── Step navigation ─────────────────────────────────────────────────────────
 
 async function goToStep(target) {
   if (target === state.currentStep) return;
@@ -581,7 +1203,6 @@ async function goToStep(target) {
   const toPanel   = document.getElementById(`step-${target}`);
   if (!fromPanel || !toPanel) return;
 
-  // Animate out current panel
   if (!prefersReducedMotion) {
     await animate(fromPanel,
       { opacity: [1, 0], x: [0, direction * -30] },
@@ -591,54 +1212,35 @@ async function goToStep(target) {
 
   fromPanel.classList.remove('is-active');
   fromPanel.style.cssText = '';
-
-  // Show next panel
   toPanel.classList.add('is-active');
+
   if (!prefersReducedMotion) {
     toPanel.style.opacity = '0';
     toPanel.style.transform = `translateX(${direction * 30}px)`;
-
-    // Animate in
-    animate(toPanel,
-      { opacity: [0, 1], x: [direction * 30, 0] },
-      { duration: 0.3, easing: [0.25, 0.46, 0.45, 0.94] }
-    );
+    animate(toPanel, { opacity: [0, 1], x: [direction * 30, 0] }, { duration: 0.3, easing: [0.25, 0.46, 0.45, 0.94] });
   }
 
-  // Stagger-reveal form fields inside new panel
   const revealEls = toPanel.querySelectorAll('.field, .timeslot-section, .payment-option, .review-block');
   if (revealEls.length && !prefersReducedMotion) {
-    animate(revealEls,
-      { opacity: [0, 1], y: [10, 0] },
-      { duration: 0.3, delay: stagger(0.05), easing: 'ease-out' }
-    );
+    animate(revealEls, { opacity: [0, 1], y: [10, 0] }, { duration: 0.3, delay: stagger(0.05), easing: 'ease-out' });
   }
 
-  // Update stepper
   state.currentStep = target;
   updateStepper(prefersReducedMotion);
-
-  // Scroll to top of form
   document.querySelector('.booking-stepper')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-// ─── Stepper UI update ───────────────────────────────────────────────────────
+// ─── Stepper UI ───────────────────────────────────────────────────────────────
 
 function updateStepper(prefersReducedMotion) {
   stepItems.forEach((item, idx) => {
-    const stepNum  = idx + 1;
-    const numEl    = item.querySelector('.step-num');
-
+    const stepNum = idx + 1;
+    const numEl   = item.querySelector('.step-num');
     item.classList.remove('is-active', 'is-done');
 
     if (stepNum < state.currentStep) {
       item.classList.add('is-done');
-      if (numEl) {
-        numEl.innerHTML = `
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3">
-            <polyline points="20 6 9 17 4 12"></polyline>
-          </svg>`;
-      }
+      if (numEl) numEl.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
       if (!prefersReducedMotion) animate(item, { scale: [1, 1.04, 1] }, { duration: 0.25 });
     } else if (stepNum === state.currentStep) {
       item.classList.add('is-active');
@@ -650,64 +1252,34 @@ function updateStepper(prefersReducedMotion) {
   });
 }
 
-// ─── Card number formatting ───────────────────────────────────────────────────
-
-document.getElementById('cardNumber')?.addEventListener('input', (e) => {
-  const raw = e.target.value.replace(/\D/g, '').slice(0, 16);
-  e.target.value = raw.replace(/(.{4})/g, '$1 ').trim();
-});
-
-document.getElementById('cardExpiry')?.addEventListener('input', (e) => {
-  const raw = e.target.value.replace(/\D/g, '').slice(0, 4);
-  if (raw.length > 2) {
-    e.target.value = raw.slice(0, 2) + ' / ' + raw.slice(2);
-  } else {
-    e.target.value = raw;
-  }
-});
-
 // ─── Entry animation ─────────────────────────────────────────────────────────
 
 (function entryAnimation() {
   const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (prefersReducedMotion) return;
 
-  // ── Hero animations ──
-  const heroEyebrow  = document.querySelector('.booking-hero__eyebrow');
-  const heroTitle    = document.querySelector('.booking-hero__title');
-  const heroSub      = document.querySelector('.booking-hero__sub');
-  const trustPills   = document.querySelectorAll('.trust-pill');
-  const techCard     = document.querySelector('.tech-hero-card');
-  const heroStats    = document.querySelectorAll('.hero-stat');
+  const heroEyebrow = document.querySelector('.booking-hero__eyebrow');
+  const heroTitle   = document.querySelector('.booking-hero__title');
+  const heroSub     = document.querySelector('.booking-hero__sub');
+  const trustPills  = document.querySelectorAll('.trust-pill');
+  const techCard    = document.querySelector('.tech-hero-card');
+  const heroStats   = document.querySelectorAll('.hero-stat');
 
-  if (!prefersReducedMotion) {
-    if (heroEyebrow) animate(heroEyebrow, { opacity: [0, 1], y: [-10, 0] }, { duration: 0.4, easing: 'ease-out' });
-    if (heroTitle)   animate(heroTitle,   { opacity: [0, 1], y: [16, 0]  }, { duration: 0.45, delay: 0.08, easing: [0.22, 1, 0.36, 1] });
-    if (heroSub)     animate(heroSub,     { opacity: [0, 1], y: [10, 0]  }, { duration: 0.4,  delay: 0.16, easing: 'ease-out' });
-    if (trustPills.length) {
-      animate(trustPills, { opacity: [0, 1], y: [8, 0] }, { duration: 0.3, delay: stagger(0.06, { start: 0.28 }), easing: 'ease-out' });
-    }
-    if (techCard) {
-      animate(techCard, { opacity: [0, 1], x: [24, 0], scale: [0.97, 1] }, { duration: 0.55, delay: 0.2, easing: [0.22, 1, 0.36, 1] });
-    }
-    if (heroStats.length) {
-      animate(heroStats, { opacity: [0, 1], y: [6, 0] }, { duration: 0.3, delay: stagger(0.07, { start: 0.5 }), easing: 'ease-out' });
-    }
-  }
+  if (heroEyebrow) animate(heroEyebrow, { opacity: [0, 1], y: [-10, 0] }, { duration: 0.4, easing: 'ease-out' });
+  if (heroTitle)   animate(heroTitle,   { opacity: [0, 1], y: [16, 0] },  { duration: 0.45, delay: 0.08, easing: [0.22, 1, 0.36, 1] });
+  if (heroSub)     animate(heroSub,     { opacity: [0, 1], y: [10, 0] },  { duration: 0.4, delay: 0.16, easing: 'ease-out' });
+  if (trustPills.length) animate(trustPills, { opacity: [0, 1], y: [8, 0] }, { duration: 0.3, delay: stagger(0.06, { start: 0.28 }), easing: 'ease-out' });
+  if (techCard) animate(techCard, { opacity: [0, 1], x: [24, 0], scale: [0.97, 1] }, { duration: 0.55, delay: 0.2, easing: [0.22, 1, 0.36, 1] });
+  if (heroStats.length) animate(heroStats, { opacity: [0, 1], y: [6, 0] }, { duration: 0.3, delay: stagger(0.07, { start: 0.5 }), easing: 'ease-out' });
 
-  // ── Page body animations ──
   const stepper = document.querySelector('.booking-stepper');
   const formCard = document.querySelector('.booking-form-card');
   const sidebar  = document.querySelector('.booking-sidebar');
 
-  if (!prefersReducedMotion) {
-    if (stepper) animate(stepper, { opacity: [0, 1], y: [-16, 0] }, { duration: 0.45, delay: 0.35, easing: 'ease-out' });
-    if (formCard) animate(formCard, { opacity: [0, 1], y: [20, 0] }, { duration: 0.5, delay: 0.42, easing: 'ease-out' });
-    if (sidebar)  animate(sidebar,  { opacity: [0, 1], x: [16, 0] }, { duration: 0.5, delay: 0.5, easing: 'ease-out' });
-  }
+  if (stepper) animate(stepper, { opacity: [0, 1], y: [-16, 0] }, { duration: 0.45, delay: 0.35, easing: 'ease-out' });
+  if (formCard) animate(formCard, { opacity: [0, 1], y: [20, 0] }, { duration: 0.5, delay: 0.42, easing: 'ease-out' });
+  if (sidebar)  animate(sidebar,  { opacity: [0, 1], x: [16, 0] }, { duration: 0.5, delay: 0.5, easing: 'ease-out' });
 
-  // Stagger initial form fields
-  const fields = document.querySelectorAll('#step-1 .field, #step-1 .timeslot-section');
-  if (fields.length && !prefersReducedMotion) {
-    animate(fields, { opacity: [0, 1], y: [8, 0] }, { duration: 0.35, delay: stagger(0.06, { start: 0.55 }), easing: 'ease-out' });
-  }
+  const fields = document.querySelectorAll('#step-1 .field');
+  if (fields.length) animate(fields, { opacity: [0, 1], y: [8, 0] }, { duration: 0.35, delay: stagger(0.06, { start: 0.55 }), easing: 'ease-out' });
 })();

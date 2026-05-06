@@ -7,7 +7,8 @@ html {
 body {
   line-height: 1.5;
   background: var(--color-bg);
-  transition: background 300ms ease, color 300ms ease;
+  /* NOTE: No transition here — theme is set synchronously by theme-init.js before
+     first paint, so animating background/color causes a flicker flash on load. */
 }
 
 h1,

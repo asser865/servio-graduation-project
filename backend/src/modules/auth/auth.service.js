@@ -25,6 +25,24 @@ const generateToken = (userId, role, authVersion = 0) => {
 };
 
 /**
+ * SEED AVAILABILITY
+ * WHAT: Generates a weekly availability schedule from the availability type.
+ * WHEN: Called after user creation for workers who selected an availability type.
+ */
+function seedAvailability(type) {
+  const WEEKDAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+  const WEEKENDS = ['saturday', 'sunday'];
+  let days = [];
+  if      (type === 'weekdays') days = WEEKDAYS;
+  else if (type === 'weekends') days = WEEKENDS;
+  else if (type === 'both')     days = [...WEEKDAYS, ...WEEKENDS];
+  else                          return [];
+  const from = type === 'weekends' ? '10:00' : '09:00';
+  const to   = type === 'weekends' ? '15:00' : '17:00';
+  return days.map(day => ({ day, from, to }));
+}
+
+/**
  * REGISTER NEW USER
  * WHAT: Validates email uniqueness and saves a new user to MongoDB.
  * HOW:  Hashes password automatically via Model pre-save hook.
@@ -137,6 +155,15 @@ const registerUser = async (data) => {
     ...(portfolioFiles !== undefined && { portfolioFiles }),
     ...(isWorker && validatedServices.length > 0 && { services: validatedServices }),
   });
+
+  // Auto-seed weekly availability from availabilityType chosen at signup
+  if (isWorker && availabilityType) {
+    const seeded = seedAvailability(availabilityType);
+    if (seeded.length) {
+      await User.findByIdAndUpdate(user._id, { availability: seeded });
+      user.availability = seeded;
+    }
+  }
 
   const token = generateToken(user._id, user.role, user.authVersion);
 

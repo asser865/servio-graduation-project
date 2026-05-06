@@ -48,7 +48,7 @@ const emailUpdateValidation = [
 ];
 
 const availabilityValidation = [
-  body('availability').isArray({ min: 1 }).withMessage('Availability must be an array'),
+  body('availability').isArray().withMessage('Availability must be an array'),
   body('availability.*.day')
     .isIn(['monday','tuesday','wednesday','thursday','friday','saturday','sunday'])
     .withMessage('Invalid day'),
@@ -79,6 +79,14 @@ router.patch('/me/password', protect, userController.updatePassword);
 // DELETE /api/v1/users/me — delete own profile
 router.delete('/me', protect, userController.deleteMe);
 
+// PATCH /api/v1/users/me/available — worker toggles their Available Now status
+router.patch(
+  '/me/available',
+  protect,
+  authorize('worker'),
+  userController.toggleAvailableNow
+);
+
 // PATCH /api/v1/users/me/availability — worker updates availability
 router.patch(
   '/me/availability',
@@ -87,6 +95,9 @@ router.patch(
   validate(availabilityValidation),
   userController.updateAvailability
 );
+
+// PATCH /api/v1/users/me/blocked-dates — worker toggles a specific date blocked/unblocked
+router.patch('/me/blocked-dates', protect, authorize('worker'), userController.toggleBlockedDate);
 
 // ── Admin user management routes ──────────────────────────────────────────────
 // GET /api/v1/users — admin: list all users
@@ -97,6 +108,9 @@ router.patch('/:id/status', protect, authorize('admin'), userController.updateUs
 
 // PATCH /api/v1/users/workers/:id/verify — admin: approve/reject worker
 router.patch('/workers/:id/verify', protect, authorize('admin'), userController.verifyWorker);
+
+// PATCH /api/v1/users/workers/:id/approve-category — admin: approve a pending category expansion
+router.patch('/workers/:id/approve-category', protect, authorize('admin'), userController.approveWorkerCategory);
 
 // DELETE /api/v1/users/:id — admin: permanent delete
 router.delete('/:id', protect, authorize('admin'), userController.deleteUser);

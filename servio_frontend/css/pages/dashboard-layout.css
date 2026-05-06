@@ -558,6 +558,15 @@
   animation: panel-enter 0.3s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
+/* ── Tab Restoration Flicker Guard ──────────────────────────
+   While the inline script in <head> is restoring the active
+   tab from sessionStorage (before DOMContentLoaded fires),
+   we suppress the panel-enter animation to prevent a jump-in
+   flash. The class is removed immediately after DOMContentLoaded. */
+.is-restoring-tab .dash-panel.is-active {
+  animation: none !important;
+}
+
 /* Ensure hidden panels are strictly hidden and do not take space */
 .dash-panel:not(.is-active) {
   display: none !important;

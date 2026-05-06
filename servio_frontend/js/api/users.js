@@ -6,6 +6,8 @@ export const updateEmail    = (data)        => api.patch('/users/me/email', data
 export const updatePassword = (data)        => api.patch('/users/me/password', data);
 export const deleteMe           = ()                   => api.delete('/users/me');
 export const updateAvailability = (availability)       => api.patch('/users/me/availability', { availability });
+export const toggleAvailableNow = (isAvailable)        => api.patch('/users/me/available', { isAvailable });
+export const toggleBlockedDate  = (date)               => api.patch('/users/me/blocked-dates', { date });
 export const getWorkers     = (params = {}) => {
   const qs = new URLSearchParams(params).toString();
   return api.get(`/users/workers${qs ? '?' + qs : ''}`);
@@ -19,6 +21,8 @@ export const updateUser     = (id, data)    => api.patch(`/users/${id}`, data);
 export const deleteUser     = (id)          => api.delete(`/users/${id}`);
 
 // Admin specific
-export const updateUserStatus = (id, isActive) => api.patch(`/users/${id}/status`, { isActive });
-export const verifyWorker     = (id, isVerified) => api.patch(`/users/workers/${id}/verify`, { isVerified });
-export const reviewWorker     = (id, data)       => api.patch(`/users/workers/${id}/verify`, data);
+export const updateUserStatus      = (id, isActive)  => api.patch(`/users/${id}/status`, { isActive });
+export const verifyWorker          = (id, isVerified) => api.patch(`/users/workers/${id}/verify`, { isVerified });
+export const reviewWorker          = (id, data)       => api.patch(`/users/workers/${id}/verify`, data);
+export const approveWorkerCategory = (id, category)  => api.patch(`/users/workers/${id}/approve-category`, { category });
+
