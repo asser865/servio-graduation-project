@@ -10,6 +10,7 @@ import '../../design_system/widgets/servio_tab_shell.dart';
 import '../auth/auth_landing_screen.dart';
 import '../marketing/about_screen.dart';
 import '../marketing/contact_screen.dart';
+import '../marketing/faq_screen.dart';
 import '../marketing/privacy_policy_screen.dart';
 import '../marketing/terms_of_service_screen.dart';
 import '../shared/report_problem_screen.dart';
@@ -144,6 +145,17 @@ class TechnicianSettingsProfileScreen extends StatelessWidget {
                           onTap: () => Navigator.of(context).push(
                             MaterialPageRoute<void>(
                               builder: (_) => const PrivacyPolicyScreen(),
+                            ),
+                          ),
+                        ),
+                        _NavTile(
+                          icon: Icons.quiz_outlined,
+                          iconColor: context.servio.accent,
+                          label: 'FAQ',
+                          subtitle: 'Frequently asked questions',
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const FaqScreen(),
                             ),
                           ),
                         ),
