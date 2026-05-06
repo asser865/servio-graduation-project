@@ -55,7 +55,7 @@ class _AuthLandingScreenState extends State<AuthLandingScreen>
                   const SizedBox(height: 48),
 
                   // ── Brand ──────────────────────────────────────
-                  _BrandMark(controller: _entranceController, isDark: isDark),
+                  _BrandMark(controller: _entranceController),
 
                   const SizedBox(height: 36),
 
@@ -141,9 +141,8 @@ class _AuthLandingScreenState extends State<AuthLandingScreen>
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _BrandMark extends StatelessWidget {
-  const _BrandMark({required this.controller, required this.isDark});
+  const _BrandMark({required this.controller});
   final AnimationController controller;
-  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
