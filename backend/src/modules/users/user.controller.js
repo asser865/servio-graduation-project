@@ -35,7 +35,13 @@ const getMe = async (req, res) => {
 const getWorkers = async (req, res) => {
   const { serviceId, category, page = 1, limit = 10 } = req.query;
 
-  const filter = { role: 'worker', isActive: true, isVerified: true, isAvailable: true };
+  const filter = {
+    role:     'worker',
+    isActive: true,
+    isVerified: true,
+    isAvailable: true,
+    'availability.0': { $exists: true },
+  };
 
   if (serviceId) {
     // Canonical filter: match workers whose services array contains this ObjectId
@@ -68,10 +74,17 @@ const getWorkers = async (req, res) => {
 // HOW:  GET /api/v1/users/workers/:id
 const getWorkerProfile = async (req, res) => {
   const worker = await User.findOne({ _id: req.params.id, role: 'worker' })
-    .select('-password');
+    .select('-password')
+    .populate('services', 'title category basePrice priceUnit description');
 
   if (!worker) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Worker not found.');
+  }
+
+  // Hide services from categories not yet approved by admin
+  const pendingCats = worker.pendingCategories || [];
+  if (pendingCats.length && Array.isArray(worker.services)) {
+    worker.services = worker.services.filter(s => !pendingCats.includes(s.category));
   }
 
   // Fetch the worker's reviews to embed in the profile response
@@ -122,6 +135,10 @@ const updateProfile = async (req, res) => {
   if (updates.services !== undefined && req.user?.role !== 'worker') {
     delete updates.services;
   }
+  // Workers cannot self-update categories — handled via pendingCategories approval flow
+  if (updates.categories !== undefined && req.user?.role === 'worker') {
+    delete updates.categories;
+  }
 
   const user = await User.findById(req.user.id);
   if (!user) throw new ApiError(StatusCodes.NOT_FOUND, 'User not found.');
@@ -168,6 +185,19 @@ const updateProfile = async (req, res) => {
       throw new ApiError(StatusCodes.CONFLICT, 'An account with this email already exists.');
     }
     throw err;
+  }
+
+  // Detect new categories in submitted services and route to pendingCategories
+  if (req.user?.role === 'worker' && Array.isArray(updates.services) && updates.services.length > 0) {
+    const svcDocs      = await Service.find({ _id: { $in: updates.services } }).select('category');
+    const requestedCats = [...new Set(svcDocs.map(s => s.category).filter(Boolean))];
+    const verifiedCats  = user.categories || [];
+    const alreadyPending = user.pendingCategories || [];
+    const newPending    = requestedCats.filter(c => !verifiedCats.includes(c) && !alreadyPending.includes(c));
+    if (newPending.length) {
+      await User.findByIdAndUpdate(user._id, { $addToSet: { pendingCategories: { $each: newPending } } });
+      user.pendingCategories = [...alreadyPending, ...newPending];
+    }
   }
 
   return ApiResponse.success(res, StatusCodes.OK, 'Profile updated successfully.', user);
@@ -286,6 +316,14 @@ const updatePassword = async (req, res) => {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Please provide both current and new passwords.');
   }
 
+  const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+  if (!passwordRegex.test(newPassword)) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'New password must be at least 8 characters and include a letter, a number, and a special character.'
+    );
+  }
+
   const user = await User.findById(req.user.id).select('+password');
   if (!user) throw new ApiError(StatusCodes.NOT_FOUND, 'User not found.');
 
@@ -294,7 +332,13 @@ const updatePassword = async (req, res) => {
     throw new ApiError(StatusCodes.UNAUTHORIZED, 'Incorrect current password.');
   }
 
-  user.password = newPassword; // the pre-save hook handles hashing (if not temporarily disabled)
+  const isSameAsOld = await user.comparePassword(newPassword);
+  if (isSameAsOld) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'New password must be different from your current password.');
+  }
+
+  user.password = newPassword;
+  user.authVersion = (user.authVersion ?? 0) + 1;
   await user.save();
 
   return ApiResponse.success(res, StatusCodes.OK, 'Password updated successfully.', undefined);
@@ -385,6 +429,28 @@ const verifyWorker = async (req, res) => {
   });
 
   return ApiResponse.success(res, StatusCodes.OK, `Worker ${decision}.`, worker);
+};
+
+// ── APPROVE WORKER CATEGORY (Admin Only) ─────────────────────────────────────
+// WHAT: Moves a category from pendingCategories → categories so the worker can
+//       appear in listings and accept bookings for that category.
+// HOW:  PATCH /api/v1/users/workers/:id/approve-category  { category: 'electrical' }
+const approveWorkerCategory = async (req, res) => {
+  const { category } = req.body;
+  if (!category) throw new ApiError(StatusCodes.BAD_REQUEST, 'Category is required.');
+
+  const worker = await User.findOneAndUpdate(
+    { _id: req.params.id, role: 'worker', pendingCategories: category },
+    {
+      $pull:     { pendingCategories: category },
+      $addToSet: { categories: category },
+    },
+    { new: true }
+  );
+  if (!worker) throw new ApiError(StatusCodes.NOT_FOUND, 'Worker not found or category not pending.');
+
+  logEvent({ req, type: 'user', action: `Category approved: ${category}`, target: worker.email });
+  return ApiResponse.success(res, StatusCodes.OK, `Category '${category}' approved.`, worker);
 };
 
 // ── DELETE USER (Admin Only) ──────────────────────────────────────────────────
@@ -498,6 +564,22 @@ const getPaymentAnalytics = async (req, res) => {
   });
 };
 
+const toggleBlockedDate = async (req, res) => {
+  const { date } = req.body;
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid date format. Use YYYY-MM-DD.');
+  }
+  const user = await User.findById(req.user.id);
+  const idx  = (user.blockedDates || []).indexOf(date);
+  if (idx === -1) {
+    user.blockedDates.push(date);
+  } else {
+    user.blockedDates.splice(idx, 1);
+  }
+  await user.save();
+  return ApiResponse.success(res, StatusCodes.OK, 'Blocked dates updated.', { blockedDates: user.blockedDates });
+};
+
 module.exports = {
   getWorkers,
   getWorkerProfile,
@@ -506,11 +588,13 @@ module.exports = {
   updateProfile,
   updateEmail,
   toggleAvailableNow,
+  toggleBlockedDate,
   updateAvailability,
   updatePassword,
   getAllUsers,
   updateUserStatus,
   verifyWorker,
+  approveWorkerCategory,
   deleteUser,
   getAnalytics,
   getPaymentAnalytics,

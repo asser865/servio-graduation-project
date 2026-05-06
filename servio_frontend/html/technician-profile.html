@@ -445,50 +445,14 @@
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
             </svg>
           </h3>
-          <ul class="list-credentials">
-            <li>
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              <span data-i18n="prof_cred1">Master Plumber License #89218</span>
-            </li>
-            <li>
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              <span data-i18n="prof_cred2">Fully Insured up to 1,000,000 EGP</span>
-            </li>
-            <li>
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              <span data-i18n="prof_cred3">Background Cleared (Level 2)</span>
-            </li>
-            <li>
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              <span data-i18n="prof_cred4">SERVIO Elite Tier</span>
-            </li>
-          </ul>
+          <ul class="list-credentials" id="credentials-list"></ul>
         </div>
 
         <!-- 4. AVAILABILITY SCHEDULE -->
         <div class="sidebar-widget">
           <h3 class="sidebar-widget__title" data-i18n="prof_avail_title">Availability</h3>
-          <div class="avail-days">
-            <span class="avail-pill avail-pill--on" data-i18n="prof_day_sat">Sat</span>
-            <span class="avail-pill avail-pill--on" data-i18n="prof_day_sun">Sun</span>
-            <span class="avail-pill avail-pill--on" data-i18n="prof_day_mon">Mon</span>
-            <span class="avail-pill avail-pill--on" data-i18n="prof_day_tue">Tue</span>
-            <span class="avail-pill avail-pill--on" data-i18n="prof_day_wed">Wed</span>
-            <span class="avail-pill avail-pill--on" data-i18n="prof_day_thu">Thu</span>
-            <span class="avail-pill avail-pill--off" data-i18n="prof_day_fri">Fri</span>
-          </div>
-          <div class="avail-hours">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            <span data-i18n="prof_typical_hours">Typical hours: 8:00 AM – 8:00 PM</span>
-          </div>
+          <div class="avail-days" id="avail-days"></div>
+          <div class="avail-hours" id="avail-hours"></div>
         </div>
 
         <!-- 5. SIMILAR TECHNICIANS -->

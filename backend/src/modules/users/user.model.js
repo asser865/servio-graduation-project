@@ -106,11 +106,19 @@ const userSchema = new mongoose.Schema(
     },
 
     // ── Worker-specific ──────────────────────────────────────────────────────
-    // Categories the worker operates in (mirrors Service.category enum)
-    // Kept for backward compatibility — prefer `services` (ObjectId refs) going forward.
+    // Admin-verified categories the worker can appear in for bookings and listings.
+    // Set at signup and expanded only via admin approval (pendingCategories flow).
     categories: {
       type: [String],
-      enum: ['plumbing', 'electrical', 'painting', 'flooring', 'carpentry', 'cleaning', 'hvac', 'other'],
+      enum: ['plumbing','electrical','hvac','carpentry','appliance','handyman','renovation',
+             'painting','flooring','drywall','roofing','cleaning','pest-control','landscaping','installation','other'],
+    },
+
+    // Categories requested by the worker but not yet approved by admin.
+    // Services from these categories are saved but hidden from listings until approved.
+    pendingCategories: {
+      type: [String],
+      default: [],
     },
 
     // Canonical service references — the source of truth for which services this worker offers.
@@ -211,6 +219,9 @@ const userSchema = new mongoose.Schema(
       type:    Number,
       default: 0,
     },
+
+    // Specific calendar dates the worker has blocked (YYYY-MM-DD). Overrides weekly schedule.
+    blockedDates: { type: [String], default: [] },
 
     // Weekly availability slots stored as { day: 'monday', from: '08:00', to: '18:00' }
     availability: [

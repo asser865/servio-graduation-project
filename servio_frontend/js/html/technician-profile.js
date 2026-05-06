@@ -32,6 +32,83 @@ function setText(target, value) {
 
 const CLOCK_SVG = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
 
+// ── Credentials & Availability ─────────────────────────────────────────────────
+
+function renderCredentials(worker) {
+  const list = document.getElementById('credentials-list');
+  if (!list) return;
+
+  const CHECK_SVG = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>`;
+  const PENDING_SVG = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#9ca3af" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
+
+  if (!worker.isVerified) {
+    list.innerHTML = `<li style="opacity:0.55">${PENDING_SVG}<span>Verification Pending</span></li>`;
+    return;
+  }
+
+  const items = [
+    'SERVIO Verified Professional',
+    'Background Checked & ID Verified',
+  ];
+
+  const rating = worker.averageRating || 0;
+  if      (rating >= 4.8) items.push('SERVIO Elite Tier');
+  else if (rating >= 4.5) items.push('SERVIO Pro Tier');
+  else                    items.push('SERVIO Standard Tier');
+
+  if ((worker.completedJobs || 0) > 0) {
+    items.push(`${worker.completedJobs}+ Verified Jobs Completed`);
+  }
+
+  list.innerHTML = items
+    .map(text => `<li>${CHECK_SVG}<span>${escapeHtml(text)}</span></li>`)
+    .join('');
+}
+
+function renderAvailability(worker) {
+  const daysEl  = document.getElementById('avail-days');
+  const hoursEl = document.getElementById('avail-hours');
+  if (!daysEl) return;
+
+  // Weekend-first order matches the existing HTML layout (Sat → Sun → Mon … Fri)
+  const WEEK = [
+    { key: 'saturday',  label: 'Sat' },
+    { key: 'sunday',    label: 'Sun' },
+    { key: 'monday',    label: 'Mon' },
+    { key: 'tuesday',   label: 'Tue' },
+    { key: 'wednesday', label: 'Wed' },
+    { key: 'thursday',  label: 'Thu' },
+    { key: 'friday',    label: 'Fri' },
+  ];
+
+  const schedule = worker.availability || [];
+
+  if (!schedule.length) {
+    daysEl.innerHTML = '<p style="font-size:0.85rem;color:#9ca3af;margin:0;">Schedule not yet published</p>';
+    if (hoursEl) hoursEl.innerHTML = '';
+    return;
+  }
+
+  daysEl.innerHTML = WEEK.map(({ key, label }) => {
+    const slot = schedule.find(s => s.day === key);
+    const cls  = slot ? 'avail-pill avail-pill--on' : 'avail-pill avail-pill--off';
+    const tip  = slot ? ` title="${slot.from} – ${slot.to}"` : '';
+    return `<span class="${cls}"${tip}>${label}</span>`;
+  }).join('');
+
+  if (hoursEl) {
+    const fmt = t => {
+      const [h, min] = t.split(':').map(Number);
+      return `${h % 12 || 12}:${String(min).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+    };
+    const froms = schedule.map(s => s.from).sort();
+    const tos   = schedule.map(s => s.to).sort().reverse();
+    hoursEl.innerHTML = `
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <span>Typical hours: ${fmt(froms[0])} – ${fmt(tos[0])}</span>`;
+  }
+}
+
 // ── Render ─────────────────────────────────────────────────────────────────────
 
 function render(worker, lang) {
@@ -75,46 +152,47 @@ function render(worker, lang) {
     ratingCount.textContent = isAr ? `بناءً على ${reviewCount} تقييم` : `Based on ${reviewCount} reviews`;
   }
 
-  // Availability Pills Logic
-  const availType = worker.availabilityType || 'both'; // Default to both if not set
-  const pills = document.querySelectorAll('.avail-pill');
-  pills.forEach(pill => {
-    const dayKey = pill.getAttribute('data-i18n') || '';
-    pill.classList.remove('avail-pill--on', 'avail-pill--off');
-    
-    // Simple logic: Fri is usually 'off' unless 'both' or specific days
-    if (dayKey === 'prof_day_fri') {
-      pill.classList.add(availType === 'both' ? 'avail-pill--on' : 'avail-pill--off');
-    } else {
-      // Sat-Thu are 'on' for weekdays or both, 'off' for weekends (approximate)
-      if (availType === 'weekdays' || availType === 'both') {
-        pill.classList.add('avail-pill--on');
-      } else {
-        pill.classList.add('avail-pill--off');
-      }
-    }
-  });
+  renderCredentials(worker);
+  renderAvailability(worker);
 
   const coverageAreas = el('coverage-areas');
   if (coverageAreas) {
-    coverageAreas.innerHTML = (worker.categories || ['general'])
-      .map(c => `<span class="coverage-tag">${escapeHtml(c)}</span>`)
-      .join('');
+    const areaTags = [];
+    if (worker.serviceArea)   areaTags.push(worker.serviceArea);
+    if (worker.locationLabel) areaTags.push(worker.locationLabel);
+    if (worker.city)          areaTags.push(worker.city);
+    coverageAreas.innerHTML = areaTags.length
+      ? areaTags.map(a => `<span class="coverage-tag">${escapeHtml(a)}</span>`).join('')
+      : '<span class="coverage-tag" style="opacity:0.5">Not specified</span>';
   }
 
   const servicesGrid = el('services-grid');
   if (servicesGrid) {
-    // Show worker skills as service cards
-    const displayList = worker.skills && worker.skills.length ? worker.skills : worker.categories;
-    servicesGrid.innerHTML = displayList.length
-      ? displayList.map(c => `
+    const populated = Array.isArray(worker.services) &&
+      worker.services.length &&
+      typeof worker.services[0] === 'object' &&
+      worker.services[0] !== null;
+
+    if (populated) {
+      servicesGrid.innerHTML = worker.services.map(s => `
         <div class="service-card">
           <div class="service-card__body">
-            <div class="service-card__name">${escapeHtml(c)}</div>
-            <div class="service-card__price">—</div>
+            <div class="service-card__name">${escapeHtml(s.title || s.category || '—')}</div>
+            <div class="service-card__price">${s.basePrice ? `From ${s.basePrice} EGP` : '—'}</div>
           </div>
-        </div>`).join('')
-      : '<p>—</p>';
+        </div>`).join('');
+    } else {
+      const fallback = worker.skills?.length ? worker.skills : worker.categories;
+      servicesGrid.innerHTML = fallback?.length
+        ? fallback.map(c => `
+          <div class="service-card">
+            <div class="service-card__body">
+              <div class="service-card__name">${escapeHtml(c)}</div>
+              <div class="service-card__price">—</div>
+            </div>
+          </div>`).join('')
+        : '<p>—</p>';
+    }
   }
 }
 

@@ -3,7 +3,7 @@
    ─────────────────────────────────────────────── */
 
 import { showToast } from '../components/toast.js';
-import { getAllUsers, deleteUser, updateUserStatus, updatePassword, reviewWorker } from '../api/users.js';
+import { getAllUsers, deleteUser, updateUserStatus, updatePassword, reviewWorker, approveWorkerCategory } from '../api/users.js';
 import { getServices, createService, updateService, deleteService as apiDeleteService } from '../api/services.js';
 import { getAllBookings } from '../api/bookings.js';
 import { getAuditLogs, deleteAuditLog, getAdminSettings, updateAdminSettings, getAnalytics } from '../api/admin.js';
@@ -1731,6 +1731,42 @@ async function loadAdminData() {
     _set('kpi-techs-verified', verifiedTechs.length.toLocaleString());
     _set('kpi-techs-suspended', suspendedTechs.length.toLocaleString());
     _set('kpi-techs-pending-badge', pendingTechs.length);
+
+    // Pending category expansion requests
+    const techsWithPendingCats = techs.filter(t => Array.isArray(t.pendingCategories) && t.pendingCategories.length > 0);
+    const pendingCatGrid = document.getElementById('pending-category-grid');
+    if (pendingCatGrid) {
+      if (!techsWithPendingCats.length) {
+        pendingCatGrid.innerHTML = '<p style="color:var(--color-secondary,#9A8C73);font-size:0.875rem;padding:12px 0;">No pending category requests.</p>';
+      } else {
+        pendingCatGrid.innerHTML = techsWithPendingCats.map(tech => {
+          const catBadges = (tech.pendingCategories || []).map(cat =>
+            `<button class="bk-action-btn bk-action-btn--xs" data-approve-cat="${tech._id}" data-cat="${cat}" style="background:rgba(154,140,115,0.15);margin:2px;">Approve: ${cat}</button>`
+          ).join('');
+          return `<div class="th-verify-card" style="align-items:flex-start;flex-wrap:wrap;gap:8px;">
+            <div class="th-verify-identity" style="flex:1;min-width:180px;">
+              <div class="th-avatar">${escapeHtml((tech.name || '?').slice(0,2).toUpperCase())}</div>
+              <div class="th-identity-text"><strong>${escapeHtml(tech.name || '—')}</strong><span>${escapeHtml(tech.email || '')}</span></div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">${catBadges}</div>
+          </div>`;
+        }).join('');
+        pendingCatGrid.querySelectorAll('[data-approve-cat]').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const workerId = btn.dataset.approveCat;
+            const category = btn.dataset.cat;
+            try {
+              await approveWorkerCategory(workerId, category);
+              btn.textContent = `✓ ${category}`;
+              btn.disabled = true;
+              btn.style.opacity = '0.5';
+            } catch (e) {
+              alert('Failed to approve category: ' + (e.message || e));
+            }
+          });
+        });
+      }
+    }
 
     const techInfoEl = document.getElementById('techPaginationInfo');
     if (techInfoEl) {

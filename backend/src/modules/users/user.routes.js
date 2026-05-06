@@ -96,6 +96,9 @@ router.patch(
   userController.updateAvailability
 );
 
+// PATCH /api/v1/users/me/blocked-dates — worker toggles a specific date blocked/unblocked
+router.patch('/me/blocked-dates', protect, authorize('worker'), userController.toggleBlockedDate);
+
 // ── Admin user management routes ──────────────────────────────────────────────
 // GET /api/v1/users — admin: list all users
 router.get('/', protect, authorize('admin'), userController.getAllUsers);
@@ -105,6 +108,9 @@ router.patch('/:id/status', protect, authorize('admin'), userController.updateUs
 
 // PATCH /api/v1/users/workers/:id/verify — admin: approve/reject worker
 router.patch('/workers/:id/verify', protect, authorize('admin'), userController.verifyWorker);
+
+// PATCH /api/v1/users/workers/:id/approve-category — admin: approve a pending category expansion
+router.patch('/workers/:id/approve-category', protect, authorize('admin'), userController.approveWorkerCategory);
 
 // DELETE /api/v1/users/:id — admin: permanent delete
 router.delete('/:id', protect, authorize('admin'), userController.deleteUser);

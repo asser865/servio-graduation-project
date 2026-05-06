@@ -13,7 +13,8 @@ const router = Router();
 
 const createValidation = [
   body('workerId').notEmpty().isMongoId().withMessage('Valid worker ID is required'),
-  body('serviceId').notEmpty().isMongoId().withMessage('Valid service ID is required'),
+  body('serviceId').optional({ checkFalsy: true }).isMongoId().withMessage('Valid service ID is required'),
+  body('serviceCategory').if(body('serviceId').isEmpty()).notEmpty().withMessage('Service category is required if no specific service is selected'),
   body('scheduledDate').notEmpty().isISO8601().withMessage('Scheduled date must be a valid date'),
   body('address').trim().notEmpty().withMessage('Address is required'),
 ];

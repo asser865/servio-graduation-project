@@ -1,72 +1,85 @@
 import { getServices } from '../api/services.js';
 
-// ── Service category metadata ──────────────────────────────────────────────
-const CATEGORY_META = {
-  plumbing:      { cssClass: 'category-card--plumbing',  emoji: '🔧', icon: `<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"></path><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"></path></svg>` },
-  electrical:    { cssClass: 'category-card--electrical', emoji: '⚡', icon: `<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"></path></svg>` },
-  hvac:          { cssClass: 'category-card--ac',         emoji: '❄️', icon: `<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20"></path><path d="M12 2v20"></path><path d="m20 16-4-4 4-4"></path><path d="m4 8 4 4-4 4"></path><path d="m16 4-4 4-4-4"></path><path d="m8 20 4-4 4 4"></path></svg>` },
-  carpentry:     { cssClass: 'category-card--carpentry',  emoji: '🪵', icon: `<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 12-8.373 8.373a1 1 0 1 1-3-3L12 9"></path><path d="m18 15 4-4"></path><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172V7l-2.26-2.26a6 6 0 0 0-4.202-1.756L9 2.96l.92.82A6.18 6.18 0 0 1 12 8.4V10l2 2h1.172a2 2 0 0 1 1.414.586L18 14"></path></svg>` },
-  appliance:     { cssClass: 'category-card--electrical', emoji: '🔌', icon: `<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="15" x="2" y="4" rx="2"></rect><path d="M8 4v15"></path><path d="M16 4v15"></path><path d="M2 9h20"></path><path d="M2 14h20"></path></svg>` },
-  handyman:      { cssClass: 'category-card--carpentry',  emoji: '🔨', icon: `<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>` },
-  renovation:    { cssClass: 'category-card--plumbing',   emoji: '🏠', icon: `<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>` },
-  painting:      { cssClass: 'category-card--painting',   emoji: '🎨', icon: `<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"></path><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"></path></svg>` },
-  flooring:      { cssClass: 'category-card--carpentry',  emoji: '🪨', icon: `<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M3 9h18M3 15h18M9 3v18M15 3v18"></path></svg>` },
-  drywall:       { cssClass: 'category-card--plumbing',   emoji: '🧱', icon: `<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="18" rx="2"></rect><path d="M2 9h20M2 15h20M8 3v6M16 3v6M8 15v6M16 15v6"></path></svg>` },
-  roofing:       { cssClass: 'category-card--electrical', emoji: '🏚️', icon: `<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7"></path><path d="M3 9v13h18V9"></path><path d="M9 22V12h6v10"></path></svg>` },
-  cleaning:      { cssClass: 'category-card--cleaning',   emoji: '✨', icon: `<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"></path><path d="M20 3v4"></path><path d="M22 5h-4"></path><path d="M4 17v2"></path><path d="M5 18H3"></path></svg>` },
-  'pest-control':{ cssClass: 'category-card--cleaning',   emoji: '🐛', icon: `<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12h8M12 8v8"></path><circle cx="12" cy="12" r="9"></circle><path d="M4.93 4.93l14.14 14.14"></path></svg>` },
-  landscaping:   { cssClass: 'category-card--ac',         emoji: '🌿', icon: `<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-7l-2-2"></path><path d="M17 8v.8A6 6 0 0 1 13.8 20v0H10v0A6.5 6.5 0 0 1 7 8h0a5 5 0 0 1 10 0z"></path><path d="m14 14-2 2-2-2"></path></svg>` },
-  installation:  { cssClass: 'category-card--electrical', emoji: '📺', icon: `<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"></rect><path d="M8 21h8M12 17v4"></path></svg>` },
-};
+// ── 6 main service categories shown on the homepage ───────────────────────
+const HOME_CATEGORIES = [
+  {
+    key: 'plumbing',
+    cssClass: 'category-card--plumbing',
+    label: 'Plumbing',
+    desc: 'Pipe repairs, leak fixes & water systems',
+    emoji: '🔧',
+    icon: `<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"></path><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"></path></svg>`,
+  },
+  {
+    key: 'electrical',
+    cssClass: 'category-card--electrical',
+    label: 'Electrical',
+    desc: 'Wiring, panels, outlets & lighting',
+    emoji: '⚡',
+    icon: `<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"></path></svg>`,
+  },
+  {
+    key: 'hvac',
+    cssClass: 'category-card--ac',
+    label: 'HVAC & Climate',
+    desc: 'AC installation, repair & maintenance',
+    emoji: '❄️',
+    icon: `<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20"></path><path d="M12 2v20"></path><path d="m20 16-4-4 4-4"></path><path d="m4 8 4 4-4 4"></path><path d="m16 4-4 4-4-4"></path><path d="m8 20 4-4 4 4"></path></svg>`,
+  },
+  {
+    key: 'cleaning',
+    cssClass: 'category-card--cleaning',
+    label: 'Cleaning',
+    desc: 'Deep cleaning, maid services & sanitising',
+    emoji: '✨',
+    icon: `<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"></path><path d="M20 3v4"></path><path d="M22 5h-4"></path><path d="M4 17v2"></path><path d="M5 18H3"></path></svg>`,
+  },
+  {
+    key: 'painting',
+    cssClass: 'category-card--painting',
+    label: 'Painting',
+    desc: 'Interior & exterior painting & finishing',
+    emoji: '🎨',
+    icon: `<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"></path><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"></path></svg>`,
+  },
+  {
+    key: 'carpentry',
+    cssClass: 'category-card--carpentry',
+    label: 'Carpentry',
+    desc: 'Custom woodwork, cabinets & furniture',
+    emoji: '🪵',
+    icon: `<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 12-8.373 8.373a1 1 0 1 1-3-3L12 9"></path><path d="m18 15 4-4"></path><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172V7l-2.26-2.26a6 6 0 0 0-4.202-1.756L9 2.96l.92.82A6.18 6.18 0 0 1 12 8.4V10l2 2h1.172a2 2 0 0 1 1.414.586L18 14"></path></svg>`,
+  },
+];
 
-function getPriceLabel(svc) {
-  if (!svc.basePrice) return '';
-  const unit = svc.priceUnit === 'per_hour' ? '/hr' : svc.priceUnit === 'per_sqm' ? '/m²' : ' flat';
-  return `From ${svc.basePrice} EGP${unit}`;
-}
+// Keep for autocomplete emoji lookup
+const CATEGORY_META = Object.fromEntries(
+  HOME_CATEGORIES.map(c => [c.key, { cssClass: c.cssClass, emoji: c.emoji }])
+);
 
-function buildCategoryCard(svc, delay) {
-  const cat  = (svc.category || 'other').toLowerCase();
-  const meta = CATEGORY_META[cat] || { cssClass: '', emoji: '🔧', icon: '' };
-  const price = getPriceLabel(svc);
+const ARROW_SVG = `<svg class="category-card__arrow" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>`;
 
-  const a = document.createElement('a');
-  a.href  = `./services-marketplace.html?q=${cat}`;
-  a.className = `category-card ${meta.cssClass}`;
-  a.setAttribute('data-reveal', '');
-  a.setAttribute('data-reveal-delay', String(delay));
-
-  a.innerHTML = `
-    <div class="category-card__icon">${meta.icon}</div>
-    <h3 class="category-card__title">${svc.title}</h3>
-    <p class="category-card__desc" style="font-size:.8rem;opacity:.75;margin:.25rem 0 .5rem;line-height:1.4;">${svc.description ? svc.description.slice(0, 80) + (svc.description.length > 80 ? '…' : '') : ''}</p>
-    ${price ? `<p class="category-card__count">${price}</p>` : ''}
-    <svg class="category-card__arrow" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
-  `;
-  return a;
-}
-
-async function loadServicesGrid() {
+function loadServicesGrid() {
   const grid = document.getElementById('home-services-grid');
   if (!grid) return;
 
-  try {
-    const resp = await getServices({ limit: 50 });
-    const services = (resp && resp.services) ? resp.services : [];
+  grid.innerHTML = '';
+  HOME_CATEGORIES.forEach((cat, i) => {
+    const a = document.createElement('a');
+    a.href = `./services-marketplace.html?category=${cat.key}`;
+    a.className = `category-card ${cat.cssClass}`;
+    a.setAttribute('data-reveal', '');
+    a.setAttribute('data-reveal-delay', String(i * 80));
+    a.innerHTML = `
+      <div class="category-card__icon">${cat.icon}</div>
+      <h3 class="category-card__title">${cat.label}</h3>
+      <p class="category-card__count">${cat.desc}</p>
+      ${ARROW_SVG}
+    `;
+    grid.appendChild(a);
+  });
 
-    grid.innerHTML = '';
-    if (!services.length) {
-      grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;opacity:.6;">No services available yet.</p>';
-      return;
-    }
-
-    services.forEach((svc, i) => {
-      grid.appendChild(buildCategoryCard(svc, i * 60));
-    });
-  } catch {
-    // On API failure keep skeleton hidden gracefully
-    grid.innerHTML = '';
-  }
+  if (typeof window.initScrollReveal === 'function') window.initScrollReveal();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -201,9 +214,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (autocomplete) autocomplete.hidden = true;
   }
 
+  // Seed autocomplete with category labels immediately; enrich with API titles if available
+  autocompleteServices = HOME_CATEGORIES.map(c => c.label);
+
   getServices({ limit: 50 })
     .then(resp => {
-      autocompleteServices = ((resp && resp.services) ? resp.services : []).map(s => s.title);
+      const apiTitles = ((resp && resp.services) ? resp.services : []).map(s => s.title);
+      if (apiTitles.length) autocompleteServices = apiTitles;
     })
     .catch(() => {});
 

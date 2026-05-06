@@ -23,44 +23,143 @@ const TRANSITION_RULES = {
  * HOW:  Checks if worker and service are valid/active before creating.
  */
 const createBooking = async (userId, data) => {
-  const { workerId, serviceId, scheduledDate, scheduledTime, address, description, images } = data;
+  const { workerId, serviceId, serviceCategory, serviceName, scheduledDate, scheduledTime, address, description, images } = data;
 
-  // Verify the worker exists and is an active, verified worker
+  // Fetch worker
   const worker = await User.findOne({ _id: workerId, role: 'worker', isActive: true, isVerified: true });
-  if (!worker) {
-    throw new ApiError(StatusCodes.NOT_FOUND, 'Worker not found or not available.');
+  if (!worker) throw new ApiError(StatusCodes.NOT_FOUND, 'Worker not found or not available.');
+
+  // 3a — Worker availability gate
+  if (!worker.isAvailable) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'This technician is not currently accepting bookings.');
   }
 
-  // Verify the service exists and is active
-  const service = await Service.findOne({ _id: serviceId, isActive: true });
-  if (!service) {
-    throw new ApiError(StatusCodes.NOT_FOUND, 'Service not found or no longer available.');
+  // 3b — Date range (UTC-based to match Mongoose's Date type storage)
+  const [y, m, d] = scheduledDate.split('-').map(Number);
+  const bookingDateUTC = new Date(Date.UTC(y, m - 1, d));
+  const todayUTC       = new Date(); todayUTC.setUTCHours(0, 0, 0, 0);
+  const maxDateUTC     = new Date(todayUTC); maxDateUTC.setUTCDate(maxDateUTC.getUTCDate() + 30);
+
+  if (bookingDateUTC < todayUTC) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Booking date must be today or in the future.');
+  }
+  if (bookingDateUTC > maxDateUTC) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Bookings can only be made up to 30 days in advance.');
   }
 
-  // Verify the worker supports this specific service (canonical check via ObjectId)
-  const workerSupportsService = Array.isArray(worker.services) &&
-    worker.services.some((id) => id.toString() === service._id.toString());
-
-  // Backward-compatibility: also accept if worker's legacy categories include this service's category
-  const legacyCategoryMatches = !workerSupportsService &&
-    Array.isArray(worker.categories) &&
-    worker.categories.includes(service.category);
-
-  if (!workerSupportsService && !legacyCategoryMatches) {
-    throw new ApiError(StatusCodes.BAD_REQUEST, 'Selected worker does not support this service.');
+  // 3c — Time provided
+  if (!scheduledTime) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'A time slot must be selected.');
   }
 
-  const booking = await Booking.create({
-    user: userId,
-    worker: workerId,
-    service: serviceId,
-    scheduledDate,
-    scheduledTime: scheduledTime || '',
-    address,
-    description,
-    images,
-    totalPrice: service.basePrice,
+  // 3d — Slot alignment: valid hour (00–23) at whole-hour boundary
+  if (!/^(0[0-9]|1[0-9]|2[0-3]):00$/.test(scheduledTime)) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid time slot format. Only whole-hour slots are accepted.');
+  }
+
+  const scheduledHour = parseInt(scheduledTime, 10);
+
+  // 3d-extra — Same-day past-time check (compare local hours since scheduledTime is local)
+  const todayLocal       = new Date(); todayLocal.setHours(0, 0, 0, 0);
+  const bookingDateLocal = new Date(y, m - 1, d);
+  if (bookingDateLocal.getTime() === todayLocal.getTime() && scheduledHour <= new Date().getHours()) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Cannot book a time slot that has already started or passed today.');
+  }
+
+  // 3e — Day must exist in worker's schedule.
+  // bookingDateUTC = Date.UTC(y, m-1, d) which is always exactly "YYYY-MM-DDT00:00:00Z".
+  // getUTCDay() on that value returns the calendar day-of-week for the requested date
+  // regardless of server timezone — safe to use here instead of bookingDateLocal.getDay().
+  const DAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  const dayName   = DAY_NAMES[bookingDateUTC.getUTCDay()];
+  const daySlot   = (worker.availability || []).find(a => a.day === dayName);
+  if (!daySlot) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Technician is not available on this day.');
+  }
+
+  // 3e-extra — Blocked date check (worker marked this date as time-off)
+  const bookingDateStr = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  if ((worker.blockedDates || []).includes(bookingDateStr)) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Technician is not available on this date (time off).');
+  }
+
+  // 3f — Time must fall within working hours (last valid slot starts at toHour - 1)
+  const fromHour = parseInt(daySlot.from, 10);
+  const toHour   = parseInt(daySlot.to,   10);
+  if (scheduledHour < fromHour || scheduledHour >= toHour) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, "Selected time is outside technician's working hours.");
+  }
+
+  // 3g — Double-booking check (exact UTC midnight match eliminates timezone range ambiguity).
+  // All bookings created by this function store scheduledDate as bookingDateUTC (UTC midnight),
+  // so exact equality is safe and intentional — no range query needed.
+  const conflict = await Booking.findOne({
+    worker:        workerId,
+    scheduledDate: bookingDateUTC,
+    scheduledTime,
+    status:        { $in: ['pending', 'accepted', 'in_progress'] },
   });
+  if (conflict) {
+    throw new ApiError(StatusCodes.CONFLICT, 'This time slot is already booked. Please select another.');
+  }
+
+  // ── Service / category validation ──────────────────────────────────────────
+  let service     = null;
+  let bookingPrice = 0;
+  let resolvedCategory = serviceCategory || '';
+  let resolvedName     = serviceName || '';
+
+  if (serviceId) {
+    // Specific sub-service path
+    service = await Service.findOne({ _id: serviceId, isActive: true });
+    if (!service) throw new ApiError(StatusCodes.NOT_FOUND, 'Service not found or no longer available.');
+
+    const workerSupportsService = Array.isArray(worker.services) &&
+      worker.services.some((id) => id.toString() === service._id.toString());
+    const legacyCategoryMatches = !workerSupportsService &&
+      Array.isArray(worker.categories) &&
+      worker.categories.includes(service.category);
+    if (!workerSupportsService && !legacyCategoryMatches) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Selected worker does not support this service.');
+    }
+
+    bookingPrice     = service.basePrice;
+    resolvedCategory = service.category;
+    resolvedName     = service.title;
+  } else if (serviceCategory) {
+    // General category path — no specific sub-service selected
+    const workerCoversCategory = (worker.categories || []).includes(serviceCategory);
+    if (!workerCoversCategory) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'This technician does not offer this service category.');
+    }
+    bookingPrice  = worker.hourlyRate || 0;
+    resolvedName  = resolvedName || `General ${serviceCategory.charAt(0).toUpperCase() + serviceCategory.slice(1)}`;
+  } else {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'A service or service category is required.');
+  }
+
+  // Create booking — catch duplicate-key as race-condition safeguard
+  let booking;
+  try {
+    booking = await Booking.create({
+      user:            userId,
+      worker:          workerId,
+      service:         serviceId || undefined,
+      serviceCategory: resolvedCategory,
+      serviceName:     resolvedName,
+      scheduledDate:   bookingDateUTC,
+      scheduledTime,
+      address,
+      description,
+      images,
+      totalPrice:      bookingPrice,
+    });
+  } catch (err) {
+    if (err.code === 11000) {
+      throw new ApiError(StatusCodes.CONFLICT, 'This time slot is already booked. Please select another.');
+    }
+    throw err;
+  }
 
   return booking.populate(['user', 'worker', 'service']);
 };
@@ -149,10 +248,10 @@ const updateBookingStatus = async (bookingId, newStatus, actorId, actorRole) => 
   }
 
   // ── Ownership check ────────────────────────────────────────────────────────
-  if (actorRole === 'worker' && booking.worker.toString() !== actorId) {
+  if (actorRole === 'worker' && booking.worker.toString() !== actorId.toString()) {
     throw new ApiError(StatusCodes.FORBIDDEN, 'You are not assigned to this booking.');
   }
-  if (actorRole === 'user' && booking.user.toString() !== actorId) {
+  if (actorRole === 'user' && booking.user.toString() !== actorId.toString()) {
     throw new ApiError(StatusCodes.FORBIDDEN, 'This is not your booking.');
   }
 

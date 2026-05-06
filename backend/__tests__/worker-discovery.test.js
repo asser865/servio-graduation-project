@@ -57,7 +57,7 @@ describe('getWorkers — serviceId filter (canonical)', () => {
     await getWorkers(req, res);
 
     expect(User.find).toHaveBeenCalledWith(
-      expect.objectContaining({ services: PLUMBING_ID, isAvailable: true })
+      expect.objectContaining({ services: PLUMBING_ID, isAvailable: true, 'availability.0': { $exists: true } })
     );
     expect(User.find).toHaveBeenCalledWith(
       expect.not.objectContaining({ categories: expect.anything() })
@@ -72,7 +72,7 @@ describe('getWorkers — serviceId filter (canonical)', () => {
     await getWorkers(req, mockRes());
 
     expect(User.find).toHaveBeenCalledWith(
-      expect.objectContaining({ isActive: true, isVerified: true, role: 'worker', isAvailable: true })
+      expect.objectContaining({ isActive: true, isVerified: true, role: 'worker', isAvailable: true, 'availability.0': { $exists: true } })
     );
   });
 });
@@ -86,7 +86,7 @@ describe('getWorkers — category filter (legacy backward compat)', () => {
     await getWorkers(req, mockRes());
 
     expect(User.find).toHaveBeenCalledWith(
-      expect.objectContaining({ categories: { $in: ['plumbing'] }, isAvailable: true })
+      expect.objectContaining({ categories: { $in: ['plumbing'] }, isAvailable: true, 'availability.0': { $exists: true } })
     );
     expect(User.find).toHaveBeenCalledWith(
       expect.not.objectContaining({ services: expect.anything() })
@@ -103,7 +103,7 @@ describe('getWorkers — serviceId takes priority over category', () => {
     await getWorkers(req, mockRes());
 
     expect(User.find).toHaveBeenCalledWith(
-      expect.objectContaining({ services: PLUMBING_ID, isAvailable: true })
+      expect.objectContaining({ services: PLUMBING_ID, isAvailable: true, 'availability.0': { $exists: true } })
     );
     expect(User.find).toHaveBeenCalledWith(
       expect.not.objectContaining({ categories: expect.anything() })
@@ -120,7 +120,7 @@ describe('getWorkers — no filters', () => {
     await getWorkers(req, mockRes());
 
     expect(User.find).toHaveBeenCalledWith(
-      expect.objectContaining({ role: 'worker', isActive: true, isVerified: true, isAvailable: true })
+      expect.objectContaining({ role: 'worker', isActive: true, isVerified: true, isAvailable: true, 'availability.0': { $exists: true } })
     );
     expect(User.find).toHaveBeenCalledWith(
       expect.not.objectContaining({ services: expect.anything(), categories: expect.anything() })

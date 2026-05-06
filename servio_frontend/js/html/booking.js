@@ -38,6 +38,7 @@ const state = {
   selectedPayment: 'online',
   data: {
     serviceId: '',
+    serviceCategory: '',
     serviceType: '',
     date: '',
     time: '',
@@ -45,16 +46,18 @@ const state = {
     notes: '',
     payment: 'online',
   },
+  addresses: [], // List of { id, label, street, city, state, full }
 };
 
 // ─── DOM refs ─────────────────────────────────────────────────────────────────
 
-const panels      = document.querySelectorAll('.step-panel');
 const stepItems   = document.querySelectorAll('.step-item');
 const paymentOpts = document.querySelectorAll('.payment-option');
 
 const step1Next   = document.getElementById('step1Next');
-const serviceType = document.getElementById('serviceType');
+const serviceType     = document.getElementById('serviceType');
+const serviceCategory = document.getElementById('serviceCategory');
+const serviceName     = document.getElementById('serviceName');
 const bookDate    = document.getElementById('bookDate');
 const bookAddress = document.getElementById('bookAddress');
 
@@ -74,33 +77,170 @@ const reviewBaseRate = document.getElementById('reviewBaseRate');
 const reviewFee      = document.getElementById('reviewFee');
 const reviewTotal    = document.getElementById('reviewTotal');
 
-const otherProblemRow = document.getElementById('otherProblemRow');
-const otherProblem    = document.getElementById('otherProblem');
+// otherProblemRow removed — general bookings use bookNotes textarea instead
 
-// ─── "Other" service toggle ────────────────────────────────────────────────────
+// ─── Service picker state ─────────────────────────────────────────────────────
 
-if (serviceType && otherProblemRow && otherProblem) {
-  serviceType.addEventListener('change', () => {
-    const isOther = serviceType.value === 'other';
-    otherProblemRow.style.display = isOther ? '' : 'none';
-    otherProblem.required = isOther;
-    if (!isOther) otherProblem.value = '';
+const pickerState = { category: '', serviceId: '', label: '' };
+
+function setPickerSelection(catKey, svcId, label) {
+  pickerState.category  = catKey;
+  pickerState.serviceId = svcId;
+  pickerState.label     = label;
+  if (serviceType)     serviceType.value     = svcId || catKey;
+  if (serviceCategory) serviceCategory.value = catKey;
+  if (serviceName)     serviceName.value     = label;
+
+  const confirmed = document.getElementById('svcPickerConfirmed');
+  const lbl       = document.getElementById('svcConfirmedLabel');
+  const cats      = document.getElementById('svcPickerCats');
+  const subs      = document.getElementById('svcPickerSubs');
+  if (lbl)       lbl.textContent = label;
+  if (confirmed) confirmed.hidden = false;
+  if (cats)      cats.hidden = true;
+  if (subs)      subs.hidden = true;
+}
+
+function resetPicker() {
+  pickerState.category = pickerState.serviceId = pickerState.label = '';
+  if (serviceType)     serviceType.value     = '';
+  if (serviceCategory) serviceCategory.value = '';
+  if (serviceName)     serviceName.value     = '';
+  const confirmed = document.getElementById('svcPickerConfirmed');
+  const cats      = document.getElementById('svcPickerCats');
+  const subs      = document.getElementById('svcPickerSubs');
+  if (confirmed) confirmed.hidden = true;
+  if (cats)      cats.hidden      = false;
+  if (subs)      subs.hidden      = true;
+}
+
+// ─── Date validation helpers ──────────────────────────────────────────────────
+
+const DAY_ABBR = { monday:'Mon', tuesday:'Tue', wednesday:'Wed', thursday:'Thu', friday:'Fri', saturday:'Sat', sunday:'Sun' };
+
+function validateBookingDate(dateStr, availability) {
+  const sel   = new Date(dateStr + 'T00:00:00');
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const max   = new Date(); max.setDate(max.getDate() + 30); max.setHours(0, 0, 0, 0);
+
+  if (sel < today) return 'Please select a date that is today or in the future.';
+  if (sel > max)   return 'You can only book up to 30 days in advance.';
+
+  if (availability.length) {
+    const dayName = sel.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+    if (!availability.find(a => a.day === dayName)) {
+      const available = availability.map(a => DAY_ABBR[a.day] || a.day).join(', ');
+      return `Technician is not available on ${dayName.charAt(0).toUpperCase() + dayName.slice(1)}s. Available: ${available}.`;
+    }
+  }
+  return null;
+}
+
+function showDateError(msg) {
+  const el = document.getElementById('dateError');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.display = 'block';
+  const input = document.getElementById('bookDate');
+  if (input) input.style.borderColor = '#e74c3c';
+}
+
+function clearDateError() {
+  const el = document.getElementById('dateError');
+  if (el) { el.textContent = ''; el.style.display = 'none'; }
+}
+
+// ─── Custom calendar ──────────────────────────────────────────────────────────
+
+const calState = {
+  year:  new Date().getFullYear(),
+  month: new Date().getMonth(), // 0-based
+};
+
+function buildCalendar(availability, blockedDates) {
+  const today    = new Date(); today.setHours(0,0,0,0);
+  const maxDate  = new Date(); maxDate.setDate(maxDate.getDate() + 30); maxDate.setHours(0,0,0,0);
+  const avDays   = (availability || []).map(a => a.day);
+  const DAY_NAMES = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+
+  const grid      = document.getElementById('calGrid');
+  const monthLbl  = document.getElementById('calMonthLabel');
+  const prevBtn   = document.getElementById('calPrev');
+  const nextBtn   = document.getElementById('calNext');
+  if (!grid) return;
+
+  const firstDay  = new Date(calState.year, calState.month, 1);
+  const lastDay   = new Date(calState.year, calState.month + 1, 0);
+  const monthName = firstDay.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  if (monthLbl) monthLbl.textContent = monthName;
+
+  // Disable prev if entire prev month is before today
+  const prevMonthEnd = new Date(calState.year, calState.month, 0);
+  if (prevBtn) prevBtn.disabled = prevMonthEnd < today;
+
+  // Disable next if entire next month is after maxDate
+  const nextMonthStart = new Date(calState.year, calState.month + 1, 1);
+  if (nextBtn) nextBtn.disabled = nextMonthStart > maxDate;
+
+  // Leading empty cells
+  let html = '';
+  for (let i = 0; i < firstDay.getDay(); i++) html += '<div class="cal-day cal-day--empty"></div>';
+
+  for (let day = 1; day <= lastDay.getDate(); day++) {
+    const date    = new Date(calState.year, calState.month, day);
+    const dateStr = `${calState.year}-${String(calState.month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const isToday    = date.getTime() === today.getTime();
+    const isPast     = date < today;
+    const isFar      = date > maxDate;
+    const dayName    = DAY_NAMES[date.getDay()];
+    const isOffSched = avDays.length > 0 && !avDays.includes(dayName);
+    const isBlocked  = (blockedDates || []).includes(dateStr);
+    const isSelected = bookDate?.value === dateStr;
+
+    let cls = 'cal-day';
+    if      (isSelected)  cls += ' cal-day--selected';
+    if      (isToday)     cls += ' cal-day--today';
+    if      (isPast || isFar) cls += ' cal-day--past';
+    else if (isBlocked)   cls += ' cal-day--blocked';
+    else if (isOffSched)  cls += ' cal-day--off-schedule';
+    else                  cls += ' cal-day--available';
+
+    const clickable = !isPast && !isFar && !isBlocked && !isOffSched;
+    html += `<div class="${cls}" ${clickable ? `data-date="${dateStr}"` : ''} title="${dateStr}">${day}</div>`;
+  }
+
+  grid.innerHTML = html;
+
+  grid.querySelectorAll('.cal-day--available[data-date]').forEach(cell => {
+    cell.addEventListener('click', () => {
+      const d = cell.dataset.date;
+      if (bookDate) bookDate.value = d;
+      clearDateError();
+      buildCalendar(availability, blockedDates);
+      renderTimeSlotsForDate(d, availability);
+    });
   });
 }
 
-// ─── Date input: set min + trigger slot render ────────────────────────────────
+function initCalendar(availability, blockedDates) {
+  // Start at the first valid month that contains an available date
+  const today = new Date(); today.setHours(0,0,0,0);
+  calState.year  = today.getFullYear();
+  calState.month = today.getMonth();
 
-(function setMinDate() {
-  if (!bookDate) return;
-  const d = new Date();
-  bookDate.min = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-})();
+  document.getElementById('calPrev')?.addEventListener('click', () => {
+    calState.month--;
+    if (calState.month < 0) { calState.month = 11; calState.year--; }
+    buildCalendar(availability, blockedDates);
+  });
+  document.getElementById('calNext')?.addEventListener('click', () => {
+    calState.month++;
+    if (calState.month > 11) { calState.month = 0; calState.year++; }
+    buildCalendar(availability, blockedDates);
+  });
 
-bookDate?.addEventListener('change', () => {
-  if (bookDate.value) {
-    renderTimeSlotsForDate(bookDate.value, state.worker?.availability || []);
-  }
-});
+  buildCalendar(availability, blockedDates);
+}
 
 // ─── Time slot selection (event delegation) ───────────────────────────────────
 
@@ -187,10 +327,34 @@ confirmBtn?.addEventListener('click', (e) => {
 function validateStep1() {
   const errors = [];
 
-  if (!serviceType?.value) errors.push(serviceType);
-  if (serviceType?.value === 'other' && !otherProblem?.value.trim()) errors.push(otherProblem);
-  if (!bookDate?.value) errors.push(bookDate);
-  if (!bookAddress?.value.trim()) errors.push(bookAddress);
+  // Service picker — must have a category selected
+  if (!pickerState.category) {
+    const picker = document.getElementById('svcPicker');
+    if (picker) {
+      picker.style.borderColor = '#e74c3c';
+      picker.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => { picker.style.borderColor = ''; }, 2000);
+    }
+    errors.push(null);
+  }
+  if (!bookDate?.value) {
+    errors.push(bookDate);
+  } else {
+    const dateErr = validateBookingDate(bookDate.value, state.worker?.availability || []);
+    if (dateErr) {
+      showDateError(dateErr);
+      errors.push(null); // date error shown via showDateError, no input to shake
+    }
+  }
+  if (!bookAddress?.value.trim()) {
+    const list = document.getElementById('savedAddressesList');
+    if (list) {
+      list.style.borderColor = '#e74c3c';
+      animate(list, { x: [0, -5, 5, -3, 3, 0] }, { duration: 0.35 });
+      list.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    errors.push(null);
+  }
   if (!state.selectedTime) {
     const grid = document.querySelector('.timeslot-grid');
     if (grid) animate(grid, { x: [0, -5, 5, -3, 3, 0] }, { duration: 0.35 });
@@ -211,11 +375,9 @@ function validateStep1() {
 // ─── Data collection ──────────────────────────────────────────────────────────
 
 function collectStep1() {
-  const opt = serviceType?.options[serviceType.selectedIndex];
-  state.data.serviceId   = opt?.value === 'other' ? '' : (opt?.value || '');
-  state.data.serviceType = serviceType?.value === 'other' && otherProblem?.value.trim()
-    ? `Other: ${otherProblem.value.trim()}`
-    : (opt?.text || '');
+  state.data.serviceId       = pickerState.serviceId;
+  state.data.serviceCategory = pickerState.category;
+  state.data.serviceType     = pickerState.label;
   state.data.date    = bookDate?.value || '';
   state.data.address = bookAddress?.value.trim() || '';
   state.data.time    = state.data.time || '';
@@ -320,14 +482,20 @@ function renderTimeSlotsForDate(dateString, availability) {
     return;
   }
 
-  const clockSvg = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
+  const PERIOD_ICONS = {
+    'morning': `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v8"/><path d="m4.93 10.93 1.41-1.41"/><path d="M2 18h2"/><path d="M20 18h2"/><path d="m19.07 10.93-1.41-1.41"/><path d="M22 22H2"/><path d="m8 6 4-4 4 4"/><path d="M16 18a4 4 0 0 0-8 0"/></svg>`,
+    'afternoon': `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>`,
+    'evening': `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>`
+  };
 
   groups.forEach(group => {
+    const periodKey = group.label.split(' ')[0].toLowerCase();
+    const icon = PERIOD_ICONS[periodKey] || PERIOD_ICONS['morning'];
     const section = document.createElement('div');
     section.className = 'timeslot-section';
     section.innerHTML = `
       <div class="timeslot-section__label">
-        ${clockSvg}
+        ${icon}
         <span>${group.label}</span>
       </div>
       <div class="timeslot-grid" role="group" aria-label="${group.label} time slots">
@@ -469,101 +637,267 @@ function setText(id, val) {
   if (el) el.textContent = val;
 }
 
-// ─── Services dropdown ────────────────────────────────────────────────────────
+// ─── Two-step service picker ──────────────────────────────────────────────────
 
-async function loadServices(worker) {
-  if (!serviceType) return;
+const CAT_LABELS = {
+  plumbing:'Plumbing', electrical:'Electrical', hvac:'A/C & HVAC',
+  carpentry:'Carpentry', appliance:'Appliances', handyman:'Handyman',
+  renovation:'Renovation', painting:'Painting', flooring:'Flooring',
+  drywall:'Drywall', roofing:'Roofing', cleaning:'Cleaning',
+  'pest-control':'Pest Control', landscaping:'Landscaping',
+  installation:'Installation', other:'Other',
+};
+
+const CAT_ICONS = {
+  plumbing:'🔧', electrical:'⚡', hvac:'❄️', carpentry:'🪵',
+  appliance:'🏠', handyman:'🔨', renovation:'🏗️', painting:'🎨',
+  flooring:'🪨', drywall:'🧱', roofing:'🏠', cleaning:'🧹',
+  'pest-control':'🐛', landscaping:'🌿', installation:'📺', other:'⚙️',
+};
+
+async function initServicePicker(worker) {
+  const catsEl = document.getElementById('svcPickerCats');
+  const subsEl = document.getElementById('svcPickerSubs');
+  const changeBtn = document.getElementById('svcChangeBtn');
+  if (!catsEl) return;
+
+  changeBtn?.addEventListener('click', resetPicker);
 
   let allServices = [];
   try {
-    const res = await getServices({ limit: 100, isActive: true });
+    const res = await getServices({ limit: 200 });
     allServices = res.data?.services || res.services || res.data || [];
   } catch (e) {
-    console.warn('Could not load services:', e);
+    catsEl.innerHTML = '<p style="color:#e74c3c;font-size:0.875rem;">Failed to load services.</p>';
+    return;
   }
 
-  const workerServiceIds = (worker.services || []).map(s => (s._id || s).toString());
-  const workerCategories = worker.categories || [];
+  // Only show services the worker explicitly selected in their dashboard
+  const workerServiceIds = new Set((worker.services || []).map(s => (s._id || s).toString()));
+  const workerCategories = new Set(worker.categories || []);
 
-  let filtered = allServices.filter(svc => {
-    const svcId  = (svc._id || svc.id || '').toString();
-    const inList = workerServiceIds.includes(svcId);
-    const inCat  = workerCategories.includes(svc.category);
-    return inList || inCat;
+  const grouped = {};
+  allServices.forEach(svc => {
+    const id  = (svc._id || svc.id || '').toString();
+    const cat = svc.category || 'other';
+    if (!workerServiceIds.has(id)) return; // only explicitly selected services
+    if (!grouped[cat]) grouped[cat] = [];
+    grouped[cat].push(svc);
   });
 
-  if (filtered.length === 0) filtered = allServices;
+  // For verified categories with no specific services selected → show category card
+  // with only the "General" option (empty array triggers auto-general path)
+  workerCategories.forEach(cat => {
+    if (!grouped[cat]) grouped[cat] = [];
+  });
 
-  // Clear default options except placeholder
-  while (serviceType.options.length > 1) serviceType.remove(1);
-
-  if (filtered.length === 0) {
-    const opt = document.createElement('option');
-    opt.disabled = true;
-    opt.textContent = 'No services available — contact support.';
-    serviceType.appendChild(opt);
-  } else {
-    filtered.forEach(svc => {
-      const opt = document.createElement('option');
-      opt.value = svc._id || svc.id || '';
-      opt.textContent = svc.category ? `${svc.title} — ${svc.category}` : svc.title;
-      serviceType.appendChild(opt);
+  // Last resort: worker has no data at all — show everything
+  if (!Object.keys(grouped).length) {
+    allServices.forEach(svc => {
+      const cat = svc.category || 'other';
+      if (!grouped[cat]) grouped[cat] = [];
+      grouped[cat].push(svc);
     });
+  }
 
-    // "Other" catch-all
-    const otherOpt = document.createElement('option');
-    otherOpt.value = 'other';
-    otherOpt.textContent = 'Other';
-    serviceType.appendChild(otherOpt);
+  // Render category cards
+  catsEl.innerHTML = `
+    <p class="svc-picker-hint">What type of service do you need?</p>
+    <div class="svc-cat-cards">
+      ${Object.keys(grouped).map(cat => `
+        <button type="button" class="svc-cat-card" data-cat="${cat}">
+          <span class="svc-cat-card__icon">${CAT_ICONS[cat] || '⚙️'}</span>
+          <span class="svc-cat-card__label">${CAT_LABELS[cat] || cat}</span>
+        </button>
+      `).join('')}
+    </div>`;
 
-    // Pre-select from URL param
-    if (serviceIdParam) {
-      const match = Array.from(serviceType.options).find(o => o.value === serviceIdParam);
-      if (match) serviceType.value = serviceIdParam;
+  catsEl.querySelectorAll('.svc-cat-card').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const cat      = btn.dataset.cat;
+      const catLabel = CAT_LABELS[cat] || cat;
+      const subs     = grouped[cat] || [];
+
+      // Auto-select if only general (no sub-services available)
+      if (!subs.length) {
+        setPickerSelection(cat, '', `General ${catLabel}`);
+        return;
+      }
+
+      subsEl.hidden = false;
+      subsEl.innerHTML = `
+        <button type="button" class="svc-back-btn" id="svcBackBtn">
+          ← Back to categories
+        </button>
+        <p class="svc-picker-hint">Select the specific service — or continue with <strong>General ${catLabel}</strong> if unsure.</p>
+        <div class="svc-sub-options">
+          <button type="button" class="svc-sub-btn svc-sub-btn--general" data-svc-id="" data-label="General ${catLabel}" data-cat="${cat}">
+            <span class="svc-sub-btn__name">General ${catLabel}</span>
+            <span class="svc-sub-btn__desc">I'll describe the issue in the notes</span>
+          </button>
+          ${subs.map(svc => {
+            const id    = (svc._id || svc.id || '').toString();
+            const price = svc.priceUnit === 'per_hour' ? `From ${svc.basePrice} EGP/hr`
+                        : svc.priceUnit === 'per_sqm'  ? `From ${svc.basePrice} EGP/m²`
+                        :                                `From ${svc.basePrice} EGP`;
+            return `<button type="button" class="svc-sub-btn" data-svc-id="${id}" data-label="${svc.title}" data-cat="${cat}">
+              <span class="svc-sub-btn__name">${svc.title}</span>
+              <span class="svc-sub-btn__price">${price}</span>
+            </button>`;
+          }).join('')}
+        </div>`;
+
+      catsEl.hidden = true;
+      document.getElementById('svcBackBtn')?.addEventListener('click', () => {
+        subsEl.hidden = true;
+        catsEl.hidden = false;
+      });
+
+      subsEl.querySelectorAll('.svc-sub-btn').forEach(subBtn => {
+        subBtn.addEventListener('click', () => {
+          setPickerSelection(subBtn.dataset.cat, subBtn.dataset.svcId, subBtn.dataset.label);
+        });
+      });
+
+      // Pre-select if URL param matches one of these subs
+      if (serviceIdParam) {
+        const match = subs.find(s => (s._id || s.id || '').toString() === serviceIdParam);
+        if (match) setPickerSelection(cat, serviceIdParam, match.title);
+      }
+    });
+  });
+
+  // Pre-select from URL param — try service ID first, then category key
+  if (serviceIdParam) {
+    const match = allServices.find(s => (s._id || s.id || '').toString() === serviceIdParam);
+    if (match) {
+      catsEl.querySelector(`[data-cat="${match.category}"]`)?.click();
+    } else {
+      // serviceIdParam is a category key (e.g. "plumbing") — click it directly
+      catsEl.querySelector(`[data-cat="${serviceIdParam}"]`)?.click();
     }
   }
 }
 
 // ─── Address prefill ──────────────────────────────────────────────────────────
 
+// ─── Address Management (Multiple Saved Addresses) ────────────────────────────
+
+function renderAddresses() {
+  const list = document.getElementById('savedAddressesList');
+  const hiddenInput = document.getElementById('bookAddress');
+  if (!list) return;
+
+  list.innerHTML = '';
+  state.addresses.forEach((addr) => {
+    const isSelected = state.data.address === addr.full;
+    const card = document.createElement('div');
+    card.className = `address-card ${isSelected ? 'is-selected' : ''}`;
+    card.innerHTML = `
+      <div class="address-card__label">${addr.label || 'Saved Address'}</div>
+      <div class="address-card__text">${addr.full}</div>
+    `;
+    card.addEventListener('click', () => {
+      state.data.address = addr.full;
+      if (hiddenInput) hiddenInput.value = addr.full;
+      renderAddresses();
+    });
+    list.appendChild(card);
+  });
+
+  if (hiddenInput) hiddenInput.value = state.data.address;
+}
+
 async function prefillUserAddress() {
-  if (!bookAddress) return;
   try {
     const res  = await getMe();
     const user = res.user || res.data?.user || res;
     const addr = user.address;
-    if (addr) {
-      const parts = [addr.street, addr.city, addr.state].filter(Boolean);
-      if (parts.length) {
-        bookAddress.value = parts.join(', ');
-        bookAddress.dataset.autofilled = 'true';
 
-        // Visual autofill state via CSS class on wrapper
-        const wrap = bookAddress.closest('.field-icon-wrap');
-        if (wrap) wrap.classList.add('field-icon-wrap--autofilled');
-
-        // Polished autofill badge below the input
-        const badge = document.createElement('div');
-        badge.className = 'field-autofill-badge';
-        badge.innerHTML = `
-          <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-          </svg>
-          Auto-filled from your profile — click to edit`;
-        bookAddress.closest('.field')?.appendChild(badge);
-
-        bookAddress.addEventListener('input', () => {
-          badge.style.opacity = '0';
-          setTimeout(() => badge.remove(), 220);
-          if (wrap) wrap.classList.remove('field-icon-wrap--autofilled');
-          delete bookAddress.dataset.autofilled;
-        }, { once: true });
+    if (addr && addr.street) {
+      const full = [addr.street, addr.city, addr.state].filter(Boolean).join(', ');
+      const homeAddr = {
+        id: 'home',
+        label: 'Home',
+        street: addr.street,
+        city: addr.city,
+        state: addr.state,
+        full: full
+      };
+      
+      if (!state.addresses.some(a => a.full === full)) {
+        state.addresses.push(homeAddr);
       }
+      
+      // Default select the first one if none selected
+      if (!state.data.address) {
+        state.data.address = full;
+      }
+      renderAddresses();
     }
   } catch (e) {
     console.warn('Could not prefill address:', e);
   }
 }
+
+// ─── Address Modal Logic ──────────────────────────────────────────────────────
+
+const addrModalOverlay = document.getElementById('addressModalOverlay');
+const addrModal        = document.getElementById('addressModal');
+const addrForm         = document.getElementById('addressForm');
+const addNewBtn        = document.getElementById('addNewAddressBtn');
+
+function openAddressModal() {
+  if (!addrModalOverlay || !addrModal) return;
+  addrModalOverlay.hidden = false;
+  document.body.style.overflow = 'hidden';
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    animate(addrModalOverlay, { opacity: [0, 1] }, { duration: 0.25 });
+    animate(addrModal, { opacity: [0, 1], y: [30, 0], scale: [0.95, 1] }, { duration: 0.35, easing: [0.22, 1, 0.36, 1] });
+  }
+}
+
+function closeAddressModal() {
+  if (!addrModalOverlay) return;
+  addrModalOverlay.hidden = true;
+  document.body.style.overflow = '';
+  addrForm?.reset();
+}
+
+addNewBtn?.addEventListener('click', openAddressModal);
+document.getElementById('addressModalClose')?.addEventListener('click', closeAddressModal);
+document.getElementById('addressModalCancel')?.addEventListener('click', closeAddressModal);
+
+addrForm?.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const street = document.getElementById('newAddrStreet').value.trim();
+  const city   = document.getElementById('newAddrCity').value.trim();
+  const stateVal = document.getElementById('newAddrState').value.trim();
+  const label  = document.getElementById('newAddrLabel').value.trim() || 'New Address';
+
+  const full = [street, city, stateVal].filter(Boolean).join(', ');
+  const newAddr = {
+    id: 'new-' + Date.now(),
+    label: label,
+    street, city, state: stateVal,
+    full
+  };
+
+  state.addresses.push(newAddr);
+  state.data.address = full;
+  
+  renderAddresses();
+  closeAddressModal();
+  
+  // Visual feedback on the newly selected card
+  setTimeout(() => {
+    const cards = document.querySelectorAll('.address-card');
+    const newCard = cards[cards.length - 1];
+    if (newCard && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      animate(newCard, { scale: [1, 1.05, 1] }, { duration: 0.3 });
+    }
+  }, 100);
+});
 
 // ─── Init: load worker data ───────────────────────────────────────────────────
 
@@ -627,14 +961,27 @@ async function init() {
   // Auto-select the nearest day the technician is available (local date, not UTC)
   const todayStr   = getLocalDateStr();
   const startDate  = findNextAvailableDate(worker.availability || [], todayStr);
-  if (bookDate) {
-    bookDate.min   = todayStr;
+  const hint = document.getElementById('dateAvailHint');
+  if (hint && worker.availability?.length) {
+    const days = worker.availability.map(a => DAY_ABBR[a.day] || a.day).join(', ');
+    hint.textContent = `Available days: ${days}`;
+  }
+
+  const blockedDates = worker.blockedDates || [];
+  initCalendar(worker.availability || [], blockedDates);
+
+  // Pre-select the next available date
+  if (startDate && bookDate) {
     bookDate.value = startDate;
+    const [sy, sm] = startDate.split('-').map(Number);
+    calState.year  = sy;
+    calState.month = sm - 1;
+    buildCalendar(worker.availability || [], blockedDates);
     renderTimeSlotsForDate(startDate, worker.availability || []);
   }
 
   await Promise.all([
-    loadServices(worker),
+    initServicePicker(worker),
     prefillUserAddress(),
   ]);
 }
@@ -776,25 +1123,38 @@ async function finalizeBooking() {
 
   // Try real API first
   let bookingId = null;
-  if (workerId && state.data.serviceId && state.data.serviceId !== 'other') {
+  if (workerId && state.data.serviceCategory) {
     try {
       const payload = {
         workerId,
-        serviceId:     state.data.serviceId,
-        scheduledDate: state.data.date,
-        scheduledTime: state.selectedTime || '',
-        address:       state.data.address,
-        description:   document.getElementById('bookNotes')?.value.trim() || '',
+        serviceId:       state.data.serviceId || undefined,
+        serviceCategory: state.data.serviceCategory,
+        serviceName:     state.data.serviceType,
+        scheduledDate:   state.data.date,
+        scheduledTime:   state.selectedTime || '',
+        address:         state.data.address,
+        description:     document.getElementById('bookNotes')?.value.trim() || '',
       };
       const res = await createBooking(payload);
       bookingId = res.data?._id || res._id || res.data?.booking?._id || null;
     } catch (e) {
-      console.warn('createBooking API error (falling back to local):', e);
+      const msg = e?.message || '';
+      let userMsg = 'Booking failed. Please try again.';
+      if      (msg.includes('not currently accepting'))  userMsg = 'This technician is not currently accepting bookings.';
+      else if (msg.includes('today or in the future'))   userMsg = 'Please select a valid date.';
+      else if (msg.includes('30 days in advance'))       userMsg = 'Bookings can only be made up to 30 days in advance.';
+      else if (msg.includes('outside technician'))       userMsg = 'Selected time is outside this technician\'s working hours.';
+      else if (msg.includes('not available on this day')) userMsg = 'This technician doesn\'t work on the selected day.';
+      else if (msg.includes('time slot'))                userMsg = 'Please select a valid time slot.';
+      else if (msg.includes('already booked'))           userMsg = 'This time slot was just taken — please pick another time.';
+      alert(userMsg);
+      return;
     }
   }
 
   const bookingData = {
-    id: bookingId || ('S-' + Math.floor(2900 + Math.random() * 100)),
+    _id:      bookingId || null,
+    id:       bookingId || ('S-' + Math.floor(2900 + Math.random() * 100)),
     bookingId,
     workerId,
     workerName: state.worker?.name || '',
@@ -810,6 +1170,17 @@ async function finalizeBooking() {
     pin,
     status:    'Booked',
     timestamp: Date.now(),
+    technician: {
+      name:     state.worker?.name     || '—',
+      initials: (state.worker?.name || 'T').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase(),
+      specialty:(state.worker?.categories || state.worker?.skills || [])[0] || '—',
+      rating:   state.worker?.averageRating != null ? Number(state.worker.averageRating).toFixed(1) : '—',
+      phone:    state.worker?.phone || '',
+    },
+    rate:              state.worker?.hourlyRate || state.worker?.rate || state.worker?.baseRate || null,
+    workerLocation:    state.worker?.location || state.worker?.city || state.worker?.area || '',
+    workerReviewCount: state.worker?.reviewCount || state.worker?.totalReviews || 0,
+    workerAvatar:      state.worker?.avatar || state.worker?.photo || state.worker?.profileImage || null,
   };
 
   localStorage.setItem('servio_active_booking', JSON.stringify(bookingData));
