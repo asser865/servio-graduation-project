@@ -98,9 +98,8 @@ class _SplashScreenState extends State<SplashScreen>
         );
       },
       child: Scaffold(
-        backgroundColor: isDark
-            ? ServioColors.backgroundDark
-            : ServioColors.backgroundLight,
+        backgroundColor:
+            isDark ? ServioColors.backgroundDark : ServioColors.backgroundLight,
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,

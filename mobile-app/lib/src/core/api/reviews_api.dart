@@ -1,3 +1,4 @@
+import 'api_endpoints.dart';
 import 'api_client.dart';
 
 class ReviewResult {
@@ -38,8 +39,8 @@ class ReviewsApi {
   final ApiClient _client;
 
   Future<List<ReviewResult>> getWorkerReviews(String workerId) async {
-    final data =
-        _client.unwrapData(await _client.get('/reviews/worker/$workerId'));
+    final data = _client
+        .unwrapData(await _client.get(ApiEndpoints.workerReviews(workerId)));
     final list = (data['reviews'] as List<dynamic>?) ??
         (data['data'] as List<dynamic>?) ??
         <dynamic>[];
@@ -54,7 +55,7 @@ class ReviewsApi {
     required int rating,
     required String comment,
   }) async {
-    await _client.post('/reviews', <String, dynamic>{
+    await _client.post(ApiEndpoints.reviews, <String, dynamic>{
       'bookingId': bookingId,
       'rating': rating,
       'comment': comment,

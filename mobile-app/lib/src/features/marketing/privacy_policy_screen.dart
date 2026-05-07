@@ -11,7 +11,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
-    
+
     return DefaultTabController(
       length: 2,
       child: Scaffold(
@@ -38,27 +38,33 @@ class PrivacyPolicyScreen extends StatelessWidget {
                   SizedBox(height: 8),
                   _SectionCard(
                     title: '1. Data We Collect',
-                    content: '• Personal details (Name, email, phone number).\n• Location data (to facilitate service matching).\n• Payment and billing information.',
+                    content:
+                        '• Personal details (Name, email, phone number).\n• Location data (to facilitate service matching).\n• Payment and billing information.',
                   ),
                   _SectionCard(
                     title: '2. How We Use Your Data',
-                    content: '• To deliver and manage requested services.\n• To communicate with you regarding bookings and account updates.\n• To improve platform performance and user experience.',
+                    content:
+                        '• To deliver and manage requested services.\n• To communicate with you regarding bookings and account updates.\n• To improve platform performance and user experience.',
                   ),
                   _SectionCard(
                     title: '3. Data Sharing',
-                    content: '• We share necessary information between customers and technicians to facilitate the service.\n• Payment details are shared securely with third-party payment providers.\n• We do not sell your personal data to advertisers.',
+                    content:
+                        '• We share necessary information between customers and technicians to facilitate the service.\n• Payment details are shared securely with third-party payment providers.\n• We do not sell your personal data to advertisers.',
                   ),
                   _SectionCard(
                     title: '4. Customer Privacy Notes',
-                    content: '• Your exact address is only shared with the technician once a booking is confirmed.\n• Your booking history is securely stored for your reference.',
+                    content:
+                        '• Your exact address is only shared with the technician once a booking is confirmed.\n• Your booking history is securely stored for your reference.',
                   ),
                   _SectionCard(
                     title: '5. Security',
-                    content: 'We use industry-standard encryption and security measures to protect your personal data from unauthorized access or disclosure.',
+                    content:
+                        'We use industry-standard encryption and security measures to protect your personal data from unauthorized access or disclosure.',
                   ),
                   _SectionCard(
                     title: '6. Your Rights',
-                    content: 'You have the right to request access to the data we hold about you, request corrections, or request deletion of your account and associated data.',
+                    content:
+                        'You have the right to request access to the data we hold about you, request corrections, or request deletion of your account and associated data.',
                   ),
                   SizedBox(height: 32),
                 ],
@@ -72,27 +78,33 @@ class PrivacyPolicyScreen extends StatelessWidget {
                   SizedBox(height: 8),
                   _SectionCard(
                     title: '1. Data We Collect',
-                    content: '• Personal details (Name, email, phone number).\n• Location data (to facilitate service matching).\n• Payment and billing information.\n• Professional certifications and documents.',
+                    content:
+                        '• Personal details (Name, email, phone number).\n• Location data (to facilitate service matching).\n• Payment and billing information.\n• Professional certifications and documents.',
                   ),
                   _SectionCard(
                     title: '2. How We Use Your Data',
-                    content: '• To deliver and manage requested services.\n• To communicate with you regarding bookings and account updates.\n• To improve platform performance and user experience.',
+                    content:
+                        '• To deliver and manage requested services.\n• To communicate with you regarding bookings and account updates.\n• To improve platform performance and user experience.',
                   ),
                   _SectionCard(
                     title: '3. Data Sharing',
-                    content: '• We share necessary information between customers and technicians to facilitate the service.\n• Payment details are shared securely with third-party payment providers.\n• We do not sell your personal data to advertisers.',
+                    content:
+                        '• We share necessary information between customers and technicians to facilitate the service.\n• Payment details are shared securely with third-party payment providers.\n• We do not sell your personal data to advertisers.',
                   ),
                   _SectionCard(
                     title: '4. Technician Privacy Notes',
-                    content: '• Your public profile (name, photo, ratings) is visible to customers browsing the platform.\n• Your work history and customer reviews will be publicly accessible on your profile.',
+                    content:
+                        '• Your public profile (name, photo, ratings) is visible to customers browsing the platform.\n• Your work history and customer reviews will be publicly accessible on your profile.',
                   ),
                   _SectionCard(
                     title: '5. Security',
-                    content: 'We use industry-standard encryption and security measures to protect your personal data from unauthorized access or disclosure.',
+                    content:
+                        'We use industry-standard encryption and security measures to protect your personal data from unauthorized access or disclosure.',
                   ),
                   _SectionCard(
                     title: '6. Your Rights',
-                    content: 'You have the right to request access to the data we hold about you, request corrections, or request deletion of your account and associated data.',
+                    content:
+                        'You have the right to request access to the data we hold about you, request corrections, or request deletion of your account and associated data.',
                   ),
                   SizedBox(height: 32),
                 ],
@@ -115,7 +127,7 @@ class _SectionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
-    
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: ServioCard(
@@ -123,7 +135,9 @@ class _SectionCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text(title, style: theme.textTheme.titleMedium?.copyWith(color: servio.accent)),
+            Text(title,
+                style: theme.textTheme.titleMedium
+                    ?.copyWith(color: servio.accent)),
             const SizedBox(height: 8),
             Text(
               content,

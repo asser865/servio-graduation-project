@@ -31,7 +31,8 @@ class CustomerSecurityScreen extends StatelessWidget {
             _SecurityTile(
               label: 'Two-Factor Authentication',
               icon: Icons.verified_user_outlined,
-              onTap: () => _showPlaceholder(context, 'Two-Factor Authentication'),
+              onTap: () =>
+                  _showPlaceholder(context, 'Two-Factor Authentication'),
             ),
             _SecurityTile(
               label: 'Enable SMS Authentication',
@@ -118,7 +119,8 @@ class _SecurityTile extends StatelessWidget {
               Icon(icon, size: 20, color: servio.textSecondary),
               const SizedBox(width: 14),
               Expanded(
-                child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
+                child:
+                    Text(label, style: Theme.of(context).textTheme.bodyMedium),
               ),
               Icon(Icons.chevron_right_rounded, color: servio.textSecondary),
             ],

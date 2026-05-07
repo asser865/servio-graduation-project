@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
@@ -42,7 +44,8 @@ class AccountScreen extends StatelessWidget {
                   _AccountTile(
                     label: 'Delete Account',
                     icon: Icons.delete_outline_rounded,
-                    description: 'Permanently delete your account and all data.',
+                    description:
+                        'Permanently delete your account and all data.',
                     isDestructive: true,
                     onTap: () => _showDeleteDialog(context),
                   ),
@@ -105,8 +108,9 @@ class _DeleteAccountDialog extends StatefulWidget {
 }
 
 class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
-  final TextEditingController _confirmationController =
-      TextEditingController();
+  final TextEditingController _confirmationController = TextEditingController();
+  bool _deleting = false;
+  String? _deleteError;
 
   bool get _canDelete =>
       _confirmationController.text.toLowerCase() == _deleteConfirmationWord;
@@ -288,6 +292,15 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
                           progress: _confirmationProgress,
                           danger: servio.danger,
                         ),
+                        if (_deleteError != null) ...<Widget>[
+                          const SizedBox(height: 12),
+                          Text(
+                            _deleteError!,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: servio.danger,
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 22),
                         LayoutBuilder(
                           builder: (BuildContext context,
@@ -299,8 +312,9 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
                               runSpacing: 10,
                               children: <Widget>[
                                 SizedBox(
-                                  width:
-                                      stackActions ? constraints.maxWidth : null,
+                                  width: stackActions
+                                      ? constraints.maxWidth
+                                      : null,
                                   child: TextButton(
                                     key: const ValueKey<String>(
                                       'delete-account-cancel-button',
@@ -314,20 +328,21 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
                                   ),
                                 ),
                                 SizedBox(
-                                  width:
-                                      stackActions ? constraints.maxWidth : null,
+                                  width: stackActions
+                                      ? constraints.maxWidth
+                                      : null,
                                   child: FilledButton(
                                     key: const ValueKey<String>(
                                       'delete-account-confirm-button',
                                     ),
-                                    onPressed: _canDelete
+                                    onPressed: _canDelete && !_deleting
                                         ? _deleteAccountIfConfirmed
                                         : null,
                                     style: FilledButton.styleFrom(
                                       backgroundColor: servio.danger,
                                       foregroundColor: Colors.white,
-                                      disabledBackgroundColor: servio.danger
-                                          .withValues(alpha: 0.45),
+                                      disabledBackgroundColor:
+                                          servio.danger.withValues(alpha: 0.45),
                                       disabledForegroundColor:
                                           Colors.white.withValues(alpha: 0.65),
                                       minimumSize: const Size(0, 48),
@@ -341,7 +356,11 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
                                         ),
                                       ),
                                     ),
-                                    child: const Text('Delete My Account'),
+                                    child: Text(
+                                      _deleting
+                                          ? 'Deleting...'
+                                          : 'Delete My Account',
+                                    ),
                                   ),
                                 ),
                               ],
@@ -370,12 +389,30 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
     );
   }
 
-  void _deleteAccountIfConfirmed() {
-    if (!_canDelete) {
+  Future<void> _deleteAccountIfConfirmed() async {
+    if (!_canDelete || _deleting) {
+      return;
+    }
+    final session = context.read<SessionProvider?>();
+    if (session == null) {
+      Navigator.of(context).pop();
+      return;
+    }
+
+    setState(() {
+      _deleting = true;
+      _deleteError = null;
+    });
+    final error = await session.deleteAccount();
+    if (!mounted) return;
+    if (error != null) {
+      setState(() {
+        _deleting = false;
+        _deleteError = error;
+      });
       return;
     }
     Navigator.of(context).pop();
-    // TODO: call delete account API when available
   }
 }
 
@@ -388,8 +425,7 @@ class _DeleteConfirmationFormatter extends TextInputFormatter {
     TextEditingValue newValue,
   ) {
     final normalizedValue = newValue.text.toLowerCase();
-    final isAllowedPrefix =
-        _deleteConfirmationWord.startsWith(normalizedValue);
+    final isAllowedPrefix = _deleteConfirmationWord.startsWith(normalizedValue);
     final isAllowedLength =
         newValue.text.length <= _deleteConfirmationWord.length;
 

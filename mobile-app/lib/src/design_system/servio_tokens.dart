@@ -4,38 +4,38 @@ final class ServioColors {
   const ServioColors._();
 
   // ── Light mode ──────────────────────────────────────────────
-  static const Color backgroundLight     = Color(0xFFFAF8F5);
+  static const Color backgroundLight = Color(0xFFFAF8F5);
   static const Color backgroundSoftLight = Color(0xFFF3EDE7);
-  static const Color surfaceLight        = Color(0xFFFFFFFF);
-  static const Color surfaceAltLight     = Color(0xFFF7F3EF);
-  static const Color textPrimaryLight    = Color(0xFF222831);
-  static const Color textSecondaryLight  = Color(0xFF6B6560);
-  static const Color borderLight         = Color(0xFFDDD5CC);
+  static const Color surfaceLight = Color(0xFFFFFFFF);
+  static const Color surfaceAltLight = Color(0xFFF7F3EF);
+  static const Color textPrimaryLight = Color(0xFF222831);
+  static const Color textSecondaryLight = Color(0xFF6B6560);
+  static const Color borderLight = Color(0xFFDDD5CC);
 
   // ── Dark mode ───────────────────────────────────────────────
-  static const Color backgroundDark      = Color(0xFF1A1D23);
-  static const Color backgroundSoftDark  = Color(0xFF262B34);
-  static const Color surfaceDark         = Color(0xFF222831);
-  static const Color surfaceAltDark      = Color(0xFF1E2229);
-  static const Color surfaceRaisedDark   = Color(0xFF2D323B);
-  static const Color textPrimaryDark     = Color(0xFFE3D5CA);
-  static const Color textSecondaryDark   = Color(0xFF9A8C73);
-  static const Color borderDark          = Color(0xFF393E46);
+  static const Color backgroundDark = Color(0xFF1A1D23);
+  static const Color backgroundSoftDark = Color(0xFF262B34);
+  static const Color surfaceDark = Color(0xFF222831);
+  static const Color surfaceAltDark = Color(0xFF1E2229);
+  static const Color surfaceRaisedDark = Color(0xFF2D323B);
+  static const Color textPrimaryDark = Color(0xFFE3D5CA);
+  static const Color textSecondaryDark = Color(0xFF9A8C73);
+  static const Color borderDark = Color(0xFF393E46);
 
   // ── Brand palette ───────────────────────────────────────────
-  static const Color accent       = Color(0xFF9A8C73);
-  static const Color accentLight  = Color(0xFFBFB09A);
-  static const Color neutralWarm  = Color(0xFFE3D5CA);
-  static const Color deepBrown    = Color(0xFF3C2415);
-  static const Color brownLight   = Color(0xFF5C3D2E);
-  static const Color navyDark     = Color(0xFF222831);
-  static const Color navySoft     = Color(0xFF393E46);
+  static const Color accent = Color(0xFF9A8C73);
+  static const Color accentLight = Color(0xFFBFB09A);
+  static const Color neutralWarm = Color(0xFFE3D5CA);
+  static const Color deepBrown = Color(0xFF3C2415);
+  static const Color brownLight = Color(0xFF5C3D2E);
+  static const Color navyDark = Color(0xFF222831);
+  static const Color navySoft = Color(0xFF393E46);
 
   // ── Status ──────────────────────────────────────────────────
-  static const Color success  = Color(0xFF22C55E);
-  static const Color warning  = Color(0xFFE67E22);
-  static const Color info     = Color(0xFF2980B9);
-  static const Color danger   = Color(0xFFEF4444);
+  static const Color success = Color(0xFF22C55E);
+  static const Color warning = Color(0xFFE67E22);
+  static const Color info = Color(0xFF2980B9);
+  static const Color danger = Color(0xFFEF4444);
 
   static Color tint(Color color) => color.withValues(alpha: 0.12);
 }
@@ -87,23 +87,23 @@ final class ServioGradients {
 final class ServioRadius {
   const ServioRadius._();
 
-  static const double sm      = 10;
-  static const double md      = 14;
-  static const double lg      = 18;
-  static const double xl      = 22;
-  static const double xxl     = 28;
-  static const double card    = 16;  // recommended mobile card radius
-  static const double navItem = 12;  // dashboard / bottom-nav item pill
-  static const double full    = 9999;
+  static const double sm = 10;
+  static const double md = 14;
+  static const double lg = 18;
+  static const double xl = 22;
+  static const double xxl = 28;
+  static const double card = 16; // recommended mobile card radius
+  static const double navItem = 12; // dashboard / bottom-nav item pill
+  static const double full = 9999;
 }
 
 final class ServioSpacing {
   const ServioSpacing._();
 
   static const double screenPadding = 20;
-  static const double sectionGap    = 32;
-  static const double cardPadding   = 16;
-  static const double tapTarget     = 44; // minimum touch target (iOS HIG)
+  static const double sectionGap = 32;
+  static const double cardPadding = 16;
+  static const double tapTarget = 44; // minimum touch target (iOS HIG)
 }
 
 final class ServioMotion {
@@ -119,14 +119,14 @@ final class ServioMotion {
   static const Curve standard = Curves.ease;
 
   // ── Duration scale ──────────────────────────────────────────
-  static const Duration fast            = Duration(milliseconds: 180);
-  static const Duration normal          = Duration(milliseconds: 220);
-  static const Duration micro           = Duration(milliseconds: 300);
-  static const Duration page            = Duration(milliseconds: 700);
+  static const Duration fast = Duration(milliseconds: 180);
+  static const Duration normal = Duration(milliseconds: 220);
+  static const Duration micro = Duration(milliseconds: 300);
+  static const Duration page = Duration(milliseconds: 700);
   static const Duration stackNavigation = Duration(milliseconds: 350);
-  static const Duration tabSwitch       = Duration(milliseconds: 300);
-  static const Duration bottomSheet     = Duration(milliseconds: 400);
-  static const Duration toast           = Duration(milliseconds: 300);
+  static const Duration tabSwitch = Duration(milliseconds: 300);
+  static const Duration bottomSheet = Duration(milliseconds: 400);
+  static const Duration toast = Duration(milliseconds: 300);
 
   // ── Convenience alias (used in theme) ───────────────────────
   /// Primary curve for UI interactions — use [spring] for

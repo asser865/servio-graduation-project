@@ -20,7 +20,12 @@ class JobQueueScreen extends StatefulWidget {
 
 class _JobQueueScreenState extends State<JobQueueScreen> {
   int _tabIndex = 0;
-  static const List<String> _tabs = <String>['Pending', 'Confirmed', 'In Progress', 'Completed'];
+  static const List<String> _tabs = <String>[
+    'Pending',
+    'Confirmed',
+    'In Progress',
+    'Completed'
+  ];
 
   List<BackendBooking> _jobs = [];
   bool _loading = true;
@@ -107,21 +112,30 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
                         curve: ServioMotion.curve,
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         decoration: BoxDecoration(
-                          color: active ? Theme.of(context).colorScheme.surface : Colors.transparent,
-                          borderRadius: BorderRadius.circular(ServioRadius.full),
+                          color: active
+                              ? Theme.of(context).colorScheme.surface
+                              : Colors.transparent,
+                          borderRadius:
+                              BorderRadius.circular(ServioRadius.full),
                         ),
                         child: Column(
                           children: <Widget>[
                             Text(
                               _tabs[index],
-                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                    color: active ? servio.accent : servio.textSecondary,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelSmall
+                                  ?.copyWith(
+                                    color: active
+                                        ? servio.accent
+                                        : servio.textSecondary,
                                   ),
                               textAlign: TextAlign.center,
                             ),
                             const SizedBox(height: 4),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
                                 color: ServioColors.tint(
                                   index == 0
@@ -130,11 +144,15 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
                                           ? servio.success
                                           : servio.info,
                                 ),
-                                borderRadius: BorderRadius.circular(ServioRadius.full),
+                                borderRadius:
+                                    BorderRadius.circular(ServioRadius.full),
                               ),
                               child: Text(
                                 count,
-                                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .labelSmall
+                                    ?.copyWith(
                                       color: index == 0
                                           ? servio.warning
                                           : index == 3
@@ -189,8 +207,9 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
                             return ListView.separated(
                               padding: EdgeInsets.only(bottom: bottomInset),
                               itemCount: filteredJobs.length,
-                              separatorBuilder: (BuildContext context, int index) =>
-                                  const SizedBox(height: 12),
+                              separatorBuilder:
+                                  (BuildContext context, int index) =>
+                                      const SizedBox(height: 12),
                               itemBuilder: (BuildContext context, int index) {
                                 final job = filteredJobs[index];
                                 return _JobCard(
@@ -198,15 +217,18 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
                                   onOpen: () {
                                     Navigator.of(context).push(
                                       MaterialPageRoute<void>(
-                                        builder: (_) => JobDetailsScreen(jobId: job.id),
+                                        builder: (_) =>
+                                            JobDetailsScreen(jobId: job.id),
                                       ),
                                     );
                                   },
                                   onAccept: _tabIndex == 0
-                                      ? () => _updateJobStatus(job.id, 'accepted')
+                                      ? () =>
+                                          _updateJobStatus(job.id, 'accepted')
                                       : null,
                                   onDecline: _tabIndex == 0
-                                      ? () => _updateJobStatus(job.id, 'cancelled')
+                                      ? () =>
+                                          _updateJobStatus(job.id, 'cancelled')
                                       : null,
                                 );
                               },
@@ -289,7 +311,9 @@ class _JobCard extends StatelessWidget {
                 ),
                 child: Center(
                   child: Text(
-                    job.serviceName.isNotEmpty ? job.serviceName[0].toUpperCase() : '?',
+                    job.serviceName.isNotEmpty
+                        ? job.serviceName[0].toUpperCase()
+                        : '?',
                   ),
                 ),
               ),
@@ -298,7 +322,8 @@ class _JobCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text(job.serviceName, style: Theme.of(context).textTheme.titleMedium),
+                    Text(job.serviceName,
+                        style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: 2),
                     if (job.customerName.isNotEmpty)
                       Text(
@@ -320,7 +345,10 @@ class _JobCard extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             '${job.addressCity} • EGP ${job.totalAmount.toStringAsFixed(0)}',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: servio.textSecondary),
           ),
           const SizedBox(height: 14),
           if (onAccept != null || onDecline != null)

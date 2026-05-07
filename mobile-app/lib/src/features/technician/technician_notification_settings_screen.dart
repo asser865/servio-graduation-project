@@ -8,10 +8,12 @@ class TechnicianNotificationSettingsScreen extends StatefulWidget {
   const TechnicianNotificationSettingsScreen({super.key});
 
   @override
-  State<TechnicianNotificationSettingsScreen> createState() => _TechnicianNotificationSettingsScreenState();
+  State<TechnicianNotificationSettingsScreen> createState() =>
+      _TechnicianNotificationSettingsScreenState();
 }
 
-class _TechnicianNotificationSettingsScreenState extends State<TechnicianNotificationSettingsScreen> {
+class _TechnicianNotificationSettingsScreenState
+    extends State<TechnicianNotificationSettingsScreen> {
   bool _pushEnabled = true;
   bool _emailEnabled = false;
   bool _jobRequests = true;

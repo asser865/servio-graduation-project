@@ -38,7 +38,6 @@ class TechnicianSettingsScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-
             // ── Profile ──────────────────────────────────────────────────────
             _SectionHeader(label: 'Profile'),
             _SettingsGroup(
@@ -95,7 +94,8 @@ class TechnicianSettingsScreen extends StatelessWidget {
                   subtitle: 'Alerts, job updates, reminders',
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
-                      builder: (_) => const TechnicianNotificationSettingsScreen(),
+                      builder: (_) =>
+                          const TechnicianNotificationSettingsScreen(),
                     ),
                   ),
                 ),

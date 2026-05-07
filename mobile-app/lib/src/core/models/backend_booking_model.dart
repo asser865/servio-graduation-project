@@ -3,6 +3,7 @@ class BackendBooking {
     required this.id,
     required this.status,
     required this.scheduledDate,
+    required this.scheduledTime,
     required this.totalAmount,
     required this.notes,
     required this.workerName,
@@ -18,6 +19,7 @@ class BackendBooking {
   final String id;
   final String status;
   final DateTime scheduledDate;
+  final String scheduledTime;
   final double totalAmount;
   final String notes;
   final String workerName;
@@ -43,10 +45,10 @@ class BackendBooking {
 
     // service is a populated object { _id, title, category, basePrice, priceUnit }
     final service = json['service'];
-    String serviceName = '';
+    String serviceName = (json['serviceName'] as String?) ?? '';
     String serviceId = '';
     if (service is Map<String, dynamic>) {
-      serviceName = (service['title'] as String?) ?? '';
+      serviceName = (service['title'] as String?) ?? serviceName;
       serviceId = (service['_id'] as String?) ?? '';
     } else if (service is String) {
       serviceId = service;
@@ -63,14 +65,23 @@ class BackendBooking {
       customerId = user;
     }
 
-    // address is stored as a plain string in the database
     final addressRaw = json['address'];
-    final addressCity = addressRaw is String ? addressRaw : '';
+    var addressCity = '';
+    var addressStreet = '';
+    if (addressRaw is String) {
+      addressCity = addressRaw;
+    } else if (addressRaw is Map<String, dynamic>) {
+      addressCity = (addressRaw['city'] as String?) ?? '';
+      addressStreet = (addressRaw['street'] as String?) ?? '';
+    }
 
     return BackendBooking(
       id: (json['_id'] as String?) ?? (json['id'] as String?) ?? '',
       status: (json['status'] as String?) ?? 'pending',
-      scheduledDate: DateTime.tryParse((json['scheduledDate'] as String?) ?? '') ?? DateTime.now(),
+      scheduledDate:
+          DateTime.tryParse((json['scheduledDate'] as String?) ?? '') ??
+              DateTime.now(),
+      scheduledTime: (json['scheduledTime'] as String?) ?? '',
       totalAmount: ((json['totalPrice'] as num?) ?? 0).toDouble(),
       notes: (json['description'] as String?) ?? '',
       workerName: workerName,
@@ -78,7 +89,7 @@ class BackendBooking {
       serviceName: serviceName,
       serviceId: serviceId,
       addressCity: addressCity,
-      addressStreet: '',
+      addressStreet: addressStreet,
       customerName: customerName,
       customerId: customerId,
     );

@@ -106,19 +106,17 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           children: <Widget>[
             // ── Skip button ──────────────────────────────────
             Padding(
-              padding: const EdgeInsets.fromLTRB(
-                  ServioSpacing.screenPadding, 12, ServioSpacing.screenPadding, 0),
+              padding: const EdgeInsets.fromLTRB(ServioSpacing.screenPadding,
+                  12, ServioSpacing.screenPadding, 0),
               child: Row(
                 children: <Widget>[
                   const Spacer(),
                   AnimatedOpacity(
-                    opacity:
-                        _currentIndex == _slides.length - 1 ? 0.0 : 1.0,
+                    opacity: _currentIndex == _slides.length - 1 ? 0.0 : 1.0,
                     duration: ServioMotion.micro,
                     child: TextButton(
-                      onPressed: _currentIndex == _slides.length - 1
-                          ? null
-                          : _skip,
+                      onPressed:
+                          _currentIndex == _slides.length - 1 ? null : _skip,
                       child: Text(
                         'Skip',
                         style: theme.textTheme.labelLarge?.copyWith(
@@ -206,8 +204,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                                 child: Text(
                                   slide.body,
                                   key: ValueKey<String>(slide.body),
-                                  style:
-                                      theme.textTheme.bodyMedium?.copyWith(
+                                  style: theme.textTheme.bodyMedium?.copyWith(
                                     color: servio.textSecondary,
                                     height: 1.6,
                                   ),
@@ -396,9 +393,8 @@ class _IconContainerMorphing extends StatelessWidget {
                   width: 56,
                   height: 56,
                   decoration: BoxDecoration(
-                    color: isDark
-                        ? ServioColors.surfaceRaisedDark
-                        : Colors.white,
+                    color:
+                        isDark ? ServioColors.surfaceRaisedDark : Colors.white,
                     shape: BoxShape.circle,
                     boxShadow: isDark
                         ? ServioShadows.restDark

@@ -1,4 +1,5 @@
 import 'api_client.dart';
+import 'api_endpoints.dart';
 
 class ApiConversation {
   const ApiConversation({
@@ -24,7 +25,8 @@ class ApiConversation {
       otherUserId: (other?['_id'] as String?) ?? '',
       otherUserName: (other?['name'] as String?) ?? 'Unknown',
       lastMessage: (json['lastMessage'] as String?) ?? '',
-      updatedAt: DateTime.tryParse((json['updatedAt'] as String?) ?? '') ?? DateTime.now(),
+      updatedAt: DateTime.tryParse((json['updatedAt'] as String?) ?? '') ??
+          DateTime.now(),
       unreadCount: ((json['unreadCount'] as num?) ?? 0).toInt(),
     );
   }
@@ -47,7 +49,8 @@ class ApiMessage {
         id: (json['_id'] as String?) ?? '',
         text: (json['content'] as String?) ?? '',
         senderId: (json['senderId'] as String?) ?? '',
-        createdAt: DateTime.tryParse((json['createdAt'] as String?) ?? '') ?? DateTime.now(),
+        createdAt: DateTime.tryParse((json['createdAt'] as String?) ?? '') ??
+            DateTime.now(),
       );
 }
 
@@ -57,23 +60,32 @@ class MessagesApi {
   final ApiClient _client;
 
   Future<List<ApiConversation>> getConversations() async {
-    final data = _client.unwrapData(await _client.get('/messages/conversations'));
+    final data =
+        _client.unwrapData(await _client.get(ApiEndpoints.conversations));
     final list = (data['conversations'] as List<dynamic>?) ??
         (data['data'] as List<dynamic>?) ??
         <dynamic>[];
-    return list.whereType<Map<String, dynamic>>().map(ApiConversation.fromJson).toList();
+    return list
+        .whereType<Map<String, dynamic>>()
+        .map(ApiConversation.fromJson)
+        .toList();
   }
 
   Future<List<ApiMessage>> getMessages(String bookingId) async {
-    final data = _client.unwrapData(await _client.get('/messages/$bookingId'));
+    final data = _client.unwrapData(
+      await _client.get(ApiEndpoints.messagesForBooking(bookingId)),
+    );
     final list = (data['messages'] as List<dynamic>?) ??
         (data['data'] as List<dynamic>?) ??
         <dynamic>[];
-    return list.whereType<Map<String, dynamic>>().map(ApiMessage.fromJson).toList();
+    return list
+        .whereType<Map<String, dynamic>>()
+        .map(ApiMessage.fromJson)
+        .toList();
   }
 
   Future<void> sendMessage(String bookingId, String content) async {
-    await _client.post('/messages', <String, dynamic>{
+    await _client.post(ApiEndpoints.messages, <String, dynamic>{
       'bookingId': bookingId,
       'content': content,
     });

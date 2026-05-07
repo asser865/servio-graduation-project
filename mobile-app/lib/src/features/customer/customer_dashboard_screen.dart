@@ -54,7 +54,9 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
     try {
       final client = context.read<ApiClient>();
       final raw = await BookingsApi(client).getMyBookings();
-      if (mounted) setState(() => _bookings = raw.map(_toBookingModel).toList());
+      if (mounted) {
+        setState(() => _bookings = raw.map(_toBookingModel).toList());
+      }
     } catch (_) {}
   }
 
@@ -64,7 +66,9 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
     final isDark = theme.brightness == Brightness.dark;
     final bookings = _bookings;
 
-    final userName = context.watch<SessionProvider>().account?.name.split(' ').first ?? 'Customer';
+    final userName =
+        context.watch<SessionProvider>().account?.name.split(' ').first ??
+            'Customer';
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -89,7 +93,8 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
             },
             child: Container(
               decoration: BoxDecoration(
-                gradient: isDark ? ServioGradients.brandDark : ServioGradients.brand,
+                gradient:
+                    isDark ? ServioGradients.brandDark : ServioGradients.brand,
               ),
               child: Stack(
                 children: <Widget>[
@@ -153,9 +158,13 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
                                 color: Colors.white.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(ServioRadius.sm),
+                                borderRadius:
+                                    BorderRadius.circular(ServioRadius.sm),
                               ),
-                              child: const Icon(Icons.home_repair_service_rounded, color: Colors.white, size: 20),
+                              child: const Icon(
+                                  Icons.home_repair_service_rounded,
+                                  color: Colors.white,
+                                  size: 20),
                             ),
                             const SizedBox(width: 10),
                             Text(
@@ -171,7 +180,9 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                             GestureDetector(
                               onTap: () {
                                 Navigator.of(context).push(
-                                  MaterialPageRoute<void>(builder: (_) => const NotificationsScreen()),
+                                  MaterialPageRoute<void>(
+                                      builder: (_) =>
+                                          const NotificationsScreen()),
                                 );
                               },
                               child: Stack(
@@ -181,10 +192,14 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                                     width: 44,
                                     height: 44,
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withValues(alpha: 0.15),
+                                      color:
+                                          Colors.white.withValues(alpha: 0.15),
                                       shape: BoxShape.circle,
                                     ),
-                                    child: const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 22),
+                                    child: const Icon(
+                                        Icons.notifications_none_rounded,
+                                        color: Colors.white,
+                                        size: 22),
                                   ),
                                   Positioned(
                                     top: 10,
@@ -206,7 +221,9 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                             GestureDetector(
                               onTap: () {
                                 Navigator.of(context).push(
-                                  MaterialPageRoute<void>(builder: (_) => const CustomerProfileScreen()),
+                                  MaterialPageRoute<void>(
+                                      builder: (_) =>
+                                          const CustomerProfileScreen()),
                                 );
                               },
                               child: Container(
@@ -218,8 +235,11 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                                 ),
                                 child: Center(
                                   child: Text(
-                                    userName.isNotEmpty ? userName[0].toUpperCase() : 'C',
-                                    style: theme.textTheme.titleMedium?.copyWith(color: Colors.white),
+                                    userName.isNotEmpty
+                                        ? userName[0].toUpperCase()
+                                        : 'C',
+                                    style: theme.textTheme.titleMedium
+                                        ?.copyWith(color: Colors.white),
                                   ),
                                 ),
                               ),
@@ -238,7 +258,8 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                         // Segmented Control inside the hero
                         _DashboardSegmentedControl(
                           current: _section,
-                          onChanged: (value) => setState(() => _section = value),
+                          onChanged: (value) =>
+                              setState(() => _section = value),
                         ),
                         const SizedBox(height: 16),
                       ],
@@ -256,10 +277,13 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                   ),
                   decoration: BoxDecoration(
                     color: theme.scaffoldBackgroundColor,
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(32)),
                     boxShadow: <BoxShadow>[
                       BoxShadow(
-                        color: isDark ? Colors.black.withValues(alpha: 0.4) : Colors.black.withValues(alpha: 0.05),
+                        color: isDark
+                            ? Colors.black.withValues(alpha: 0.4)
+                            : Colors.black.withValues(alpha: 0.05),
                         blurRadius: 24,
                         offset: const Offset(0, -8),
                       ),
@@ -270,7 +294,8 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                     duration: ServioMotion.tabSwitch,
                     switchInCurve: ServioMotion.spring,
                     switchOutCurve: ServioMotion.standard,
-                    layoutBuilder: (Widget? currentChild, List<Widget> previousChildren) {
+                    layoutBuilder:
+                        (Widget? currentChild, List<Widget> previousChildren) {
                       return Stack(
                         alignment: Alignment.topCenter,
                         children: <Widget>[
@@ -629,7 +654,8 @@ class _FavouritesSection extends StatelessWidget {
       children: <Widget>[
         ServioSectionHeading(title: 'Saved Technicians'),
         SizedBox(height: 16),
-        _EmptyDashboardState(message: 'Save technicians from their profile to see them here.'),
+        _EmptyDashboardState(
+            message: 'Save technicians from their profile to see them here.'),
       ],
     );
   }
@@ -1894,36 +1920,6 @@ class _Avatar extends StatelessWidget {
   }
 }
 
-class _RoundIconButton extends StatelessWidget {
-  const _RoundIconButton({
-    required this.icon,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final servio = context.servio;
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          shape: BoxShape.circle,
-          border: Border.all(color: servio.border),
-          boxShadow: ServioShadows.rest,
-        ),
-        child: Icon(icon, color: servio.accent),
-      ),
-    );
-  }
-}
-
 class _ProgressBar extends StatelessWidget {
   const _ProgressBar({required this.value});
 
@@ -1996,7 +1992,8 @@ class _EmptyDashboardState extends StatelessWidget {
       ),
       child: Row(
         children: <Widget>[
-          Icon(Icons.info_outline_rounded, color: servio.textSecondary, size: 24),
+          Icon(Icons.info_outline_rounded,
+              color: servio.textSecondary, size: 24),
           const SizedBox(width: 16),
           Expanded(
             child: Text(
@@ -2081,9 +2078,14 @@ int _amountValue(String amount) {
 
 BookingModel _toBookingModel(BackendBooking b) {
   final date = DateFormat('dd/MM/yyyy').format(b.scheduledDate);
-  final time = DateFormat('hh:mm a').format(b.scheduledDate);
-  final shortId = b.id.length >= 6 ? b.id.substring(b.id.length - 6).toUpperCase() : b.id.toUpperCase();
-  final location = [b.addressStreet, b.addressCity].where((s) => s.isNotEmpty).join(', ');
+  final time = b.scheduledTime.isNotEmpty
+      ? _displayScheduledTime(b.scheduledTime)
+      : DateFormat('hh:mm a').format(b.scheduledDate);
+  final shortId = b.id.length >= 6
+      ? b.id.substring(b.id.length - 6).toUpperCase()
+      : b.id.toUpperCase();
+  final location =
+      [b.addressStreet, b.addressCity].where((s) => s.isNotEmpty).join(', ');
   return BookingModel(
     id: b.id,
     reference: '#SRV-$shortId',
@@ -2098,6 +2100,14 @@ BookingModel _toBookingModel(BackendBooking b) {
     pin: b.id.length >= 4 ? b.id.substring(b.id.length - 4) : b.id,
     notes: b.notes,
   );
+}
+
+String _displayScheduledTime(String value) {
+  final parts = value.split(':');
+  final hour = int.tryParse(parts.first) ?? 0;
+  final suffix = hour >= 12 ? 'PM' : 'AM';
+  final displayHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+  return '$displayHour:00 $suffix';
 }
 
 BookingStatus _parseBookingStatus(String status) {

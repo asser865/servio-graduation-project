@@ -10,10 +10,12 @@ class AiFinishingEstimatorScreen extends StatefulWidget {
   const AiFinishingEstimatorScreen({super.key});
 
   @override
-  State<AiFinishingEstimatorScreen> createState() => _AiFinishingEstimatorScreenState();
+  State<AiFinishingEstimatorScreen> createState() =>
+      _AiFinishingEstimatorScreenState();
 }
 
-class _AiFinishingEstimatorScreenState extends State<AiFinishingEstimatorScreen> {
+class _AiFinishingEstimatorScreenState
+    extends State<AiFinishingEstimatorScreen> {
   int _step = 0;
   int _roomIndex = 0;
   int _finishIndex = 1;
@@ -30,7 +32,11 @@ class _AiFinishingEstimatorScreenState extends State<AiFinishingEstimatorScreen>
     'Other',
   ];
 
-  static const List<String> _finishes = <String>['Economy', 'Standard', 'Premium'];
+  static const List<String> _finishes = <String>[
+    'Economy',
+    'Standard',
+    'Premium'
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -49,7 +55,10 @@ class _AiFinishingEstimatorScreenState extends State<AiFinishingEstimatorScreen>
           children: <Widget>[
             Text(
               'Step ${_step + 1} of 4',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: servio.textSecondary),
             ),
             const SizedBox(height: 10),
             LayoutBuilder(
@@ -140,7 +149,8 @@ class _StepRoomType extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text('Select Room Type', style: Theme.of(context).textTheme.headlineMedium),
+        Text('Select Room Type',
+            style: Theme.of(context).textTheme.headlineMedium),
         const SizedBox(height: 8),
         const ServioStatusChip(label: 'AI POWERED'),
         const SizedBox(height: 20),
@@ -161,15 +171,19 @@ class _StepRoomType extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: selected ? servio.accent : Theme.of(context).colorScheme.surface,
+                  color: selected
+                      ? servio.accent
+                      : Theme.of(context).colorScheme.surface,
                   borderRadius: BorderRadius.circular(ServioRadius.md),
-                  border: Border.all(color: selected ? servio.accent : servio.border),
+                  border: Border.all(
+                      color: selected ? servio.accent : servio.border),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: <Widget>[
-                    Icon(Icons.weekend_outlined, color: selected ? Colors.white : servio.accent),
+                    Icon(Icons.weekend_outlined,
+                        color: selected ? Colors.white : servio.accent),
                     const SizedBox(height: 10),
                     Text(
                       rooms[index],
@@ -205,7 +219,8 @@ class _StepDimensions extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text('Room Dimensions', style: Theme.of(context).textTheme.headlineMedium),
+        Text('Room Dimensions',
+            style: Theme.of(context).textTheme.headlineMedium),
         const SizedBox(height: 8),
         const ServioStatusChip(label: 'AI POWERED'),
         const SizedBox(height: 20),
@@ -229,7 +244,8 @@ class _StepDimensions extends StatelessWidget {
                       'Meters',
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                            color: meterUnit ? Colors.white : servio.textSecondary,
+                            color:
+                                meterUnit ? Colors.white : servio.textSecondary,
                           ),
                     ),
                   ),
@@ -248,7 +264,9 @@ class _StepDimensions extends StatelessWidget {
                       'Feet',
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                            color: !meterUnit ? Colors.white : servio.textSecondary,
+                            color: !meterUnit
+                                ? Colors.white
+                                : servio.textSecondary,
                           ),
                     ),
                   ),
@@ -258,19 +276,27 @@ class _StepDimensions extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        const TextField(decoration: InputDecoration(labelText: 'Length', suffixText: 'm')),
+        const TextField(
+            decoration: InputDecoration(labelText: 'Length', suffixText: 'm')),
         const SizedBox(height: 12),
-        const TextField(decoration: InputDecoration(labelText: 'Width', suffixText: 'm')),
+        const TextField(
+            decoration: InputDecoration(labelText: 'Width', suffixText: 'm')),
         const SizedBox(height: 12),
-        const TextField(decoration: InputDecoration(labelText: 'Ceiling Height', suffixText: 'm')),
+        const TextField(
+            decoration:
+                InputDecoration(labelText: 'Ceiling Height', suffixText: 'm')),
         Align(
           alignment: Alignment.centerRight,
-          child: TextButton(onPressed: () {}, child: const Text('Use Standard (2.7m)')),
+          child: TextButton(
+              onPressed: () {}, child: const Text('Use Standard (2.7m)')),
         ),
         Text(
           'Your data is processed securely by SERVIO AI',
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+          style: Theme.of(context)
+              .textTheme
+              .bodySmall
+              ?.copyWith(color: servio.textSecondary),
         ),
       ],
     );
@@ -296,7 +322,8 @@ class _StepBudget extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text('What is your budget range?', style: Theme.of(context).textTheme.headlineMedium),
+        Text('What is your budget range?',
+            style: Theme.of(context).textTheme.headlineMedium),
         const SizedBox(height: 20),
         ServioCard(
           backgroundColor: servio.surfaceAlt,
@@ -305,7 +332,10 @@ class _StepBudget extends StatelessWidget {
             children: <Widget>[
               Text(
                 'AI Cost Suggestion',
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(color: servio.accent),
+                style: Theme.of(context)
+                    .textTheme
+                    .labelLarge
+                    ?.copyWith(color: servio.accent),
               ),
               const SizedBox(height: 8),
               Text(
@@ -324,7 +354,8 @@ class _StepBudget extends StatelessWidget {
             return GestureDetector(
               onTap: () => onFinishChanged(index),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
                   gradient: active ? ServioGradients.brand : null,
                   color: active ? null : servio.backgroundSoft,
@@ -343,9 +374,15 @@ class _StepBudget extends StatelessWidget {
         const SizedBox(height: 16),
         Row(
           children: const <Widget>[
-            Expanded(child: TextField(decoration: InputDecoration(labelText: 'Min', prefixText: 'EGP '))),
+            Expanded(
+                child: TextField(
+                    decoration:
+                        InputDecoration(labelText: 'Min', prefixText: 'EGP '))),
             SizedBox(width: 12),
-            Expanded(child: TextField(decoration: InputDecoration(labelText: 'Max', prefixText: 'EGP '))),
+            Expanded(
+                child: TextField(
+                    decoration:
+                        InputDecoration(labelText: 'Max', prefixText: 'EGP '))),
           ],
         ),
         const SizedBox(height: 20),
@@ -377,10 +414,12 @@ class _StepResults extends StatelessWidget {
         const SizedBox(height: 16),
         Text(
           'Total Estimated Range',
-          style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+          style:
+              theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary),
         ),
         const SizedBox(height: 6),
-        Text('3,250 EGP - 3,800 EGP', style: theme.textTheme.displayLarge?.copyWith(fontSize: 30)),
+        Text('3,250 EGP - 3,800 EGP',
+            style: theme.textTheme.displayLarge?.copyWith(fontSize: 30)),
         const SizedBox(height: 12),
         const ServioStatusChip(
           label: '-5% vs. Market Average',
@@ -389,25 +428,38 @@ class _StepResults extends StatelessWidget {
         const SizedBox(height: 24),
         Text('Cost Breakdown', style: theme.textTheme.titleMedium),
         const SizedBox(height: 12),
-        const _BreakdownRow(label: 'Labor & Services', amount: '~1,600 EGP', value: 0.8),
+        const _BreakdownRow(
+            label: 'Labor & Services', amount: '~1,600 EGP', value: 0.8),
         const SizedBox(height: 10),
-        const _BreakdownRow(label: 'Materials', amount: '~1,200 EGP', value: 0.65),
+        const _BreakdownRow(
+            label: 'Materials', amount: '~1,200 EGP', value: 0.65),
         const SizedBox(height: 10),
-        const _BreakdownRow(label: 'Logistics & Fees', amount: '~750 EGP', value: 0.35),
+        const _BreakdownRow(
+            label: 'Logistics & Fees', amount: '~750 EGP', value: 0.35),
         const SizedBox(height: 20),
         Text('Estimated Materials', style: theme.textTheme.titleMedium),
         const SizedBox(height: 12),
-        const _MaterialCard(name: 'Wall Paint', brand: 'Jotun', quantity: '4 cans', unitPrice: '280 EGP'),
+        const _MaterialCard(
+            name: 'Wall Paint',
+            brand: 'Jotun',
+            quantity: '4 cans',
+            unitPrice: '280 EGP'),
         const SizedBox(height: 10),
-        const _MaterialCard(name: 'Primer', brand: 'Sipes', quantity: '2 cans', unitPrice: '190 EGP'),
+        const _MaterialCard(
+            name: 'Primer',
+            brand: 'Sipes',
+            quantity: '2 cans',
+            unitPrice: '190 EGP'),
         const SizedBox(height: 20),
         Text('Vendor Quotes', style: theme.textTheme.titleMedium),
         const SizedBox(height: 12),
         Row(
           children: const <Widget>[
-            Expanded(child: _QuoteCard(name: 'Ahmed Nabil', price: '3,400 EGP')),
+            Expanded(
+                child: _QuoteCard(name: 'Ahmed Nabil', price: '3,400 EGP')),
             SizedBox(width: 12),
-            Expanded(child: _QuoteCard(name: 'Mariam Adel', price: '3,550 EGP')),
+            Expanded(
+                child: _QuoteCard(name: 'Mariam Adel', price: '3,550 EGP')),
           ],
         ),
       ],
@@ -437,7 +489,10 @@ class _BreakdownRow extends StatelessWidget {
             Expanded(child: Text(label)),
             Text(
               amount,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: servio.accent),
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: servio.accent),
             ),
           ],
         ),
@@ -483,14 +538,20 @@ class _MaterialCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   '$brand • $quantity',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: servio.textSecondary),
                 ),
               ],
             ),
           ),
           Text(
             unitPrice,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: servio.accent),
+            style: Theme.of(context)
+                .textTheme
+                .bodyMedium
+                ?.copyWith(color: servio.accent),
           ),
         ],
       ),
@@ -528,7 +589,9 @@ class _QuoteCard extends StatelessWidget {
                 child: Center(child: Text(name[0])),
               ),
               const SizedBox(width: 10),
-              Expanded(child: Text(name, style: Theme.of(context).textTheme.labelLarge)),
+              Expanded(
+                  child: Text(name,
+                      style: Theme.of(context).textTheme.labelLarge)),
             ],
           ),
           const SizedBox(height: 12),
@@ -536,7 +599,10 @@ class _QuoteCard extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             price,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(color: servio.accent),
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(color: servio.accent),
           ),
         ],
       ),
