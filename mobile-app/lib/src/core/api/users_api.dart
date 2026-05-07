@@ -81,6 +81,14 @@ class UsersApi {
     return UserAccount.fromBackend(_client.unwrapData(response));
   }
 
+  Future<void> updateEmail({
+    required String newEmail,
+    required String currentPassword,
+  }) async {
+    await _client.patch('/users/me/email', <String, dynamic>{
+      'newEmail': newEmail,
+      'currentPassword': currentPassword,
+    });
   Future<void> deleteMe() async {
     await _client.delete(ApiEndpoints.usersMe);
   }
