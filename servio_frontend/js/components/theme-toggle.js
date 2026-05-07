@@ -34,8 +34,11 @@ function applyTheme(theme, persist = true) {
 }
 
 export function initThemeToggle() {
-  const initialTheme = getPreferredTheme();
-  applyTheme(initialTheme, false);
+  // theme-init.js already applied the correct data-theme before first paint.
+  // We only need to sync button state — NOT re-apply the theme (which would
+  // cause a second setAttribute and a style recalculation flash).
+  const initialTheme = document.documentElement.getAttribute('data-theme') || getPreferredTheme();
+  syncThemeButtons(initialTheme);
 
   document.querySelectorAll("[data-theme-button]").forEach((button) => {
     button.addEventListener("click", () => {

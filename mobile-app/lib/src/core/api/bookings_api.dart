@@ -1,5 +1,6 @@
 import '../models/backend_booking_model.dart';
 import 'api_client.dart';
+import 'api_endpoints.dart';
 
 class BookingsApi {
   BookingsApi(this._client);
@@ -13,11 +14,16 @@ class BookingsApi {
         if (status != null && status.isNotEmpty) 'status': status,
       },
     ).query;
-    final data = _client.unwrapData(await _client.get('/bookings/my?$qs'));
+    final data = _client.unwrapData(
+      await _client.get('${ApiEndpoints.myBookings}?$qs'),
+    );
     final list = (data['bookings'] as List<dynamic>?) ??
         (data['data'] as List<dynamic>?) ??
         <dynamic>[];
-    return list.whereType<Map<String, dynamic>>().map(BackendBooking.fromJson).toList();
+    return list
+        .whereType<Map<String, dynamic>>()
+        .map(BackendBooking.fromJson)
+        .toList();
   }
 
   Future<List<BackendBooking>> getWorkerBookings({String? status}) async {
@@ -27,44 +33,95 @@ class BookingsApi {
         if (status != null && status.isNotEmpty) 'status': status,
       },
     ).query;
-    final data = _client.unwrapData(await _client.get('/bookings/worker?$qs'));
+    final data = _client.unwrapData(
+      await _client.get('${ApiEndpoints.workerBookings}?$qs'),
+    );
     final list = (data['bookings'] as List<dynamic>?) ??
         (data['data'] as List<dynamic>?) ??
         <dynamic>[];
-    return list.whereType<Map<String, dynamic>>().map(BackendBooking.fromJson).toList();
+    return list
+        .whereType<Map<String, dynamic>>()
+        .map(BackendBooking.fromJson)
+        .toList();
   }
 
   Future<BackendBooking> createBooking({
     required String workerId,
-    required String serviceId,
+    String serviceId = '',
+    String serviceCategory = '',
+    String serviceName = '',
     required DateTime scheduledDate,
-    required String addressCity,
-    required String addressStreet,
+    required String scheduledTime,
+    String address = '',
+    String addressCity = '',
+    String addressStreet = '',
     String notes = '',
   }) async {
+    final resolvedAddress = address.trim().isNotEmpty
+        ? address.trim()
+        : <String>[addressStreet, addressCity]
+            .where((part) => part.trim().isNotEmpty)
+            .join(', ');
+
     final data = _client.unwrapData(
-      await _client.post('/bookings', <String, dynamic>{
+      await _client.post(ApiEndpoints.bookings, <String, dynamic>{
         'workerId': workerId,
-        'serviceId': serviceId,
-        'scheduledDate': scheduledDate.toIso8601String(),
-        'address': <String, dynamic>{
-          'city': addressCity,
-          'street': addressStreet,
-        },
-        if (notes.isNotEmpty) 'notes': notes,
+        if (serviceId.trim().isNotEmpty) 'serviceId': serviceId.trim(),
+        if (serviceId.trim().isEmpty && serviceCategory.trim().isNotEmpty)
+          'serviceCategory': serviceCategory.trim(),
+        if (serviceName.trim().isNotEmpty) 'serviceName': serviceName.trim(),
+        'scheduledDate': _dateOnly(scheduledDate),
+        'scheduledTime': _normalizeScheduledTime(scheduledTime),
+        'address': resolvedAddress,
+        if (notes.trim().isNotEmpty) 'description': notes.trim(),
       }),
     );
     return BackendBooking.fromJson(data);
   }
 
   Future<void> updateStatus(String bookingId, String status) async {
-    await _client.patch('/bookings/$bookingId/status', <String, dynamic>{
+    await _client
+        .patch(ApiEndpoints.bookingStatus(bookingId), <String, dynamic>{
       'status': status,
     });
   }
 
   Future<BackendBooking> getBooking(String id) async {
-    final data = _client.unwrapData(await _client.get('/bookings/$id'));
+    final data =
+        _client.unwrapData(await _client.get(ApiEndpoints.bookingById(id)));
     return BackendBooking.fromJson(data);
   }
+
+  Future<List<String>> getWorkerBookedSlots({
+    required String workerId,
+    required String date,
+  }) async {
+    final data = _client.unwrapData(
+      await _client.get(ApiEndpoints.workerBookedSlots(workerId, date)),
+    );
+    final slots = (data['bookedSlots'] as List<dynamic>?) ?? <dynamic>[];
+    return slots.whereType<String>().toList();
+  }
+}
+
+String _dateOnly(DateTime value) {
+  final year = value.year.toString().padLeft(4, '0');
+  final month = value.month.toString().padLeft(2, '0');
+  final day = value.day.toString().padLeft(2, '0');
+  return '$year-$month-$day';
+}
+
+String _normalizeScheduledTime(String value) {
+  final trimmed = value.trim();
+  final hourMatch =
+      RegExp(r'(\d{1,2})(?::\d{2})?\s*(AM|PM)?', caseSensitive: false)
+          .firstMatch(trimmed);
+  if (hourMatch == null) return '10:00';
+
+  var hour = int.tryParse(hourMatch.group(1) ?? '') ?? 10;
+  final meridiem = hourMatch.group(2)?.toUpperCase();
+  if (meridiem == 'PM' && hour < 12) hour += 12;
+  if (meridiem == 'AM' && hour == 12) hour = 0;
+  hour = hour.clamp(0, 23).toInt();
+  return '${hour.toString().padLeft(2, '0')}:00';
 }

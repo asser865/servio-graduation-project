@@ -13,7 +13,8 @@ extension AuthRoleX on AuthRole {
 
   String get subtitle {
     return switch (this) {
-      AuthRole.customer => 'Browse and book verified home service professionals.',
+      AuthRole.customer =>
+        'Browse and book verified home service professionals.',
       AuthRole.technician => 'Manage jobs, earn money, grow your reputation.',
     };
   }

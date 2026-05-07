@@ -45,31 +45,6 @@ const SERVICE_KEY_MAP = {
   'installation services':       'home_cat_installation',
 };
 
-// ─── Canonical fallback booking (spec-defined demo data) ───────────────────
-const DEFAULT_BOOKING = {
-  id: 'S-2848',
-  service: 'HVAC Maintenance',
-  category: 'HVAC Maintenance',
-  status: 'In Progress',
-  date: 'Sun, 22 Mar 2026',
-  time: '10:00 AM',
-  scheduledDate: 'Sun, 22 Mar 2026',
-  scheduledTime: '10:00 AM – 12:00 PM',
-  duration: '~2 hours',
-  location: '12 Nile View St, Maadi, Cairo',
-  paymentMethod: 'Online Payment',
-  paymentAmount: 'EGP 450',
-  paymentStatus: 'Paid',
-  pin: '—',
-  technician: {
-    name: 'Hassan Ali',
-    initials: 'HA',
-    specialty: 'HVAC Specialist',
-    rating: '4.8',
-    phone: '+201000000000',
-  },
-};
-
 // ─── Timeline step definitions ──────────────────────────────────────────────
 function getSteps() {
   const t = (window.t || function(k){ return k; });
@@ -141,70 +116,93 @@ const bkDialogConfirm  = document.getElementById('bkDialogConfirm');
 const bkToastWrap      = document.getElementById('bkToastWrap');
 const bkCancelledBannerWrap = document.getElementById('bkCancelledBannerWrap');
 
-// ─── Load booking — default first, upgrade from localStorage if available ─────
-// Always starts with canonical dummy data so the page is never blank.
-// Real booking data from the flow overwrites it when present.
-let booking = DEFAULT_BOOKING;
-try {
-  const raw = localStorage.getItem('servio_active_booking');
-  if (raw) { const parsed = JSON.parse(raw); if (parsed?.id) booking = parsed; }
-} catch (_) {}
-
-// If URL has ?id=..., load from API and override local data
-const _bookingIdFromUrl = new URLSearchParams(window.location.search).get('id');
-if (_bookingIdFromUrl) {
-  getBooking(_bookingIdFromUrl).then(res => {
-    const b = res;
-    if (!b?._id) return;
-    // Map API booking to the shape renderBooking expects
-    booking = {
-      id:            b._id,
-      _id:           b._id,
-      service:       b.service?.title || b.serviceId || 'Service',
-      category:      b.service?.category || '',
-      status:        mapApiStatus(b.status),
-      date:          b.scheduledDate ? new Date(b.scheduledDate).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : '—',
-      scheduledDate: b.scheduledDate ? new Date(b.scheduledDate).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : '—',
-      time:          b.scheduledTime || '—',
-      scheduledTime: b.scheduledTime || '—',
-      location:      b.address || '—',
-      paymentMethod: b.paymentMethod === 'cash' ? 'Cash' : 'Online Payment',
-      paymentAmount: b.amount ? `EGP ${(b.amount / 100).toFixed(2)}` : '—',
-      paymentStatus: b.paymentStatus || '—',
-      pin:           b.pin || '—',
-      technician: {
-        name:      b.worker?.name || '—',
-        initials:  (b.worker?.name || 'T')[0].toUpperCase(),
-        specialty: (b.worker?.categories || [])[0] || '—',
-        rating:    b.worker?.averageRating?.toFixed(1) || '—',
-        phone:     b.worker?.phone || '',
-      },
-    };
-    renderPage(booking);
-  }).catch(() => {
-    showToast('Could not load booking from server — showing cached data', 'info');
-  });
-}
-
+// ─── Map API status → display status ─────────────────────────────────────────
 function mapApiStatus(s) {
-  const map = { pending: 'Booked', accepted: 'Confirmed', in_progress: 'In Progress', completed: 'Complete', cancelled: 'Cancelled', rejected: 'Cancelled' };
+  const map = {
+    pending:     'Booked',
+    accepted:    'Confirmed',
+    in_progress: 'In Progress',
+    completed:   'Complete',
+    cancelled:   'Cancelled',
+    rejected:    'Cancelled',
+  };
   return map[s] || s || 'Booked';
 }
 
-if (booking === DEFAULT_BOOKING) {
-  try {
-    const rawList = localStorage.getItem('servio_bookings');
-    if (rawList) {
-      const list = JSON.parse(rawList);
-      if (Array.isArray(list) && list.length > 0) {
-        list.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-        if (list[0]?.id) booking = list[0];
-      }
-    }
-  } catch (_) {}
+// ─── Map an API booking object → the shape renderPage expects ─────────────────
+function mapApiBooking(b) {
+  const workerName     = b.worker?.name || '';
+  const workerInitials = workerName
+    ? workerName.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
+    : 'T';
+
+  // Derive specialty from worker's categories/skills list
+  const workerSkills = b.worker?.categories || b.worker?.skills || [];
+  const workerSpecialty = Array.isArray(workerSkills) && workerSkills.length
+    ? workerSkills[0]
+    : (b.worker?.specialty || b.service?.category || '—');
+
+  return {
+    id:            b._id,
+    _id:           b._id,
+    service:       b.service?.title || b.serviceId || 'Service',
+    category:      b.service?.category || b.service?.title || '',
+    status:        mapApiStatus(b.status),
+    rawStatus:     b.status,
+    date:          b.scheduledDate
+      ? new Date(b.scheduledDate).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })
+      : '—',
+    scheduledDate: b.scheduledDate
+      ? new Date(b.scheduledDate).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })
+      : '—',
+    time:          b.scheduledTime || '—',
+    scheduledTime: b.scheduledTime || '—',
+    duration:      b.duration || '—',
+    location:      b.address || '—',
+    paymentMethod: b.paymentMethod === 'cash' ? 'Cash' : 'Online Payment',
+    paymentAmount: b.totalPrice != null
+      ? `EGP ${Number(b.totalPrice).toLocaleString('en-US')}`
+      : (b.amount != null ? `EGP ${(b.amount / 100).toFixed(2)}` : '—'),
+    paymentStatus: b.paymentStatus || 'Pending',
+    pin:           b.pin || '—',
+    technician: {
+      name:      workerName || '—',
+      initials:  workerInitials,
+      specialty: workerSpecialty,
+      rating:    b.worker?.averageRating != null ? Number(b.worker.averageRating).toFixed(1) : '—',
+      phone:     b.worker?.phone || '',
+    },
+  };
 }
 
-// Date/Time Translation Helper
+// ─── Show skeleton while loading ──────────────────────────────────────────────
+function showSkeleton() {
+  bkEmptyState.style.display = 'none';
+  bkContent.style.display    = 'block';
+
+  const skeletonText = '—';
+  if (bkId)            bkId.textContent           = '…';
+  if (bkService)       bkService.textContent       = '…';
+  if (bkDate)          bkDate.textContent          = '…';
+  if (bkTime)          bkTime.textContent          = '…';
+  if (bkTechName)      bkTechName.textContent      = '…';
+  if (bkTechInitials)  bkTechInitials.textContent  = '…';
+  if (bkTechSpecialty) bkTechSpecialty.textContent = '…';
+  if (bkTechRating)    bkTechRating.textContent    = '…';
+  if (bkLocation)      bkLocation.textContent      = '…';
+  if (bkPayAmount)     bkPayAmount.textContent     = '…';
+}
+
+// ─── Show empty state when no booking is available ────────────────────────────
+function showEmptyState() {
+  bkContent.style.display    = 'none';
+  bkEmptyState.style.display = '';
+  // If empty state has a CTA link, ensure it navigates to the dashboard
+  const cta = bkEmptyState.querySelector('a, button[data-href]');
+  if (cta && !cta.href) cta.href = './customer-dashboard.html';
+}
+
+// ─── Date/Time Translation Helper ─────────────────────────────────────────────
 function translateDateTime(str) {
   if (!str) return '—';
   const lang = localStorage.getItem('servio_lang') || 'en';
@@ -217,13 +215,10 @@ function translateDateTime(str) {
     'January': 'يناير', 'February': 'فبراير', 'March': 'مارس', 'April': 'أبريل',
     'June': 'يونيو', 'July': 'يوليو', 'August': 'أغسطس',
     'September': 'سبتمبر', 'October': 'أكتوبر', 'November': 'نوفمبر', 'December': 'ديسمبر',
-    'Sun': 'الأحد', 'Mon': 'الاثنين', 'Tue': 'الثلاثاء', 'Wed': 'الأربعاء', 'Thu': 'الخميس', 'Fri': 'الجمعة', 'Sat': 'السبت'
+    'Sun': 'الأحد', 'Mon': 'الاثنين', 'Tue': 'الثلاثاء', 'Wed': 'الأربعاء',
+    'Thu': 'الخميس', 'Fri': 'الجمعة', 'Sat': 'السبت',
   };
-
-  const ampmMap = {
-    'AM': 'صباحاً',
-    'PM': 'مساءً'
-  };
+  const ampmMap = { 'AM': 'صباحاً', 'PM': 'مساءً' };
 
   let res = str;
   Object.keys(monthsMap).forEach(k => { res = res.replace(new RegExp('\\b' + k + '\\b', 'g'), monthsMap[k]); });
@@ -234,8 +229,12 @@ function translateDateTime(str) {
 // ─── Render ───────────────────────────────────────────────────────────────────
 function renderPage(bk) {
   const t = (window.t || function(k){ return k; });
+
+  bkEmptyState.style.display = 'none';
+  bkContent.style.display    = 'block';
+
   // Header card
-  bkId.textContent      = bk.id;
+  bkId.textContent = bk.id;
   const svcKey = SERVICE_KEY_MAP[(bk.service || '').toLowerCase()];
   if (svcKey) {
     bkService.setAttribute('data-i18n', svcKey);
@@ -244,8 +243,8 @@ function renderPage(bk) {
     bkService.removeAttribute('data-i18n');
     bkService.textContent = bk.service;
   }
-  bkDate.textContent    = translateDateTime(bk.date);
-  bkTime.textContent    = translateDateTime(bk.time);
+  bkDate.textContent = translateDateTime(bk.date);
+  bkTime.textContent = translateDateTime(bk.time);
 
   // Status badge
   const statusKey = bk.status || 'Booked';
@@ -257,10 +256,15 @@ function renderPage(bk) {
 
   // Cancelled banner
   if (statusKey === 'Cancelled') {
-    bkCancelledBannerWrap.hidden = false;
+    if (bkCancelledBannerWrap) bkCancelledBannerWrap.hidden = false;
     bkCancelBtn.disabled = true;
     bkCancelBtn.style.opacity = '0.45';
     bkCancelBtn.style.pointerEvents = 'none';
+  } else {
+    if (bkCancelledBannerWrap) bkCancelledBannerWrap.hidden = true;
+    bkCancelBtn.disabled = false;
+    bkCancelBtn.style.opacity = '';
+    bkCancelBtn.style.pointerEvents = '';
   }
 
   // Timeline
@@ -269,42 +273,57 @@ function renderPage(bk) {
   // Technician
   const tech = bk.technician || {};
   bkTechInitials.textContent = tech.initials || getInitials(tech.name || '');
-  bkTechName.textContent     = tech.name      || '—';
-  const roleKey = 'tech_role_hvac';
-  bkTechSpecialty.setAttribute('data-i18n', roleKey);
-  bkTechSpecialty.textContent = t(roleKey) || tech.specialty || '—';
-  bkTechRating.textContent   = tech.rating    || '—';
+  bkTechName.textContent     = tech.name || '—';
+
+  // Use the actual specialty from the worker — not a hardcoded i18n key
+  const specialty = tech.specialty || '—';
+  bkTechSpecialty.removeAttribute('data-i18n');
+  bkTechSpecialty.textContent = specialty;
+
+  bkTechRating.textContent = tech.rating || '—';
   if (tech.phone) bkCallLink.href = `tel:${tech.phone}`;
+  else bkCallLink.removeAttribute('href');
 
   // Job details
-  const catKey = 'home_cat_' + (bk.category || bk.service || '').toLowerCase().replace(' ', '_');
-  bkCategory.setAttribute('data-i18n', catKey);
-  bkCategory.textContent = t(catKey) || bk.category || bk.service || '—';
+  const catStr = (bk.category || bk.service || '').toLowerCase().replace(/\s+/g, '_');
+  const catKey = 'home_cat_' + catStr;
+  const catTranslated = t(catKey);
+  if (catTranslated && catTranslated !== catKey) {
+    bkCategory.setAttribute('data-i18n', catKey);
+    bkCategory.textContent = catTranslated;
+  } else {
+    bkCategory.removeAttribute('data-i18n');
+    bkCategory.textContent = bk.category || bk.service || '—';
+  }
 
-  bkLocation.textContent             = bk.location       || '—';
-  bkScheduledDate.textContent        = translateDateTime(bk.scheduledDate  || bk.date);
-  bkScheduledTime.textContent        = translateDateTime(bk.scheduledTime  || bk.time);
-  bkDuration.textContent             = bk.duration       || '—';
+  bkLocation.textContent      = bk.location || '—';
+  bkScheduledDate.textContent = translateDateTime(bk.scheduledDate || bk.date);
+  bkScheduledTime.textContent = translateDateTime(bk.scheduledTime || bk.time);
+  bkDuration.textContent      = bk.duration || '—';
 
-  const payMethKey = 'payment_' + (bk.paymentMethod || '').toLowerCase().replace(' ', '_');
-  bkPaymentMethodDetail.setAttribute('data-i18n', payMethKey);
-  bkPaymentMethodDetail.textContent  = t(payMethKey) || bk.paymentMethod || '—';
+  const payMethKey = 'payment_' + (bk.paymentMethod || '').toLowerCase().replace(/\s+/g, '_');
+  const payMethTranslated = t(payMethKey);
+  if (payMethTranslated && payMethTranslated !== payMethKey) {
+    bkPaymentMethodDetail.setAttribute('data-i18n', payMethKey);
+    bkPaymentMethodDetail.textContent = payMethTranslated;
+  } else {
+    bkPaymentMethodDetail.removeAttribute('data-i18n');
+    bkPaymentMethodDetail.textContent = bk.paymentMethod || '—';
+  }
 
   // PIN — space out digits for readability
   const pin = bk.pin && bk.pin !== '—' ? String(bk.pin) : null;
-  bkPin.textContent = pin ? pin.split('').join(' ') : 'PIN not available';
+  bkPin.textContent = pin ? pin.split('').join(' ') : (t('bkd_pin_unavailable') || 'PIN not available');
 
   // Payment summary
-  bkPaySummaryMethod.setAttribute('data-i18n', payMethKey);
-  bkPaySummaryMethod.textContent = t(payMethKey) || bk.paymentMethod || '—';
+  bkPaySummaryMethod.textContent = bkPaymentMethodDetail.textContent;
   bkPayAmount.textContent = bk.paymentAmount || '—';
-  const payStatusKey = 'status_' + (bk.paymentStatus || 'Pending').toLowerCase().replace(' ', '_');
-  bkPayStatus.setAttribute('data-i18n', payStatusKey);
+  const payStatusKey = 'status_' + (bk.paymentStatus || 'pending').toLowerCase().replace(/\s+/g, '_');
   bkPayStatus.textContent = t(payStatusKey) || bk.paymentStatus || 'Pending';
 
   // Mobile bar
   bkBarInitials.textContent = tech.initials || getInitials(tech.name || '');
-  bkBarName.textContent     = tech.name     || '—';
+  bkBarName.textContent     = tech.name || '—';
 
   // Dialog booking ID
   if (bkDialogId) bkDialogId.textContent = bk.id;
@@ -322,7 +341,7 @@ function renderTimeline(currentStatus) {
     if (isCancelled) {
       state = i < currentIndex ? 'done' : 'pending';
     } else {
-      if (i < currentIndex)      state = 'done';
+      if (i < currentIndex)        state = 'done';
       else if (i === currentIndex) state = 'active';
       else                         state = 'pending';
     }
@@ -339,9 +358,9 @@ function renderTimeline(currentStatus) {
       iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/></svg>`;
     }
 
-    const ariaLabel = state === 'done' ? t('bkd_step_state_done') || 'Completed'
-                    : state === 'active' ? t('bkd_step_state_active') || 'Current step'
-                    : t('bkd_step_state_pending') || 'Pending';
+    const ariaLabel = state === 'done'   ? (t('bkd_step_state_done')   || 'Completed')
+                    : state === 'active' ? (t('bkd_step_state_active') || 'Current step')
+                    :                      (t('bkd_step_state_pending') || 'Pending');
 
     li.innerHTML = `
       <div class="bk-timeline__node" aria-label="${ariaLabel}">
@@ -357,22 +376,118 @@ function renderTimeline(currentStatus) {
 }
 
 function getInitials(name) {
-  return name
-    .split(' ')
-    .map(w => w[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
+  return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
 }
 
-// ─── Always render content — empty state is never shown in demo mode ──────────
-// Use style.display (inline) so it overrides the CSS display:flex on .bk-empty
-bkEmptyState.style.display = 'none';
-bkContent.style.display    = 'block';
-renderPage(booking);
+// ─── Booking state (starts empty — always loaded from API) ────────────────────
+let booking = null;
+
+// ─── Main load logic ──────────────────────────────────────────────────────────
+const _bookingIdFromUrl = new URLSearchParams(window.location.search).get('id');
+
+async function loadBooking() {
+  // 1. If URL has ?id= → fetch from API (authoritative)
+  if (_bookingIdFromUrl) {
+    showSkeleton();
+    try {
+      const b = await getBooking(_bookingIdFromUrl);
+      if (!b?._id) { showEmptyState(); return; }
+      booking = mapApiBooking(b);
+      renderPage(booking);
+      // Persist so back-navigation keeps the last viewed booking
+      try { localStorage.setItem('servio_active_booking', JSON.stringify(booking)); } catch (_) {}
+    } catch (err) {
+      // Try localStorage fallback
+      const cached = tryLoadFromStorage(_bookingIdFromUrl);
+      if (cached) { booking = cached; renderPage(booking); showToast(t_('bkd_toast_cached_data') || 'Showing cached data', 'info'); }
+      else showEmptyState();
+    }
+    return;
+  }
+
+  // Helper: a real MongoDB ObjectId is 24 hex characters
+  function isRealId(id) {
+    return typeof id === 'string' && /^[a-f0-9]{24}$/i.test(id);
+  }
+
+  // 2. No URL param — look for a real booking ID in localStorage, then fetch from API
+  let candidateId = null;
+
+  try {
+    const raw = localStorage.getItem('servio_active_booking');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const id = parsed?._id || parsed?.bookingId || parsed?.id;
+      if (isRealId(id)) candidateId = id;
+      // If only a fake S- id, wipe the stale entry so it never shows again
+      else if (parsed?.id) {
+        try { localStorage.removeItem('servio_active_booking'); } catch (_) {}
+      }
+    }
+  } catch (_) {}
+
+  if (!candidateId) {
+    // 3. Fall back to most-recent real booking in the list
+    try {
+      const rawList = localStorage.getItem('servio_bookings');
+      if (rawList) {
+        const list = JSON.parse(rawList);
+        if (Array.isArray(list)) {
+          const sorted = list
+            .filter(b => isRealId(b?._id || b?.bookingId || b?.id))
+            .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+          if (sorted.length > 0) {
+            candidateId = sorted[0]._id || sorted[0].bookingId || sorted[0].id;
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  if (candidateId) {
+    showSkeleton();
+    try {
+      const b = await getBooking(candidateId);
+      if (!b?._id) { showEmptyState(); return; }
+      booking = mapApiBooking(b);
+      renderPage(booking);
+      try { localStorage.setItem('servio_active_booking', JSON.stringify(booking)); } catch (_) {}
+    } catch (_) {
+      showEmptyState();
+    }
+    return;
+  }
+
+  // 4. Nothing valid found → empty state
+  showEmptyState();
+}
+
+function t_(key) { return typeof window.t === 'function' ? window.t(key) : key; }
+
+function tryLoadFromStorage(id) {
+  try {
+    const raw = localStorage.getItem('servio_active_booking');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && (parsed._id === id || parsed.id === id)) return parsed;
+    }
+    const rawList = localStorage.getItem('servio_bookings');
+    if (rawList) {
+      const list = JSON.parse(rawList);
+      if (Array.isArray(list)) {
+        const found = list.find(b => b._id === id || b.id === id);
+        if (found) return found;
+      }
+    }
+  } catch (_) {}
+  return null;
+}
+
+loadBooking();
 
 // ─── Cancel dialog ────────────────────────────────────────────────────────────
 bkCancelBtn.addEventListener('click', () => {
+  if (!booking) return;
   bkCancelDialog.hidden = false;
   bkDialogKeep.focus();
 });
@@ -382,133 +497,103 @@ bkDialogKeep.addEventListener('click', () => {
   bkCancelBtn.focus();
 });
 
-bkDialogConfirm.addEventListener('click', () => {
+bkDialogConfirm.addEventListener('click', async () => {
   bkCancelDialog.hidden = true;
+  if (!booking) return;
 
-  // Update booking status
+  const prevStatus = booking.status;
   booking.status = 'Cancelled';
-  try {
-    if (localStorage.getItem('servio_active_booking')) {
-      localStorage.setItem('servio_active_booking', JSON.stringify(booking));
-    }
-  } catch (_) {}
 
-  // Re-render with cancelled state
+  try { localStorage.setItem('servio_active_booking', JSON.stringify(booking)); } catch (_) {}
+
   renderPage(booking);
 
-  // Disable cancel btn
-  bkCancelBtn.disabled = true;
-  bkCancelBtn.style.opacity = '0.45';
-  bkCancelBtn.style.pointerEvents = 'none';
-
-  if (booking._id) {
-    cancelBooking(booking._id).catch(() => {}); // Best-effort API cancel
+  const id = booking._id || booking.id;
+  if (id && !id.startsWith('S-')) {
+    try {
+      await cancelBooking(id);
+    } catch (err) {
+      // Revert on failure
+      booking.status = prevStatus;
+      try { localStorage.setItem('servio_active_booking', JSON.stringify(booking)); } catch (_) {}
+      renderPage(booking);
+      showToast(t_('bkd_toast_cancel_failed') || 'Could not cancel booking. Please try again.', 'danger');
+      return;
+    }
   }
 
-  showToast((window.getLang || function(k){return k;})('bkd_toast_cancelled'), 'danger');
+  showToast(t_('bkd_toast_cancelled') || 'Booking cancelled.', 'danger');
 });
 
-// Close dialog on overlay click
+// Close dialog on overlay click or Escape
 bkCancelDialog.addEventListener('click', (e) => {
-  if (e.target === bkCancelDialog) {
-    bkCancelDialog.hidden = true;
-    bkCancelBtn.focus();
-  }
+  if (e.target === bkCancelDialog) { bkCancelDialog.hidden = true; bkCancelBtn.focus(); }
 });
-
-// Close dialog on Escape
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !bkCancelDialog.hidden) {
-    bkCancelDialog.hidden = true;
-    bkCancelBtn.focus();
-  }
+  if (e.key === 'Escape' && !bkCancelDialog.hidden) { bkCancelDialog.hidden = true; bkCancelBtn.focus(); }
 });
 
 // ─── Reschedule functionality ──────────────────────────────────────────────
-const bkRescheduleDialog  = document.getElementById('bkRescheduleDialog');
-const bkRsDialogCancel     = document.getElementById('bkRsDialogCancel');
-const bkRsDialogConfirm    = document.getElementById('bkRsDialogConfirm');
-const newBookingDate       = document.getElementById('newBookingDate');
-const newBookingSlot       = document.getElementById('newBookingSlot');
+const bkRescheduleDialog = document.getElementById('bkRescheduleDialog');
+const bkRsDialogCancel   = document.getElementById('bkRsDialogCancel');
+const bkRsDialogConfirm  = document.getElementById('bkRsDialogConfirm');
+const newBookingDate      = document.getElementById('newBookingDate');
+const newBookingSlot      = document.getElementById('newBookingSlot');
 
 bkRescheduleBtn.addEventListener('click', () => {
-  if (booking.status === 'Cancelled') {
-    showToast((window.getLang || function(k){return k;})('bkd_toast_no_reschedule'), 'warning');
+  if (!booking || booking.status === 'Cancelled') {
+    showToast(t_('bkd_toast_no_reschedule') || 'Cannot reschedule a cancelled booking.', 'warning');
     return;
   }
-  // Pre-fill date (default to tomorrow)
   const today = new Date();
-  today.setDate(today.getDate() + 1); 
+  today.setDate(today.getDate() + 1);
   const yyyy = today.getFullYear();
-  const mm = String(today.getMonth() + 1).padStart(2, '0');
-  const dd = String(today.getDate()).padStart(2, '0');
+  const mm   = String(today.getMonth() + 1).padStart(2, '0');
+  const dd   = String(today.getDate()).padStart(2, '0');
   newBookingDate.value = `${yyyy}-${mm}-${dd}`;
-  newBookingDate.min = `${yyyy}-${mm}-${dd}`;
-  
+  newBookingDate.min   = `${yyyy}-${mm}-${dd}`;
   bkRescheduleDialog.hidden = false;
 });
 
-bkRsDialogCancel.addEventListener('click', () => {
-  bkRescheduleDialog.hidden = true;
-});
+bkRsDialogCancel.addEventListener('click', () => { bkRescheduleDialog.hidden = true; });
 
 bkRsDialogConfirm.addEventListener('click', () => {
   const dateVal = newBookingDate.value;
   const slotVal = newBookingSlot.value;
+  if (!dateVal) { showToast(t_('bkd_toast_select_date') || 'Please select a date.', 'warning'); return; }
 
-  if (!dateVal) {
-    showToast((window.getLang || function(k){return k;})('bkd_toast_select_date'), 'warning');
-    return;
-  }
-
-  // Format the date for display (e.g. Thu, 27 Mar 2026)
   const d = new Date(dateVal);
-  const options = { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' };
-  const formattedDate = d.toLocaleDateString('en-US', options);
+  const formattedDate = d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 
-  // Apply changes
-  booking.date = formattedDate;
+  booking.date          = formattedDate;
   booking.scheduledDate = formattedDate;
-  booking.time = slotVal.split(' – ')[0];
+  booking.time          = slotVal.split(' – ')[0];
   booking.scheduledTime = slotVal;
 
-  // Persist
   try {
     localStorage.setItem('servio_active_booking', JSON.stringify(booking));
-    // Also update in list if it came from there
     const rawList = localStorage.getItem('servio_bookings');
     if (rawList) {
       const list = JSON.parse(rawList);
-      const idx = list.findIndex(b => b.id === booking.id);
-      if (idx !== -1) {
-        list[idx] = { ...list[idx], ...booking };
-        localStorage.setItem('servio_bookings', JSON.stringify(list));
-      }
+      const idx = list.findIndex(b => b.id === booking.id || b._id === booking._id);
+      if (idx !== -1) { list[idx] = { ...list[idx], ...booking }; localStorage.setItem('servio_bookings', JSON.stringify(list)); }
     }
   } catch (_) {}
 
   renderPage(booking);
   bkRescheduleDialog.hidden = true;
-  showToast((window.getLang || function(k){return k;})('bkd_toast_rescheduled'), 'success');
+  showToast(t_('bkd_toast_rescheduled') || 'Booking rescheduled.', 'success');
 });
 
-// Reschedule dialog overlay click
 bkRescheduleDialog.addEventListener('click', (e) => {
-  if (e.target === bkRescheduleDialog) {
-    bkRescheduleDialog.hidden = true;
-  }
+  if (e.target === bkRescheduleDialog) bkRescheduleDialog.hidden = true;
 });
 
 bkReceiptBtn.addEventListener('click', () => {
-  showToast((window.t || function(k){return k;})('bkd_toast_receipt'), 'info');
+  showToast(t_('bkd_toast_receipt') || 'Receipt functionality coming soon.', 'info');
 });
 
 // ─── Toast system ─────────────────────────────────────────────────────────────
-/**
- * @param {string} message
- * @param {'success'|'info'|'warning'|'danger'} type
- * @param {number} duration ms
- */
 function showToast(message, type = 'info', duration = 3800) {
   const icons = {
     success: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
@@ -525,12 +610,9 @@ function showToast(message, type = 'info', duration = 3800) {
   `;
   bkToastWrap.appendChild(toast);
 
-  // Auto dismiss
   const remove = () => {
     toast.classList.add('bk-toast--out');
     toast.addEventListener('animationend', () => toast.remove(), { once: true });
   };
   setTimeout(remove, duration);
 }
-
-// .

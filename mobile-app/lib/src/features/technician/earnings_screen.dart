@@ -5,12 +5,8 @@ import '../../core/api/api_client.dart';
 import '../../core/api/payments_api.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
-import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
 import '../../design_system/widgets/servio_card.dart';
-import 'availability_manager_screen.dart';
-import 'job_queue_screen.dart';
-import 'technician_dashboard_screen.dart';
-import 'technician_profile_screen.dart';
+import '../../design_system/widgets/servio_tab_shell.dart';
 
 class EarningsScreen extends StatefulWidget {
   const EarningsScreen({super.key});
@@ -21,7 +17,11 @@ class EarningsScreen extends StatefulWidget {
 
 class _EarningsScreenState extends State<EarningsScreen> {
   int _periodIndex = 0;
-  static const List<String> _periods = <String>['This Week', 'This Month', 'All Time'];
+  static const List<String> _periods = <String>[
+    'This Week',
+    'This Month',
+    'All Time'
+  ];
 
   EarningsSummary? _summary;
   bool _loading = true;
@@ -48,51 +48,20 @@ class _EarningsScreenState extends State<EarningsScreen> {
     final theme = Theme.of(context);
     final earnings = _summary?.totalEarnings ?? 0.0;
     final pending = _summary?.pendingPayout ?? 0.0;
+    final bottomInset = ServioTabShell.bottomOverlayInsetOf(context);
 
     return Scaffold(
-      bottomNavigationBar: ServioBottomNavigationBar(
-        items: const <ServioBottomNavItem>[
-          ServioBottomNavItem(icon: Icons.bar_chart_rounded, label: 'Dashboard'),
-          ServioBottomNavItem(icon: Icons.work_outline_rounded, label: 'Jobs'),
-          ServioBottomNavItem(icon: Icons.account_balance_wallet_outlined, label: 'Earnings'),
-          ServioBottomNavItem(icon: Icons.schedule_rounded, label: 'Availability'),
-          ServioBottomNavItem(icon: Icons.person_rounded, label: 'Profile'),
-        ],
-        currentIndex: 2,
-        onTap: (int index) {
-          if (index == 0) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const TechnicianDashboardScreen(),
-              ),
-            );
-          } else if (index == 1) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const JobQueueScreen(),
-              ),
-            );
-          } else if (index == 3) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const AvailabilityManagerScreen(),
-              ),
-            );
-          } else if (index == 4) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const TechnicianSettingsProfileScreen(),
-              ),
-            );
-          }
-        },
-      ),
       appBar: AppBar(
         title: const Text('Earnings'),
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(ServioSpacing.screenPadding),
+        padding: EdgeInsets.fromLTRB(
+          ServioSpacing.screenPadding,
+          ServioSpacing.screenPadding,
+          ServioSpacing.screenPadding,
+          ServioSpacing.screenPadding + bottomInset,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
@@ -104,7 +73,8 @@ class _EarningsScreenState extends State<EarningsScreen> {
                 return GestureDetector(
                   onTap: () => setState(() => _periodIndex = index),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
                       color: active ? servio.accent : servio.backgroundSoft,
                       borderRadius: BorderRadius.circular(ServioRadius.full),
@@ -132,19 +102,22 @@ class _EarningsScreenState extends State<EarningsScreen> {
                 children: <Widget>[
                   Text(
                     'Total Earnings',
-                    style: theme.textTheme.labelLarge?.copyWith(color: Colors.white.withValues(alpha: 0.8)),
+                    style: theme.textTheme.labelLarge
+                        ?.copyWith(color: Colors.white.withValues(alpha: 0.8)),
                   ),
                   const SizedBox(height: 10),
                   _loading
                       ? const CircularProgressIndicator(color: Colors.white)
                       : Text(
                           '${earnings.toStringAsFixed(0)} EGP',
-                          style: theme.textTheme.displayLarge?.copyWith(color: Colors.white),
+                          style: theme.textTheme.displayLarge
+                              ?.copyWith(color: Colors.white),
                         ),
                   const SizedBox(height: 8),
                   Text(
                     'Pending: ${pending.toStringAsFixed(0)} EGP',
-                    style: theme.textTheme.bodyMedium?.copyWith(color: ServioColors.accentLight),
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(color: ServioColors.accentLight),
                   ),
                   const SizedBox(height: 16),
                   OutlinedButton(
@@ -198,6 +171,10 @@ class _EarningsScreenState extends State<EarningsScreen> {
               amount: '420 EGP',
               released: true,
             ),
+            const SizedBox(height: 12),
+            _PayoutSummaryCard(
+              pendingAmount: pending,
+            ),
           ],
         ),
       ),
@@ -232,9 +209,69 @@ class _BarColumn extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           label,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.servio.textSecondary),
+          style: Theme.of(context)
+              .textTheme
+              .bodySmall
+              ?.copyWith(color: context.servio.textSecondary),
         ),
       ],
+    );
+  }
+}
+
+class _PayoutSummaryCard extends StatelessWidget {
+  const _PayoutSummaryCard({
+    required this.pendingAmount,
+  });
+
+  final double pendingAmount;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+
+    return ServioCard(
+      backgroundColor: servio.backgroundSoft,
+      borderColor: servio.border,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: ServioColors.tint(servio.accent),
+                  borderRadius: BorderRadius.circular(ServioRadius.sm),
+                ),
+                child: Icon(
+                  Icons.account_balance_wallet_outlined,
+                  size: 20,
+                  color: servio.accent,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text('Payout summary', style: theme.textTheme.titleMedium),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Pending release: ${pendingAmount.toStringAsFixed(0)} EGP',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: servio.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
@@ -265,11 +302,19 @@ class _TransactionCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(date, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: servio.textSecondary)),
+                Text(date,
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: servio.textSecondary)),
                 const SizedBox(height: 6),
                 Text(service, style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 4),
-                Text(customer, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: servio.textSecondary)),
+                Text(customer,
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: servio.textSecondary)),
               ],
             ),
           ),
@@ -279,13 +324,18 @@ class _TransactionCard extends StatelessWidget {
             children: <Widget>[
               Text(
                 amount,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(color: servio.accent),
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(color: servio.accent),
               ),
               const SizedBox(height: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: ServioColors.tint(released ? servio.success : servio.warning),
+                  color: ServioColors.tint(
+                      released ? servio.success : servio.warning),
                   borderRadius: BorderRadius.circular(ServioRadius.full),
                 ),
                 child: Text(

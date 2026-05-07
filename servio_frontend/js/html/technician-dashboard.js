@@ -4,8 +4,10 @@
 import { revealAll } from '../components/scroll-reveal.js';
 import { showToast } from '../components/toast.js';
 import { getInitials } from '../utils/string.js';
-import { getMe, updateMe, updatePassword, updateEmail, deleteMe } from '../api/users.js';
+import { getMe, updateMe, updatePassword, updateEmail, deleteMe, updateAvailability, toggleAvailableNow, toggleBlockedDate } from '../api/users.js';
 import { uploadPublicFile } from '../api/uploads.js';
+import { getWorkerBookings, updateBookingStatus } from '../api/bookings.js';
+import { getServices } from '../api/services.js';
 
 const TAB_KEY = 'servio_activeTab_technician';
 
@@ -80,6 +82,10 @@ function initTabs() {
     });
   }
 
+  // Timestamps of last data refresh per tab (ms). Avoids redundant API calls on rapid switches.
+  const tabLastRefresh = {};
+  const TAB_REFRESH_TTL = 30_000; // 30 s
+
   function showTab(id) {
     tabs.forEach(t => {
       const active = t.dataset.tab === id;
@@ -108,6 +114,21 @@ function initTabs() {
       } else {
         el.textContent = id;
       }
+    }
+
+    // Refresh data for data-driven tabs (skip on first load — initDashboard already fetched)
+    const now = Date.now();
+    const stale = !tabLastRefresh[id] || (now - tabLastRefresh[id]) > TAB_REFRESH_TTL;
+    if (stale && tabLastRefresh[id] !== undefined) {
+      tabLastRefresh[id] = now;
+      if (id === 'job-queue') {
+        initJobQueue().catch(() => {});
+      } else if (id === 'overview' || id === 'earnings') {
+        populateStats().catch(() => {});
+      }
+    } else if (tabLastRefresh[id] === undefined) {
+      // Mark as seen so next visit triggers refresh
+      tabLastRefresh[id] = now;
     }
   }
 
@@ -326,70 +347,1369 @@ function updateWelcomeText() {
   });
 }
 
-function populateStats() {
-  const stats = {
-    'total-jobs': '18',
-    'month-earnings': 'EGP 3,200',
-    'avg-rating': '4.8',
-    'pending-requests': '2'
-  };
-  Object.entries(stats).forEach(([key, val]) => {
+async function populateStats() {
+  const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
+
+  function setStat(key, val) {
     const el = document.querySelector(`[data-stat="${key}"]`);
     if (el) el.textContent = val;
+  }
+  function setStatSub(key, val) {
+    const el = document.querySelector(`[data-stat-sub="${key}"]`);
+    if (el) el.textContent = val;
+  }
+
+  // Fetch all bookings for this worker (up to 200 to compute stats)
+  let bookings = [];
+  let totalCount = 0;
+  try {
+    const res = await getWorkerBookings({ limit: 200 });
+    bookings = res?.bookings || [];
+    totalCount = res?.pagination?.total ?? bookings.length;
+  } catch (_) {}
+
+  const now = new Date();
+  const thisMonth = now.getMonth();
+  const thisYear  = now.getFullYear();
+  const lastMonth = thisMonth === 0 ? 11 : thisMonth - 1;
+  const lastYear  = thisMonth === 0 ? thisYear - 1 : thisYear;
+
+  const completed = bookings.filter(b => b.status === 'completed');
+  const pending   = bookings.filter(b => b.status === 'pending');
+
+  // Month earnings = sum of totalPrice for completed bookings this month
+  const monthEarnings = completed.reduce((sum, b) => {
+    const d = new Date(b.scheduledDate || b.createdAt);
+    if (d.getMonth() === thisMonth && d.getFullYear() === thisYear) {
+      return sum + (b.totalPrice || 0);
+    }
+    return sum;
+  }, 0);
+
+  // Last month earnings for delta
+  const lastMonthEarnings = completed.reduce((sum, b) => {
+    const d = new Date(b.scheduledDate || b.createdAt);
+    if (d.getMonth() === lastMonth && d.getFullYear() === lastYear) {
+      return sum + (b.totalPrice || 0);
+    }
+    return sum;
+  }, 0);
+
+  // Outstanding cash: cash bookings that are completed but not yet settled
+  const cashCompleted = completed.filter(b => b.paymentMethod === 'cash');
+  const outstandingAmount = cashCompleted.reduce((sum, b) => sum + (b.totalPrice || 0), 0);
+
+  // This month's job count
+  const monthJobs = bookings.filter(b => {
+    const d = new Date(b.scheduledDate || b.createdAt);
+    return d.getMonth() === thisMonth && d.getFullYear() === thisYear && b.status !== 'cancelled' && b.status !== 'rejected';
+  }).length;
+
+  // Update stat card values
+  const nonCancelled = bookings.filter(b => b.status !== 'cancelled' && b.status !== 'rejected');
+  setStat('total-jobs', totalCount > bookings.length ? totalCount : nonCancelled.length);
+  setStatSub('total-jobs-month', `+${monthJobs} ${_t('tech_stat_this_month') || 'this month'}`);
+
+  setStat('month-earnings', monthEarnings > 0 ? `EGP ${monthEarnings.toLocaleString('en-US')}` : 'EGP 0');
+  const delta = monthEarnings - lastMonthEarnings;
+  const deltaStr = delta >= 0
+    ? `+EGP ${Math.abs(delta).toLocaleString('en-US')} vs last`
+    : `-EGP ${Math.abs(delta).toLocaleString('en-US')} vs last`;
+  setStatSub('month-earnings-change', deltaStr);
+
+  setStat('pending-requests', pending.length);
+  setStatSub('pending-requests-note', pending.length > 0 ? (_t('tech_action_needed') || 'Action needed') : (_t('tech_no_pending') || 'All clear'));
+
+  // Outstanding balance stat card
+  const outstandingEl = document.querySelector('[data-stat="outstanding-balance"]');
+  if (outstandingEl) {
+    outstandingEl.innerHTML = `${outstandingAmount.toLocaleString('en-US')} <span data-i18n="currency_egp">EGP</span>`;
+  }
+
+  // Notification badge = pending requests
+  updateTopbarBadge(pending.length);
+
+  // Update welcome sub-text with real pending count
+  document.querySelectorAll('[data-dash-status-sub], .dash-welcome__sub').forEach(el => {
+    let subText;
+    if (pending.length === 0) {
+      subText = _t('tech_no_requests') || 'No new requests right now.';
+    } else if (pending.length === 1) {
+      subText = _t('tech_n_requests') ? _t('tech_n_requests').replace('{n}', 1) : 'You have 1 new job request waiting.';
+    } else {
+      const key = _t('tech_n_requests_plural') || `You have ${pending.length} new job requests waiting.`;
+      subText = key.replace('{n}', pending.length);
+    }
+    el.textContent = subText;
   });
-  // Show unread notification count on topbar badge (demo: 2 pending)
-  updateTopbarBadge(2);
+
+  // Populate earnings panel
+  populateEarnings(bookings, completed, monthEarnings, lastMonthEarnings, cashCompleted, outstandingAmount);
+
+  // Populate overview panels
+  populateOverviewIncoming(pending);
+  populateOverviewSchedule(bookings);
+
+  // Populate notifications from booking activity
+  populateNotifications(bookings);
+
+  return { bookings, pending, completed, monthEarnings, outstandingAmount };
 }
 
-function initAvailabilitySchedule() {
+// ── Available Now Toggle ──────────────────────────────────────────────────────
+// Connects the toggle to PATCH /users/me/available with debounce + UI feedback
+function initAvailableNowToggle(initialState) {
+  const toggle  = document.getElementById('avail-now-toggle');
+  const card    = document.getElementById('avail-now-card');
+  const pill    = document.getElementById('avail-now-pill');
+  const icon    = document.getElementById('avail-now-icon');
+  if (!toggle) return;
+
+  const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
+
+  function applyUIState(isOn) {
+    const safeT = (k, def) => { 
+      const r = _t(k); 
+      return (r === k || !r) ? def : r; 
+    };
+    toggle.checked = isOn;
+    if (card)  card.classList.toggle('is-active', isOn);
+    if (pill) {
+      pill.textContent = isOn ? safeT('avail_status_online', 'Online') : safeT('avail_status_offline', 'Offline');
+      pill.classList.toggle('is-online', isOn);
+    }
+  }
+
+  // Seed from API state
+  applyUIState(!!initialState);
+
+  let debounceTimer = null;
+  toggle.addEventListener('change', () => {
+    const isOn = toggle.checked;
+    applyUIState(isOn);
+
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(async () => {
+      toggle.disabled = true;
+      try {
+        await toggleAvailableNow(isOn);
+        // Persist to session
+        try {
+          const s = JSON.parse(localStorage.getItem('servio_session') || '{}');
+          s.isAvailable = isOn;
+          localStorage.setItem('servio_session', JSON.stringify(s));
+        } catch (_) {}
+        const msg = isOn
+          ? (_t('toast_avail_on')  || 'You are now visible and accepting bookings.')
+          : (_t('toast_avail_off') || 'You are now offline. New bookings are paused.');
+        showToast(msg, isOn ? 'success' : 'info');
+      } catch (err) {
+        // Revert on error
+        applyUIState(!isOn);
+        showToast(err?.message || 'Failed to update availability.', 'error');
+      } finally {
+        toggle.disabled = false;
+      }
+    }, 350);
+  });
+}
+
+// ── Weekly Schedule Builder ────────────────────────────────────────────────────
+// Renders structured day rows with AM/PM dropdowns, on/off chip, and validation
+function initAvailabilitySchedule(savedSlots) {
   const container = document.getElementById('avail-schedule');
   if (!container) return;
   const T = typeof window.t === 'function' ? window.t.bind(window) : (k) => k;
-  const toLabel = T('avail_to');
-  const offLabel = T('avail_off');
-  DAYS_KEYS.forEach(dayKey => {
-    const day = T(dayKey);
+
+  const DAY_CONFIGS = [
+    { key: 'monday',    label: T('avail_day_mon') || 'Monday',    abbr: 'MON', defaultFrom: '09:00', defaultTo: '17:00' },
+    { key: 'tuesday',   label: T('avail_day_tue') || 'Tuesday',   abbr: 'TUE', defaultFrom: '09:00', defaultTo: '17:00' },
+    { key: 'wednesday', label: T('avail_day_wed') || 'Wednesday', abbr: 'WED', defaultFrom: '09:00', defaultTo: '17:00' },
+    { key: 'thursday',  label: T('avail_day_thu') || 'Thursday',  abbr: 'THU', defaultFrom: '09:00', defaultTo: '17:00' },
+    { key: 'friday',    label: T('avail_day_fri') || 'Friday',    abbr: 'FRI', defaultFrom: '09:00', defaultTo: '17:00' },
+    { key: 'saturday',  label: T('avail_day_sat') || 'Saturday',  abbr: 'SAT', defaultFrom: '10:00', defaultTo: '15:00' },
+    { key: 'sunday',    label: T('avail_day_sun') || 'Sunday',    abbr: 'SUN', defaultFrom: '10:00', defaultTo: '15:00' },
+  ];
+
+  // Build half-hour time options for dropdown
+  function buildTimeOptions() {
+    const opts = [];
+    for (let h = 6; h <= 23; h++) {
+      for (const m of [0, 30]) {
+        const pad  = n => String(n).padStart(2, '0');
+        const val  = `${pad(h)}:${pad(m)}`;
+        const h12  = h === 0 ? 12 : h > 12 ? h - 12 : h;
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        const lbl  = `${h12}:${pad(m)} ${ampm}`;
+        opts.push({ val, lbl });
+      }
+    }
+    return opts;
+  }
+  const TIME_OPTIONS = buildTimeOptions();
+
+  function makeSelect(id, selectedVal) {
+    const sel = document.createElement('select');
+    sel.className = 'avail-time-select';
+    sel.id = id;
+    sel.setAttribute('aria-label', id);
+    TIME_OPTIONS.forEach(({ val, lbl }) => {
+      const opt = document.createElement('option');
+      opt.value = val;
+      opt.textContent = lbl;
+      if (val === selectedVal) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    return sel;
+  }
+
+  function validateRow(fromSel, toSel) {
+    const fromVal = fromSel.value;
+    const toVal   = toSel.value;
+    const isValid = toVal > fromVal;
+    toSel.classList.toggle('is-error', !isValid);
+    return isValid;
+  }
+
+  container.innerHTML = '';
+
+  DAY_CONFIGS.forEach(day => {
+    const savedSlot = (savedSlots || []).find(s => s.day === day.key);
+    const isActive  = !!savedSlot;
+    const fromVal   = savedSlot?.from || day.defaultFrom;
+    const toVal     = savedSlot?.to   || day.defaultTo;
+
     const row = document.createElement('div');
-    row.className = 'avail-day-row';
-    row.innerHTML = `
-      <span class="avail-day-row__label">${day}</span>
-      <input type="time" value="09:00" aria-label="${day} start time" />
-      <span style="color:var(--color-text-light);font-size:0.8rem;">${toLabel}</span>
-      <input type="time" value="17:00" aria-label="${day} end time" />
-      <label class="avail-day-off-label">
-        <input type="checkbox" aria-label="${day} day off" /> ${offLabel}
-      </label>
-    `;
+    row.className = `avail-day-row${isActive ? '' : ' is-off'}`;
+    row.dataset.day = day.key;
+
+    // Day name
+    const nameEl = document.createElement('span');
+    nameEl.className = 'avail-day-row__name';
+    nameEl.textContent = day.abbr;
+    nameEl.title = day.label;
+
+    // Time selects
+    const timesDiv = document.createElement('div');
+    timesDiv.className = 'avail-day-row__times';
+    const fromSel = makeSelect(`avail-from-${day.key}`, fromVal);
+    const sep     = document.createElement('span');
+    sep.className = 'avail-day-row__sep';
+    sep.textContent = T('avail_to') || 'to';
+    const toSel = makeSelect(`avail-to-${day.key}`, toVal);
+    timesDiv.append(fromSel, sep, toSel);
+
+    // Validate on change
+    function onTimeChange() { validateRow(fromSel, toSel); }
+    fromSel.addEventListener('change', onTimeChange);
+    toSel.addEventListener('change', onTimeChange);
+
+    // On/Off chip
+    const chip = document.createElement('button');
+    const safeT = (k, def) => { 
+      const v = T(k); 
+      return (v === k || !v) ? def : v; 
+    };
+    chip.type = 'button';
+    chip.className = `avail-day-toggle-chip${isActive ? ' is-on' : ''}`;
+    chip.textContent = isActive ? safeT('avail_working', 'Working') : safeT('avail_day_off', 'Not Available');
+    chip.setAttribute('aria-pressed', String(isActive));
+    chip.addEventListener('click', () => {
+      const nowOn = !chip.classList.contains('is-on');
+      chip.classList.toggle('is-on', nowOn);
+      chip.textContent = nowOn ? safeT('avail_working', 'Working') : safeT('avail_day_off', 'Not Available');
+      chip.setAttribute('aria-pressed', String(nowOn));
+      row.classList.toggle('is-off', !nowOn);
+      timesDiv.style.visibility = nowOn ? '' : 'hidden';
+    });
+    if (!isActive) timesDiv.style.visibility = 'hidden';
+
+    row.append(nameEl, timesDiv, chip);
     container.appendChild(row);
   });
-}
 
-function initCategories() {
-  const grid = document.getElementById('categories-grid');
-  if (!grid) return;
-  const account = getAccount();
-  const saved = account?.skills || [];
-  const T2 = typeof window.t === 'function' ? window.t.bind(window) : (k) => k;
-  SKILLS_KEYS.forEach(skillKey => {
-    const skill = T2(skillKey);
-    const label = document.createElement('label');
-    const checked = saved.includes(skill) ? 'checked' : '';
-    label.innerHTML = `<input type="checkbox" ${checked} /><span>${skill}</span>`;
-    grid.appendChild(label);
-  });
-}
-
-function initJobQueue() {
-  document.querySelectorAll('[data-accept]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const actionsEl = btn.closest('.dash-card').querySelector('.dash-card__actions');
-      const acceptedLabel = typeof window.t === 'function' ? window.t('jq_accepted_badge') : 'Accepted';
-      actionsEl.innerHTML = `<span class="badge badge--confirmed">${acceptedLabel}</span>`;
+  // Clear All handler
+  document.getElementById('avail-clear-schedule')?.addEventListener('click', () => {
+    const safeT = (k, def) => { 
+      const v = T(k); 
+      return (v === k || !v) ? def : v; 
+    };
+    container.querySelectorAll('.avail-day-row').forEach(row => {
+      row.classList.add('is-off');
+      const chip = row.querySelector('.avail-day-toggle-chip');
+      if (chip) {
+        chip.classList.remove('is-on');
+        chip.textContent = safeT('avail_day_off', 'Not Available');
+        chip.setAttribute('aria-pressed', 'false');
+      }
+      const times = row.querySelector('.avail-day-row__times');
+      if (times) times.style.visibility = 'hidden';
     });
   });
-  document.querySelectorAll('[data-decline]').forEach(btn => {
-    btn.addEventListener('click', () => btn.closest('.dash-card').remove());
+}
+
+function initBlockedDatesCalendar(workerAvailability, initialBlockedDates) {
+  let blockedDates = new Set(initialBlockedDates || []);
+  let currentYear  = new Date().getFullYear();
+  let currentMonth = new Date().getMonth();
+
+  const DAY_NAMES  = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+  const avDays     = (workerAvailability || []).map(a => a.day);
+
+  function renderBlockedCal() {
+    const grid  = document.getElementById('blockedCalGrid');
+    const label = document.getElementById('blockedCalLabel');
+    const prev  = document.getElementById('blockedCalPrev');
+    const next  = document.getElementById('blockedCalNext');
+    if (!grid) return;
+
+    const today     = new Date(); today.setHours(0,0,0,0);
+    const maxDate   = new Date(); maxDate.setDate(maxDate.getDate() + 60); maxDate.setHours(0,0,0,0);
+    const firstDay  = new Date(currentYear, currentMonth, 1);
+    const lastDay   = new Date(currentYear, currentMonth + 1, 0);
+    const prevEnd   = new Date(currentYear, currentMonth, 0);
+    const nextStart = new Date(currentYear, currentMonth + 1, 1);
+
+    if (label) label.textContent = firstDay.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    if (prev)  prev.disabled  = prevEnd < today;
+    if (next)  next.disabled  = nextStart > maxDate;
+
+    let html = '';
+    for (let i = 0; i < firstDay.getDay(); i++) html += '<div class="bcal-day bcal-day--empty"></div>';
+
+    for (let d = 1; d <= lastDay.getDate(); d++) {
+      const date    = new Date(currentYear, currentMonth, d);
+      const dateStr = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const isPast     = date < today;
+      const isFar      = date > maxDate;
+      const isToday    = date.getTime() === today.getTime();
+      const dayName    = DAY_NAMES[date.getDay()];
+      const isOffSched = avDays.length > 0 && !avDays.includes(dayName);
+      const isBlocked  = blockedDates.has(dateStr);
+
+      let cls = 'bcal-day';
+      if (isToday)    cls += ' bcal-day--today';
+      if (isPast || isFar) cls += ' bcal-day--past';
+      else if (isOffSched) cls += ' bcal-day--off-schedule';
+      else if (isBlocked)  cls += ' bcal-day--blocked';
+      else                 cls += ' bcal-day--working';
+
+      const canClick = !isPast && !isFar && !isOffSched;
+      html += `<div class="${cls}" ${canClick ? `data-date="${dateStr}"` : ''}>${d}</div>`;
+    }
+
+    grid.innerHTML = html;
+
+    grid.querySelectorAll('.bcal-day[data-date]').forEach(cell => {
+      cell.addEventListener('click', async () => {
+        const d = cell.dataset.date;
+        try {
+          await toggleBlockedDate(d);
+          if (blockedDates.has(d)) blockedDates.delete(d);
+          else blockedDates.add(d);
+          renderBlockedCal();
+          // Show brief feedback
+          const fb = document.getElementById('blocked-dates-feedback');
+          if (fb) { fb.hidden = false; setTimeout(() => { fb.hidden = true; }, 2000); }
+        } catch (err) {
+          console.error('Failed to toggle blocked date:', err);
+        }
+      });
+    });
+  }
+
+  document.getElementById('blockedCalPrev')?.addEventListener('click', () => {
+    currentMonth--;
+    if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+    renderBlockedCal();
   });
+  document.getElementById('blockedCalNext')?.addEventListener('click', () => {
+    currentMonth++;
+    if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+    renderBlockedCal();
+  });
+
+  renderBlockedCal();
+}
+
+function initCategories(savedSkills) {
+  const grid = document.getElementById('categories-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  const savedSet = new Set((savedSkills || []).map(s => s.toLowerCase()));
+  const T2 = typeof window.t === 'function' ? window.t.bind(window) : (k) => k;
+  const SKILL_DATA = [
+    { key: 'skill_plumbing',     icon: '🔧' },
+    { key: 'skill_electrical',   icon: '⚡' },
+    { key: 'skill_hvac',         icon: '❄️' },
+    { key: 'skill_painting',     icon: '🖌️' },
+    { key: 'skill_carpentry',    icon: '🪚' },
+    { key: 'skill_cleaning',     icon: '🧹' },
+    { key: 'skill_roofing',      icon: '🏠' },
+    { key: 'skill_flooring',     icon: '🪵' },
+    { key: 'skill_appliance',    icon: '🔌' },
+    { key: 'skill_landscaping',  icon: '🌿' },
+    { key: 'skill_renovation',   icon: '🏗️' },
+    { key: 'skill_handyman',     icon: '🔨' },
+    { key: 'skill_drywall',      icon: '🧱' },
+    { key: 'skill_pest_control', icon: '🦟' },
+    { key: 'skill_installation', icon: '📺' },
+    { key: 'skill_general',      icon: '🛠️' },
+  ];
+  SKILL_DATA.forEach(({ key, icon }) => {
+    const label = T2(key);
+    const isSelected = savedSet.has(label.toLowerCase()) || savedSet.has(key.replace('skill_', '').toLowerCase());
+    const chip = document.createElement('label');
+    chip.className = `avail-category-chip${isSelected ? ' is-selected' : ''}`;
+    chip.dataset.skill = label;
+    chip.innerHTML = `<input type="checkbox" ${isSelected ? 'checked' : ''} /><span>${icon} ${label}</span>`;
+    chip.addEventListener('click', (e) => {
+      e.preventDefault();
+      chip.classList.toggle('is-selected');
+      const cb = chip.querySelector('input[type="checkbox"]');
+      if (cb) cb.checked = chip.classList.contains('is-selected');
+    });
+    grid.appendChild(chip);
+  });
+}
+
+async function initJobQueue() {
+  const container = document.getElementById('job-queue-list');
+  if (!container) return;
+
+  const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
+
+  const showMsg = (text, color = '#6b7280') =>
+    (container.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;padding:48px 24px;gap:12px;text-align:center;">
+      <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+      <p style="color:${color};font-size:0.95rem;margin:0;">${text}</p>
+    </div>`);
+
+  // Loading state
+  showMsg('Loading jobs…');
+
+  let bookings = [];
+  try {
+    const res = await getWorkerBookings({ limit: 50 });
+    // Backend returns { bookings: [...], pagination: {...} }
+    bookings = Array.isArray(res) ? res : (res?.bookings || []);
+  } catch (err) {
+    showMsg('Failed to load jobs. Please refresh.', '#dc2626');
+    console.error('[Job Queue] API error:', err);
+    return;
+  }
+
+  if (bookings.length === 0) {
+    showMsg('No jobs assigned yet. Bookings from customers will appear here.');
+    return;
+  }
+
+  const active = bookings.filter(b => !['completed','rejected','cancelled'].includes(b.status));
+  const done   = bookings.filter(b =>  ['completed','rejected','cancelled'].includes(b.status));
+
+  const activeSorted = active.sort((a, b) => {
+    const order = { pending: 0, accepted: 1, in_progress: 2 };
+    return (order[a.status] ?? 9) - (order[b.status] ?? 9);
+  });
+
+  container.innerHTML = '';
+
+  // ── Active jobs ──
+  const activeList = document.createElement('div');
+  activeList.id = 'jq-active-list';
+  if (activeSorted.length === 0) {
+    activeList.innerHTML = `<div class="jq-empty-state">
+      <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="#6b7280" stroke-width="1.5" opacity="0.4"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>
+      <p>No active jobs right now.</p>
+    </div>`;
+  }
+  activeSorted.forEach(b => {
+    try { activeList.appendChild(buildJobCard(b, _t)); }
+    catch (e) { console.error('[Job Queue] card error', b._id, e); }
+  });
+  container.appendChild(activeList);
+
+  // ── Completed / inactive section ──
+  const doneSection = document.createElement('div');
+  doneSection.id = 'jq-completed-section';
+  doneSection.className = 'jq-completed-section';
+  doneSection.style.display = done.length > 0 ? 'block' : 'none';
+  doneSection.innerHTML = `
+    <div class="jq-premium-divider">
+      <div class="jq-divider-line"></div>
+      <div class="jq-divider-content">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>
+        <span>Completed &amp; Inactive</span>
+      </div>
+      <div class="jq-divider-line"></div>
+    </div>
+    <div class="jq-completed-list"></div>`;
+  const completedList = doneSection.querySelector('.jq-completed-list');
+  done.forEach(b => {
+    try { completedList.appendChild(buildJobCard(b, _t)); }
+    catch (e) { console.error('[Job Queue] card error', b._id, e); }
+  });
+  container.appendChild(doneSection);
+
+  wireArrivalFlows(container);
+  revealAll(container);
+}
+
+/* ── Job Flow Modal ──────────────────────────────────────────────────────── */
+function ensureJobModal() {
+  if (document.getElementById('jq-modal')) return;
+  const el = document.createElement('div');
+  el.id = 'jq-modal';
+  el.className = 'jq-modal-overlay';
+  el.innerHTML = `<div class="jq-modal-box" role="dialog" aria-modal="true"><div class="jq-modal-inner"></div></div>`;
+  document.body.appendChild(el);
+  el.addEventListener('click', e => { if (e.target === el) closeJobModal(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeJobModal(); });
+}
+function openJobModal(html) {
+  ensureJobModal();
+  const overlay = document.getElementById('jq-modal');
+  overlay.querySelector('.jq-modal-inner').innerHTML = html;
+  overlay.classList.add('is-open');
+  document.body.style.overflow = 'hidden';
+}
+function closeJobModal() {
+  const overlay = document.getElementById('jq-modal');
+  if (!overlay) return;
+  overlay.classList.remove('is-open');
+  document.body.style.overflow = '';
+}
+
+/* ── Progress Stepper ────────────────────────────────────────────────────── */
+function buildStepperHtml(localState) {
+  const steps = ['Accepted', 'En Route', 'Arrived', 'Working', 'Done'];
+  const idx   = { accepted: 0, 'en-route': 1, arrived: 2, 'in-progress': 3, 'complete-confirm': 3, done: 4 };
+  const cur   = idx[localState] ?? 0;
+  const checkSvg = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+  
+  return `
+    <div class="jq-stepper-container">
+      <div class="jq-stepper">
+        ${steps.map((label, i) => {
+          const done   = i < cur;
+          const active = i === cur;
+          let stateClass = '';
+          if (done) stateClass = 'is-done';
+          else if (active) stateClass = 'is-active';
+          
+          return `
+            <div class="jq-step ${stateClass}">
+              <div class="jq-step__indicator">
+                ${done ? checkSvg : `<span>${i + 1}</span>`}
+              </div>
+              <span class="jq-step__label">${label}</span>
+            </div>
+            ${i < steps.length - 1 ? `<div class="jq-step-line ${done ? 'is-done' : ''}"></div>` : ''}
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+function buildJobCard(b, _t) {
+  const id       = b._id;
+  const shortId  = id.slice(-6).toUpperCase();
+  const service  = b.serviceName || b.service?.title || b.serviceCategory || 'Service';
+  const badge    = (b.serviceCategory || b.service?.category || 'service').replace(/_/g,' ').toUpperCase();
+  const customer = b.user?.name  || '—';
+  const phone    = b.user?.phone || '';
+  const address  = b.address || '—';
+  const mapsUrl  = `https://maps.google.com/?q=${encodeURIComponent(address)}`;
+  const date     = b.scheduledDate
+    ? new Date(b.scheduledDate).toLocaleDateString('en-US', { weekday:'short', day:'numeric', month:'short' })
+    : '—';
+  const time    = b.scheduledTime || '';
+  const price   = b.totalPrice != null ? `${Number(b.totalPrice).toLocaleString('en-US')} EGP` : '—';
+  const payment = b.paymentMethod === 'cash' ? 'Cash' : 'Credit Card';
+  const pin     = b.pin || '';
+  const desc    = b.description ? `<p class="jq-premium-desc">${b.description}</p>` : '';
+
+  const statusCfg = {
+    pending:     { label:'Pending Acceptance', dot:'amber'  },
+    accepted:    { label:'Accepted',           dot:'blue'   },
+    in_progress: { label:'In Progress',        dot:'purple' },
+    completed:   { label:'Completed',          dot:'green'  },
+    cancelled:   { label:'Cancelled',          dot:'grey'   },
+    rejected:    { label:'Declined',           dot:'grey'   },
+  };
+  const { label: statusLabel, dot: dotColor } = statusCfg[b.status] || { label: b.status, dot:'grey' };
+  const isActive = ['accepted','in_progress'].includes(b.status);
+
+  let flowHtml = '';
+  if (b.status === 'pending') {
+    flowHtml = `
+      <div class="jq-flow" data-booking-id="${id}" data-pin="${pin}"
+        data-customer="${customer}" data-address="${address}"
+        data-date="${date}" data-time="${time}" data-price="${price}" data-payment="${payment}" data-service="${service}">
+        <div class="jq-section" data-section="pending">
+          <div class="jq-premium-actions">
+            <button class="btn-premium btn-premium--primary" data-flow-action="accept">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              See Details
+            </button>
+            <button class="btn-premium btn-premium--danger-outline" data-flow-action="decline">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              Decline
+            </button>
+          </div>
+        </div>
+      </div>`;
+  } else if (b.status === 'accepted' || b.status === 'in_progress') {
+    const phoneRow = phone
+      ? `<div class="jq-meta-row"><span>Phone</span><a href="tel:${phone}" class="jq-phone-link">${phone}</a></div>`
+      : '';
+    flowHtml = `
+      <div class="jq-flow" data-booking-id="${id}" data-pin="${pin}" data-customer="${customer}" data-address="${address}">
+        <div class="jq-section" data-section="accepted">
+          <div class="jq-premium-nav-card">
+            <div class="jq-nav-info">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="12" r="3"/></svg>
+              <span class="truncate">${address}</span>
+            </div>
+            <a class="btn-premium btn-premium--accent btn-premium--sm" href="${mapsUrl}" target="_blank" rel="noopener">
+              Navigate
+            </a>
+          </div>
+          <button class="btn-premium btn-premium--primary btn-premium--lg" data-flow-action="on-my-way">
+            I'm On My Way
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </button>
+        </div>
+        <div class="jq-section" data-section="en-route" hidden>
+          <div class="jq-premium-status-banner jq-premium-status-banner--blue">
+            <div class="jq-pulse-indicator">
+              <span class="pulse-dot"></span>
+              <span class="pulse-ring"></span>
+            </div>
+            <div class="jq-banner-text">
+              <label>EN ROUTE</label>
+              <p>${address}</p>
+            </div>
+            <a class="btn-premium btn-premium--blue btn-premium--sm" href="${mapsUrl}" target="_blank" rel="noopener">Maps</a>
+          </div>
+          <button class="btn-premium btn-premium--primary btn-premium--lg" data-flow-action="arrived">
+            I've Arrived at Location
+          </button>
+        </div>
+        <div class="jq-section" data-section="arrived" hidden>
+          <div class="jq-premium-pin-card">
+            <div class="jq-pin-icon-box">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </div>
+            <div class="jq-pin-content">
+              <h4>Customer Verification</h4>
+              <p>Ask <strong>${customer}</strong> for their 4-digit PIN</p>
+            </div>
+          </div>
+          <div class="jq-premium-pin-group" data-pin-group>
+            <input type="text" inputmode="numeric" maxlength="1" class="jq-pin-input-box" autocomplete="off"/>
+            <input type="text" inputmode="numeric" maxlength="1" class="jq-pin-input-box" autocomplete="off"/>
+            <input type="text" inputmode="numeric" maxlength="1" class="jq-pin-input-box" autocomplete="off"/>
+            <input type="text" inputmode="numeric" maxlength="1" class="jq-pin-input-box" autocomplete="off"/>
+          </div>
+          <p class="jq-pin-error-text" hidden>Incorrect PIN — please try again.</p>
+          <button class="btn-premium btn-premium--amber btn-premium--lg" data-flow-action="start-job">Verify & Start Job</button>
+        </div>
+        <div class="jq-section" data-section="in-progress" hidden>
+          <div class="jq-premium-timer-card">
+            <div class="jq-timer-header">
+              <div class="jq-timer-live-dot"></div>
+              <div class="jq-timer-text" id="timer-${id}">00:00:00</div>
+              <span class="jq-timer-pill">LIVE</span>
+            </div>
+            <div class="jq-timer-details">
+              <div class="detail-row"><span>Customer</span><strong>${customer}</strong></div>
+              <div class="detail-row"><span>Service</span><strong>${service}</strong></div>
+              <div class="detail-row"><span>Payout</span><strong class="text-emerald">${price}</strong></div>
+              ${phoneRow}
+            </div>
+          </div>
+          <button class="btn-premium btn-premium--emerald btn-premium--lg" data-flow-action="complete">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Mark Job Complete
+          </button>
+        </div>
+        <div class="jq-section" data-section="complete-confirm" hidden>
+          <div class="jq-premium-confirm-card">
+            <div class="jq-confirm-icon-box">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <div class="jq-confirm-content">
+              <h4>Confirm Completion</h4>
+              <p>Ensure all work is finished before submitting.</p>
+            </div>
+          </div>
+          <div class="jq-notes-field">
+            <label>Notes for customer <span>(optional)</span></label>
+            <textarea class="jq-notes-textarea" placeholder="Describe the work done..." maxlength="400" rows="3"></textarea>
+          </div>
+          <div class="jq-premium-actions">
+            <button class="btn-premium btn-premium--ghost" data-flow-action="back-to-inprogress">Back</button>
+            <button class="btn-premium btn-premium--primary" data-flow-action="submit-complete">Submit Completion</button>
+          </div>
+        </div>
+      </div>`;
+  } else if (b.status === 'completed') {
+    flowHtml = `
+      <div class="jq-premium-completion">
+        <div class="jq-completion-hero">
+          <div class="jq-check-blob">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <div class="jq-completion-text">
+            <h4>Job Completed</h4>
+            <p>${customer}</p>
+          </div>
+        </div>
+        <div class="jq-completion-value">${price}</div>
+      </div>`;
+  } else {
+    flowHtml = `<div class="jq-premium-status-note">${statusLabel}</div>`;
+  }
+
+  const article = document.createElement('article');
+  article.className = `jq-premium-card status-${b.status}`.trim();
+  article.id = `jq-${id}`;
+  article.setAttribute('data-reveal', '');
+  article.dataset.status = b.status;
+
+  const serviceIconHtml = `
+    <div class="jq-premium-icon-wrap jq-premium-icon-wrap--${dotColor}">
+      <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+    </div>
+  `;
+
+  article.innerHTML = `
+    <div class="jq-premium-card__header">
+      <div class="jq-header-left">
+        <span class="jq-premium-badge">${badge}</span>
+        <span class="jq-premium-id">#${shortId}</span>
+      </div>
+      <div class="jq-premium-status jq-status--${dotColor}">
+        <span class="status-dot"></span>
+        <span class="status-label">${statusLabel}</span>
+      </div>
+    </div>
+    
+    ${isActive ? `<div class="jq-premium-stepper-wrap" id="stepper-${id}">${buildStepperHtml(b.status === 'in_progress' ? 'in-progress' : 'accepted')}</div>` : ''}
+    
+    <div class="jq-premium-card__body">
+      <div class="jq-body-main">
+        ${serviceIconHtml}
+        <div class="jq-body-content">
+          <h3 class="jq-premium-name">${customer}</h3>
+          <div class="jq-premium-meta">
+            <div class="meta-item">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="12" r="3"/></svg>
+              <span>${address}</span>
+            </div>
+            <div class="meta-chips">
+              <span class="meta-chip">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                ${date}${time ? ' · ' + time : ''}
+              </span>
+              <span class="meta-chip">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                ${payment}
+              </span>
+            </div>
+          </div>
+          ${desc}
+        </div>
+      </div>
+      <div class="jq-body-payout">
+        <div class="payout-amount">${price}</div>
+        <div class="payout-label">TOTAL PAYOUT</div>
+      </div>
+    </div>
+    
+    <div class="jq-premium-card__footer">
+      ${flowHtml}
+    </div>
+  `;
+  return article;
+}
+
+function wireArrivalFlows(container) {
+  container.querySelectorAll('.jq-flow').forEach(flow => {
+    const bookingId  = flow.dataset.bookingId;
+    const correctPin = flow.dataset.pin;
+    const storeKey   = `servio_flow_${bookingId}`;
+    const timerKey   = `servio_timer_${bookingId}`;
+    let timerInterval = null;
+
+    /* ── Section visibility ── */
+    function showSection(name) {
+      flow.querySelectorAll('.jq-section').forEach(s => { s.hidden = true; });
+      const target = flow.querySelector(`[data-section="${name}"]`);
+      if (target) target.hidden = false;
+      localStorage.setItem(storeKey, name);
+      const stepperWrap = document.getElementById(`stepper-${bookingId}`);
+      if (stepperWrap) stepperWrap.innerHTML = buildStepperHtml(name);
+    }
+
+    /* ── Timer (wall-clock based so refresh-safe) ── */
+    function startTimer() {
+      const el = document.getElementById(`timer-${bookingId}`);
+      if (!el) return;
+      clearInterval(timerInterval);
+      let t0 = parseInt(localStorage.getItem(timerKey) || '0');
+      if (!t0) { t0 = Date.now(); localStorage.setItem(timerKey, t0); }
+      const tick = () => {
+        const s = Math.floor((Date.now() - t0) / 1000);
+        const h = String(Math.floor(s / 3600)).padStart(2,'0');
+        const m = String(Math.floor((s % 3600) / 60)).padStart(2,'0');
+        const sec = String(s % 60).padStart(2,'0');
+        if (el) el.textContent = `${h}:${m}:${sec}`;
+      };
+      tick();
+      timerInterval = setInterval(tick, 1000);
+    }
+
+    /* ── Restore persisted state on load ── */
+    const stored = localStorage.getItem(storeKey);
+    if (stored) {
+      showSection(stored);
+      if (stored === 'in-progress') startTimer();
+    }
+
+    /* ── PIN box auto-advance + backspace ── */
+    const pinGroup = flow.querySelector('[data-pin-group]');
+    if (pinGroup) {
+      const boxes = [...pinGroup.querySelectorAll('.jq-pin-box')];
+      boxes.forEach((box, i) => {
+        box.addEventListener('input', e => {
+          const v = e.target.value.replace(/\D/g, '');
+          e.target.value = v;
+          if (v && i < boxes.length - 1) boxes[i + 1].focus();
+        });
+        box.addEventListener('keydown', e => {
+          if (e.key === 'Backspace' && !box.value && i > 0) boxes[i - 1].focus();
+        });
+        box.addEventListener('paste', e => {
+          e.preventDefault();
+          const digits = (e.clipboardData.getData('text') || '').replace(/\D/g,'').slice(0,4);
+          [...digits].forEach((d, j) => { if (boxes[j]) boxes[j].value = d; });
+          boxes[Math.min(digits.length, boxes.length - 1)]?.focus();
+        });
+      });
+    }
+
+    /* ── Accept modal ── */
+    function showAcceptModal() {
+      const { service, customer, address, date, time, price, payment } = flow.dataset;
+      const circumference = 2 * Math.PI * 16; // r=16 → ~100.5
+      openJobModal(`
+        <div class="jqm-accept">
+          <div class="jqm-accept-head">
+            <div class="jqm-countdown-wrap">
+              <svg class="jqm-countdown-svg" viewBox="0 0 40 40" width="64" height="64">
+                <circle cx="20" cy="20" r="16" fill="none" stroke="var(--dash-card-border)" stroke-width="3"/>
+                <circle cx="20" cy="20" r="16" fill="none" stroke="var(--color-accent)" stroke-width="3"
+                  stroke-dasharray="${circumference.toFixed(2)}"
+                  stroke-dashoffset="0" stroke-linecap="round"
+                  transform="rotate(-90 20 20)" id="accept-ring"/>
+              </svg>
+              <span class="jqm-countdown-num" id="accept-secs">30</span>
+            </div>
+            <div class="jqm-accept-title">
+              <h2>New Job Request</h2>
+              <p>Review details before accepting</p>
+            </div>
+            <button class="jqm-close-btn" data-modal-close aria-label="Close">
+              <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="5" x2="15" y2="15"/><line x1="15" y1="5" x2="5" y2="15"/></svg>
+            </button>
+          </div>
+          <div class="jqm-detail-list">
+            <div class="jqm-row"><span>Service</span><strong>${service || '—'}</strong></div>
+            <div class="jqm-row"><span>Customer</span><strong>${customer || '—'}</strong></div>
+            <div class="jqm-row"><span>Address</span><strong>${address || '—'}</strong></div>
+            <div class="jqm-row"><span>Date</span><strong>${date || '—'}${time ? ' · ' + time : ''}</strong></div>
+            <div class="jqm-row jqm-row--payout"><span>Payout</span><strong>${price || '—'}</strong></div>
+            <div class="jqm-row"><span>Payment</span><strong>${payment || '—'}</strong></div>
+          </div>
+          <div class="jqm-actions">
+            <button class="jqm-btn-pass" id="modal-pass-btn">Pass on this job</button>
+            <button class="jqm-btn-confirm-accept" id="modal-accept-btn">
+              <svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="4,10 8,14 16,6"/></svg>
+              Accept Job
+            </button>
+          </div>
+        </div>`);
+
+      /* countdown ring */
+      let secs = 30;
+      const ring  = document.getElementById('accept-ring');
+      const secsEl = document.getElementById('accept-secs');
+      const cdInterval = setInterval(() => {
+        secs--;
+        if (secsEl) secsEl.textContent = secs;
+        if (ring)   ring.style.strokeDashoffset = String((circumference * (1 - secs / 30)).toFixed(2));
+        if (secs <= 0) { clearInterval(cdInterval); closeJobModal(); }
+      }, 1000);
+
+      document.getElementById('modal-accept-btn')?.addEventListener('click', async () => {
+        clearInterval(cdInterval);
+        const btn = document.getElementById('modal-accept-btn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Accepting…'; }
+        try {
+          await updateBookingStatus(bookingId, 'accepted');
+          closeJobModal();
+          const card = flow.closest('.jq-premium-card');
+          if (card) {
+            card.classList.add('jq-premium-card--accepted');
+            const statusEl = card.querySelector('.jq-premium-status');
+            if (statusEl) {
+              statusEl.innerHTML = `<span class="status-dot"></span><span>Accepted</span>`;
+              statusEl.className = 'jq-premium-status jq-status--blue';
+            }
+            if (!document.getElementById(`stepper-${bookingId}`)) {
+              const sw = document.createElement('div');
+              sw.className = 'jq-premium-stepper-wrap';
+              sw.id = `stepper-${bookingId}`;
+              sw.innerHTML = buildStepperHtml('accepted');
+              card.querySelector('.jq-premium-card__body')?.before(sw);
+            }
+          }
+          showSection('accepted');
+          showToast('Job accepted! Head to the customer location.', 'success');
+        } catch (err) {
+          closeJobModal();
+          showToast(err?.message || 'Failed to accept job.', 'error');
+        }
+      });
+
+      document.getElementById('modal-pass-btn')?.addEventListener('click', () => {
+        clearInterval(cdInterval);
+        closeJobModal();
+        showDeclineModal();
+      });
+
+      document.querySelector('#jq-modal [data-modal-close]')?.addEventListener('click', () => {
+        clearInterval(cdInterval);
+        closeJobModal();
+      });
+    }
+
+    /* ── Decline modal ── */
+    function showDeclineModal() {
+      openJobModal(`
+        <div class="jqm-decline">
+          <div class="jqm-decline-icon">
+            <svg viewBox="0 0 48 48" width="52" height="52" fill="none" stroke="#EF4444" stroke-width="2"><circle cx="24" cy="24" r="20"/><line x1="15" y1="15" x2="33" y2="33"/><line x1="33" y1="15" x2="15" y2="33"/></svg>
+          </div>
+          <h2>Decline This Job?</h2>
+          <p>Select a reason — this helps improve job matching for you.</p>
+          <select class="jqm-reason-select" id="decline-reason">
+            <option value="">Select a reason…</option>
+            <option value="busy">I'm busy at this time</option>
+            <option value="too_far">Location is too far</option>
+            <option value="outside_skills">Outside my skill set</option>
+            <option value="emergency">Personal emergency</option>
+            <option value="other">Other</option>
+          </select>
+          <div class="jqm-actions">
+            <button class="jqm-btn-keep" id="decline-cancel-btn">Keep Job</button>
+            <button class="jqm-btn-confirm-decline" id="decline-confirm-btn" disabled>Decline Job</button>
+          </div>
+        </div>`);
+
+      document.getElementById('decline-reason')?.addEventListener('change', e => {
+        const b = document.getElementById('decline-confirm-btn');
+        if (b) b.disabled = !e.target.value;
+      });
+
+      document.getElementById('decline-cancel-btn')?.addEventListener('click', closeJobModal);
+
+      document.getElementById('decline-confirm-btn')?.addEventListener('click', async () => {
+        const btn = document.getElementById('decline-confirm-btn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Declining…'; }
+        try {
+          await updateBookingStatus(bookingId, 'rejected');
+          closeJobModal();
+          const card = flow.closest('.jq-premium-card');
+          if (card) {
+            card.style.transition = 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+            card.style.opacity = '0';
+            card.style.transform = 'scale(0.95) translateY(10px)';
+            setTimeout(() => card.remove(), 420);
+          }
+          localStorage.removeItem(storeKey);
+          showToast('Job declined.', 'info');
+        } catch (err) {
+          closeJobModal();
+          showToast(err?.message || 'Failed to decline.', 'error');
+        }
+      });
+    }
+
+    /* ── Main click handler ── */
+    flow.addEventListener('click', async e => {
+      const btn = e.target.closest('[data-flow-action]');
+      if (!btn) return;
+      const action = btn.dataset.flowAction;
+
+      if (action === 'accept') { showAcceptModal(); return; }
+
+      if (action === 'decline') { showDeclineModal(); return; }
+
+      if (action === 'on-my-way') {
+        showSection('en-route');
+        showToast('Customer notified — you\'re on your way!', 'info');
+        return;
+      }
+
+      if (action === 'arrived') {
+        showSection('arrived');
+        setTimeout(() => flow.querySelector('.jq-pin-box')?.focus(), 80);
+        showToast('Ask the customer for their 4-digit PIN.', 'info');
+        return;
+      }
+
+      if (action === 'start-job') {
+        const boxes  = [...flow.querySelectorAll('.jq-pin-box')];
+        const entered = boxes.map(b => b.value).join('');
+        const errEl  = flow.querySelector('.jq-pin-error');
+        if (correctPin && entered !== correctPin) {
+          const pg = flow.querySelector('[data-pin-group]');
+          if (pg) { pg.classList.remove('jq-pin--shake'); void pg.offsetWidth; pg.classList.add('jq-pin--shake'); }
+          if (errEl) errEl.hidden = false;
+          boxes.forEach(b => b.value = '');
+          boxes[0]?.focus();
+          return;
+        }
+        if (errEl) errEl.hidden = true;
+        btn.disabled = true; btn.textContent = 'Starting…';
+        try {
+          await updateBookingStatus(bookingId, 'in_progress');
+          const card = flow.closest('.jq-premium-card');
+          if (card) {
+            card.classList.add('jq-premium-card--in-progress');
+            const statusEl = card.querySelector('.jq-premium-status');
+            if (statusEl) {
+              statusEl.innerHTML = `<span class="status-dot"></span><span>In Progress</span>`;
+              statusEl.className = 'jq-premium-status jq-status--purple';
+            }
+          }
+          showSection('in-progress');
+          startTimer();
+          showToast('Job started! Timer is running.', 'success');
+        } catch (err) {
+          btn.disabled = false; btn.textContent = 'Verify & Start Job';
+          showToast(err?.message || 'Failed to start job.', 'error');
+        }
+        return;
+      }
+
+      if (action === 'complete') {
+        showSection('complete-confirm');
+        return;
+      }
+
+      if (action === 'back-to-inprogress') {
+        showSection('in-progress');
+        startTimer();
+        return;
+      }
+
+      if (action === 'submit-complete') {
+        const notes = flow.querySelector('.jq-notes-input')?.value?.trim() || '';
+        btn.disabled = true; btn.textContent = 'Submitting…';
+        try {
+          await updateBookingStatus(bookingId, 'completed');
+          clearInterval(timerInterval);
+          const duration = document.getElementById(`timer-${bookingId}`)?.textContent || '—';
+          const customer = flow.dataset.customer || '—';
+          const payoutAmount = flow.closest('.jq-premium-card')?.querySelector('.payout-amount')?.textContent?.trim() || '—';
+          localStorage.removeItem(storeKey);
+          localStorage.removeItem(timerKey);
+
+          const card = flow.closest('.jq-premium-card');
+          if (card) {
+            card.className = 'jq-premium-card jq-premium-card--completed jq-premium-card--done-anim';
+            card.removeAttribute('data-status');
+            card.innerHTML = `
+              <div class="jq-done-banner">
+                <div class="jq-done-icon">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="3"><polyline points="4,12 9,17 20,6"/></svg>
+                </div>
+                <div class="jq-done-info">
+                  <p class="jq-done-label">Job Completed Successfully</p>
+                  <p class="jq-done-sub">${customer} · ${duration}</p>
+                </div>
+                <div class="jq-done-earnings">${payoutAmount}</div>
+              </div>
+              ${notes ? `<div class="jq-done-notes">
+                <div class="jq-notes-label">Service Notes:</div>
+                <p>${notes}</p>
+              </div>` : ''}`;
+
+            const doneSection = document.getElementById('jq-completed-section');
+            if (doneSection) {
+              doneSection.style.display = 'block';
+              doneSection.querySelector('.jq-completed-list')?.prepend(card);
+            }
+          }
+          showToast('Job complete! Earnings added to your wallet. 🎉', 'success');
+        } catch (err) {
+          btn.disabled = false; btn.textContent = 'Submit Completion';
+          showToast(err?.message || 'Failed to complete job.', 'error');
+        }
+        return;
+      }
+    });
+  });
+}
+
+// ── Populate overview incoming requests ──────────────────────────────────────
+function populateOverviewIncoming(pendingBookings) {
+  const container = document.getElementById('overview-incoming-list');
+  if (!container) return;
+  const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
+
+  const preview = pendingBookings.slice(0, 3);
+  if (preview.length === 0) {
+    container.innerHTML = `<p style="color:var(--color-text-muted);font-size:0.85rem;padding:12px 0;">${_t('tech_no_pending_requests') || 'No pending requests right now.'}</p>`;
+    return;
+  }
+
+  container.innerHTML = preview.map(b => {
+    const service  = b.service?.title || b.service?.category || 'Service';
+    const customer = b.user?.name || '—';
+    const address  = b.address || '—';
+    const price    = b.totalPrice != null ? `~EGP ${Number(b.totalPrice).toLocaleString('en-US')}` : '—';
+    return `
+      <div class="job-card-v2">
+        <div class="job-card-v2__icon">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#9A8C73" stroke-width="2" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+        </div>
+        <div class="job-card-v2__body">
+          <h4 class="job-card-v2__title">${service}</h4>
+          <p class="job-card-v2__meta">
+            <span>${customer}</span><span class="job-card-v2__sep">·</span>
+            <span>${address}</span><span class="job-card-v2__sep">·</span>
+            <span class="job-card-v2__price">${price}</span>
+          </p>
+        </div>
+        <span class="badge badge--pending">${_t('status_new') || 'New'}</span>
+      </div>`;
+  }).join('');
+}
+
+// ── Populate overview upcoming schedule ──────────────────────────────────────
+function populateOverviewSchedule(bookings) {
+  const container = document.getElementById('overview-schedule-list');
+  if (!container) return;
+  const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
+
+  const now = new Date();
+  const upcoming = bookings
+    .filter(b => {
+      const d = new Date(b.scheduledDate);
+      return d >= now && (b.status === 'pending' || b.status === 'accepted' || b.status === 'in_progress');
+    })
+    .sort((a, b) => new Date(a.scheduledDate) - new Date(b.scheduledDate))
+    .slice(0, 4);
+
+  if (upcoming.length === 0) {
+    container.innerHTML = `<p style="color:var(--color-text-muted);font-size:0.85rem;padding:12px 0;">${_t('tech_no_upcoming') || 'No upcoming jobs scheduled.'}</p>`;
+    return;
+  }
+
+  const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  container.innerHTML = upcoming.map(b => {
+    const d       = new Date(b.scheduledDate);
+    const day     = String(d.getDate()).padStart(2, '0');
+    const month   = MONTHS[d.getMonth()];
+    const service = b.service?.title || b.service?.category || 'Service';
+    const time    = b.scheduledTime || '—';
+    const loc     = b.address ? b.address.split(',')[0] : '—';
+    return `
+      <div class="dash-schedule-item">
+        <div class="dash-schedule-date">
+          <span class="dash-schedule-day">${day}</span>
+          <span class="dash-schedule-month">${month}</span>
+        </div>
+        <div class="dash-schedule-content">
+          <h4 class="dash-schedule-title">${service}</h4>
+          <p class="dash-schedule-info">
+            <span class="dash-schedule-time">${time}</span>
+            <span class="dash-schedule-sep">·</span>
+            <span class="dash-schedule-loc">${loc}</span>
+          </p>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ── Populate earnings panel ───────────────────────────────────────────────────
+function populateEarnings(allBookings, completed, monthEarnings, lastMonthEarnings, cashCompleted, outstandingAmount) {
+  const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
+
+  // Summary stats
+  const totalEarned = completed.reduce((s, b) => s + (b.totalPrice || 0), 0);
+  const earnTotalEl = document.getElementById('earn-total');
+  if (earnTotalEl) earnTotalEl.textContent = `${totalEarned.toLocaleString('en-US')} EGP`;
+
+  const earnMonthEl = document.getElementById('earn-month');
+  if (earnMonthEl) earnMonthEl.textContent = `${monthEarnings.toLocaleString('en-US')} EGP`;
+
+  const earnMonthSubEl = document.getElementById('earn-month-sub');
+  if (earnMonthSubEl) {
+    const delta = monthEarnings - lastMonthEarnings;
+    const isUp = delta >= 0;
+    earnMonthSubEl.innerHTML = `
+      <span class="${isUp ? 'jq-earn-trend-up' : 'jq-earn-trend-down'}">
+        ${isUp ? '↑' : '↓'} EGP ${Math.abs(delta).toLocaleString('en-US')}
+      </span> vs last month`;
+  }
+
+  const earnCompletedEl = document.getElementById('earn-completed-count');
+  if (earnCompletedEl) earnCompletedEl.textContent = completed.length;
+
+  // Outstanding cash balance
+  const liabilityAmountEl = document.getElementById('liabilityAmount');
+  if (liabilityAmountEl) liabilityAmountEl.innerHTML = `${outstandingAmount.toLocaleString('en-US')} <span>EGP</span>`;
+
+  // Liability items — last 5 cash completed bookings
+  const liabilityList = document.getElementById('liability-items-list');
+  if (liabilityList) {
+    if (cashCompleted.length === 0) {
+      liabilityList.innerHTML = `<p style="color:var(--color-text-muted);font-size:0.85rem;padding:8px 0;">${_t('tech_no_outstanding') || 'No outstanding cash balance.'}</p>`;
+    } else {
+      liabilityList.innerHTML = cashCompleted.slice(0, 5).map(b => {
+        const shortId = b._id.slice(-6).toUpperCase();
+        const amount  = b.totalPrice != null ? `${Number(b.totalPrice).toLocaleString('en-US')} EGP` : '—';
+        return `
+          <div class="jq-premium-liability-row">
+            <div class="jq-premium-liability-info">
+              <span class="jq-premium-liability-id">#${shortId}</span>
+              <span class="jq-premium-liability-tag">${_t('tech_commission') || 'Commission'}</span>
+            </div>
+            <span class="jq-premium-liability-val">${amount}</span>
+          </div>`;
+      }).join('');
+    }
+  }
+
+  // Show warning if outstanding > 2000
+  const liabilityWarning = document.getElementById('liabilityWarning');
+  if (liabilityWarning) liabilityWarning.hidden = outstandingAmount < 2000;
+
+  // Recent jobs list
+  const recentList = document.getElementById('earnings-recent-list');
+  if (recentList) {
+    const recentCompleted = completed
+      .sort((a, b) => new Date(b.scheduledDate || b.updatedAt) - new Date(a.scheduledDate || a.updatedAt))
+      .slice(0, 10);
+
+    if (recentCompleted.length === 0) {
+      recentList.innerHTML = `<p style="color:var(--color-text-muted);font-size:0.85rem;padding:12px 0;">${_t('tech_no_completed_jobs') || 'No completed jobs yet.'}</p>`;
+    } else {
+      recentList.innerHTML = recentCompleted.map(b => {
+        const service = b.service?.title || b.service?.category || 'Service';
+        const dateStr = b.scheduledDate
+          ? new Date(b.scheduledDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
+          : '—';
+        const amount = b.totalPrice != null ? `+${Number(b.totalPrice).toLocaleString('en-US')} EGP` : '—';
+        return `
+          <div class="jq-premium-earn-row" data-reveal>
+            <div class="jq-earn-row-left">
+              <div class="jq-earn-row-icon">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              </div>
+              <div class="jq-earn-row-info">
+                <h4>${service}</h4>
+                <p>${dateStr}</p>
+              </div>
+            </div>
+            <div class="jq-earn-row-amount">${amount}</div>
+          </div>`;
+      }).join('');
+    }
+  }
+
+  // Next settlement date
+  const settlementEl = document.getElementById('liability-settlement-date');
+  if (settlementEl) {
+    const now = new Date();
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const settlementStr = lastDay.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+    settlementEl.textContent = settlementStr;
+  }
+}
+
+// ── Populate notifications from booking activity ──────────────────────────────
+function populateNotifications(bookings) {
+  const list = document.getElementById('notif-items-list');
+  if (!list) return;
+  const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
+
+  // Generate notifications from recent booking events
+  const notifs = [];
+  const now = new Date();
+
+  bookings.slice(0, 20).forEach(b => {
+    const service = b.service?.title || b.service?.category || 'Service';
+    const customer = b.user?.name || '—';
+    const updated = new Date(b.updatedAt || b.createdAt);
+    const ageMs = now - updated;
+    const ageMinutes = Math.floor(ageMs / 60000);
+    const ageHours   = Math.floor(ageMs / 3600000);
+    const ageDays    = Math.floor(ageMs / 86400000);
+
+    let timeStr;
+    if (ageMinutes < 60)   timeStr = `${ageMinutes || 1} min ago`;
+    else if (ageHours < 24) timeStr = `${ageHours} hr ago`;
+    else if (ageDays === 1) timeStr = 'Yesterday';
+    else                    timeStr = `${ageDays} days ago`;
+
+    let icon, msg, isUnread = false;
+    if (b.status === 'pending') {
+      icon = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`;
+      msg = `New job request: <strong>${service}</strong> from ${customer}`;
+      isUnread = ageMinutes < 60;
+    } else if (b.status === 'completed') {
+      icon = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`;
+      const amount = b.totalPrice != null ? `EGP ${Number(b.totalPrice).toLocaleString('en-US')}` : '';
+      msg = amount ? `Payment of <strong>${amount}</strong> received for <strong>${service}</strong>` : `Job completed: <strong>${service}</strong>`;
+    } else if (b.status === 'cancelled') {
+      icon = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`;
+      msg = `Booking cancelled: <strong>${service}</strong> by ${customer}`;
+    } else {
+      return; // skip accepted/in_progress in notifications
+    }
+
+    notifs.push({ icon, msg, timeStr, isUnread });
+  });
+
+  if (notifs.length === 0) {
+    list.innerHTML = '';
+    const emptyEl = document.getElementById('notif-empty');
+    if (emptyEl) emptyEl.hidden = false;
+    updateTopbarBadge(0);
+    return;
+  }
+
+  list.innerHTML = notifs.map((n, i) => `
+    <div class="notif-item${n.isUnread ? ' is-unread' : ''}" data-notif-id="live-${i}">
+      <span class="notif-item__dot"></span>
+      <span class="notif-item__icon notif-item__icon--job">${n.icon}</span>
+      <div class="notif-item__body">
+        <p class="notif-item__msg">${n.msg}</p>
+        <span class="notif-item__time">${n.timeStr}</span>
+      </div>
+    </div>`).join('');
+
+  const unreadCount = notifs.filter(n => n.isUnread).length;
+  updateTopbarBadge(unreadCount);
 }
 
 /* ── Fix 6: Password show/hide toggles ─────────────────── */
@@ -608,12 +1928,105 @@ function initSettingsForm() {
     });
   }
 
-  const saveAvailBtn = document.getElementById('save-availability');
-  const availSaveMsg = document.querySelector('[data-avail-save-msg]');
-  if (saveAvailBtn && availSaveMsg) {
-    saveAvailBtn.addEventListener('click', () => {
-      availSaveMsg.hidden = false;
-      setTimeout(() => { availSaveMsg.hidden = true; }, 2500);
+  const saveScheduleBtn = document.getElementById('save-schedule');
+  const scheduleFeedback = document.getElementById('avail-schedule-feedback');
+  if (saveScheduleBtn) {
+    saveScheduleBtn.addEventListener('click', async () => {
+      const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
+      const slots = [];
+      let hasTimeError = false;
+      document.querySelectorAll('#avail-schedule .avail-day-row').forEach(row => {
+        const dayKey  = row.dataset.day;
+        const isOff   = row.classList.contains('is-off');
+        if (isOff) return;
+        const fromSel = row.querySelector(`#avail-from-${dayKey}`);
+        const toSel   = row.querySelector(`#avail-to-${dayKey}`);
+        if (!fromSel || !toSel) return;
+        const from = fromSel.value;
+        const to   = toSel.value;
+        if (to <= from) {
+          toSel.classList.add('is-error');
+          hasTimeError = true;
+          return;
+        }
+        toSel.classList.remove('is-error');
+        slots.push({ day: dayKey, from, to });
+      });
+
+      if (hasTimeError) {
+        showToast(_t('toast_avail_time_error') || 'End time must be after start time.', 'error');
+        return;
+      }
+
+      const origLabel = saveScheduleBtn.querySelector('.avail-save-btn__label');
+      if (origLabel) origLabel.textContent = _t('tech_saving') || 'Saving…';
+      const iconSpan = saveScheduleBtn.querySelector('.avail-save-btn__icon');
+      if (iconSpan) iconSpan.innerHTML = '<span class="spinner"></span>';
+      saveScheduleBtn.disabled = true;
+      if (scheduleFeedback) scheduleFeedback.hidden = true;
+
+      try {
+        await updateAvailability(slots);
+        try {
+          const acc = JSON.parse(localStorage.getItem('servio_account') || '{}');
+          acc.availability = slots;
+          localStorage.setItem('servio_account', JSON.stringify(acc));
+        } catch (_) {}
+
+        if (scheduleFeedback) { scheduleFeedback.hidden = false; setTimeout(() => { scheduleFeedback.hidden = true; }, 3500); }
+        showToast(_t('tech_schedule_saved_msg') || 'Schedule saved successfully!', 'success');
+      } catch (err) {
+        showToast(err?.message || 'Failed to save schedule.', 'error');
+      } finally {
+        saveScheduleBtn.disabled = false;
+        if (origLabel) origLabel.textContent = _t('tech_save_schedule') || 'Save Schedule';
+        if (iconSpan) iconSpan.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>`;
+      }
+    });
+  }
+
+  const saveCoverageBtn = document.getElementById('save-coverage');
+  const coverageFeedback = document.getElementById('avail-coverage-feedback');
+  if (saveCoverageBtn) {
+    saveCoverageBtn.addEventListener('click', async () => {
+      const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
+      const serviceAreaInput = document.getElementById('service-area');
+      const serviceArea = serviceAreaInput?.value.trim() || '';
+      const selectedSkills = [];
+      document.querySelectorAll('#categories-grid .avail-category-chip.is-selected').forEach(chip => {
+        selectedSkills.push(chip.dataset.skill || chip.querySelector('span')?.textContent || '');
+      });
+
+      const origLabel = saveCoverageBtn.querySelector('.avail-save-btn__label');
+      if (origLabel) origLabel.textContent = _t('tech_saving') || 'Saving…';
+      const iconSpan = saveCoverageBtn.querySelector('.avail-save-btn__icon');
+      if (iconSpan) iconSpan.innerHTML = '<span class="spinner"></span>';
+      saveCoverageBtn.disabled = true;
+      if (coverageFeedback) coverageFeedback.hidden = true;
+
+      try {
+        const profileUpdate = {};
+        profileUpdate.serviceArea = serviceArea; // allow empty to clear
+        profileUpdate.skills = selectedSkills; // allow empty array to clear
+        await updateMe(profileUpdate);
+
+        try {
+          const acc = JSON.parse(localStorage.getItem('servio_account') || '{}');
+          acc.serviceArea = serviceArea;
+          acc.skills = selectedSkills;
+          acc.specialty = selectedSkills.join(', ');
+          localStorage.setItem('servio_account', JSON.stringify(acc));
+        } catch (_) {}
+
+        if (coverageFeedback) { coverageFeedback.hidden = false; setTimeout(() => { coverageFeedback.hidden = true; }, 3500); }
+        showToast(_t('tech_coverage_saved_msg') || 'Coverage saved successfully!', 'success');
+      } catch (err) {
+        showToast(err?.message || 'Failed to save coverage.', 'error');
+      } finally {
+        saveCoverageBtn.disabled = false;
+        if (origLabel) origLabel.textContent = _t('tech_save_coverage') || 'Save Coverage';
+        if (iconSpan) iconSpan.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>`;
+      }
     });
   }
 }
@@ -676,8 +2089,16 @@ function initTechSecurityForm() {
       showToast(_t('toast_pw_min_length') || 'Password must be at least 8 characters.', 'info');
       newPw.focus(); return;
     }
-    if (!/(?=.*[A-Za-z])(?=.*\d)/.test(newPw.value)) {
-      showToast(_t('toast_pw_needs_letter_num') || 'Password must contain a letter and a number.', 'info');
+    if (!/[0-9]/.test(newPw.value)) {
+      showToast(_t('toast_pw_needs_number') || 'Password must contain at least one number.', 'info');
+      newPw.focus(); return;
+    }
+    if (!/[^A-Za-z0-9]/.test(newPw.value)) {
+      showToast(_t('toast_pw_needs_special') || 'Password must contain at least one special character.', 'info');
+      newPw.focus(); return;
+    }
+    if (newPw.value === currentPw.value) {
+      showToast(_t('toast_pw_same_as_current') || 'New password must be different from your current password.', 'info');
       newPw.focus(); return;
     }
     if (newPw.value !== confirmPw.value) {
@@ -692,7 +2113,12 @@ function initTechSecurityForm() {
       confirmPw.value = '';
       document.getElementById('pw-strength-wrap')?.setAttribute('hidden', '');
       document.querySelectorAll('.pw-check').forEach(c => c.classList.remove('is-met'));
-      showToast(_t('toast_pw_updated') || 'Password updated successfully.', 'success');
+      showToast(_t('toast_pw_updated') || 'Password updated. Please sign in again.', 'success');
+      setTimeout(() => {
+        localStorage.removeItem('servio_token');
+        localStorage.removeItem('servio_session');
+        window.location.href = './login.html';
+      }, 1500);
     } catch (err) {
       showToast(err.message || 'Failed to update password.', 'error');
     } finally {
@@ -1200,37 +2626,81 @@ function initNotifPanel() {
   });
 }
 
-populateProfile();
-populateStats();
-updateWelcomeText();
-initTabs();
-initTopbarAvatar();
-initAvailabilitySchedule();
-initCategories();
-initJobQueue();
-initSettingsForm();
-initPasswordToggles();
-initSettingsValidation();
-initSettingsTabs();
-initTechSecurityForm();
-initPasswordStrengthMeter();
-initSettingToggles();
-initLanguageCards();
-initThemeCards();
-initAccountTab();
-initDashLogout();
-initNotifPanel();
-initPhase2();
-initVerificationTab();
-initPendingGuard();
+// ── Top-level async initialization ───────────────────────────────────────────────
+// Fetches live user data first, then seeds the availability UI with real data
+async function initDashboard() {
+  populateProfile();
+  updateWelcomeText();
+  initTabs();
+  initTopbarAvatar();
+  initSettingsForm();
+  initPasswordToggles();
+  initSettingsValidation();
+  initSettingsTabs();
+  initTechSecurityForm();
+  initPasswordStrengthMeter();
+  initSettingToggles();
+  initLanguageCards();
+  initThemeCards();
+  initAccountTab();
+  initDashLogout();
+  initNotifPanel();
+  initPhase2();
+  initVerificationTab();
+  initPendingGuard();
+
+  // Fetch live availability data and seed the panel
+  let liveAvailability = null;
+  let liveIsAvailable = false;
+  let liveSkills = null;
+  let liveServiceArea = '';
+  let liveBlockedDates = [];
+  try {
+    const res = await getMe();
+    const user = res?.user || res?.data?.user || res?.data || res;
+    liveAvailability = user?.availability  || null;
+    liveIsAvailable  = user?.isAvailable   || false;
+    liveSkills       = user?.skills        || null;
+    liveServiceArea  = user?.serviceArea   || '';
+    liveBlockedDates = user?.blockedDates  || [];
+    // Populate service area input
+    const saInput = document.getElementById('service-area');
+    if (saInput && liveServiceArea) saInput.value = liveServiceArea;
+  } catch (_) {
+    // Fall back to cached data
+    const acc = getAccount();
+    liveAvailability = acc?.availability  || null;
+    liveIsAvailable  = acc?.isAvailable   || false;
+    liveSkills       = acc?.skills        || null;
+    liveServiceArea  = acc?.serviceArea   || '';
+    liveBlockedDates = acc?.blockedDates  || [];
+  }
+
+  initAvailableNowToggle(liveIsAvailable);
+  initAvailabilitySchedule(liveAvailability);
+  initBlockedDatesCalendar(liveAvailability || [], liveBlockedDates);
+  initCategories(liveSkills);
+
+  // Fire data fetches in parallel — stats/queue/earnings all come from bookings API
+  await Promise.allSettled([
+    populateStats(),
+    initJobQueue(),
+  ]);
+}
+
+initDashboard().catch(err => console.error('[Dashboard init error]', err));
 
 /* Re-render dynamic grids and welcome text on language change */
 document.addEventListener('langchange', () => {
   updateWelcomeText();
+  const acc = getAccount();
   const scheduleContainer = document.getElementById('avail-schedule');
-  if (scheduleContainer) { scheduleContainer.innerHTML = ''; initAvailabilitySchedule(); }
+  if (scheduleContainer) { scheduleContainer.innerHTML = ''; initAvailabilitySchedule(acc?.availability || null); }
   const categoriesGrid = document.getElementById('categories-grid');
-  if (categoriesGrid) { categoriesGrid.innerHTML = ''; initCategories(); }
+  if (categoriesGrid) { categoriesGrid.innerHTML = ''; initCategories(acc?.skills || null); }
+  // Re-render data-driven sections with new language
+  populateStats().catch(() => {});
+  initJobQueue().catch(() => {});
 });
 
 /* ── Phase 2: Job Board, Proposals, Arrival Flow ── */
@@ -1321,82 +2791,18 @@ function initPhase2() {
     btn.addEventListener('click', () => btn.closest('[data-dismissible]').remove());
   });
 
-  // Arrival state machine
-  document.querySelectorAll('.arrival-flow').forEach(flow => {
-    const bookingId = flow.dataset.bookingId;
-    const correctPin = flow.dataset.pin;
-    const key = `servio_job_state_${bookingId}`;
-
-    // Determine initial state from HTML (whichever arrival-state does not have hidden attr)
-    const visibleState = flow.querySelector('.arrival-state:not([hidden])');
-    let currentState = visibleState?.dataset.state || 'pending';
-    // Check localStorage override
-    const stored = localStorage.getItem(key);
-    if (stored) {
-      currentState = stored;
-      showArrivalState(flow, currentState);
-    }
-
-    let timerInterval;
-    let seconds = 0;
-
-    function showArrivalState(flowEl, state) {
-      flowEl.querySelectorAll('.arrival-state').forEach(el => el.hidden = true);
-      const target = flowEl.querySelector(`[data-state="${state}"]`);
-      if (target) target.hidden = false;
-      localStorage.setItem(key, state);
-      currentState = state;
-      if (state === 'in-progress') startTimer(bookingId);
-    }
-
-    function startTimer(id) {
-      const el = document.getElementById(`jobTimer-${id}`) || document.getElementById(`timer-${id}`);
-      clearInterval(timerInterval);
-      seconds = 0;
-      timerInterval = setInterval(() => {
-        seconds++;
-        const h = String(Math.floor(seconds/3600)).padStart(2,'0');
-        const m = String(Math.floor((seconds%3600)/60)).padStart(2,'0');
-        const s = String(seconds%60).padStart(2,'0');
-        if (el) el.textContent = `${h}:${m}:${s}`;
-      }, 1000);
-    }
-
-    flow.addEventListener('click', e => {
-      const action = e.target.closest('[data-action], [data-flow-action]');
-      const actionName = action?.dataset.action || action?.dataset.flowAction;
-      if (!actionName) return;
-      if (actionName === 'accept-job' || actionName === 'accept')   showArrivalState(flow, 'accepted');
-      if (actionName === 'decline-job' || actionName === 'decline') { const declineMsg = typeof window.t === 'function' ? window.t('tech_decline') + '?' : 'Decline this job?'; if (confirm(declineMsg)) flow.closest('.jq-card, article, .dash-card')?.remove(); }
-      if (actionName === 'on-my-way')    showArrivalState(flow, 'en-route');
-      if (actionName === 'arrived')      showArrivalState(flow, 'arrived');
-      if (actionName === 'start-job') {
-        const input = flow.querySelector('.pin-input');
-        const errEl = flow.querySelector('.pin-error');
-        if (input && input.value === correctPin) {
-          showArrivalState(flow, 'in-progress');
-        } else if (errEl) {
-          errEl.hidden = false;
-        }
-      }
-      if (actionName === 'complete-job' || actionName === 'complete') showArrivalState(flow, 'complete');
-      if (actionName === 'submit-complete') {
-        showToast(typeof window.t === 'function' ? window.t('tech_status_completed') : 'Job marked complete!', 'success');
-        flow.closest('.jq-card, article, .dash-card')?.classList.add('is-completed');
-      }
-    });
-  });
-
-  // Liability: Pay Now
+  // Liability: Pay Now — clears outstanding balance display
   document.getElementById('payLiabilityBtn')?.addEventListener('click', () => {
     const el = document.getElementById('liabilityAmount');
     if (el) el.textContent = '0 EGP';
+    const listEl = document.getElementById('liability-items-list');
+    if (listEl) listEl.innerHTML = '';
     showToast(typeof window.t === 'function' ? window.t('toast_saved') : 'Balance cleared!', 'success');
   });
 
   initBioSection();
   initSocialLinks();
-  initSkillTags();
+  initServicesCatalog();
   initAreaTags();
   initPricingForm();
   initPayoutSection();
@@ -1458,69 +2864,165 @@ function initSocialLinks() {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   SKILL TAGS
+   SERVICES CATALOG
 ───────────────────────────────────────────────────────────── */
-function initSkillTags() {
-  const container = document.getElementById('skill-tags');
-  const saveBtn   = document.getElementById('btn-save-skills');
-  const saveMsg   = document.getElementById('skills-save-msg');
-  if (!container) return;
+const CATEGORY_LABELS = {
+  plumbing:     'Plumbing',
+  electrical:   'Electrical',
+  hvac:         'A/C & HVAC',
+  carpentry:    'Carpentry',
+  appliance:    'Appliances',
+  handyman:     'Handyman',
+  renovation:   'Renovation',
+  painting:     'Painting',
+  flooring:     'Flooring',
+  drywall:      'Drywall',
+  roofing:      'Roofing',
+  cleaning:     'Cleaning',
+  'pest-control': 'Pest Control',
+  landscaping:  'Landscaping',
+  installation: 'Installation',
+  other:        'Other',
+};
 
-  const account = getAccount() || {};
-  const saved = Array.isArray(account.skillTags) ? account.skillTags : [];
+async function initServicesCatalog() {
+  const catalog = document.getElementById('services-catalog');
+  const saveBtn = document.getElementById('btn-save-skills');
+  const saveMsg = document.getElementById('skills-save-msg');
+  if (!catalog) return;
 
-  container.querySelectorAll('.skill-tag').forEach(tag => {
-    const skill = tag.dataset.skill;
-    if (saved.includes(skill)) tag.setAttribute('aria-pressed', 'true');
-    tag.addEventListener('click', () => {
-      const pressed = tag.getAttribute('aria-pressed') === 'true';
-      tag.setAttribute('aria-pressed', String(!pressed));
-    });
-  });
+  let allServices    = [];
+  let selectedIds    = new Set();
+  let verifiedCats   = [];
+  let pendingCats    = [];
 
-  saveBtn?.addEventListener('click', () => {
-    const acc = getAccount() || {};
-    acc.skillTags = [...container.querySelectorAll('.skill-tag[aria-pressed="true"]')]
-      .map(t => t.dataset.skill);
-    // Also save certifications
+  try {
+    const [svcRes, meRes] = await Promise.all([
+      getServices({ limit: 200 }),
+      getMe(),
+    ]);
+    allServices  = svcRes.data?.services || svcRes.services || svcRes.data || [];
+    const me     = meRes.data || meRes;
+    verifiedCats = me.categories         || [];
+    pendingCats  = me.pendingCategories  || [];
+
+    const workerServices = me.services || [];
+    workerServices.forEach(s => selectedIds.add((s._id || s).toString()));
+
+    const skills = me.skills || [];
     const certEl = document.getElementById('s-certifications');
-    if (certEl) acc.certifications = certEl.value.trim();
-    localStorage.setItem('servio_account', JSON.stringify(acc));
-    if (saveMsg) { saveMsg.hidden = false; setTimeout(() => { saveMsg.hidden = true; }, 2500); }
+    if (certEl && skills.length) certEl.value = skills.join('\n');
+  } catch (e) {
+    catalog.innerHTML = '<p style="color:#e74c3c;font-size:0.875rem;">Failed to load services. Please refresh.</p>';
+    return;
+  }
+
+  if (!allServices.length) {
+    catalog.innerHTML = '<p style="color:var(--color-secondary,#9A8C73);font-size:0.875rem;">No services found. Ask an admin to seed the service catalog.</p>';
+    return;
+  }
+
+  const grouped = {};
+  allServices.forEach(svc => {
+    const cat = svc.category || 'other';
+    if (!grouped[cat]) grouped[cat] = [];
+    grouped[cat].push(svc);
   });
 
-  // Restore certifications
-  const certEl = document.getElementById('s-certifications');
-  if (certEl && account.certifications) certEl.value = account.certifications;
+  const formatPrice = svc => {
+    if (svc.priceUnit === 'per_hour') return `${svc.basePrice} EGP/hr`;
+    if (svc.priceUnit === 'per_sqm')  return `${svc.basePrice} EGP/m²`;
+    return `${svc.basePrice} EGP`;
+  };
+
+  const catBadge = cat => {
+    if (verifiedCats.includes(cat))  return '<span class="svc-cat-badge svc-cat-badge--verified">Verified</span>';
+    if (pendingCats.includes(cat))   return '<span class="svc-cat-badge svc-cat-badge--pending">Pending Admin Approval</span>';
+    return '<span class="svc-cat-badge svc-cat-badge--new">Requires Re-verification</span>';
+  };
+
+  catalog.innerHTML = Object.entries(grouped).map(([cat, services]) => `
+    <div class="svc-cat-group">
+      <div class="svc-cat-header">${CATEGORY_LABELS[cat] || cat} ${catBadge(cat)}</div>
+      <div class="svc-cat-options">
+        ${services.map(svc => {
+          const id      = (svc._id || svc.id || '').toString();
+          const checked = selectedIds.has(id) ? 'checked' : '';
+          return `<label class="svc-check-label">
+            <input type="checkbox" class="svc-checkbox" value="${id}" data-category="${svc.category || ''}" ${checked} />
+            <span class="svc-check-name">${svc.title}</span>
+            <span class="svc-check-price">${formatPrice(svc)}</span>
+          </label>`;
+        }).join('')}
+      </div>
+    </div>
+  `).join('');
+
+  saveBtn?.addEventListener('click', async () => {
+    const checkedIds  = [...catalog.querySelectorAll('.svc-checkbox:checked')].map(cb => cb.value);
+    const checkedCats = [...new Set([...catalog.querySelectorAll('.svc-checkbox:checked')].map(cb => cb.dataset.category).filter(Boolean))];
+    const certEl      = document.getElementById('s-certifications');
+    const skills      = certEl ? certEl.value.trim().split('\n').map(s => s.trim()).filter(Boolean) : [];
+
+    try {
+      await updateMe({ services: checkedIds, skills });
+      const newCats = checkedCats.filter(c => !verifiedCats.includes(c));
+      if (newCats.length) {
+        const labels = newCats.map(c => CATEGORY_LABELS[c] || c).join(', ');
+        showToast(`Services saved. ${labels}: pending admin review before appearing live.`, 'info');
+        pendingCats = [...new Set([...pendingCats, ...newCats])];
+        catalog.querySelectorAll('.svc-cat-header').forEach(h => {
+          const cat = Object.keys(CATEGORY_LABELS).find(k => h.textContent.includes(CATEGORY_LABELS[k]));
+          if (cat && newCats.includes(cat)) {
+            const badge = h.querySelector('.svc-cat-badge');
+            if (badge) { badge.textContent = 'Pending Admin Approval'; badge.className = 'svc-cat-badge svc-cat-badge--pending'; }
+          }
+        });
+      } else if (saveMsg) {
+        saveMsg.hidden = false;
+        setTimeout(() => { saveMsg.hidden = true; }, 2500);
+      }
+    } catch (e) {
+      showToast('Failed to save services. Please try again.', 'error');
+    }
+  });
 }
 
 /* ─────────────────────────────────────────────────────────────
    SERVICE AREA TAGS
 ───────────────────────────────────────────────────────────── */
-function initAreaTags() {
+async function initAreaTags() {
   const container = document.getElementById('area-tags');
   const saveBtn   = document.getElementById('btn-save-areas');
   const saveMsg   = document.getElementById('areas-save-msg');
   if (!container) return;
 
-  const account = getAccount() || {};
-  const saved = Array.isArray(account.serviceAreas) ? account.serviceAreas : [];
+  // Load saved areas from backend
+  try {
+    const me = await getMe();
+    const serviceArea = me.data?.serviceArea || me.serviceArea || '';
+    const savedAreas  = serviceArea ? serviceArea.split(',').map(a => a.trim()).filter(Boolean) : [];
+    container.querySelectorAll('.skill-tag').forEach(tag => {
+      if (savedAreas.includes(tag.dataset.area)) tag.setAttribute('aria-pressed', 'true');
+    });
+  } catch (e) { /* leave all unselected */ }
 
   container.querySelectorAll('.skill-tag').forEach(tag => {
-    const area = tag.dataset.area;
-    if (saved.includes(area)) tag.setAttribute('aria-pressed', 'true');
     tag.addEventListener('click', () => {
       const pressed = tag.getAttribute('aria-pressed') === 'true';
       tag.setAttribute('aria-pressed', String(!pressed));
     });
   });
 
-  saveBtn?.addEventListener('click', () => {
-    const acc = getAccount() || {};
-    acc.serviceAreas = [...container.querySelectorAll('.skill-tag[aria-pressed="true"]')]
+  saveBtn?.addEventListener('click', async () => {
+    const selected = [...container.querySelectorAll('.skill-tag[aria-pressed="true"]')]
       .map(t => t.dataset.area);
-    localStorage.setItem('servio_account', JSON.stringify(acc));
-    if (saveMsg) { saveMsg.hidden = false; setTimeout(() => { saveMsg.hidden = true; }, 2500); }
+    try {
+      await updateMe({ serviceArea: selected.join(', ') });
+      if (saveMsg) { saveMsg.hidden = false; setTimeout(() => { saveMsg.hidden = true; }, 2500); }
+    } catch (e) {
+      showToast('Failed to save service areas. Please try again.', 'error');
+    }
   });
 }
 

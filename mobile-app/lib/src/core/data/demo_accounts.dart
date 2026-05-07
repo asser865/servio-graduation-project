@@ -1,7 +1,8 @@
 import '../models/user_account.dart';
 
 /// Demo accounts matching the web frontend's login.js credentials.
-const Map<String, _DemoCredential> _kDemoCredentials = <String, _DemoCredential>{
+const Map<String, _DemoCredential> _kDemoCredentials =
+    <String, _DemoCredential>{
   'ahmed@test.com': _DemoCredential(
     password: 'test1234',
     account: UserAccount(

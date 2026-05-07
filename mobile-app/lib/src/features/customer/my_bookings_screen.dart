@@ -8,15 +8,11 @@ import '../../core/models/backend_booking_model.dart';
 import '../../core/models/booking_model.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
-import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
 import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
 import '../../design_system/widgets/servio_status_chip.dart';
 import '../booking/booking_flow_data.dart';
 import '../messages/chat_screen.dart';
-import 'ai_smart_match_screen.dart';
-import 'customer_profile_screen.dart';
-import 'services_marketplace_screen.dart';
 import 'write_review_screen.dart';
 
 class MyBookingsScreen extends StatefulWidget {
@@ -63,43 +59,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     const tabs = <String>['Active', 'History', 'Favourites'];
 
     return Scaffold(
-      bottomNavigationBar: ServioBottomNavigationBar(
-        items: const <ServioBottomNavItem>[
-          ServioBottomNavItem(icon: Icons.home_rounded, label: 'Home'),
-          ServioBottomNavItem(icon: Icons.grid_view_rounded, label: 'Services'),
-          ServioBottomNavItem(
-              icon: Icons.auto_awesome_rounded,
-              label: 'Smart Match',
-              highlighted: true),
-          ServioBottomNavItem(
-              icon: Icons.calendar_month_rounded, label: 'Bookings'),
-          ServioBottomNavItem(icon: Icons.person_rounded, label: 'Profile'),
-        ],
-        currentIndex: 3,
-        onTap: (int index) {
-          if (index == 0) {
-            Navigator.of(context).popUntil((route) => route.isFirst);
-          } else if (index == 1) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const ServicesMarketplaceScreen(),
-              ),
-            );
-          } else if (index == 2) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const AiSmartMatchScreen(),
-              ),
-            );
-          } else if (index == 4) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const CustomerProfileScreen(),
-              ),
-            );
-          }
-        },
-      ),
       appBar: AppBar(
         title: const Text('My Bookings'),
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -161,9 +120,13 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     switch (_tabIndex) {
       case 0:
         final active = _bookings
-            .where((b) => b.status == BookingStatus.upcoming || b.status == BookingStatus.inProgress)
+            .where((b) =>
+                b.status == BookingStatus.upcoming ||
+                b.status == BookingStatus.inProgress)
             .toList();
-        if (active.isEmpty) return const _EmptyState(message: 'No active bookings yet.');
+        if (active.isEmpty) {
+          return const _EmptyState(message: 'No active bookings yet.');
+        }
         return ListView.separated(
           itemCount: active.length,
           separatorBuilder: (_, __) => const SizedBox(height: 16),
@@ -193,9 +156,13 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
         );
       case 1:
         final past = _bookings
-            .where((b) => b.status == BookingStatus.completed || b.status == BookingStatus.cancelled)
+            .where((b) =>
+                b.status == BookingStatus.completed ||
+                b.status == BookingStatus.cancelled)
             .toList();
-        if (past.isEmpty) return const _EmptyState(message: 'No booking history yet.');
+        if (past.isEmpty) {
+          return const _EmptyState(message: 'No booking history yet.');
+        }
         return ListView.separated(
           itemCount: past.length,
           separatorBuilder: (_, __) => const SizedBox(height: 16),
@@ -226,9 +193,11 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
       default:
         return ListView(
           children: const <Widget>[
-            _FavouriteTechnicianCard(name: 'Khaled Mohamed', specialty: 'Plumbing'),
+            _FavouriteTechnicianCard(
+                name: 'Khaled Mohamed', specialty: 'Plumbing'),
             SizedBox(height: 16),
-            _FavouriteTechnicianCard(name: 'Mahmoud Ibrahim', specialty: 'Electrical'),
+            _FavouriteTechnicianCard(
+                name: 'Mahmoud Ibrahim', specialty: 'Electrical'),
           ],
         );
     }
@@ -362,43 +331,6 @@ class BookingDetailsScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Booking Details'),
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      ),
-      bottomNavigationBar: ServioBottomNavigationBar(
-        items: const <ServioBottomNavItem>[
-          ServioBottomNavItem(icon: Icons.home_rounded, label: 'Home'),
-          ServioBottomNavItem(icon: Icons.grid_view_rounded, label: 'Services'),
-          ServioBottomNavItem(
-              icon: Icons.auto_awesome_rounded,
-              label: 'Smart Match',
-              highlighted: true),
-          ServioBottomNavItem(
-              icon: Icons.calendar_month_rounded, label: 'Bookings'),
-          ServioBottomNavItem(icon: Icons.person_rounded, label: 'Profile'),
-        ],
-        currentIndex: 4,
-        onTap: (int index) {
-          if (index == 0) {
-            Navigator.of(context).popUntil((route) => route.isFirst);
-          } else if (index == 1) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const ServicesMarketplaceScreen(),
-              ),
-            );
-          } else if (index == 2) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const AiSmartMatchScreen(),
-              ),
-            );
-          } else if (index == 3) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const MyBookingsScreen(),
-              ),
-            );
-          }
-        },
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(ServioSpacing.screenPadding),
@@ -649,12 +581,15 @@ class _DetailsPair extends StatelessWidget {
 BookingModel _toBookingModel(BackendBooking b) {
   return BookingModel(
     id: b.id,
-    reference: '#${b.id.length >= 8 ? b.id.substring(0, 8).toUpperCase() : b.id.toUpperCase()}',
+    reference:
+        '#${b.id.length >= 8 ? b.id.substring(0, 8).toUpperCase() : b.id.toUpperCase()}',
     serviceName: b.serviceName.isNotEmpty ? b.serviceName : 'Service',
     technicianName: b.workerName.isNotEmpty ? b.workerName : 'Technician',
     technicianId: b.workerId,
     date: DateFormat('MMM d, y').format(b.scheduledDate),
-    time: DateFormat('h:mm a').format(b.scheduledDate),
+    time: b.scheduledTime.isNotEmpty
+        ? _displayScheduledTime(b.scheduledTime)
+        : DateFormat('h:mm a').format(b.scheduledDate),
     location: b.addressCity.isNotEmpty ? b.addressCity : 'Cairo',
     amount: 'EGP ${b.totalAmount.toStringAsFixed(0)}',
     status: _parseBookingStatus(b.status),
@@ -664,11 +599,19 @@ BookingModel _toBookingModel(BackendBooking b) {
 }
 
 BookingStatus _parseBookingStatus(String s) => switch (s) {
-  'confirmed' || 'pending' => BookingStatus.upcoming,
-  'in_progress' || 'inProgress' => BookingStatus.inProgress,
-  'completed' => BookingStatus.completed,
-  _ => BookingStatus.cancelled,
-};
+      'confirmed' || 'pending' || 'accepted' => BookingStatus.upcoming,
+      'in_progress' || 'inProgress' => BookingStatus.inProgress,
+      'completed' => BookingStatus.completed,
+      _ => BookingStatus.cancelled,
+    };
+
+String _displayScheduledTime(String value) {
+  final parts = value.split(':');
+  final hour = int.tryParse(parts.first) ?? 0;
+  final suffix = hour >= 12 ? 'PM' : 'AM';
+  final displayHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+  return '$displayHour:00 $suffix';
+}
 
 class _FavouriteTechnicianCard extends StatelessWidget {
   const _FavouriteTechnicianCard({

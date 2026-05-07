@@ -43,9 +43,12 @@ const List<ServiceModel> kDemoServices = <ServiceModel>[
       en: 'Expert pipe repair, leak detection, and fixture installation by verified professionals.',
       ar: 'إصلاح الأنابيب والكشف عن التسربات وتركيب الأجهزة من قبل متخصصين معتمدين.',
     ),
-    priceBadge: BilingualText(en: 'avg. 200 – 2,000 EGP', ar: 'متوسط 200 – 2,000 جنيه'),
-    heroImageUrl: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&w=800&q=80',
-    ctaTitle: BilingualText(en: 'Ready to book a plumber?', ar: 'جاهز لحجز سباك؟'),
+    priceBadge:
+        BilingualText(en: 'avg. 200 – 2,000 EGP', ar: 'متوسط 200 – 2,000 جنيه'),
+    heroImageUrl:
+        'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&w=800&q=80',
+    ctaTitle:
+        BilingualText(en: 'Ready to book a plumber?', ar: 'جاهز لحجز سباك؟'),
     ctaSub: BilingualText(
       en: 'Browse our network of verified plumbing specialists.',
       ar: 'تصفح شبكتنا من متخصصي السباكة المعتمدين.',
@@ -109,7 +112,9 @@ const List<ServiceModel> kDemoServices = <ServiceModel>[
     ],
     faqs: <ServiceFaq>[
       ServiceFaq(
-        question: BilingualText(en: 'How long does a plumbing job take?', ar: 'كم يستغرق عمل السباكة؟'),
+        question: BilingualText(
+            en: 'How long does a plumbing job take?',
+            ar: 'كم يستغرق عمل السباكة؟'),
         answer: BilingualText(
           en: 'Most standard jobs take 1–3 hours. Complex work like re-piping may take a full day.',
           ar: 'معظم الأعمال تستغرق 1–3 ساعات. الأعمال المعقدة قد تستغرق يوماً كاملاً.',
@@ -139,7 +144,6 @@ const List<ServiceModel> kDemoServices = <ServiceModel>[
       ),
     ],
   ),
-
   ServiceModel(
     id: 'electrical',
     icon: 'bolt',
@@ -148,16 +152,20 @@ const List<ServiceModel> kDemoServices = <ServiceModel>[
       en: 'Safe, licensed wiring, lighting installation, and precision electrical repairs by certified electricians.',
       ar: 'توصيلات كهربائية آمنة ومرخصة وتركيب الإضاءة وإصلاحات دقيقة من كهربائيين معتمدين.',
     ),
-    priceBadge: BilingualText(en: 'avg. 300 – 3,000 EGP', ar: 'متوسط 300 – 3,000 جنيه'),
-    heroImageUrl: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?auto=format&fit=crop&w=800&q=80',
-    ctaTitle: BilingualText(en: 'Ready to book an electrician?', ar: 'جاهز لحجز كهربائي؟'),
+    priceBadge:
+        BilingualText(en: 'avg. 300 – 3,000 EGP', ar: 'متوسط 300 – 3,000 جنيه'),
+    heroImageUrl:
+        'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?auto=format&fit=crop&w=800&q=80',
+    ctaTitle: BilingualText(
+        en: 'Ready to book an electrician?', ar: 'جاهز لحجز كهربائي؟'),
     ctaSub: BilingualText(
       en: 'Browse our network of licensed electrical specialists.',
       ar: 'تصفح شبكتنا من الكهربائيين المرخصين.',
     ),
     included: <ServiceIncluded>[
       ServiceIncluded(
-        title: BilingualText(en: 'Wiring & Rewiring', ar: 'التوصيلات الكهربائية'),
+        title:
+            BilingualText(en: 'Wiring & Rewiring', ar: 'التوصيلات الكهربائية'),
         desc: BilingualText(
           en: 'Safe installation and replacement of household electrical circuits.',
           ar: 'تركيب وإعادة توصيل دوائر المنزل الكهربائية بأمان.',
@@ -214,7 +222,8 @@ const List<ServiceModel> kDemoServices = <ServiceModel>[
     ],
     faqs: <ServiceFaq>[
       ServiceFaq(
-        question: BilingualText(en: 'Are electricians licensed?', ar: 'هل الكهربائيون مرخصون؟'),
+        question: BilingualText(
+            en: 'Are electricians licensed?', ar: 'هل الكهربائيون مرخصون؟'),
         answer: BilingualText(
           en: 'All our electricians hold valid trade licenses and complete safety training before joining the platform.',
           ar: 'جميع كهربائيونا يحملون رخص مهنية سارية ويجتازون تدريب السلامة.',
@@ -244,18 +253,21 @@ const List<ServiceModel> kDemoServices = <ServiceModel>[
       ),
     ],
   ),
-
   ServiceModel(
     id: 'ac-maintenance',
     icon: 'temp',
-    title: BilingualText(en: 'A/C Maintenance & HVAC', ar: 'صيانة التكييف والتبريد'),
+    title: BilingualText(
+        en: 'A/C Maintenance & HVAC', ar: 'صيانة التكييف والتبريد'),
     lead: BilingualText(
       en: 'Professional air conditioning installation, servicing, and repair by certified HVAC technicians.',
       ar: 'تركيب وصيانة وإصلاح أجهزة التكييف من قبل فنيين مخصصين معتمدين.',
     ),
-    priceBadge: BilingualText(en: 'avg. 400 – 2,500 EGP', ar: 'متوسط 400 – 2,500 جنيه'),
-    heroImageUrl: 'https://images.unsplash.com/photo-1631545806609-5a1e3d9d5ff4?auto=format&fit=crop&w=800&q=80',
-    ctaTitle: BilingualText(en: 'Ready to book AC service?', ar: 'جاهز لحجز صيانة تكييف؟'),
+    priceBadge:
+        BilingualText(en: 'avg. 400 – 2,500 EGP', ar: 'متوسط 400 – 2,500 جنيه'),
+    heroImageUrl:
+        'https://images.unsplash.com/photo-1631545806609-5a1e3d9d5ff4?auto=format&fit=crop&w=800&q=80',
+    ctaTitle: BilingualText(
+        en: 'Ready to book AC service?', ar: 'جاهز لحجز صيانة تكييف؟'),
     ctaSub: BilingualText(
       en: 'Browse our certified HVAC specialists available today.',
       ar: 'تصفح متخصصي التكييف المعتمدين المتاحين اليوم.',
@@ -276,7 +288,8 @@ const List<ServiceModel> kDemoServices = <ServiceModel>[
         ),
       ),
       ServiceIncluded(
-        title: BilingualText(en: 'Fault Diagnosis & Repair', ar: 'تشخيص الأعطال وإصلاحها'),
+        title: BilingualText(
+            en: 'Fault Diagnosis & Repair', ar: 'تشخيص الأعطال وإصلاحها'),
         desc: BilingualText(
           en: 'Identifying and fixing cooling failures, leaks, and compressor issues.',
           ar: 'تحديد وإصلاح أعطال التبريد والتسربات ومشاكل الضاغط.',
@@ -319,7 +332,9 @@ const List<ServiceModel> kDemoServices = <ServiceModel>[
     ],
     faqs: <ServiceFaq>[
       ServiceFaq(
-        question: BilingualText(en: 'How often should I service my AC?', ar: 'كم مرة يجب صيانة التكييف؟'),
+        question: BilingualText(
+            en: 'How often should I service my AC?',
+            ar: 'كم مرة يجب صيانة التكييف؟'),
         answer: BilingualText(
           en: 'We recommend servicing once a year before summer, with filter cleaning every 3 months.',
           ar: 'نوصي بالصيانة مرة سنوياً قبل الصيف مع تنظيف الفلاتر كل 3 أشهر.',
@@ -349,7 +364,6 @@ const List<ServiceModel> kDemoServices = <ServiceModel>[
       ),
     ],
   ),
-
   ServiceModel(
     id: 'carpentry',
     icon: 'wrench',
@@ -358,9 +372,12 @@ const List<ServiceModel> kDemoServices = <ServiceModel>[
       en: 'Skilled woodwork, furniture repair, and structural carpentry by experienced craftsmen.',
       ar: 'أعمال خشبية ماهرة وإصلاح الأثاث ونجارة هيكلية من قبل حرفيين ذوي خبرة.',
     ),
-    priceBadge: BilingualText(en: 'avg. 200 – 2,000 EGP', ar: 'متوسط 200 – 2,000 جنيه'),
-    heroImageUrl: 'https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&w=800&q=80',
-    ctaTitle: BilingualText(en: 'Ready to book a carpenter?', ar: 'جاهز لحجز نجار؟'),
+    priceBadge:
+        BilingualText(en: 'avg. 200 – 2,000 EGP', ar: 'متوسط 200 – 2,000 جنيه'),
+    heroImageUrl:
+        'https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&w=800&q=80',
+    ctaTitle:
+        BilingualText(en: 'Ready to book a carpenter?', ar: 'جاهز لحجز نجار؟'),
     ctaSub: BilingualText(
       en: 'Browse our verified carpentry specialists.',
       ar: 'تصفح متخصصي النجارة المعتمدين.',
@@ -374,14 +391,16 @@ const List<ServiceModel> kDemoServices = <ServiceModel>[
         ),
       ),
       ServiceIncluded(
-        title: BilingualText(en: 'Door & Window Work', ar: 'أعمال الأبواب والنوافذ'),
+        title: BilingualText(
+            en: 'Door & Window Work', ar: 'أعمال الأبواب والنوافذ'),
         desc: BilingualText(
           en: 'Fitting, adjustment, and repair of wooden doors and frames.',
           ar: 'تركيب وتعديل وإصلاح الأبواب الخشبية والإطارات.',
         ),
       ),
       ServiceIncluded(
-        title: BilingualText(en: 'Custom Woodwork', ar: 'الأعمال الخشبية المخصصة'),
+        title:
+            BilingualText(en: 'Custom Woodwork', ar: 'الأعمال الخشبية المخصصة'),
         desc: BilingualText(
           en: 'Bespoke shelves, cabinets, and built-in storage solutions.',
           ar: 'رفوف وخزائن وحلول تخزين مدمجة مخصصة.',
@@ -424,7 +443,9 @@ const List<ServiceModel> kDemoServices = <ServiceModel>[
     ],
     faqs: <ServiceFaq>[
       ServiceFaq(
-        question: BilingualText(en: 'Do you supply the wood and materials?', ar: 'هل يوفرون الخشب والمواد؟'),
+        question: BilingualText(
+            en: 'Do you supply the wood and materials?',
+            ar: 'هل يوفرون الخشب والمواد؟'),
         answer: BilingualText(
           en: 'Technicians can source materials for you at cost, or work with materials you provide.',
           ar: 'يمكن للفنيين توفير المواد بالتكلفة أو العمل بمواد توفرها أنت.',
@@ -454,7 +475,6 @@ const List<ServiceModel> kDemoServices = <ServiceModel>[
       ),
     ],
   ),
-
   ServiceModel(
     id: 'painting',
     icon: 'paint',
@@ -463,9 +483,12 @@ const List<ServiceModel> kDemoServices = <ServiceModel>[
       en: 'Interior and exterior painting, Venetian plaster, and decorative finishes by skilled painters.',
       ar: 'دهانات داخلية وخارجية وجص فينيسي وتشطيبات زخرفية من قبل دهانين ماهرين.',
     ),
-    priceBadge: BilingualText(en: 'avg. 300 – 6,000 EGP', ar: 'متوسط 300 – 6,000 جنيه'),
-    heroImageUrl: 'https://images.unsplash.com/photo-1562259929-b4e1fd3aef09?auto=format&fit=crop&w=800&q=80',
-    ctaTitle: BilingualText(en: 'Ready to book a painter?', ar: 'جاهز لحجز دهان؟'),
+    priceBadge:
+        BilingualText(en: 'avg. 300 – 6,000 EGP', ar: 'متوسط 300 – 6,000 جنيه'),
+    heroImageUrl:
+        'https://images.unsplash.com/photo-1562259929-b4e1fd3aef09?auto=format&fit=crop&w=800&q=80',
+    ctaTitle:
+        BilingualText(en: 'Ready to book a painter?', ar: 'جاهز لحجز دهان؟'),
     ctaSub: BilingualText(
       en: 'Browse our verified painting specialists.',
       ar: 'تصفح متخصصي الدهانات المعتمدين.',
@@ -529,7 +552,8 @@ const List<ServiceModel> kDemoServices = <ServiceModel>[
     ],
     faqs: <ServiceFaq>[
       ServiceFaq(
-        question: BilingualText(en: 'Do you provide the paint?', ar: 'هل يوفرون الطلاء؟'),
+        question: BilingualText(
+            en: 'Do you provide the paint?', ar: 'هل يوفرون الطلاء؟'),
         answer: BilingualText(
           en: 'Yes, painters can supply premium paint brands at cost, or use paint you provide.',
           ar: 'نعم، يمكن للدهانين توفير ماركات طلاء متميزة بالتكلفة أو استخدام طلاء تقدمه أنت.',

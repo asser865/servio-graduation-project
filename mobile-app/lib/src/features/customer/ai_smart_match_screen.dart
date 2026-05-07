@@ -1,16 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/api/ai_api.dart';
 import '../../core/api/api_client.dart';
+import '../../core/api/api_exception.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
-import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
 import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
 import '../../design_system/widgets/servio_status_chip.dart';
-import 'customer_profile_screen.dart';
-import 'my_bookings_screen.dart';
-import 'service_detail_screen.dart';
+import '../../design_system/widgets/servio_tab_shell.dart';
 import 'services_marketplace_screen.dart';
 import 'technician_profile_screen.dart';
 
@@ -23,10 +22,12 @@ class AiSmartMatchScreen extends StatefulWidget {
 
 class _AiSmartMatchScreenState extends State<AiSmartMatchScreen> {
   final TextEditingController _controller = TextEditingController();
+  final TextEditingController _locationController = TextEditingController();
+  final TextEditingController _budgetController = TextEditingController();
   bool _showResults = false;
   bool _loading = false;
   String? _error;
-  Map<String, dynamic>? _results;
+  AiRecommendationResponse? _recommendation;
 
   static const List<String> _suggestions = <String>[
     'Leaky Faucet',
@@ -38,6 +39,8 @@ class _AiSmartMatchScreenState extends State<AiSmartMatchScreen> {
   @override
   void dispose() {
     _controller.dispose();
+    _locationController.dispose();
+    _budgetController.dispose();
     super.dispose();
   }
 
@@ -51,6 +54,12 @@ class _AiSmartMatchScreenState extends State<AiSmartMatchScreen> {
   Future<void> _analyze() async {
     final query = _controller.text.trim();
     if (query.isEmpty) return;
+    final budgetText = _budgetController.text.trim();
+    final budget = budgetText.isEmpty ? null : num.tryParse(budgetText);
+    if (budgetText.isNotEmpty && budget == null) {
+      setState(() => _error = 'Budget must be a number.');
+      return;
+    }
     setState(() {
       _loading = true;
       _showResults = false;
@@ -58,15 +67,19 @@ class _AiSmartMatchScreenState extends State<AiSmartMatchScreen> {
     });
     try {
       final client = context.read<ApiClient>();
-      final response = await client.post('/ai/recommend', <String, dynamic>{
-        'query': query,
-      });
-      final data = client.unwrapData(response);
+      final recommendation = await AiApi(client).recommend(
+        description: query,
+        location: _locationController.text.trim(),
+        budget: budget,
+      );
       if (!mounted) return;
       setState(() {
-        _results = data;
+        _recommendation = recommendation;
         _showResults = true;
       });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.message);
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = 'AI service unavailable. Try again later.');
@@ -79,48 +92,17 @@ class _AiSmartMatchScreenState extends State<AiSmartMatchScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
+    final bottomInset = ServioTabShell.bottomOverlayInsetOf(context);
 
     return Scaffold(
-      bottomNavigationBar: ServioBottomNavigationBar(
-        items: const <ServioBottomNavItem>[
-          ServioBottomNavItem(icon: Icons.home_rounded, label: 'Home'),
-          ServioBottomNavItem(icon: Icons.grid_view_rounded, label: 'Services'),
-          ServioBottomNavItem(
-            icon: Icons.auto_awesome_rounded,
-            label: 'Smart Match',
-            highlighted: true,
-          ),
-          ServioBottomNavItem(icon: Icons.calendar_month_rounded, label: 'Bookings'),
-          ServioBottomNavItem(icon: Icons.person_rounded, label: 'Profile'),
-        ],
-        currentIndex: 2,
-        onTap: (int index) {
-          if (index == 0) {
-            Navigator.of(context).popUntil((route) => route.isFirst);
-          } else if (index == 1) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const ServicesMarketplaceScreen(),
-              ),
-            );
-          } else if (index == 3) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const MyBookingsScreen(),
-              ),
-            );
-          } else if (index == 4) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const CustomerProfileScreen(),
-              ),
-            );
-          }
-        },
-      ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(ServioSpacing.screenPadding),
+          padding: EdgeInsets.fromLTRB(
+            ServioSpacing.screenPadding,
+            ServioSpacing.screenPadding,
+            ServioSpacing.screenPadding,
+            ServioSpacing.screenPadding + bottomInset,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
@@ -135,27 +117,31 @@ class _AiSmartMatchScreenState extends State<AiSmartMatchScreen> {
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: <Widget>[
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.14),
                         borderRadius: BorderRadius.circular(ServioRadius.full),
                       ),
                       child: Text(
                         'POWERED BY SERVIO AI',
-                        style: theme.textTheme.labelSmall?.copyWith(color: ServioColors.neutralWarm),
+                        style: theme.textTheme.labelSmall
+                            ?.copyWith(color: ServioColors.neutralWarm),
                       ),
                     ),
                     const SizedBox(height: 18),
                     Text(
                       'What seems to be the',
                       textAlign: TextAlign.center,
-                      style: theme.textTheme.headlineLarge?.copyWith(color: Colors.white),
+                      style: theme.textTheme.headlineLarge
+                          ?.copyWith(color: Colors.white),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'problem?',
                       textAlign: TextAlign.center,
-                      style: theme.textTheme.headlineLarge?.copyWith(color: ServioColors.accentLight),
+                      style: theme.textTheme.headlineLarge
+                          ?.copyWith(color: ServioColors.accentLight),
                     ),
                     const SizedBox(height: 10),
                     Text(
@@ -188,26 +174,55 @@ class _AiSmartMatchScreenState extends State<AiSmartMatchScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 12),
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: TextField(
+                      controller: _locationController,
+                      decoration: const InputDecoration(
+                        labelText: 'Location',
+                        prefixIcon: Icon(Icons.location_on_outlined),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: _budgetController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Budget',
+                        prefixIcon: Icon(Icons.payments_outlined),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 16),
               SizedBox(
                 height: 44,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: _suggestions.length,
-                  separatorBuilder: (BuildContext context, int index) => const SizedBox(width: 10),
+                  separatorBuilder: (BuildContext context, int index) =>
+                      const SizedBox(width: 10),
                   itemBuilder: (BuildContext context, int index) {
                     final suggestion = _suggestions[index];
                     return GestureDetector(
                       onTap: () => _applySuggestion(suggestion),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 10),
                         decoration: BoxDecoration(
                           color: servio.backgroundSoft,
-                          borderRadius: BorderRadius.circular(ServioRadius.full),
+                          borderRadius:
+                              BorderRadius.circular(ServioRadius.full),
                         ),
                         child: Text(
                           suggestion,
-                          style: theme.textTheme.labelLarge?.copyWith(color: servio.textSecondary),
+                          style: theme.textTheme.labelLarge
+                              ?.copyWith(color: servio.textSecondary),
                         ),
                       ),
                     );
@@ -225,14 +240,15 @@ class _AiSmartMatchScreenState extends State<AiSmartMatchScreen> {
                 Text(
                   _error!,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.error,
-                  ),
+                        color: Theme.of(context).colorScheme.error,
+                      ),
                   textAlign: TextAlign.center,
                 ),
               ],
-              if (_showResults) ...<Widget>[
+              if (_showResults && _recommendation != null) ...<Widget>[
                 const SizedBox(height: 32),
-                Text('Recommended Service', style: theme.textTheme.headlineMedium),
+                Text('Recommended Service',
+                    style: theme.textTheme.headlineMedium),
                 const SizedBox(height: 14),
                 ServioCard(
                   radius: ServioRadius.lg,
@@ -242,63 +258,75 @@ class _AiSmartMatchScreenState extends State<AiSmartMatchScreen> {
                       Row(
                         children: <Widget>[
                           ServioStatusChip(
-                            label: (_results?['category'] as String?) ?? 'Plumbing',
+                            label: _recommendation!.predictedCategory.isEmpty
+                                ? 'Recommended'
+                                : _recommendation!.predictedCategory,
                           ),
                           const SizedBox(width: 10),
                           ServioStatusChip(
-                            label: (_results?['matchScore'] as String?) ?? '94% Match',
+                            label: _recommendation!.confidenceLabel,
                             type: ServioStatusChipType.success,
                           ),
                         ],
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        (_results?['serviceName'] as String?) ?? 'Plumbing Repair Visit',
+                        _recommendation!.serviceName.isEmpty
+                            ? 'Recommended service match'
+                            : _recommendation!.serviceName,
                         style: theme.textTheme.titleMedium,
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        (_results?['priceRange'] as String?) ?? '850 EGP - 1,200 EGP / session',
-                        style: theme.textTheme.bodyMedium?.copyWith(color: servio.accent),
-                      ),
+                      if (_recommendation!.priceRange.isNotEmpty) ...<Widget>[
+                        const SizedBox(height: 6),
+                        Text(
+                          _recommendation!.priceRange,
+                          style: theme.textTheme.bodyMedium
+                              ?.copyWith(color: servio.accent),
+                        ),
+                      ],
                     ],
                   ),
                 ),
                 const SizedBox(height: 24),
-                Text('Top Matched Technicians', style: theme.textTheme.titleMedium),
+                Text('Top Matched Technicians',
+                    style: theme.textTheme.titleMedium),
                 const SizedBox(height: 12),
-                _MatchedTechnicianCard(
-                  name: 'Ahmed Nabil',
-                  match: '97%',
-                  reason: 'Fast leak diagnostics and strong plumbing review history.',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const TechnicianProfileScreen(),
+                if (_recommendation!.recommendedWorkers.isEmpty)
+                  Text(
+                    'No technician matches returned yet. Browse similar services to choose one.',
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(color: servio.textSecondary),
+                  )
+                else
+                  ..._recommendation!.recommendedWorkers.map(
+                    (worker) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _MatchedTechnicianCard(
+                        name: worker.name.isEmpty ? 'Technician' : worker.name,
+                        match: worker.matchLabel,
+                        reason: worker.reason.isEmpty
+                            ? 'Recommended by SERVIO AI for this request.'
+                            : worker.reason,
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => TechnicianProfileScreen(
+                                technicianId:
+                                    worker.id.isEmpty ? null : worker.id,
+                              ),
+                            ),
+                          );
+                        },
                       ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 12),
-                _MatchedTechnicianCard(
-                  name: 'Mariam Adel',
-                  match: '91%',
-                  reason: 'Available today and highly rated for indoor maintenance calls.',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const TechnicianProfileScreen(),
-                      ),
-                    );
-                  },
-                ),
+                    ),
+                  ),
                 const SizedBox(height: 24),
                 ServioPrimaryButton(
-                  label: 'Book This Service',
+                  label: 'Browse Matching Services',
                   onPressed: () {
                     Navigator.of(context).push(
                       MaterialPageRoute<void>(
-                        builder: (_) => const ServiceDetailScreen(),
+                        builder: (_) => const ServicesMarketplaceScreen(),
                       ),
                     );
                   },
@@ -364,7 +392,9 @@ class _MatchedTechnicianCard extends StatelessWidget {
                 children: <Widget>[
                   Row(
                     children: <Widget>[
-                      Expanded(child: Text(name, style: Theme.of(context).textTheme.titleMedium)),
+                      Expanded(
+                          child: Text(name,
+                              style: Theme.of(context).textTheme.titleMedium)),
                       ServioStatusChip(
                         label: match,
                         type: ServioStatusChipType.success,
@@ -374,7 +404,10 @@ class _MatchedTechnicianCard extends StatelessWidget {
                   const SizedBox(height: 6),
                   Text(
                     reason,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: servio.textSecondary),
                   ),
                 ],
               ),

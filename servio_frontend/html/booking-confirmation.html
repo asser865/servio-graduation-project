@@ -88,14 +88,14 @@
         </svg>
       </div>
       <h1 data-i18n="booking_conf_title">Booking Confirmed!</h1>
-      <p class="confirmation-hero__sub" data-i18n="booking_conf_sub">
-        Your service request has been submitted. Omar Tarek will confirm within 30 minutes.
+      <p class="confirmation-hero__sub" id="conf-hero-sub">
+        Your service request has been submitted.
       </p>
       <button class="booking-ref" id="refCopyBtn" aria-label="Copy booking reference">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
           <rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
         </svg>
-        <span class="booking-ref__label" data-i18n="conf_ref_label" data-booking-ref>Booking #...</span>
+        <span class="booking-ref__label" data-booking-ref>Booking #...</span>
         <span class="booking-ref__copied" data-i18n="conf_copied">Copied!</span>
       </button>
     </div>
@@ -156,7 +156,7 @@
     <!-- Payment summary -->
     <div class="confirmation-payment-card">
       <h3 data-i18n="conf_payment_title">Payment Summary</h3>
-      <div id="confirmationPaymentDetails" data-i18n="conf_loading_payment">Loading payment details...</div>
+      <div id="confirmationPaymentDetails">Loading payment details...</div>
     </div>
 
     <!-- ── MAIN LAYOUT ── -->
@@ -178,15 +178,15 @@
             </div>
             <div class="conf-tech-row">
               <div class="conf-tech-row__main">
-              <img class="conf-tech-row__avatar"
-                src="https://images.unsplash.com/photo-1540569014015-19a7be504e3a?q=80&w=128&auto=format&fit=crop"
-                alt="Omar Tarek" data-i18n-alt="conf_tech_name" />
+              <img class="conf-tech-row__avatar" id="conf-tech-avatar"
+                src="../assets/images/avatar-placeholder.svg"
+                alt="Technician" />
               <div class="conf-tech-row__info">
-                <div class="conf-tech-row__name" data-i18n="conf_tech_name">Omar Tarek</div>
-                <div class="conf-tech-row__role" data-i18n="conf_tech_role">Master Plumber · Nasr City</div>
+                <div class="conf-tech-row__name" id="conf-tech-name">—</div>
+                <div class="conf-tech-row__role" id="conf-tech-role">—</div>
                 <div class="conf-tech-row__rating">
                   <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-                  <span data-i18n="conf_review_count">4.9 · 342 reviews</span>
+                  <span id="conf-tech-rating">—</span>
                 </div>
               </div>
               </div>
@@ -206,19 +206,19 @@
             </div>
             <div class="conf-row">
               <span class="conf-row__label" data-i18n="conf_row_service">Service</span>
-              <span class="conf-row__value" data-i18n="conf_service_pipe">Pipe Repair &amp; Leak Fix</span>
+              <span class="conf-row__value" id="conf-service-value">—</span>
             </div>
             <div class="conf-row">
               <span class="conf-row__label" data-i18n="conf_row_date">Date</span>
-              <span class="conf-row__value">Mon, 24 Mar 2026</span>
+              <span class="conf-row__value" id="conf-date-value">—</span>
             </div>
             <div class="conf-row">
               <span class="conf-row__label" data-i18n="conf_row_timeslot">Time Slot</span>
-              <span class="conf-row__value" data-i18n="conf_timeslot_value">10:00 AM</span>
+              <span class="conf-row__value" id="conf-time-value">—</span>
             </div>
             <div class="conf-row">
               <span class="conf-row__label" data-i18n="conf_row_address">Address</span>
-              <span class="conf-row__value" data-i18n="conf_address_value">45 El-Nasr St., Nasr City, Cairo</span>
+              <span class="conf-row__value" id="conf-address-value">—</span>
             </div>
           </div>
 
@@ -232,19 +232,19 @@
             </div>
             <div class="conf-row">
               <span class="conf-row__label" data-i18n="conf_row_method">Method</span>
-              <span class="conf-row__value" data-i18n="conf_payment_cash">Cash on arrival</span>
+              <span class="conf-row__value" id="conf-payment-method-value">—</span>
             </div>
-            <div class="conf-row">
+            <div class="conf-row" id="conf-base-rate-row">
               <span class="conf-row__label" data-i18n="conf_row_base_rate">Base Rate (1 hr)</span>
-              <span class="conf-row__value">45.00 EGP</span>
+              <span class="conf-row__value" id="conf-base-rate-value">—</span>
             </div>
-            <div class="conf-row">
+            <div class="conf-row" id="conf-platform-fee-row">
               <span class="conf-row__label" data-i18n="conf_row_fee">Platform Fee (5%)</span>
-              <span class="conf-row__value">2.25 EGP</span>
+              <span class="conf-row__value" id="conf-platform-fee-value">—</span>
             </div>
             <div class="conf-row conf-row--total">
               <span class="conf-row__label" data-i18n="conf_row_total">Estimated Total</span>
-              <span class="conf-row__value">47.25 EGP+</span>
+              <span class="conf-row__value" id="conf-total-value">—</span>
             </div>
           </div>
 
@@ -259,13 +259,13 @@
         <!-- Action buttons -->
         <div class="conf-sidebar-card" data-reveal>
           <div class="conf-actions">
-            <a href="./booking-details.html" class="btn btn--primary btn--full conf-actions__btn--lead">
+            <a href="./booking-details.html" id="viewDetailsBtn" class="btn btn--primary btn--full conf-actions__btn--lead">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
               <span data-i18n="booking_conf_view">View Booking Details</span>
             </a>
             <a href="./messages.html" class="btn btn--full btn--sm">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-              <span data-i18n="conf_message_tech">Message Omar Tarek</span>
+              <span id="conf-msg-tech-name">Message Technician</span>
             </a>
             <a href="./customer-dashboard.html" class="btn btn--full btn--sm">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>

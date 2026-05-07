@@ -124,17 +124,22 @@ class _ChatScreenState extends State<ChatScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        Text(widget.contactName, style: theme.textTheme.labelLarge),
+                        Text(widget.contactName,
+                            style: theme.textTheme.labelLarge),
                         const SizedBox(height: 2),
                         Text(
                           'Online',
-                          style: theme.textTheme.bodySmall?.copyWith(color: ServioColors.success),
+                          style: theme.textTheme.bodySmall
+                              ?.copyWith(color: ServioColors.success),
                         ),
                       ],
                     ),
                   ),
-                  IconButton(onPressed: () {}, icon: const Icon(Icons.call_outlined)),
-                  IconButton(onPressed: () {}, icon: const Icon(Icons.info_outline_rounded)),
+                  IconButton(
+                      onPressed: () {}, icon: const Icon(Icons.call_outlined)),
+                  IconButton(
+                      onPressed: () {},
+                      icon: const Icon(Icons.info_outline_rounded)),
                 ],
               ),
             ),
@@ -150,7 +155,8 @@ class _ChatScreenState extends State<ChatScreen> {
                     final msg = _apiMessages[index];
                     isMe = msg.senderId == _currentUserId;
                     text = msg.text;
-                    time = '${msg.createdAt.hour}:${msg.createdAt.minute.toString().padLeft(2, '0')}';
+                    time =
+                        '${msg.createdAt.hour}:${msg.createdAt.minute.toString().padLeft(2, '0')}';
                   } else {
                     final message = messages[index];
                     isMe = message.isMe;
@@ -159,37 +165,46 @@ class _ChatScreenState extends State<ChatScreen> {
                   }
 
                   return Align(
-                    alignment: !isMe ? Alignment.centerLeft : Alignment.centerRight,
+                    alignment:
+                        !isMe ? Alignment.centerLeft : Alignment.centerRight,
                     child: Padding(
                       padding: const EdgeInsets.only(bottom: 14),
                       child: Column(
-                        crossAxisAlignment:
-                            !isMe ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+                        crossAxisAlignment: !isMe
+                            ? CrossAxisAlignment.start
+                            : CrossAxisAlignment.end,
                         children: <Widget>[
                           Container(
                             constraints: const BoxConstraints(maxWidth: 280),
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
                             decoration: BoxDecoration(
                               gradient: !isMe ? null : ServioGradients.brand,
                               color: !isMe ? servio.surfaceRaised : null,
                               borderRadius: BorderRadius.only(
                                 topLeft: const Radius.circular(ServioRadius.xl),
-                                topRight: const Radius.circular(ServioRadius.xl),
-                                bottomLeft: Radius.circular(!isMe ? 8 : ServioRadius.xl),
-                                bottomRight: Radius.circular(!isMe ? ServioRadius.xl : 8),
+                                topRight:
+                                    const Radius.circular(ServioRadius.xl),
+                                bottomLeft: Radius.circular(
+                                    !isMe ? 8 : ServioRadius.xl),
+                                bottomRight: Radius.circular(
+                                    !isMe ? ServioRadius.xl : 8),
                               ),
                             ),
                             child: Text(
                               text,
                               style: theme.textTheme.bodyMedium?.copyWith(
-                                color: !isMe ? theme.colorScheme.onSurface : Colors.white,
+                                color: !isMe
+                                    ? theme.colorScheme.onSurface
+                                    : Colors.white,
                               ),
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             time,
-                            style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+                            style: theme.textTheme.bodySmall
+                                ?.copyWith(color: servio.textSecondary),
                           ),
                         ],
                       ),
@@ -207,7 +222,9 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
                 child: Row(
                   children: <Widget>[
-                    IconButton(onPressed: () {}, icon: const Icon(Icons.attach_file_rounded)),
+                    IconButton(
+                        onPressed: () {},
+                        icon: const Icon(Icons.attach_file_rounded)),
                     Expanded(
                       child: TextField(
                         controller: _controller,
@@ -216,12 +233,15 @@ class _ChatScreenState extends State<ChatScreen> {
                           filled: true,
                           fillColor: servio.surfaceAlt,
                           enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(ServioRadius.full),
+                            borderRadius:
+                                BorderRadius.circular(ServioRadius.full),
                             borderSide: BorderSide(color: servio.border),
                           ),
                           focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(ServioRadius.full),
-                            borderSide: BorderSide(color: servio.accent, width: 2),
+                            borderRadius:
+                                BorderRadius.circular(ServioRadius.full),
+                            borderSide:
+                                BorderSide(color: servio.accent, width: 2),
                           ),
                         ),
                       ),
@@ -236,7 +256,8 @@ class _ChatScreenState extends State<ChatScreen> {
                           gradient: ServioGradients.brand,
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 20),
+                        child: const Icon(Icons.arrow_upward_rounded,
+                            color: Colors.white, size: 20),
                       ),
                     ),
                   ],
@@ -249,4 +270,3 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 }
-

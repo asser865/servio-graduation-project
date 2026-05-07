@@ -41,7 +41,9 @@ class UserAccount {
     this.locationLabel = '',
     this.yearsExperience = 0,
     this.availabilityType = '',
+    this.isAvailable = false,
     this.availability = const <AvailabilitySlot>[],
+    this.blockedDates = const <String>[],
     this.categories = const [],
   });
 
@@ -59,7 +61,9 @@ class UserAccount {
   final String locationLabel;
   final int yearsExperience;
   final String availabilityType;
+  final bool isAvailable;
   final List<AvailabilitySlot> availability;
+  final List<String> blockedDates;
   final List<String> categories;
 
   String get initials {
@@ -84,7 +88,9 @@ class UserAccount {
     String? locationLabel,
     int? yearsExperience,
     String? availabilityType,
+    bool? isAvailable,
     List<AvailabilitySlot>? availability,
+    List<String>? blockedDates,
     List<String>? categories,
   }) =>
       UserAccount(
@@ -102,7 +108,9 @@ class UserAccount {
         locationLabel: locationLabel ?? this.locationLabel,
         yearsExperience: yearsExperience ?? this.yearsExperience,
         availabilityType: availabilityType ?? this.availabilityType,
+        isAvailable: isAvailable ?? this.isAvailable,
         availability: availability ?? this.availability,
+        blockedDates: blockedDates ?? this.blockedDates,
         categories: categories ?? this.categories,
       );
 
@@ -121,7 +129,9 @@ class UserAccount {
         'locationLabel': locationLabel,
         'yearsExperience': yearsExperience,
         'availabilityType': availabilityType,
+        'isAvailable': isAvailable,
         'availability': availability.map((slot) => slot.toJson()).toList(),
+        'blockedDates': blockedDates,
         'categories': categories,
       };
 
@@ -143,7 +153,10 @@ class UserAccount {
         locationLabel: (json['locationLabel'] as String?) ?? '',
         yearsExperience: ((json['yearsExperience'] as num?) ?? 0).toInt(),
         availabilityType: (json['availabilityType'] as String?) ?? '',
+        isAvailable: (json['isAvailable'] as bool?) ?? false,
         availability: _availabilityFromJson(json['availability']),
+        blockedDates:
+            List<String>.from((json['blockedDates'] as List<dynamic>?) ?? []),
         categories:
             List<String>.from((json['categories'] as List<dynamic>?) ?? []),
       );
@@ -168,7 +181,10 @@ class UserAccount {
       locationLabel: (json['locationLabel'] as String?) ?? '',
       yearsExperience: ((json['yearsExperience'] as num?) ?? 0).toInt(),
       availabilityType: (json['availabilityType'] as String?) ?? '',
+      isAvailable: (json['isAvailable'] as bool?) ?? false,
       availability: _availabilityFromJson(json['availability']),
+      blockedDates:
+          List<String>.from((json['blockedDates'] as List<dynamic>?) ?? []),
       categories:
           List<String>.from((json['categories'] as List<dynamic>?) ?? []),
     );

@@ -179,11 +179,17 @@
 .home-hero__bg-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to right,
+  background: 
+    linear-gradient(to right,
       rgba(15, 10, 5, 0.82) 0%,
       rgba(15, 10, 5, 0.6) 40%,
       rgba(15, 10, 5, 0.25) 70%,
-      rgba(15, 10, 5, 0.15) 100%);
+      rgba(15, 10, 5, 0.15) 100%),
+    linear-gradient(to bottom,
+      transparent 0%,
+      rgba(20, 16, 11, 0) 50%,
+      rgba(20, 16, 11, 0.4) 75%,
+      #14100B 100%);
   z-index: 1;
 }
 
@@ -1626,11 +1632,25 @@
    ENHANCEMENT 7: Why SERVIO Feature Strip — Premium Remaster
 ──────────────────────────────────────────────────────── */
 .why-servio {
-  padding: 40px 0 44px;
+  padding: 60px 0 100px;
   background: #14100B;
   position: relative;
   overflow: hidden;
   isolation: isolate;
+}
+
+.why-servio__bottom-blend {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 150px;
+  background: linear-gradient(to bottom, 
+    transparent 0%, 
+    var(--color-surface) 100%
+  );
+  z-index: 5;
+  pointer-events: none;
 }
 
 /* Ambient depth orbs */
@@ -1795,47 +1815,23 @@
   background: rgba(154, 140, 115, 0.2);
 }
 
-/* Per-item color theming */
-.why-servio__item:nth-child(1) {
-  --ws-glow:   radial-gradient(ellipse at 20% 0%, rgba(200,182,142,0.10), transparent 65%);
-  --ws-line:   linear-gradient(90deg, #C8B68E, #8E7956);
-  --ws-shadow: rgba(200, 182, 142, 0.28);
-}
-.why-servio__item:nth-child(2) {
-  --ws-glow:   radial-gradient(ellipse at 20% 0%, rgba(251,191,36,0.10), transparent 65%);
-  --ws-line:   linear-gradient(90deg, #D97706, #FDE68A);
-  --ws-shadow: rgba(251, 191, 36, 0.28);
-}
-.why-servio__item:nth-child(2) .why-servio__icon {
-  background: rgba(251, 191, 36, 0.10);
-  border-color: rgba(251, 191, 36, 0.25);
-  color: #D97706;
-}
-.why-servio__item:nth-child(3) {
-  --ws-glow:   radial-gradient(ellipse at 20% 0%, rgba(34,197,94,0.09), transparent 65%);
-  --ws-line:   linear-gradient(90deg, #16A34A, #86EFAC);
-  --ws-shadow: rgba(34, 197, 94, 0.28);
-}
-.why-servio__item:nth-child(3) .why-servio__icon {
-  background: rgba(34, 197, 94, 0.10);
-  border-color: rgba(34, 197, 94, 0.25);
-  color: #16A34A;
-}
-.why-servio__item:nth-child(4) {
-  --ws-glow:   radial-gradient(ellipse at 20% 0%, rgba(96,165,250,0.10), transparent 65%);
-  --ws-line:   linear-gradient(90deg, #2563EB, #93C5FD);
-  --ws-shadow: rgba(96, 165, 250, 0.28);
-}
-.why-servio__item:nth-child(4) .why-servio__icon {
-  background: rgba(96, 165, 250, 0.10);
-  border-color: rgba(96, 165, 250, 0.25);
-  color: #3B82F6;
+/* Per-item color theming - Standardized to Unified Brand Gold */
+.why-servio__item {
+  --ws-glow:   radial-gradient(ellipse at 20% 0%, rgba(200, 182, 142, 0.15), transparent 65%);
+  --ws-line:   linear-gradient(90deg, #C8B68E, #9A8C73);
+  --ws-shadow: rgba(200, 182, 142, 0.3);
 }
 
-/* Keep old modifier classes for backwards compat */
-.why-servio__icon--gold  { background: rgba(251, 191, 36, 0.10) !important; border-color: rgba(251, 191, 36, 0.25) !important; color: #D97706 !important; }
-.why-servio__icon--green { background: rgba(34, 197, 94, 0.10)  !important; border-color: rgba(34, 197, 94, 0.25)  !important; color: #16A34A !important; }
-.why-servio__icon--blue  { background: rgba(96, 165, 250, 0.10) !important; border-color: rgba(96, 165, 250, 0.25) !important; color: #3B82F6 !important; }
+.why-servio__icon {
+  background: rgba(200, 182, 142, 0.12) !important;
+  border-color: rgba(200, 182, 142, 0.28) !important;
+  color: #C8B68E !important;
+}
+
+/* Modifier classes support - Force palette colors */
+.why-servio__icon--gold  { background: rgba(212, 175, 55, 0.12) !important; border-color: rgba(212, 175, 55, 0.28) !important; color: #D4AF37 !important; }
+.why-servio__icon--green { background: rgba(200, 182, 142, 0.12) !important; border-color: rgba(200, 182, 142, 0.28) !important; color: #C8B68E !important; }
+.why-servio__icon--blue  { background: rgba(154, 140, 115, 0.12) !important; border-color: rgba(154, 140, 115, 0.28) !important; color: #9A8C73 !important; }
 
 /* Text */
 .why-servio__title {

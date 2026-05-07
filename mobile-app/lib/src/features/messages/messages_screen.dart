@@ -8,8 +8,9 @@ import '../../core/models/user_account.dart';
 import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
-import '../customer/customer_dashboard_screen.dart';
-import '../technician/technician_dashboard_screen.dart';
+import '../../design_system/widgets/servio_tab_shell.dart';
+import '../customer/customer_shell.dart';
+import '../technician/technician_shell.dart';
 
 import 'chat_screen.dart';
 
@@ -49,9 +50,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
   void _openDashboard(bool isTechnician) {
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute<void>(
-        builder: (_) => isTechnician
-            ? const TechnicianDashboardScreen()
-            : const CustomerDashboardScreen(),
+        builder: (_) =>
+            isTechnician ? const TechnicianShell() : const CustomerShell(),
       ),
       (Route<dynamic> route) => false,
     );
@@ -65,6 +65,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
     final allConversations = context.watch<MessagesProvider>().conversations;
     final session = context.watch<SessionProvider>();
     final isTechnician = session.account?.role == UserRole.technician;
+    final bottomInset = ServioTabShell.bottomOverlayInsetOf(context);
 
     // Filter by search query
     final conversations = _query.isEmpty
@@ -150,8 +151,12 @@ class _MessagesScreenState extends State<MessagesScreen> {
               child: conversations.isEmpty
                   ? _EmptyState(query: _query)
                   : ListView.separated(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: ServioSpacing.screenPadding),
+                      padding: EdgeInsets.fromLTRB(
+                        ServioSpacing.screenPadding,
+                        0,
+                        ServioSpacing.screenPadding,
+                        8 + bottomInset,
+                      ),
                       itemCount: conversations.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 12),
                       itemBuilder: (BuildContext context, int index) {
@@ -161,7 +166,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
                           onTap: () {
                             context.read<MessagesProvider>().markRead(conv.id);
                             final apiConv = _apiConversations
-                                .where((a) => a.otherUserName == conv.contactName)
+                                .where(
+                                    (a) => a.otherUserName == conv.contactName)
                                 .firstOrNull;
                             Navigator.of(context).push(
                               MaterialPageRoute<void>(

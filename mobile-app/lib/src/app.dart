@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
 import 'core/api/api_client.dart';
+import 'core/api/token_storage.dart';
 import 'core/services/storage_service.dart';
 import 'core/state/app_state.dart';
 import 'core/state/services_state.dart';
@@ -18,11 +19,20 @@ class ServioApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokenStorage = FlutterSecureTokenStorage(legacyStorage: storage);
+
     return MultiProvider(
       providers: [
-        Provider<ApiClient>(create: (_) => ApiClient(storage: storage)),
+        Provider<TokenStorage>.value(value: tokenStorage),
+        Provider<ApiClient>(
+          create: (_) => ApiClient(tokenStorage: tokenStorage),
+        ),
         ChangeNotifierProvider<SessionProvider>(
-          create: (ctx) => SessionProvider.load(storage, ctx.read<ApiClient>()),
+          create: (ctx) => SessionProvider.load(
+            storage,
+            ctx.read<ApiClient>(),
+            tokenStorage: ctx.read<TokenStorage>(),
+          ),
         ),
         ChangeNotifierProvider<ThemeProvider>(
           create: (_) => ThemeProvider(storage),

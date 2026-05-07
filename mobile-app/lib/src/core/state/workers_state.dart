@@ -16,12 +16,15 @@ class WorkersProvider extends ChangeNotifier {
   bool get loading => _loading;
   String? get error => _error;
 
-  Future<void> fetchAll({String? category}) async {
+  Future<void> fetchAll({String? category, String? serviceId}) async {
     _loading = true;
     _error = null;
     notifyListeners();
     try {
-      _workers = await _api.getWorkers(category: category);
+      _workers = await _api.getWorkers(
+        category: category,
+        serviceId: serviceId,
+      );
     } catch (e) {
       _error = 'Failed to load technicians.';
     } finally {
