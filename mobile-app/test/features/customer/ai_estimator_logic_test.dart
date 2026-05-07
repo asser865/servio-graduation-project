@@ -64,6 +64,19 @@ void main() {
       );
       expect(r.total, closeTo(250.0, 0.01));
     });
+
+    test('unknown finishLevel falls back to standard rates', () {
+      final r = calcCosts(
+        roomType: 'living-room',
+        finishLevel: 'unknown-level',
+        floorArea: 10.0,
+      );
+      // standard: labor=28, materials=18, logistics=9; mult=1.0
+      // total = (28+18+9)*10 = 550.0 ; variance = 550*0.10 = 55.0
+      expect(r.total, closeTo(550.0, 0.01));
+      expect(r.low,  495);
+      expect(r.high, 605);
+    });
   });
 
   group('calcMaterials', () {

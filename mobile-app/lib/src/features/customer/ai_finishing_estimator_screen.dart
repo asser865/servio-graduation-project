@@ -54,7 +54,7 @@ EstimatorResult calcCosts({
   required String finishLevel,
   required double floorArea,
 }) {
-  final Map<String, double> rate = kEstimatorRates[finishLevel]!;
+  final Map<String, double> rate = kEstimatorRates[finishLevel] ?? kEstimatorRates['standard']!;
   final double mult = kRoomMultipliers[roomType] ?? 1.0;
 
   final double labor     = floorArea * rate['labor']!     * mult;
