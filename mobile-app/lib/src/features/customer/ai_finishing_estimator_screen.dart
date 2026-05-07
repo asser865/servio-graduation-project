@@ -263,7 +263,7 @@ class _AiFinishingEstimatorScreenState
     final double l = double.tryParse(_lengthCtrl.text.trim()) ?? 0;
     final double w = double.tryParse(_widthCtrl.text.trim()) ?? 0;
     final double h = double.tryParse(_heightCtrl.text.trim()) ?? 0;
-    return l > 0 && w > 0 && h > 0;
+    return l >= 0.5 && w >= 0.5 && h > 0;
   }
 
   bool _validateDims() {
@@ -279,11 +279,11 @@ class _AiFinishingEstimatorScreenState
     bool valid = true;
     String? lErr, wErr, hErr;
 
-    if (l <= 0 || l > maxLW) {
+    if (l < 0.5 || l > maxLW) {
       lErr = 'Enter a value between 0.5 and $maxLW $unit';
       valid = false;
     }
-    if (w <= 0 || w > maxLW) {
+    if (w < 0.5 || w > maxLW) {
       wErr = 'Enter a value between 0.5 and $maxLW $unit';
       valid = false;
     }
@@ -330,15 +330,15 @@ class _AiFinishingEstimatorScreenState
   }
 
   void _reset() {
+    _lengthCtrl.clear();
+    _widthCtrl.clear();
+    _heightCtrl.text = '2.7';
     setState(() {
       _step        = 0;
       _roomType    = null;
       _finishLevel = null;
       _result      = null;
       _isMetric    = true;
-      _lengthCtrl.clear();
-      _widthCtrl.clear();
-      _heightCtrl.text = '2.7';
       _lengthError = null;
       _widthError  = null;
       _heightError = null;
