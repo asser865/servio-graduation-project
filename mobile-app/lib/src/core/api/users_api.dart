@@ -39,4 +39,14 @@ class UsersApi {
     final response = await _client.patch('/users/me', fields);
     return UserAccount.fromBackend(_client.unwrapData(response));
   }
+
+  Future<void> updateEmail({
+    required String newEmail,
+    required String currentPassword,
+  }) async {
+    await _client.patch('/users/me/email', <String, dynamic>{
+      'newEmail': newEmail,
+      'currentPassword': currentPassword,
+    });
+  }
 }
