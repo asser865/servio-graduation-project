@@ -94,5 +94,5 @@ class UsersApi {
   Future<void> deleteMe() async {
     await _client.delete(ApiEndpoints.usersMe);
   }
-
 }
+
