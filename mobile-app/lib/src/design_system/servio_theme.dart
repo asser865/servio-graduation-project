@@ -80,6 +80,7 @@ final class ServioTheme {
     final base = ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
+      fontFamily: 'Inter',
       scaffoldBackgroundColor: ServioColors.backgroundLight,
       splashFactory: NoSplash.splashFactory,
       textTheme: textTheme.apply(
@@ -182,6 +183,7 @@ final class ServioTheme {
     final base = ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
+      fontFamily: 'Inter',
       scaffoldBackgroundColor: ServioColors.backgroundDark,
       splashFactory: NoSplash.splashFactory,
       textTheme: textTheme.apply(
@@ -194,7 +196,8 @@ final class ServioTheme {
     return _buildTheme(
       base,
       const ServioThemeExtension(
-        backgroundSoft: ServioColors.backgroundSoftDark,  // #262B34 (was wrong before)
+        backgroundSoft:
+            ServioColors.backgroundSoftDark, // #262B34 (was wrong before)
         surfaceAlt: ServioColors.surfaceAltDark,
         surfaceRaised: ServioColors.surfaceRaisedDark,
         textSecondary: ServioColors.textSecondaryDark,
@@ -235,16 +238,21 @@ final class ServioTheme {
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(ServioRadius.md),
-          side: BorderSide(color: extension.border.withValues(alpha: isDark ? 0.45 : 1)),
+          side: BorderSide(
+              color: extension.border.withValues(alpha: isDark ? 0.45 : 1)),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: extension.surfaceAlt,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        labelStyle: base.textTheme.labelLarge?.copyWith(color: extension.textSecondary),
-        hintStyle: base.textTheme.bodyMedium?.copyWith(color: extension.textSecondary),
-        errorStyle: base.textTheme.labelSmall?.copyWith(color: extension.danger),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        labelStyle:
+            base.textTheme.labelLarge?.copyWith(color: extension.textSecondary),
+        hintStyle:
+            base.textTheme.bodyMedium?.copyWith(color: extension.textSecondary),
+        errorStyle:
+            base.textTheme.labelSmall?.copyWith(color: extension.danger),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(ServioRadius.sm),
           borderSide: borderSide,
@@ -315,9 +323,11 @@ final class ServioTheme {
         thickness: 1,
       ),
       bottomSheetTheme: BottomSheetThemeData(
-        backgroundColor: isDark ? extension.surfaceRaised : base.colorScheme.surface,
+        backgroundColor:
+            isDark ? extension.surfaceRaised : base.colorScheme.surface,
         surfaceTintColor: Colors.transparent,
-        modalBackgroundColor: isDark ? extension.surfaceRaised : base.colorScheme.surface,
+        modalBackgroundColor:
+            isDark ? extension.surfaceRaised : base.colorScheme.surface,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(
             top: Radius.circular(ServioRadius.xl),

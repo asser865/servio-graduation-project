@@ -5,8 +5,8 @@ import '../../core/state/app_state.dart';
 import '../../core/models/user_account.dart';
 import '../../design_system/servio_tokens.dart';
 import '../auth/auth_landing_screen.dart';
-import '../customer/customer_dashboard_screen.dart';
-import '../technician/technician_dashboard_screen.dart';
+import '../customer/customer_shell.dart';
+import '../technician/technician_shell.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -57,9 +57,9 @@ class _SplashScreenState extends State<SplashScreen>
 
     if (session.isLoggedIn) {
       if (session.account!.role == UserRole.technician) {
-        nextScreen = const TechnicianDashboardScreen();
+        nextScreen = const TechnicianShell();
       } else {
-        nextScreen = const CustomerDashboardScreen();
+        nextScreen = const CustomerShell();
       }
     }
 
@@ -98,9 +98,8 @@ class _SplashScreenState extends State<SplashScreen>
         );
       },
       child: Scaffold(
-        backgroundColor: isDark
-            ? ServioColors.backgroundDark
-            : ServioColors.backgroundLight,
+        backgroundColor:
+            isDark ? ServioColors.backgroundDark : ServioColors.backgroundLight,
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,

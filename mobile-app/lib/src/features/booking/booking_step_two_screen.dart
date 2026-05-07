@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
@@ -19,24 +20,46 @@ class BookingStepTwoScreen extends StatefulWidget {
 }
 
 class _BookingStepTwoScreenState extends State<BookingStepTwoScreen> {
-  int _selectedDay = 26;
-  String _selectedSlot = '10AM-11AM';
+  late final List<DateTime> _days;
+  late DateTime _selectedDate;
+  final TextEditingController _addressController = TextEditingController();
+  String _selectedSlot = '10:00';
+
+  static const List<String> _slots = <String>[
+    '08:00',
+    '09:00',
+    '10:00',
+    '12:00',
+    '13:00',
+    '14:00',
+    '16:00',
+    '17:00',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    final firstDay = DateTime.now().add(const Duration(days: 1));
+    final normalizedFirstDay =
+        DateTime(firstDay.year, firstDay.month, firstDay.day);
+    _days = List<DateTime>.generate(
+      7,
+      (index) => normalizedFirstDay.add(Duration(days: index)),
+    );
+    _selectedDate = _days.first;
+    _addressController.text = widget.data.addressStreet;
+  }
+
+  @override
+  void dispose() {
+    _addressController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
-    const days = <int>[24, 25, 26, 27, 28, 29, 30];
-    const slots = <String>[
-      '8AM-9AM',
-      '9AM-10AM',
-      '10AM-11AM',
-      '12PM-1PM',
-      '1PM-2PM',
-      '2PM-3PM',
-      '4PM-5PM',
-      '5PM-6PM',
-    ];
 
     return Scaffold(
       appBar: AppBar(
@@ -49,29 +72,49 @@ class _BookingStepTwoScreenState extends State<BookingStepTwoScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              Text('March 2026', style: theme.textTheme.headlineMedium),
+              Text(
+                DateFormat('MMMM y').format(_selectedDate),
+                style: theme.textTheme.headlineMedium,
+              ),
               const SizedBox(height: 14),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: days.map((int day) {
-                  final selected = day == _selectedDay;
+                children: _days.map((DateTime day) {
+                  final selected = _isSameDate(day, _selectedDate);
                   return GestureDetector(
-                    onTap: () => setState(() => _selectedDay = day),
+                    onTap: () => setState(() => _selectedDate = day),
                     child: Container(
                       width: 42,
                       height: 58,
                       decoration: BoxDecoration(
                         gradient: selected ? ServioGradients.brand : null,
-                        color: selected ? null : Theme.of(context).colorScheme.surface,
+                        color: selected
+                            ? null
+                            : Theme.of(context).colorScheme.surface,
                         borderRadius: BorderRadius.circular(ServioRadius.full),
-                        border: selected ? null : Border.all(color: servio.border),
+                        border:
+                            selected ? null : Border.all(color: servio.border),
                       ),
                       child: Center(
-                        child: Text(
-                          '$day',
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            color: selected ? Colors.white : null,
-                          ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[
+                            Text(
+                              DateFormat('E').format(day),
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: selected
+                                    ? Colors.white.withValues(alpha: 0.8)
+                                    : servio.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              '${day.day}',
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                color: selected ? Colors.white : null,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -84,19 +127,23 @@ class _BookingStepTwoScreenState extends State<BookingStepTwoScreen> {
               Wrap(
                 spacing: 10,
                 runSpacing: 10,
-                children: slots.map((String slot) {
+                children: _slots.map((String slot) {
                   final selected = slot == _selectedSlot;
                   return GestureDetector(
                     onTap: () => setState(() => _selectedSlot = slot),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
                       decoration: BoxDecoration(
-                        color: selected ? servio.accent : Theme.of(context).colorScheme.surface,
+                        color: selected
+                            ? servio.accent
+                            : Theme.of(context).colorScheme.surface,
                         borderRadius: BorderRadius.circular(ServioRadius.full),
-                        border: Border.all(color: selected ? servio.accent : servio.border),
+                        border: Border.all(
+                            color: selected ? servio.accent : servio.border),
                       ),
                       child: Text(
-                        slot,
+                        _slotLabel(slot),
                         style: theme.textTheme.labelLarge?.copyWith(
                           color: selected ? Colors.white : servio.textSecondary,
                         ),
@@ -106,26 +153,46 @@ class _BookingStepTwoScreenState extends State<BookingStepTwoScreen> {
                 }).toList(),
               ),
               const SizedBox(height: 24),
-              const TextField(
-                decoration: InputDecoration(
+              TextField(
+                controller: _addressController,
+                decoration: const InputDecoration(
                   labelText: 'Service address',
                   prefixIcon: Icon(Icons.location_on_outlined),
                 ),
               ),
               Align(
                 alignment: Alignment.centerRight,
-                child: TextButton(onPressed: () {}, child: const Text('Use current location')),
+                child: TextButton(
+                    onPressed: () {},
+                    child: const Text('Use current location')),
               ),
               const SizedBox(height: 12),
               ServioPrimaryButton(
                 label: 'Continue',
                 onPressed: () {
+                  final selectedHour =
+                      int.tryParse(_selectedSlot.split(':').first) ?? 10;
+                  final scheduledDateTime = DateTime(
+                    _selectedDate.year,
+                    _selectedDate.month,
+                    _selectedDate.day,
+                    selectedHour,
+                  );
+                  final address = _addressController.text.trim();
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
                       builder: (_) => BookingStepThreeScreen(
                         data: widget.data.copyWith(
-                          date: '$_selectedDay/03/2026',
-                          time: _selectedSlot.replaceAll('-', ' - '),
+                          date: DateFormat('dd/MM/yyyy').format(_selectedDate),
+                          time: _slotLabel(_selectedSlot),
+                          scheduledDateTime: scheduledDateTime,
+                          location: address.isNotEmpty
+                              ? address
+                              : widget.data.location,
+                          addressCity: widget.data.addressCity.isNotEmpty
+                              ? widget.data.addressCity
+                              : 'Cairo',
+                          addressStreet: address,
                         ),
                       ),
                     ),
@@ -138,4 +205,19 @@ class _BookingStepTwoScreenState extends State<BookingStepTwoScreen> {
       ),
     );
   }
+}
+
+bool _isSameDate(DateTime a, DateTime b) =>
+    a.year == b.year && a.month == b.month && a.day == b.day;
+
+String _slotLabel(String value) {
+  final hour = int.tryParse(value.split(':').first) ?? 0;
+  final nextHour = (hour + 1).clamp(0, 23).toInt();
+  return '${_hourLabel(hour)} - ${_hourLabel(nextHour)}';
+}
+
+String _hourLabel(int hour) {
+  final suffix = hour >= 12 ? 'PM' : 'AM';
+  final displayHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+  return '$displayHour:00 $suffix';
 }

@@ -84,7 +84,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
             height: MediaQuery.of(context).padding.top + 180,
             child: Container(
               decoration: BoxDecoration(
-                gradient: isDark ? ServioGradients.brandDark : ServioGradients.brand,
+                gradient:
+                    isDark ? ServioGradients.brandDark : ServioGradients.brand,
               ),
             ),
           ),
@@ -111,7 +112,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                           ),
                           child: Icon(
                             Icons.arrow_back_rounded,
-                            color: isDark ? ServioColors.navyDark : Colors.white,
+                            color:
+                                isDark ? ServioColors.navyDark : Colors.white,
                             size: 20,
                           ),
                         ),
@@ -135,8 +137,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                       end: Offset.zero,
                     ).animate(CurvedAnimation(
                       parent: _animController,
-                      curve: const Interval(0.2, 0.8,
-                          curve: ServioMotion.spring),
+                      curve:
+                          const Interval(0.2, 0.8, curve: ServioMotion.spring),
                     )),
                     child: FadeTransition(
                       opacity: CurvedAnimation(
@@ -184,8 +186,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
               color: ServioColors.tint(servio.accent),
               borderRadius: BorderRadius.circular(ServioRadius.lg),
             ),
-            child: Icon(Icons.lock_reset_rounded,
-                color: servio.accent, size: 32),
+            child:
+                Icon(Icons.lock_reset_rounded, color: servio.accent, size: 32),
           ),
           const SizedBox(height: 20),
           Text(

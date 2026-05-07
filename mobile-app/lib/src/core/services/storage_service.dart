@@ -16,7 +16,8 @@ class StorageService {
 
   // ── String ────────────────────────────────────────────────
   String? getString(String key) => _prefs.getString(key);
-  Future<void> setString(String key, String value) => _prefs.setString(key, value);
+  Future<void> setString(String key, String value) =>
+      _prefs.setString(key, value);
 
   // ── Bool ──────────────────────────────────────────────────
   bool getBool(String key, {bool defaultValue = false}) =>
@@ -52,8 +53,8 @@ class StorageService {
   Future<void> setJsonList(String key, List<Map<String, dynamic>> value) =>
       _prefs.setString(key, jsonEncode(value));
 
-  // ── Secure (uses SharedPreferences for prototype; upgrade to
-  //    flutter_secure_storage for production) ─────────────────
+  // ── Legacy token helpers.
+  // Runtime JWT storage now goes through TokenStorage/flutter_secure_storage.
   Future<String?> getSecureString(String key) async => _prefs.getString(key);
   Future<void> setSecureString(String key, String value) =>
       _prefs.setString(key, value);

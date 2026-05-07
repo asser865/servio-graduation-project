@@ -39,7 +39,6 @@ class CustomerSettingsScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-
             // ── Profile ──────────────────────────────────────────────────────
             _SectionHeader(label: 'Profile'),
             _SettingsGroup(

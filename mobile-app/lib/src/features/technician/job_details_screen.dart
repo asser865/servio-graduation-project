@@ -135,7 +135,9 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                     ),
                     child: Center(
                       child: Text(
-                        job.serviceName.isNotEmpty ? job.serviceName[0].toUpperCase() : '?',
+                        job.serviceName.isNotEmpty
+                            ? job.serviceName[0].toUpperCase()
+                            : '?',
                       ),
                     ),
                   ),
@@ -144,11 +146,13 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        Text(job.serviceName, style: theme.textTheme.titleMedium),
+                        Text(job.serviceName,
+                            style: theme.textTheme.titleMedium),
                         const SizedBox(height: 4),
                         Text(
                           'Previous rating: 5.0',
-                          style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+                          style: theme.textTheme.bodySmall
+                              ?.copyWith(color: servio.textSecondary),
                         ),
                       ],
                     ),
@@ -157,7 +161,8 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                     onPressed: () {
                       Navigator.of(context).push(
                         MaterialPageRoute<void>(
-                          builder: (_) => ChatScreen(contactName: job.serviceName),
+                          builder: (_) =>
+                              ChatScreen(contactName: job.serviceName),
                         ),
                       );
                     },
@@ -177,7 +182,8 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                   const SizedBox(height: 8),
                   Text(
                     job.notes.isNotEmpty ? job.notes : 'No additional notes.',
-                    style: theme.textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(color: servio.textSecondary),
                   ),
                   const SizedBox(height: 16),
                   SizedBox(
@@ -185,13 +191,17 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
                       itemCount: 3,
-                      separatorBuilder: (BuildContext context, int index) => const SizedBox(width: 12),
+                      separatorBuilder: (BuildContext context, int index) =>
+                          const SizedBox(width: 12),
                       itemBuilder: (BuildContext context, int index) {
                         return Container(
                           width: 120,
                           decoration: BoxDecoration(
-                            gradient: index.isEven ? ServioGradients.brand : ServioGradients.warm,
-                            borderRadius: BorderRadius.circular(ServioRadius.md),
+                            gradient: index.isEven
+                                ? ServioGradients.brand
+                                : ServioGradients.warm,
+                            borderRadius:
+                                BorderRadius.circular(ServioRadius.md),
                           ),
                         );
                       },
@@ -200,7 +210,8 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                   const SizedBox(height: 16),
                   Text(
                     job.addressCity,
-                    style: theme.textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(color: servio.textSecondary),
                   ),
                   const SizedBox(height: 12),
                   Container(
@@ -212,19 +223,22 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                     child: Center(
                       child: Text(
                         'Map Preview',
-                        style: theme.textTheme.titleMedium?.copyWith(color: servio.accent),
+                        style: theme.textTheme.titleMedium
+                            ?.copyWith(color: servio.accent),
                       ),
                     ),
                   ),
                   const SizedBox(height: 16),
                   Text(
                     'Scheduled: ${job.scheduledDate.day}/${job.scheduledDate.month}/${job.scheduledDate.year}',
-                    style: theme.textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(color: servio.textSecondary),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Offered: EGP ${job.totalAmount.toStringAsFixed(0)}',
-                    style: theme.textTheme.headlineMedium?.copyWith(color: servio.accent),
+                    style: theme.textTheme.headlineMedium
+                        ?.copyWith(color: servio.accent),
                   ),
                 ],
               ),

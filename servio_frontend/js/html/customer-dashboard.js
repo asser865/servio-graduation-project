@@ -1242,6 +1242,18 @@ function initSecurityForm() {
       if (errEl) { errEl.textContent = 'New password must be at least 8 characters.'; errEl.hidden = false; }
       return;
     }
+    if (!/[0-9]/.test(newPw)) {
+      if (errEl) { errEl.textContent = 'New password must contain at least one number.'; errEl.hidden = false; }
+      return;
+    }
+    if (!/[^A-Za-z0-9]/.test(newPw)) {
+      if (errEl) { errEl.textContent = 'New password must contain at least one special character.'; errEl.hidden = false; }
+      return;
+    }
+    if (newPw === currentPw) {
+      if (errEl) { errEl.textContent = 'New password must be different from your current password.'; errEl.hidden = false; }
+      return;
+    }
     if (newPw !== confirmPw) {
       if (errEl) { errEl.textContent = 'New passwords do not match.'; errEl.hidden = false; }
       return;
@@ -1249,11 +1261,15 @@ function initSecurityForm() {
 
     try {
       if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Updating…'; }
-      // Calls PATCH /users/me/password → { currentPassword, newPassword }
       await updatePassword({ currentPassword: currentPw, newPassword: newPw });
-      showToast(_t('toast_password_changed') || 'Password updated successfully.', 'success');
+      showToast(_t('toast_password_changed') || 'Password updated. Please sign in again.', 'success');
       form.reset();
       updateStrength('');
+      setTimeout(() => {
+        localStorage.removeItem('servio_token');
+        localStorage.removeItem('servio_session');
+        window.location.href = './login.html';
+      }, 1500);
     } catch (err) {
       const msg = err?.data?.message || err?.message || 'Failed to update password. Check your current password and try again.';
       if (errEl) { errEl.textContent = msg; errEl.hidden = false; }

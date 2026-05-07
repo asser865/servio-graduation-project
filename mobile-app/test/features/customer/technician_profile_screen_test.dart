@@ -112,6 +112,15 @@ Future<Widget> _wrap(
   );
 }
 
+Future<void> _scrollTo(WidgetTester tester, Finder finder) async {
+  await tester.scrollUntilVisible(
+    finder,
+    180,
+    scrollable: find.byType(Scrollable),
+  );
+  await tester.pumpAndSettle();
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -133,13 +142,14 @@ void main() {
 
     expect(find.text('Mona Adel'), findsWidgets);
     expect(find.textContaining('Drain Cleaning'), findsWidgets);
-    await tester.drag(find.byType(CustomScrollView), const Offset(0, -700));
-    await tester.pumpAndSettle();
+    await _scrollTo(
+      tester,
+      find.text('Licensed home maintenance specialist.'),
+    );
     expect(find.text('Licensed home maintenance specialist.'), findsOneWidget);
     expect(find.text('Drain Cleaning'), findsWidgets);
     expect(find.text('AC Tune Up'), findsWidgets);
-    await tester.drag(find.byType(CustomScrollView), const Offset(0, -700));
-    await tester.pumpAndSettle();
+    await _scrollTo(tester, find.text('Ahmed Hassan'));
     expect(find.text('Ahmed Hassan'), findsOneWidget);
     expect(find.text('Book technician'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -166,10 +176,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Technician'), findsWidgets);
-    await tester.drag(find.byType(CustomScrollView), const Offset(0, -700));
-    await tester.pumpAndSettle();
+    await _scrollTo(tester, find.text('No bio available.'));
     expect(find.text('No bio available.'), findsOneWidget);
+
+    await _scrollTo(tester, find.text('No services listed.'));
     expect(find.text('No services listed.'), findsOneWidget);
+
+    await _scrollTo(tester, find.text('Rating not available'));
     expect(find.text('Rating not available'), findsOneWidget);
     expect(find.text('Rate on request'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -221,8 +234,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.textContaining('Emergency Drain Cleaning'), findsWidgets);
-    await tester.drag(find.byType(CustomScrollView), const Offset(0, -700));
-    await tester.pumpAndSettle();
+    await _scrollTo(tester, find.text('Whole Home Electrical Inspection'));
     expect(find.text('Emergency Drain Cleaning'), findsWidgets);
     expect(find.text('Whole Home Electrical Inspection'), findsWidgets);
     expect(find.text('Book technician'), findsOneWidget);

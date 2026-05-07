@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/api/api_client.dart';
+import '../../core/api/services_api.dart';
 import '../../core/data/demo_services.dart';
+import '../../core/models/backend_service_model.dart';
 import '../../core/models/service_model.dart';
 import '../../core/state/app_state.dart';
+import '../../core/state/services_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
@@ -31,8 +35,15 @@ class ServiceDetailScreen extends StatefulWidget {
 
 class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
   int _selectedTab = 0;
+  BackendService? _backendService;
 
   static const List<String> _tabs = <String>['Overview', 'About', 'Reviews'];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadBackendService());
+  }
 
   ServiceModel get _service {
     if (widget.serviceId == null) return kDemoServices.first;
@@ -42,12 +53,48 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
     );
   }
 
+  Future<void> _loadBackendService() async {
+    final serviceId = widget.serviceId?.trim();
+    if (serviceId == null || serviceId.isEmpty) return;
+    final isDemoServiceId =
+        kDemoServices.any((service) => service.id == serviceId);
+    if (isDemoServiceId) return;
+
+    final cached = context.read<ServicesProvider>().findById(serviceId);
+    if (cached != null) {
+      if (mounted) setState(() => _backendService = cached);
+      return;
+    }
+
+    try {
+      final service = await ServicesApi(context.read<ApiClient>())
+          .getServiceById(serviceId);
+      if (mounted) setState(() => _backendService = service);
+    } catch (_) {
+      // Keep the existing demo fallback if the backend record cannot load.
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
     final locale = context.watch<LocaleProvider>().locale.languageCode;
     final service = _service;
+    final backendService = _backendService;
+    final rawServiceCategory = backendService?.category;
+    final serviceTitle = backendService?.name ?? service.title.of(locale);
+    final serviceCategory =
+        (rawServiceCategory == null || rawServiceCategory.trim().isEmpty
+                ? 'HOME MAINTENANCE'
+                : rawServiceCategory)
+            .toUpperCase();
+    final serviceDescription =
+        backendService?.description ?? service.lead.of(locale);
+    final servicePriceLabel = backendService == null
+        ? service.priceBadge.of(locale)
+        : 'EGP ${backendService.basePrice.toStringAsFixed(0)}';
+    final canonicalServiceId = backendService?.id;
 
     return Scaffold(
       body: Stack(
@@ -85,7 +132,8 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                                   end: Alignment.bottomCenter,
                                   colors: <Color>[
                                     Colors.transparent,
-                                    ServioColors.navyDark.withValues(alpha: 0.6),
+                                    ServioColors.navyDark
+                                        .withValues(alpha: 0.6),
                                   ],
                                 ),
                               ),
@@ -96,7 +144,8 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                     ),
                     SafeArea(
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 14),
                         child: Row(
                           children: <Widget>[
                             _FloatingActionIcon(
@@ -121,34 +170,39 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                   delegate: SliverChildListDelegate(
                     <Widget>[
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
                           color: servio.backgroundSoft,
                           borderRadius: BorderRadius.circular(ServioRadius.sm),
                         ),
                         child: Text(
-                          'HOME MAINTENANCE',
-                          style: theme.textTheme.labelSmall?.copyWith(color: servio.accent),
+                          serviceCategory,
+                          style: theme.textTheme.labelSmall
+                              ?.copyWith(color: servio.accent),
                         ),
                       ),
                       const SizedBox(height: 14),
-                      Text(service.title.of(locale), style: theme.textTheme.headlineLarge),
+                      Text(serviceTitle, style: theme.textTheme.headlineLarge),
                       const SizedBox(height: 12),
                       Row(
                         children: <Widget>[
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
                             decoration: BoxDecoration(
                               gradient: ServioGradients.accent,
-                              borderRadius: BorderRadius.circular(ServioRadius.full),
+                              borderRadius:
+                                  BorderRadius.circular(ServioRadius.full),
                             ),
                             child: Text(
                               'AI PRICE ESTIMATE',
-                              style: theme.textTheme.labelSmall?.copyWith(color: Colors.white),
+                              style: theme.textTheme.labelSmall
+                                  ?.copyWith(color: Colors.white),
                             ),
                           ),
                           const SizedBox(width: 12),
-                          ServioStatusChip(label: service.priceBadge.of(locale)),
+                          ServioStatusChip(label: servicePriceLabel),
                         ],
                       ),
                       const SizedBox(height: 20),
@@ -156,28 +210,37 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
                           color: servio.backgroundSoft,
-                          borderRadius: BorderRadius.circular(ServioRadius.full),
+                          borderRadius:
+                              BorderRadius.circular(ServioRadius.full),
                         ),
                         child: Row(
-                          children: List<Widget>.generate(_tabs.length, (int index) {
+                          children:
+                              List<Widget>.generate(_tabs.length, (int index) {
                             final active = index == _selectedTab;
 
                             return Expanded(
                               child: GestureDetector(
-                                onTap: () => setState(() => _selectedTab = index),
+                                onTap: () =>
+                                    setState(() => _selectedTab = index),
                                 child: AnimatedContainer(
                                   duration: ServioMotion.micro,
                                   curve: ServioMotion.curve,
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 12),
                                   decoration: BoxDecoration(
-                                    color: active ? Theme.of(context).colorScheme.surface : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(ServioRadius.full),
+                                    color: active
+                                        ? Theme.of(context).colorScheme.surface
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(
+                                        ServioRadius.full),
                                   ),
                                   child: Text(
                                     _tabs[index],
                                     textAlign: TextAlign.center,
                                     style: theme.textTheme.labelLarge?.copyWith(
-                                      color: active ? servio.accent : servio.textSecondary,
+                                      color: active
+                                          ? servio.accent
+                                          : servio.textSecondary,
                                     ),
                                   ),
                                 ),
@@ -189,7 +252,12 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                       const SizedBox(height: 24),
                       AnimatedSwitcher(
                         duration: ServioMotion.micro,
-                        child: _buildTabContent(context, service, locale),
+                        child: _buildTabContent(
+                          context,
+                          service,
+                          locale,
+                          serviceDescription,
+                        ),
                       ),
                     ],
                   ),
@@ -212,7 +280,8 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                   onPressed: () {
                     Navigator.of(context).push(
                       MaterialPageRoute<void>(
-                        builder: (_) => TechnicianListingScreen(serviceId: service.id),
+                        builder: (_) => TechnicianListingScreen(
+                            serviceId: canonicalServiceId),
                       ),
                     );
                   },
@@ -225,7 +294,12 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
     );
   }
 
-  Widget _buildTabContent(BuildContext context, ServiceModel service, String locale) {
+  Widget _buildTabContent(
+    BuildContext context,
+    ServiceModel service,
+    String locale,
+    String serviceDescription,
+  ) {
     final theme = Theme.of(context);
     final servio = context.servio;
 
@@ -236,8 +310,9 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text(
-              service.lead.of(locale),
-              style: theme.textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
+              serviceDescription,
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: servio.textSecondary),
             ),
             const SizedBox(height: 20),
             Text(
@@ -258,23 +333,28 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
           key: const ValueKey<int>(1),
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text(locale == 'ar' ? 'تسعير الخدمة' : 'Service Pricing', style: theme.textTheme.titleMedium),
+            Text(locale == 'ar' ? 'تسعير الخدمة' : 'Service Pricing',
+                style: theme.textTheme.titleMedium),
             const SizedBox(height: 12),
             ...service.pricing.map(
-              (ServicePricingTier tier) => _PricingCard(tier: tier, locale: locale),
+              (ServicePricingTier tier) =>
+                  _PricingCard(tier: tier, locale: locale),
             ),
             const SizedBox(height: 20),
-            Text(locale == 'ar' ? 'الأسئلة الشائعة' : 'FAQs', style: theme.textTheme.titleMedium),
+            Text(locale == 'ar' ? 'الأسئلة الشائعة' : 'FAQs',
+                style: theme.textTheme.titleMedium),
             const SizedBox(height: 12),
             ...service.faqs.map(
               (ServiceFaq faq) => _FaqItem(faq: faq, locale: locale),
             ),
             const SizedBox(height: 16),
-            Text(service.ctaTitle.of(locale), style: theme.textTheme.titleMedium),
+            Text(service.ctaTitle.of(locale),
+                style: theme.textTheme.titleMedium),
             const SizedBox(height: 6),
             Text(
               service.ctaSub.of(locale),
-              style: theme.textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: servio.textSecondary),
             ),
           ],
         );
@@ -288,11 +368,14 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
               style: theme.textTheme.titleMedium,
             ),
             const SizedBox(height: 12),
-            _ReviewBar(label: locale == 'ar' ? '5 نجوم' : '5 stars', value: 0.72),
+            _ReviewBar(
+                label: locale == 'ar' ? '5 نجوم' : '5 stars', value: 0.72),
             const SizedBox(height: 8),
-            _ReviewBar(label: locale == 'ar' ? '4 نجوم' : '4 stars', value: 0.18),
+            _ReviewBar(
+                label: locale == 'ar' ? '4 نجوم' : '4 stars', value: 0.18),
             const SizedBox(height: 8),
-            _ReviewBar(label: locale == 'ar' ? '3 نجوم' : '3 stars', value: 0.06),
+            _ReviewBar(
+                label: locale == 'ar' ? '3 نجوم' : '3 stars', value: 0.06),
             const SizedBox(height: 20),
             ...service.reviews.map(
               (ServiceReview r) => Padding(
@@ -358,7 +441,8 @@ class _ChecklistItem extends StatelessWidget {
         children: <Widget>[
           Padding(
             padding: const EdgeInsets.only(top: 2),
-            child: Icon(Icons.check_circle_rounded, color: servio.accent, size: 20),
+            child: Icon(Icons.check_circle_rounded,
+                color: servio.accent, size: 20),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -370,7 +454,10 @@ class _ChecklistItem extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     subtitle!,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: servio.textSecondary),
                   ),
                 ],
               ],
@@ -397,7 +484,8 @@ class _PricingCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: tier.featured ? servio.backgroundSoft : theme.colorScheme.surface,
+        color:
+            tier.featured ? servio.backgroundSoft : theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(ServioRadius.lg),
         border: Border.all(
           color: tier.featured ? servio.accent : servio.border,
@@ -409,17 +497,21 @@ class _PricingCard extends StatelessWidget {
         children: <Widget>[
           Row(
             children: <Widget>[
-              Expanded(child: Text(tier.tier.of(locale), style: theme.textTheme.titleMedium)),
+              Expanded(
+                  child: Text(tier.tier.of(locale),
+                      style: theme.textTheme.titleMedium)),
               if (tier.featured)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     gradient: ServioGradients.brand,
                     borderRadius: BorderRadius.circular(ServioRadius.full),
                   ),
                   child: Text(
                     locale == 'ar' ? 'الأكثر شيوعاً' : 'Most Popular',
-                    style: theme.textTheme.labelSmall?.copyWith(color: Colors.white),
+                    style: theme.textTheme.labelSmall
+                        ?.copyWith(color: Colors.white),
                   ),
                 ),
             ],
@@ -432,7 +524,8 @@ class _PricingCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             tier.jobs.of(locale),
-            style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: servio.textSecondary),
           ),
         ],
       ),
@@ -476,16 +569,20 @@ class _FaqItemState extends State<_FaqItem> {
               Row(
                 children: <Widget>[
                   Expanded(
-                    child: Text(widget.faq.question.of(widget.locale), style: theme.textTheme.labelLarge),
+                    child: Text(widget.faq.question.of(widget.locale),
+                        style: theme.textTheme.labelLarge),
                   ),
-                  Icon(_expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded),
+                  Icon(_expanded
+                      ? Icons.expand_less_rounded
+                      : Icons.expand_more_rounded),
                 ],
               ),
               if (_expanded) ...<Widget>[
                 const SizedBox(height: 10),
                 Text(
                   widget.faq.answer.of(widget.locale),
-                  style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: servio.textSecondary),
                 ),
               ],
             ],
@@ -565,7 +662,10 @@ class _ReviewCard extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             body,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
+            style: Theme.of(context)
+                .textTheme
+                .bodyMedium
+                ?.copyWith(color: servio.textSecondary),
           ),
         ],
       ),

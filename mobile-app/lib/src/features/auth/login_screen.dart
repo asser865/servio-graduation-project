@@ -5,12 +5,13 @@ import '../../core/models/user_account.dart';
 import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
-import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
-import '../customer/customer_home_screen.dart';
-import '../technician/technician_dashboard_screen.dart';
+import '../customer/customer_shell.dart';
+import '../technician/technician_shell.dart';
 import 'forgot_password_screen.dart';
 import 'role_selection_screen.dart';
+import 'widgets/auth_background.dart';
+import 'widgets/auth_card.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -91,8 +92,8 @@ class _LoginScreenState extends State<LoginScreen>
     }
 
     final Widget destination = account.role == UserRole.customer
-        ? const CustomerHomeScreen()
-        : const TechnicianDashboardScreen();
+        ? const CustomerShell()
+        : const TechnicianShell();
 
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute<void>(builder: (_) => destination),
@@ -124,328 +125,413 @@ class _LoginScreenState extends State<LoginScreen>
     final theme = Theme.of(context);
     final servio = context.servio;
     final isDark = theme.brightness == Brightness.dark;
-    final onGradient = isDark ? ServioColors.navyDark : Colors.white;
 
     return Scaffold(
+      backgroundColor:
+          isDark ? const Color(0xFF1E2633) : ServioColors.backgroundLight,
       body: Stack(
         children: <Widget>[
-          // ── Gradient header ───────────────────────────────────
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: MediaQuery.of(context).padding.top + 280,
-            child: Container(
-              decoration: BoxDecoration(
-                gradient:
-                    isDark ? ServioGradients.brandDark : ServioGradients.brand,
-              ),
-            ),
+          const Positioned.fill(
+            child: AuthBackground(fullBleed: true),
           ),
-
           SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: ServioSpacing.screenPadding),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  const SizedBox(height: 20),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final horizontalPadding =
+                    constraints.maxWidth >= 700 ? 32.0 : 20.0;
+                final minContentHeight = constraints.maxHeight > 116
+                    ? constraints.maxHeight - 116
+                    : 0.0;
 
-                  // ── Back button (left-aligned) ─────────────────
-                  Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: GestureDetector(
-                      onTap: () => Navigator.of(context).pop(),
-                      child: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.15),
-                          borderRadius:
-                              BorderRadius.circular(ServioRadius.full),
-                        ),
-                        child: Icon(
-                          Icons.arrow_back_rounded,
-                          color: onGradient,
-                          size: 20,
-                        ),
-                      ),
-                    ),
+                return SingleChildScrollView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding,
+                    0,
+                    horizontalPadding,
+                    24,
                   ),
-
-                  const SizedBox(height: 24),
-
-                  // ── Brand icon mark ────────────────────────────
-                  FadeTransition(
-                    opacity: CurvedAnimation(
-                      parent: _entranceController,
-                      curve: const Interval(0.0, 0.45),
-                    ),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: minContentHeight),
                     child: Center(
-                      child: Container(
-                        width: 64,
-                        height: 64,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.15),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.25),
-                            width: 1.5,
-                          ),
-                        ),
-                        child: Icon(
-                          Icons.person_outline_rounded,
-                          size: 28,
-                          color: onGradient,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // ── Welcome heading ────────────────────────────
-                  SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(0, 0.25),
-                      end: Offset.zero,
-                    ).animate(CurvedAnimation(
-                      parent: _entranceController,
-                      curve: const Interval(0.1, 0.6,
-                          curve: ServioMotion.spring),
-                    )),
-                    child: FadeTransition(
-                      opacity: CurvedAnimation(
-                        parent: _entranceController,
-                        curve: const Interval(0.1, 0.55),
-                      ),
-                      child: Column(
-                        children: <Widget>[
-                          Text(
-                            'Welcome back',
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.displayLarge?.copyWith(
-                              color: onGradient,
-                              height: 1.1,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Sign in to continue.',
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: onGradient.withValues(alpha: 0.7),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 28),
-
-                  // ── Form card ──────────────────────────────────
-                  SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(0, 0.15),
-                      end: Offset.zero,
-                    ).animate(CurvedAnimation(
-                      parent: _entranceController,
-                      curve: const Interval(0.25, 0.85,
-                          curve: ServioMotion.spring),
-                    )),
-                    child: FadeTransition(
-                      opacity: CurvedAnimation(
-                        parent: _entranceController,
-                        curve: const Interval(0.25, 0.75),
-                      ),
-                      child: ServioCard(
-                        elevated: true,
-                        radius: ServioRadius.xl,
-                        padding: const EdgeInsets.all(24),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 480),
                         child: Column(
+                          mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: <Widget>[
-                            // Section label
-                            Row(
-                              children: <Widget>[
-                                Icon(
-                                  Icons.lock_outline_rounded,
-                                  size: 13,
-                                  color: servio.accent,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'YOUR CREDENTIALS',
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    color: servio.textSecondary,
-                                    letterSpacing: 0.8,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Divider(color: servio.border),
-                            const SizedBox(height: 18),
+                            const SizedBox(height: 86),
 
-                            // Error banner
-                            if (_errorMsg != null) ...<Widget>[
-                              _ErrorBanner(message: _errorMsg!),
-                              const SizedBox(height: 14),
-                            ],
-
-                            // Email field
-                            TextField(
-                              controller: _emailCtrl,
-                              keyboardType: TextInputType.emailAddress,
-                              textInputAction: TextInputAction.next,
-                              decoration: const InputDecoration(
-                                labelText: 'Email address',
-                                prefixIcon:
-                                    Icon(Icons.mail_outline_rounded),
+                            // ── Brand icon mark ────────────────────────────
+                            FadeTransition(
+                              opacity: CurvedAnimation(
+                                parent: _entranceController,
+                                curve: const Interval(0.0, 0.45),
                               ),
-                            ),
-                            const SizedBox(height: 14),
-
-                            // Password field
-                            TextField(
-                              controller: _passwordCtrl,
-                              obscureText: _obscurePassword,
-                              textInputAction: TextInputAction.done,
-                              onSubmitted: (_) => _login(),
-                              decoration: InputDecoration(
-                                labelText: 'Password',
-                                prefixIcon:
-                                    const Icon(Icons.lock_outline_rounded),
-                                suffixIcon: IconButton(
-                                  onPressed: () => setState(() =>
-                                      _obscurePassword = !_obscurePassword),
-                                  icon: Icon(
-                                    _obscurePassword
-                                        ? Icons.visibility_outlined
-                                        : Icons.visibility_off_outlined,
-                                  ),
-                                ),
-                              ),
-                            ),
-
-                            const SizedBox(height: 6),
-
-                            // Remember me / Forgot password row
-                            Row(
-                              children: <Widget>[
-                                _AnimatedCheckbox(
-                                  value: _rememberMe,
-                                  accent: servio.accent,
-                                  border: servio.border,
-                                  onChanged: (v) =>
-                                      setState(() => _rememberMe = v),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Remember me',
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: servio.textSecondary,
-                                  ),
-                                ),
-                                const Spacer(),
-                                TextButton(
-                                  onPressed: () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute<void>(
-                                      builder: (_) =>
-                                          const ForgotPasswordScreen(),
+                              child: Center(
+                                child: Container(
+                                  width: 64,
+                                  height: 64,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.15),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color:
+                                          Colors.white.withValues(alpha: 0.25),
+                                      width: 1.5,
                                     ),
                                   ),
-                                  child: const Text('Forgot password?'),
+                                  child: const Icon(
+                                    Icons.person_outline_rounded,
+                                    size: 28,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 16),
+
+                            // ── Welcome heading ────────────────────────────
+                            SlideTransition(
+                              position: Tween<Offset>(
+                                begin: const Offset(0, 0.25),
+                                end: Offset.zero,
+                              ).animate(CurvedAnimation(
+                                parent: _entranceController,
+                                curve: const Interval(0.1, 0.6,
+                                    curve: ServioMotion.spring),
+                              )),
+                              child: FadeTransition(
+                                opacity: CurvedAnimation(
+                                  parent: _entranceController,
+                                  curve: const Interval(0.1, 0.55),
+                                ),
+                                child: Column(
+                                  children: <Widget>[
+                                    Text(
+                                      'Welcome back',
+                                      textAlign: TextAlign.center,
+                                      style: theme.textTheme.displayLarge
+                                          ?.copyWith(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w900,
+                                        height: 1.1,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      'Sign in to continue.',
+                                      textAlign: TextAlign.center,
+                                      style:
+                                          theme.textTheme.bodyMedium?.copyWith(
+                                        color: Colors.white
+                                            .withValues(alpha: 0.45),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 28),
+
+                            // ── Form card ──────────────────────────────────
+                            SlideTransition(
+                              position: Tween<Offset>(
+                                begin: const Offset(0, 0.15),
+                                end: Offset.zero,
+                              ).animate(CurvedAnimation(
+                                parent: _entranceController,
+                                curve: const Interval(0.25, 0.85,
+                                    curve: ServioMotion.spring),
+                              )),
+                              child: FadeTransition(
+                                opacity: CurvedAnimation(
+                                  parent: _entranceController,
+                                  curve: const Interval(0.25, 0.75),
+                                ),
+                                child: AuthCard(
+                                  frosted: true,
+                                  padding: const EdgeInsets.all(20),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: <Widget>[
+                                      // Section label
+                                      Row(
+                                        children: <Widget>[
+                                          Icon(
+                                            Icons.lock_outline_rounded,
+                                            size: 13,
+                                            color: servio.accent,
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            'YOUR CREDENTIALS',
+                                            style: theme.textTheme.labelSmall
+                                                ?.copyWith(
+                                              color: isDark
+                                                  ? ServioColors.accentLight
+                                                      .withValues(alpha: 0.65)
+                                                  : ServioColors.accent,
+                                              letterSpacing: 0.8,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 10),
+                                      Divider(
+                                        color: isDark
+                                            ? Colors.white
+                                                .withValues(alpha: 0.10)
+                                            : ServioColors.borderLight,
+                                      ),
+                                      const SizedBox(height: 18),
+
+                                      // Error banner
+                                      if (_errorMsg != null) ...<Widget>[
+                                        _ErrorBanner(message: _errorMsg!),
+                                        const SizedBox(height: 14),
+                                      ],
+
+                                      // Email field
+                                      TextField(
+                                        controller: _emailCtrl,
+                                        keyboardType:
+                                            TextInputType.emailAddress,
+                                        textInputAction: TextInputAction.next,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Email address',
+                                          prefixIcon:
+                                              Icon(Icons.mail_outline_rounded),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 14),
+
+                                      // Password field
+                                      TextField(
+                                        controller: _passwordCtrl,
+                                        obscureText: _obscurePassword,
+                                        textInputAction: TextInputAction.done,
+                                        onSubmitted: (_) => _login(),
+                                        decoration: InputDecoration(
+                                          labelText: 'Password',
+                                          prefixIcon: const Icon(
+                                              Icons.lock_outline_rounded),
+                                          suffixIcon: IconButton(
+                                            onPressed: () => setState(() =>
+                                                _obscurePassword =
+                                                    !_obscurePassword),
+                                            icon: Icon(
+                                              _obscurePassword
+                                                  ? Icons.visibility_outlined
+                                                  : Icons
+                                                      .visibility_off_outlined,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+
+                                      const SizedBox(height: 6),
+
+                                      // Remember me / Forgot password row
+                                      Row(
+                                        children: <Widget>[
+                                          _AnimatedCheckbox(
+                                            value: _rememberMe,
+                                            accent: servio.accent,
+                                            border: servio.border,
+                                            onChanged: (v) =>
+                                                setState(() => _rememberMe = v),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Remember me',
+                                            style: theme.textTheme.bodySmall
+                                                ?.copyWith(
+                                              color: servio.textSecondary,
+                                            ),
+                                          ),
+                                          const Spacer(),
+                                          TextButton(
+                                            onPressed: () => Navigator.push(
+                                              context,
+                                              MaterialPageRoute<void>(
+                                                builder: (_) =>
+                                                    const ForgotPasswordScreen(),
+                                              ),
+                                            ),
+                                            child:
+                                                const Text('Forgot password?'),
+                                          ),
+                                        ],
+                                      ),
+
+                                      const SizedBox(height: 18),
+
+                                      // Primary CTA
+                                      ServioPrimaryButton(
+                                        label:
+                                            _loading ? 'Signing in…' : 'Log In',
+                                        isLoading: _loading,
+                                        onPressed: _loading ? null : _login,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 28),
+
+                            // ── Social auth ────────────────────────────────
+                            Row(
+                              children: <Widget>[
+                                Expanded(
+                                  child: Divider(
+                                    color: isDark
+                                        ? Colors.white.withValues(alpha: 0.10)
+                                        : ServioColors.borderLight,
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16),
+                                  child: Text(
+                                    'or continue with',
+                                    style: theme.textTheme.bodySmall
+                                        ?.copyWith(color: servio.textSecondary),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Divider(
+                                    color: isDark
+                                        ? Colors.white.withValues(alpha: 0.10)
+                                        : ServioColors.borderLight,
+                                  ),
                                 ),
                               ],
                             ),
 
-                            const SizedBox(height: 18),
+                            const SizedBox(height: 16),
 
-                            // Primary CTA
-                            ServioPrimaryButton(
-                              label: _loading ? 'Signing in…' : 'Log In',
-                              isLoading: _loading,
-                              onPressed: _loading ? null : _login,
+                            Row(
+                              children: <Widget>[
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: () {},
+                                    style: isDark
+                                        ? OutlinedButton.styleFrom(
+                                            side: const BorderSide(
+                                                color: Color(0x1CFFFFFF)),
+                                            backgroundColor:
+                                                const Color(0x0DFFFFFF),
+                                            foregroundColor: Colors.white
+                                                .withValues(alpha: 0.60),
+                                          )
+                                        : null,
+                                    icon: const Icon(Icons.g_mobiledata_rounded,
+                                        size: 22),
+                                    label: const Text('Google'),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: () {},
+                                    style: isDark
+                                        ? OutlinedButton.styleFrom(
+                                            side: const BorderSide(
+                                                color: Color(0x1CFFFFFF)),
+                                            backgroundColor:
+                                                const Color(0x0DFFFFFF),
+                                            foregroundColor: Colors.white
+                                                .withValues(alpha: 0.60),
+                                          )
+                                        : null,
+                                    icon: const Icon(Icons.apple_rounded,
+                                        size: 22),
+                                    label: const Text('Apple'),
+                                  ),
+                                ),
+                              ],
                             ),
+
+                            const SizedBox(height: 20),
+                            Divider(
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.10)
+                                  : ServioColors.borderLight,
+                            ),
+
+                            // ── Sign-up row ────────────────────────────────
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: <Widget>[
+                                Text(
+                                  'New to SERVIO?',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: isDark
+                                        ? Colors.white.withValues(alpha: 0.35)
+                                        : ServioColors.textSecondaryLight,
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute<void>(
+                                        builder: (_) =>
+                                            const RoleSelectionScreen(),
+                                      ),
+                                    );
+                                  },
+                                  child: const Text('Create account'),
+                                ),
+                              ],
+                            ),
+
+                            const SizedBox(height: 12),
                           ],
                         ),
                       ),
                     ),
                   ),
-
-                  const SizedBox(height: 28),
-
-                  // ── Social auth ────────────────────────────────
-                  Row(
-                    children: <Widget>[
-                      Expanded(child: Divider(color: servio.border)),
-                      Padding(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 16),
-                        child: Text(
-                          'or continue with',
-                          style: theme.textTheme.bodySmall
-                              ?.copyWith(color: servio.textSecondary),
-                        ),
+                );
+              },
+            ),
+          ),
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                ServioSpacing.screenPadding,
+                18,
+                ServioSpacing.screenPadding,
+                0,
+              ),
+              child: Align(
+                alignment: AlignmentDirectional.topStart,
+                child: GestureDetector(
+                  onTap: () => Navigator.of(context).pop(),
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(ServioRadius.full),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.18),
                       ),
-                      Expanded(child: Divider(color: servio.border)),
-                    ],
+                    ),
+                    child: const Icon(
+                      Icons.arrow_back_rounded,
+                      color: Colors.white,
+                      size: 21,
+                    ),
                   ),
-
-                  const SizedBox(height: 16),
-
-                  Row(
-                    children: <Widget>[
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () {},
-                          icon: const Icon(Icons.g_mobiledata_rounded,
-                              size: 22),
-                          label: const Text('Google'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () {},
-                          icon: const Icon(Icons.apple_rounded, size: 22),
-                          label: const Text('Apple'),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 20),
-                  Divider(color: servio.border),
-
-                  // ── Sign-up row ────────────────────────────────
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: <Widget>[
-                      Text(
-                        'New to SERVIO?',
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(color: servio.textSecondary),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => const RoleSelectionScreen(),
-                            ),
-                          );
-                        },
-                        child: const Text('Create account'),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 12),
-                ],
+                ),
               ),
             ),
           ),
@@ -515,8 +601,7 @@ class _ErrorBanner extends StatelessWidget {
       decoration: BoxDecoration(
         color: ServioColors.tint(ServioColors.danger),
         borderRadius: BorderRadius.circular(ServioRadius.md),
-        border:
-            Border.all(color: ServioColors.danger.withValues(alpha: 0.28)),
+        border: Border.all(color: ServioColors.danger.withValues(alpha: 0.28)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,

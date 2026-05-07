@@ -3,8 +3,8 @@
  * Shared canvas flow-particle atmosphere animation used on auth pages (login + signup).
  */
 
-export function initShowcaseAtmosphere() {
-  const showcase = document.querySelector('.auth-showcase');
+export function initShowcaseAtmosphere(selector = '.auth-showcase', particleCount = 320) {
+  const showcase = typeof selector === 'string' ? document.querySelector(selector) : selector;
   if (!showcase) return;
 
   // Extra blobs
@@ -101,11 +101,12 @@ export function initShowcaseAtmosphere() {
     const rect = showcase.getBoundingClientRect();
     W = canvas.width  = rect.width;
     H = canvas.height = rect.height;
-    particles = Array.from({ length: N }, () => new FlowParticle());
+    particles = Array.from({ length: particleCount }, () => new FlowParticle());
   }
 
   function loop() {
-    ctx.fillStyle = 'rgba(16,8,6,0.18)';
+    const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+    ctx.fillStyle = isDark ? 'rgba(16, 8, 6, 0.18)' : 'rgba(253, 252, 251, 0.18)';
     ctx.fillRect(0, 0, W, H);
     t += 0.0018;
     particles.forEach(p => { p.update(); p.draw(); });

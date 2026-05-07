@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
-import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
 import '../../design_system/widgets/servio_bottom_sheet.dart';
 import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
@@ -20,36 +19,10 @@ class DesignShowcaseScreen extends StatelessWidget {
     final servio = context.servio;
 
     return Scaffold(
-      bottomNavigationBar: ServioBottomNavigationBar(
-        items: const <ServioBottomNavItem>[
-          ServioBottomNavItem(
-            icon: Icons.home_rounded,
-            label: 'Home',
-          ),
-          ServioBottomNavItem(
-            icon: Icons.grid_view_rounded,
-            label: 'Services',
-          ),
-          ServioBottomNavItem(
-            icon: Icons.auto_awesome_rounded,
-            label: 'Smart Match',
-            highlighted: true,
-          ),
-          ServioBottomNavItem(
-            icon: Icons.calendar_month_rounded,
-            label: 'Bookings',
-          ),
-          ServioBottomNavItem(
-            icon: Icons.person_rounded,
-            label: 'Profile',
-          ),
-        ],
-        currentIndex: 2,
-        onTap: (_) {},
-      ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: ServioSpacing.screenPadding),
+          padding: const EdgeInsets.symmetric(
+              horizontal: ServioSpacing.screenPadding),
           children: <Widget>[
             const SizedBox(height: 20),
             Container(
@@ -62,25 +35,29 @@ class DesignShowcaseScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
                       color: ServioColors.tint(ServioColors.accentLight),
                       borderRadius: BorderRadius.circular(ServioRadius.full),
                     ),
                     child: Text(
                       'NEW FEATURE',
-                      style: theme.textTheme.labelLarge?.copyWith(color: Colors.white),
+                      style: theme.textTheme.labelLarge
+                          ?.copyWith(color: Colors.white),
                     ),
                   ),
                   const SizedBox(height: 20),
                   Text(
                     'SERVIO Design System',
-                    style: theme.textTheme.headlineLarge?.copyWith(color: Colors.white),
+                    style: theme.textTheme.headlineLarge
+                        ?.copyWith(color: Colors.white),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Warm, trustworthy Flutter foundation for the Egypt marketplace.',
-                    style: theme.textTheme.bodyMedium?.copyWith(color: ServioColors.neutralWarm),
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(color: ServioColors.neutralWarm),
                   ),
                   const SizedBox(height: 20),
                   const ServioPrimaryButton(
@@ -99,10 +76,14 @@ class DesignShowcaseScreen extends StatelessWidget {
               spacing: 12,
               runSpacing: 12,
               children: const <Widget>[
-                ServioStatusChip(label: 'Verified', type: ServioStatusChipType.success),
-                ServioStatusChip(label: 'Pending', type: ServioStatusChipType.warning),
-                ServioStatusChip(label: 'In Progress', type: ServioStatusChipType.info),
-                ServioStatusChip(label: 'Cancelled', type: ServioStatusChipType.danger),
+                ServioStatusChip(
+                    label: 'Verified', type: ServioStatusChipType.success),
+                ServioStatusChip(
+                    label: 'Pending', type: ServioStatusChipType.warning),
+                ServioStatusChip(
+                    label: 'In Progress', type: ServioStatusChipType.info),
+                ServioStatusChip(
+                    label: 'Cancelled', type: ServioStatusChipType.danger),
               ],
             ),
             const SizedBox(height: ServioSpacing.sectionGap),
@@ -121,7 +102,8 @@ class DesignShowcaseScreen extends StatelessWidget {
                         backgroundColor: servio.backgroundSoft,
                         child: Text(
                           'MA',
-                          style: theme.textTheme.labelLarge?.copyWith(color: servio.accent),
+                          style: theme.textTheme.labelLarge
+                              ?.copyWith(color: servio.accent),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -129,7 +111,8 @@ class DesignShowcaseScreen extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
-                            Text('Ahmed Nabil', style: theme.textTheme.titleMedium),
+                            Text('Ahmed Nabil',
+                                style: theme.textTheme.titleMedium),
                             const SizedBox(height: 4),
                             Text(
                               'Plumbing Specialist',
@@ -149,7 +132,8 @@ class DesignShowcaseScreen extends StatelessWidget {
                   const SizedBox(height: 16),
                   Text(
                     'Fast response, verified documents, and clear upfront pricing aligned with the SERVIO brand pillars.',
-                    style: theme.textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(color: servio.textSecondary),
                   ),
                 ],
               ),
@@ -224,9 +208,10 @@ class DesignShowcaseScreen extends StatelessWidget {
                         const SizedBox(height: 8),
                         Text(
                           'This sheet uses the shared SERVIO shell with the required top radius and handle.',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: context.servio.textSecondary,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: context.servio.textSecondary,
+                                  ),
                         ),
                         const SizedBox(height: 20),
                         const ServioPrimaryButton(label: 'Confirm'),

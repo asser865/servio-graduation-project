@@ -5,11 +5,9 @@ import '../../core/models/backend_service_model.dart';
 import '../../core/state/services_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
-import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
 import '../../design_system/widgets/servio_card.dart';
+import '../../design_system/widgets/servio_tab_shell.dart';
 import 'ai_smart_match_screen.dart';
-import 'customer_profile_screen.dart';
-import 'my_bookings_screen.dart';
 import 'service_detail_screen.dart';
 import '../shared/search_results_screen.dart';
 
@@ -17,7 +15,8 @@ class ServicesMarketplaceScreen extends StatefulWidget {
   const ServicesMarketplaceScreen({super.key});
 
   @override
-  State<ServicesMarketplaceScreen> createState() => _ServicesMarketplaceScreenState();
+  State<ServicesMarketplaceScreen> createState() =>
+      _ServicesMarketplaceScreenState();
 }
 
 class _ServicesMarketplaceScreenState extends State<ServicesMarketplaceScreen> {
@@ -41,56 +40,30 @@ class _ServicesMarketplaceScreenState extends State<ServicesMarketplaceScreen> {
     });
   }
 
+  void _openServiceDetails(BackendService service) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ServiceDetailScreen(serviceId: service.id),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
     final provider = context.watch<ServicesProvider>();
+    final bottomInset = ServioTabShell.bottomOverlayInsetOf(context);
     final allServices = provider.services;
     final services = _selectedCategory == 0
         ? allServices
         : allServices
-            .where((s) => s.category.toLowerCase() == _categories[_selectedCategory].toLowerCase())
+            .where((s) =>
+                s.category.toLowerCase() ==
+                _categories[_selectedCategory].toLowerCase())
             .toList();
 
     return Scaffold(
-      bottomNavigationBar: ServioBottomNavigationBar(
-        items: const <ServioBottomNavItem>[
-          ServioBottomNavItem(icon: Icons.home_rounded, label: 'Home'),
-          ServioBottomNavItem(icon: Icons.grid_view_rounded, label: 'Services'),
-          ServioBottomNavItem(
-            icon: Icons.auto_awesome_rounded,
-            label: 'Smart Match',
-            highlighted: true,
-          ),
-          ServioBottomNavItem(icon: Icons.calendar_month_rounded, label: 'Bookings'),
-          ServioBottomNavItem(icon: Icons.person_rounded, label: 'Profile'),
-        ],
-        currentIndex: 1,
-        onTap: (int index) {
-          if (index == 0) {
-            Navigator.of(context).popUntil((route) => route.isFirst);
-          } else if (index == 2) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const AiSmartMatchScreen(),
-              ),
-            );
-          } else if (index == 3) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const MyBookingsScreen(),
-              ),
-            );
-          } else if (index == 4) {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const CustomerProfileScreen(),
-              ),
-            );
-          }
-        },
-      ),
       body: SafeArea(
         child: CustomScrollView(
           slivers: <Widget>[
@@ -105,7 +78,8 @@ class _ServicesMarketplaceScreenState extends State<ServicesMarketplaceScreen> {
                         onTap: () {
                           Navigator.of(context).push(
                             MaterialPageRoute<void>(
-                              builder: (_) => const SearchResultsScreen(query: 'plumbing'),
+                              builder: (_) =>
+                                  const SearchResultsScreen(query: 'plumbing'),
                             ),
                           );
                         },
@@ -115,12 +89,15 @@ class _ServicesMarketplaceScreenState extends State<ServicesMarketplaceScreen> {
                           filled: true,
                           fillColor: servio.surfaceAlt,
                           enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(ServioRadius.full),
+                            borderRadius:
+                                BorderRadius.circular(ServioRadius.full),
                             borderSide: BorderSide(color: servio.border),
                           ),
                           focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(ServioRadius.full),
-                            borderSide: BorderSide(color: servio.accent, width: 2),
+                            borderRadius:
+                                BorderRadius.circular(ServioRadius.full),
+                            borderSide:
+                                BorderSide(color: servio.accent, width: 2),
                           ),
                         ),
                       ),
@@ -144,20 +121,24 @@ class _ServicesMarketplaceScreenState extends State<ServicesMarketplaceScreen> {
               child: SizedBox(
                 height: 62,
                 child: ListView.separated(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                   scrollDirection: Axis.horizontal,
                   itemCount: _categories.length,
-                  separatorBuilder: (BuildContext context, int index) => const SizedBox(width: 10),
+                  separatorBuilder: (BuildContext context, int index) =>
+                      const SizedBox(width: 10),
                   itemBuilder: (BuildContext context, int index) {
                     final active = index == _selectedCategory;
 
                     return GestureDetector(
                       onTap: () => setState(() => _selectedCategory = index),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 10),
                         decoration: BoxDecoration(
                           color: active ? servio.accent : servio.backgroundSoft,
-                          borderRadius: BorderRadius.circular(ServioRadius.full),
+                          borderRadius:
+                              BorderRadius.circular(ServioRadius.full),
                         ),
                         child: Text(
                           _categories[index],
@@ -179,17 +160,20 @@ class _ServicesMarketplaceScreenState extends State<ServicesMarketplaceScreen> {
                     const Spacer(),
                     Text(
                       'Sort: Rating',
-                      style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: servio.textSecondary),
                     ),
                     const SizedBox(width: 12),
                     _ToggleIcon(
                       icon: Icons.view_agenda_outlined,
+                      tooltip: 'List view',
                       active: !_gridMode,
                       onTap: () => setState(() => _gridMode = false),
                     ),
                     const SizedBox(width: 8),
                     _ToggleIcon(
                       icon: Icons.grid_view_rounded,
+                      tooltip: 'Grid view',
                       active: _gridMode,
                       onTap: () => setState(() => _gridMode = true),
                     ),
@@ -222,7 +206,8 @@ class _ServicesMarketplaceScreenState extends State<ServicesMarketplaceScreen> {
                         Expanded(
                           child: Text(
                             'Not sure what you need? Try Smart Match ->',
-                            style: theme.textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
+                            style: theme.textTheme.bodyMedium
+                                ?.copyWith(color: servio.textSecondary),
                           ),
                         ),
                       ],
@@ -241,27 +226,16 @@ class _ServicesMarketplaceScreenState extends State<ServicesMarketplaceScreen> {
               )
             else
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (BuildContext context, int index) {
-                      final service = services[index];
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: _MarketplaceServiceCard(
-                          service: service,
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => ServiceDetailScreen(serviceId: service.id),
-                              ),
-                            );
-                          },
-                        ),
-                      );
-                    },
-                    childCount: services.length,
-                  ),
+                padding: EdgeInsets.fromLTRB(
+                  ServioSpacing.screenPadding,
+                  16,
+                  ServioSpacing.screenPadding,
+                  24 + bottomInset,
+                ),
+                sliver: _MarketplaceServicesSliver(
+                  services: services,
+                  gridMode: _gridMode,
+                  onServiceTap: _openServiceDetails,
                 ),
               ),
           ],
@@ -274,11 +248,13 @@ class _ServicesMarketplaceScreenState extends State<ServicesMarketplaceScreen> {
 class _ToggleIcon extends StatelessWidget {
   const _ToggleIcon({
     required this.icon,
+    required this.tooltip,
     required this.active,
     required this.onTap,
   });
 
   final IconData icon;
+  final String tooltip;
   final bool active;
   final VoidCallback onTap;
 
@@ -286,18 +262,124 @@ class _ToggleIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     final servio = context.servio;
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: active ? servio.backgroundSoft : Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(ServioRadius.full),
-          border: Border.all(color: servio.border),
+    return Semantics(
+      button: true,
+      selected: active,
+      label: tooltip,
+      child: Tooltip(
+        message: tooltip,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: Container(
+            width: ServioSpacing.tapTarget,
+            height: ServioSpacing.tapTarget,
+            decoration: BoxDecoration(
+              color: active
+                  ? servio.backgroundSoft
+                  : Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(ServioRadius.full),
+              border: Border.all(color: servio.border),
+            ),
+            child: Icon(icon,
+                size: 20, color: active ? servio.accent : servio.textSecondary),
+          ),
         ),
-        child: Icon(icon, size: 20, color: active ? servio.accent : servio.textSecondary),
       ),
+    );
+  }
+}
+
+const Map<String, IconData> _serviceCategoryIcons = <String, IconData>{
+  'plumbing': Icons.water_drop_outlined,
+  'electrical': Icons.electrical_services_rounded,
+  'hvac': Icons.ac_unit_rounded,
+  'carpentry': Icons.handyman_rounded,
+  'painting': Icons.format_paint_rounded,
+};
+
+IconData _iconForService(BackendService service) {
+  return _serviceCategoryIcons[service.category.toLowerCase()] ??
+      Icons.home_repair_service_rounded;
+}
+
+String _basePriceLabel(BackendService service) {
+  return 'EGP ${service.basePrice.toStringAsFixed(0)}';
+}
+
+class _MarketplaceServicesSliver extends StatelessWidget {
+  const _MarketplaceServicesSliver({
+    required this.services,
+    required this.gridMode,
+    required this.onServiceTap,
+  });
+
+  final List<BackendService> services;
+  final bool gridMode;
+  final ValueChanged<BackendService> onServiceTap;
+
+  static const double _minGridCardWidth = 164;
+  static const double _gridCardExtent = 178;
+
+  @override
+  Widget build(BuildContext context) {
+    if (services.isEmpty) {
+      return const SliverFillRemaining(
+        hasScrollBody: false,
+        child: _MarketplaceEmptyState(),
+      );
+    }
+
+    if (!gridMode) {
+      return SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (BuildContext context, int index) {
+            final service = services[index];
+            final isLast = index == services.length - 1;
+
+            return Padding(
+              padding: EdgeInsets.only(bottom: isLast ? 0 : 12),
+              child: _MarketplaceServiceCard(
+                service: service,
+                onTap: () => onServiceTap(service),
+              ),
+            );
+          },
+          childCount: services.length,
+        ),
+      );
+    }
+
+    return SliverLayoutBuilder(
+      builder: (BuildContext context, constraints) {
+        var crossAxisCount =
+            (constraints.crossAxisExtent / _minGridCardWidth).floor();
+        if (crossAxisCount < 1) {
+          crossAxisCount = 1;
+        } else if (crossAxisCount > 2) {
+          crossAxisCount = 2;
+        }
+
+        return SliverGrid(
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            mainAxisExtent: _gridCardExtent,
+          ),
+          delegate: SliverChildBuilderDelegate(
+            (BuildContext context, int index) {
+              final service = services[index];
+
+              return _MarketplaceServiceGridCard(
+                service: service,
+                onTap: () => onServiceTap(service),
+              );
+            },
+            childCount: services.length,
+          ),
+        );
+      },
     );
   }
 }
@@ -311,94 +393,257 @@ class _MarketplaceServiceCard extends StatelessWidget {
   final BackendService service;
   final VoidCallback onTap;
 
-  static const Map<String, IconData> _categoryIcons = <String, IconData>{
-    'plumbing': Icons.water_drop_outlined,
-    'electrical': Icons.electrical_services_rounded,
-    'hvac': Icons.ac_unit_rounded,
-    'carpentry': Icons.handyman_rounded,
-    'painting': Icons.format_paint_rounded,
-  };
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+    final icon = _iconForService(service);
+
+    return Semantics(
+      button: true,
+      label: 'View details for ${service.name}',
+      child: ServioCard(
+        onTap: onTap,
+        radius: ServioRadius.card,
+        padding: const EdgeInsets.all(12),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 88),
+          child: Row(
+            children: <Widget>[
+              _ServiceIconBadge(icon: icon, size: 52, iconSize: 25),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: Text(
+                            service.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        _CategoryBadge(category: service.category),
+                      ],
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      service.description,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: servio.textSecondary,
+                        height: 1.35,
+                      ),
+                    ),
+                    const SizedBox(height: 9),
+                    Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: Text(
+                            _basePriceLabel(service),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              color: servio.accent,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          size: 22,
+                          color: servio.textSecondary,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MarketplaceServiceGridCard extends StatelessWidget {
+  const _MarketplaceServiceGridCard({
+    required this.service,
+    required this.onTap,
+  });
+
+  final BackendService service;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
-    final icon = _categoryIcons[service.category.toLowerCase()] ?? Icons.home_repair_service_rounded;
+    final icon = _iconForService(service);
 
-    return GestureDetector(
-      onTap: onTap,
+    return Semantics(
+      button: true,
+      label: 'View details for ${service.name}',
       child: ServioCard(
-        radius: ServioRadius.lg,
-        padding: EdgeInsets.zero,
+        onTap: onTap,
+        radius: ServioRadius.card,
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Container(
-              height: 140,
-              decoration: const BoxDecoration(
-                gradient: ServioGradients.brand,
-                borderRadius: BorderRadius.vertical(
-                  top: Radius.circular(ServioRadius.lg),
-                ),
+            Row(
+              children: <Widget>[
+                _ServiceIconBadge(icon: icon, size: 44, iconSize: 22),
+                const SizedBox(width: 8),
+                Expanded(child: _CategoryBadge(category: service.category)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              service.name,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                height: 1.2,
               ),
-              child: Align(
-                alignment: Alignment.bottomRight,
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Icon(icon, size: 56, color: Colors.white.withValues(alpha: 0.7)),
+            ),
+            const SizedBox(height: 6),
+            Expanded(
+              child: Text(
+                service.description,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: servio.textSecondary,
+                  height: 1.35,
                 ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: servio.backgroundSoft,
-                      borderRadius: BorderRadius.circular(ServioRadius.sm),
-                    ),
-                    child: Text(
-                      service.category.toUpperCase(),
-                      style: theme.textTheme.labelSmall?.copyWith(color: servio.accent),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(service.name, style: theme.textTheme.titleMedium),
-                  const SizedBox(height: 8),
-                  Text(
-                    service.description,
-                    maxLines: 2,
+            const SizedBox(height: 8),
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    _basePriceLabel(service),
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: servio.accent,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: <Widget>[
-                      Expanded(
-                        child: Text(
-                          'EGP ${service.basePrice.toStringAsFixed(0)}',
-                          style: theme.textTheme.titleMedium?.copyWith(color: servio.accent),
-                        ),
-                      ),
-                      OutlinedButton(
-                        onPressed: onTap,
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(0, 40),
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        child: const Text('View Details'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 6),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: 20,
+                  color: servio.textSecondary,
+                ),
+              ],
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ServiceIconBadge extends StatelessWidget {
+  const _ServiceIconBadge({
+    required this.icon,
+    required this.size,
+    required this.iconSize,
+  });
+
+  final IconData icon;
+  final double size;
+  final double iconSize;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        gradient: ServioGradients.brand,
+        borderRadius: BorderRadius.circular(ServioRadius.md),
+      ),
+      child: Icon(icon, color: Colors.white, size: iconSize),
+    );
+  }
+}
+
+class _CategoryBadge extends StatelessWidget {
+  const _CategoryBadge({required this.category});
+
+  final String category;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+    final label = category.trim().isEmpty ? 'SERVICE' : category.toUpperCase();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: ServioColors.tint(servio.accent),
+        borderRadius: BorderRadius.circular(ServioRadius.full),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: servio.accent,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class _MarketplaceEmptyState extends StatelessWidget {
+  const _MarketplaceEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Icon(
+            Icons.search_off_rounded,
+            size: 32,
+            color: servio.textSecondary,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'No services found',
+            style: theme.textTheme.titleSmall,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Try another category.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: servio.textSecondary,
+            ),
+          ),
+        ],
       ),
     );
   }

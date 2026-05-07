@@ -55,22 +55,27 @@ class BookingStepOneScreen extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 6),
                             decoration: BoxDecoration(
                               color: servio.backgroundSoft,
-                              borderRadius: BorderRadius.circular(ServioRadius.sm),
+                              borderRadius:
+                                  BorderRadius.circular(ServioRadius.sm),
                             ),
                             child: Text(
                               data.category,
-                              style: theme.textTheme.labelSmall?.copyWith(color: servio.accent),
+                              style: theme.textTheme.labelSmall
+                                  ?.copyWith(color: servio.accent),
                             ),
                           ),
                           const SizedBox(height: 10),
-                          Text(data.serviceName, style: theme.textTheme.titleMedium),
+                          Text(data.serviceName,
+                              style: theme.textTheme.titleMedium),
                           const SizedBox(height: 6),
                           Text(
                             data.priceLabel,
-                            style: theme.textTheme.bodyMedium?.copyWith(color: servio.accent),
+                            style: theme.textTheme.bodyMedium
+                                ?.copyWith(color: servio.accent),
                           ),
                           const SizedBox(height: 8),
                           const ServioStatusChip(label: 'AI Estimate'),
@@ -99,28 +104,34 @@ class BookingStepOneScreen extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
-                          Text(data.technicianName, style: theme.textTheme.titleMedium),
+                          Text(data.technicianName,
+                              style: theme.textTheme.titleMedium),
                           const SizedBox(height: 4),
                           Text(
                             data.specialty,
-                            style: theme.textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
+                            style: theme.textTheme.bodyMedium
+                                ?.copyWith(color: servio.textSecondary),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             '4.9 rating • ${data.hourlyRate}',
-                            style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+                            style: theme.textTheme.bodySmall
+                                ?.copyWith(color: servio.textSecondary),
                           ),
                         ],
                       ),
                     ),
-                    TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Change')),
+                    TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Change')),
                   ],
                 ),
               ),
               const SizedBox(height: 20),
               Text(
                 'Describe your job (optional)',
-                style: theme.textTheme.labelLarge?.copyWith(color: servio.textSecondary),
+                style: theme.textTheme.labelLarge
+                    ?.copyWith(color: servio.textSecondary),
               ),
               const SizedBox(height: 10),
               const TextField(

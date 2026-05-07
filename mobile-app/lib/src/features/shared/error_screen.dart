@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
-import '../customer/customer_home_screen.dart';
+import '../customer/customer_shell.dart';
 
 class ErrorScreen extends StatefulWidget {
   const ErrorScreen({
@@ -60,8 +60,7 @@ class _ErrorScreenState extends State<ErrorScreen>
                 scale: Tween<double>(begin: 0.6, end: 1.0).animate(
                   CurvedAnimation(
                     parent: _entranceController,
-                    curve: const Interval(0.0, 0.5,
-                        curve: ServioMotion.spring),
+                    curve: const Interval(0.0, 0.5, curve: ServioMotion.spring),
                   ),
                 ),
                 child: FadeTransition(
@@ -120,8 +119,7 @@ class _ErrorScreenState extends State<ErrorScreen>
                   end: Offset.zero,
                 ).animate(CurvedAnimation(
                   parent: _entranceController,
-                  curve: const Interval(0.3, 0.7,
-                      curve: ServioMotion.spring),
+                  curve: const Interval(0.3, 0.7, curve: ServioMotion.spring),
                 )),
                 child: FadeTransition(
                   opacity: CurvedAnimation(
@@ -168,7 +166,7 @@ class _ErrorScreenState extends State<ErrorScreen>
                       onPressed: () {
                         Navigator.of(context).pushAndRemoveUntil(
                           MaterialPageRoute<void>(
-                              builder: (_) => const CustomerHomeScreen()),
+                              builder: (_) => const CustomerShell()),
                           (Route<dynamic> route) => false,
                         );
                       },

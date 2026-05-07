@@ -4,6 +4,7 @@
 
 const { StatusCodes }  = require('http-status-codes');
 const bookingService   = require('./booking.service');
+const Booking          = require('./booking.model');
 const ApiResponse      = require('../../utils/ApiResponse');
 const { logEvent }     = require('../admin/audit.service');
 
@@ -45,4 +46,26 @@ const getBookingById = async (req, res) => {
   return ApiResponse.success(res, StatusCodes.OK, 'Booking retrieved', booking);
 };
 
-module.exports = { create, getMyBookings, getWorkerBookings, updateStatus, getAllBookings, getBookingById };
+const getWorkerBookedSlots = async (req, res) => {
+  const { workerId } = req.params;
+  const { date } = req.query;
+
+  if (!date) {
+    return ApiResponse.error(res, StatusCodes.BAD_REQUEST, 'date query param is required (YYYY-MM-DD).');
+  }
+
+  const start = new Date(date + 'T00:00:00.000Z');
+  const end   = new Date(date + 'T23:59:59.999Z');
+
+  const bookings = await Booking.find({
+    worker: workerId,
+    scheduledDate: { $gte: start, $lte: end },
+    status: { $in: ['pending', 'accepted', 'in_progress'] },
+  }).select('scheduledTime');
+
+  return ApiResponse.success(res, StatusCodes.OK, 'Booked slots retrieved.', {
+    bookedSlots: bookings.map(b => b.scheduledTime).filter(Boolean),
+  });
+};
+
+module.exports = { create, getMyBookings, getWorkerBookings, updateStatus, getAllBookings, getBookingById, getWorkerBookedSlots };
