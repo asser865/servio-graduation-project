@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -7,8 +9,8 @@ import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
-import '../../design_system/widgets/servio_status_chip.dart';
 import '../../design_system/widgets/servio_tab_shell.dart';
+import 'time_off_calendar.dart';
 
 class AvailabilityManagerScreen extends StatefulWidget {
   const AvailabilityManagerScreen({super.key});
@@ -21,22 +23,23 @@ class AvailabilityManagerScreen extends StatefulWidget {
 class _AvailabilityManagerScreenState extends State<AvailabilityManagerScreen> {
   late final List<_AvailabilityDay> _days;
   late final TextEditingController _serviceAreaCtrl;
-  late bool _availableNow;
-  List<bool>? _pausedSnapshot;
-  bool _saving = false;
+
+  bool _availableNow = false;
+  bool _loadingProfile = false;
+  bool _savingSchedule = false;
+  bool _savingAvailableNow = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
     final account = context.read<SessionProvider>().account;
-    final savedAvailability =
-        account?.availability ?? const <AvailabilitySlot>[];
     _serviceAreaCtrl = TextEditingController(
       text: account?.locationLabel ?? '',
     );
-    _days = _initialDays(savedAvailability);
-    _availableNow = _hasWorkingDays;
+    _days = _initialDays(account?.availability ?? const <AvailabilitySlot>[]);
+    _availableNow = account?.isAvailable ?? false;
+    unawaited(_loadCurrentWorkerProfile());
   }
 
   @override
@@ -46,12 +49,13 @@ class _AvailabilityManagerScreenState extends State<AvailabilityManagerScreen> {
   }
 
   bool get _hasWorkingDays => _days.any((day) => day.enabled);
+  bool get _isBusy => _savingSchedule || _savingAvailableNow;
 
   List<_AvailabilityDay> _initialDays(List<AvailabilitySlot> saved) {
-    final hasSavedSchedule = saved.isNotEmpty;
     final savedByDay = <String, AvailabilitySlot>{
       for (final slot in saved) slot.day.toLowerCase(): slot,
     };
+    final hasSavedSchedule = savedByDay.isNotEmpty;
 
     return _dayDefinitions.map((definition) {
       final savedSlot = savedByDay[definition.apiDay];
@@ -65,50 +69,96 @@ class _AvailabilityManagerScreenState extends State<AvailabilityManagerScreen> {
     }).toList();
   }
 
-  void _setAvailableNow(bool value) {
-    setState(() {
-      _error = null;
-      _availableNow = value;
-      if (!value) {
-        _pausedSnapshot = _days.map((day) => day.enabled).toList();
-        for (final day in _days) {
-          day.enabled = false;
-        }
-        return;
-      }
+  void _syncFromAccount(UserAccount? account) {
+    if (account == null) return;
+    _availableNow = account.isAvailable;
+    _serviceAreaCtrl.text = account.locationLabel;
 
-      final snapshot = _pausedSnapshot;
-      if (snapshot != null && snapshot.any((enabled) => enabled)) {
-        for (var i = 0; i < _days.length; i += 1) {
-          _days[i].enabled = snapshot[i];
-        }
-      } else {
-        for (final day in _days) {
-          day.enabled = day.definition.defaultOn;
-        }
+    final freshDays = _initialDays(account.availability);
+    for (var i = 0; i < _days.length; i += 1) {
+      _days[i]
+        ..enabled = freshDays[i].enabled
+        ..start = freshDays[i].start
+        ..end = freshDays[i].end;
+    }
+  }
+
+  Future<void> _loadCurrentWorkerProfile() async {
+    setState(() => _loadingProfile = true);
+    final session = context.read<SessionProvider>();
+    final error = await session.loadCurrentWorkerProfile();
+    if (!mounted) return;
+
+    setState(() {
+      if (error == null) {
+        _syncFromAccount(session.account);
+        _error = null;
+      } else if (session.account == null) {
+        _error = error;
       }
-      _pausedSnapshot = null;
+      _loadingProfile = false;
     });
   }
 
-  void _setDayOff(_AvailabilityDay day, bool isOff) {
+  Future<void> _toggleAvailableNow(bool value) async {
+    if (_savingAvailableNow) return;
+
+    final previous = _availableNow;
+    final locale = context.read<LocaleProvider>().languageCode;
     setState(() {
+      _availableNow = value;
+      _savingAvailableNow = true;
       _error = null;
-      day.enabled = !isOff;
-      _availableNow = _hasWorkingDays;
+    });
+
+    final session = context.read<SessionProvider>();
+    final error = await session.toggleAvailableNow(value);
+    if (!mounted) return;
+
+    setState(() {
+      _savingAvailableNow = false;
+      if (error == null) {
+        _availableNow = session.account?.isAvailable ?? value;
+      } else {
+        _availableNow = previous;
+        _error = error;
+      }
+    });
+
+    _showMessage(
+      error ??
+          (value
+              ? _copy(
+                  locale,
+                  en: 'You are visible and accepting bookings.',
+                  ar: 'You are visible and accepting bookings.',
+                )
+              : _copy(
+                  locale,
+                  en: 'You are offline. New bookings are paused.',
+                  ar: 'You are offline. New bookings are paused.',
+                )),
+      isError: error != null,
+    );
+  }
+
+  void _setDayEnabled(_AvailabilityDay day, bool value) {
+    setState(() {
+      day.enabled = value;
+      _error = null;
     });
   }
 
   Future<void> _pickTime(_AvailabilityDay day, {required bool isStart}) async {
-    if (_saving || !day.enabled) return;
+    if (_isBusy || !day.enabled) return;
 
     final locale = context.read<LocaleProvider>().languageCode;
     final picked = await showTimePicker(
       context: context,
       initialTime: isStart ? day.start : day.end,
       helpText: isStart
-          ? _copy(locale, en: 'Start time', ar: 'وقت البداية')
-          : _copy(locale, en: 'End time', ar: 'وقت النهاية'),
+          ? _copy(locale, en: 'Start time', ar: 'Start time')
+          : _copy(locale, en: 'End time', ar: 'End time'),
     );
 
     if (picked == null || !mounted) return;
@@ -118,34 +168,84 @@ class _AvailabilityManagerScreenState extends State<AvailabilityManagerScreen> {
       } else {
         day.end = picked;
       }
+      _error = null;
     });
+  }
+
+  void _applyPreset(_AvailabilityPreset preset) {
+    setState(() {
+      for (final day in _days) {
+        switch (preset) {
+          case _AvailabilityPreset.weekdays:
+            day.enabled = day.definition.isWeekday;
+            day.start = const TimeOfDay(hour: 9, minute: 0);
+            day.end = const TimeOfDay(hour: 17, minute: 0);
+            break;
+          case _AvailabilityPreset.weekends:
+            day.enabled = day.definition.isWeekend;
+            day.start = const TimeOfDay(hour: 10, minute: 0);
+            day.end = const TimeOfDay(hour: 15, minute: 0);
+            break;
+          case _AvailabilityPreset.everyDay:
+            day.enabled = true;
+            day.start = const TimeOfDay(hour: 9, minute: 0);
+            day.end = const TimeOfDay(hour: 17, minute: 0);
+            break;
+          case _AvailabilityPreset.clear:
+            day.enabled = false;
+            break;
+        }
+      }
+      _error = null;
+    });
+  }
+
+  String? _validateSchedule(String locale) {
+    final activeDays = _days.where((day) => day.enabled).toList();
+    if (activeDays.isEmpty) {
+      return _copy(
+        locale,
+        en: 'Enable at least one working day before saving.',
+        ar: 'Enable at least one working day before saving.',
+      );
+    }
+
+    for (final day in activeDays) {
+      if (_minutes(day.end) <= _minutes(day.start)) {
+        return _copy(
+          locale,
+          en: 'End time must be after start time for ${day.definition.fullLabel(locale)}.',
+          ar: 'End time must be after start time for ${day.definition.fullLabel(locale)}.',
+        );
+      }
+    }
+
+    return null;
   }
 
   Future<void> _saveAvailability() async {
     final locale = context.read<LocaleProvider>().languageCode;
-    if (!_hasWorkingDays) {
-      setState(() {
-        _error = _copy(
-          locale,
-          en: 'Turn on at least one working day before saving.',
-          ar: 'فعّل يوم عمل واحداً على الأقل قبل الحفظ.',
-        );
-      });
+    final validationError = _validateSchedule(locale);
+    if (validationError != null) {
+      setState(() => _error = validationError);
+      _showMessage(validationError, isError: true);
       return;
     }
 
     setState(() {
-      _saving = true;
+      _savingSchedule = true;
       _error = null;
     });
 
-    final availability = _days
+    final slots = _days
         .where((day) => day.enabled)
-        .map((day) => <String, dynamic>{
-              'day': day.definition.apiDay,
-              'from': _formatApiTime(day.start),
-              'to': _formatApiTime(day.end),
-            })
+        .map(
+          (day) => AvailabilitySlot(
+            day: day.definition.apiDay,
+            from: _formatApiTime(day.start),
+            to: _formatApiTime(day.end),
+          ),
+        )
         .toList();
 
     final session = context.read<SessionProvider>();
@@ -159,25 +259,33 @@ class _AvailabilityManagerScreenState extends State<AvailabilityManagerScreen> {
       });
     }
 
-    error ??= await session.updateAvailability(availability);
+    error ??= await session.updateWorkerAvailability(slots);
     if (!mounted) return;
 
     setState(() {
-      _saving = false;
+      if (error == null) {
+        _syncFromAccount(session.account);
+      }
+      _savingSchedule = false;
       _error = error;
     });
 
+    _showMessage(
+      error ??
+          _copy(
+            locale,
+            en: 'Availability updated.',
+            ar: 'Availability updated.',
+          ),
+      isError: error != null,
+    );
+  }
+
+  void _showMessage(String message, {required bool isError}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          error ??
-              _copy(
-                locale,
-                en: 'Availability updated.',
-                ar: 'تم تحديث التوفر.',
-              ),
-        ),
-        backgroundColor: error == null ? null : context.servio.danger,
+        content: Text(message),
+        backgroundColor: isError ? context.servio.danger : null,
       ),
     );
   }
@@ -188,110 +296,269 @@ class _AvailabilityManagerScreenState extends State<AvailabilityManagerScreen> {
     final servio = context.servio;
     final locale = context.watch<LocaleProvider>().languageCode;
     final account = context.watch<SessionProvider>().account;
-    final canSave = !_saving && _hasWorkingDays;
     final bottomInset = ServioTabShell.bottomOverlayInsetOf(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_copy(locale, en: 'Availability', ar: 'التوفر')),
-        backgroundColor: theme.scaffoldBackgroundColor,
-        elevation: 0,
-      ),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         top: false,
-        child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(
-            ServioSpacing.screenPadding,
-            8,
-            ServioSpacing.screenPadding,
-            ServioSpacing.screenPadding + bottomInset,
-          ),
+        child: Stack(
+          fit: StackFit.expand,
+          children: <Widget>[
+            LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(
+                    ServioSpacing.screenPadding,
+                    MediaQuery.paddingOf(context).top + 12,
+                    ServioSpacing.screenPadding,
+                    104 + bottomInset,
+                  ),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 720),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: <Widget>[
+                          _AvailabilityHeaderCard(
+                            locale: locale,
+                            availableNow: _availableNow,
+                            saving: _savingAvailableNow,
+                            loading: _loadingProfile,
+                            onChanged: _toggleAvailableNow,
+                          ),
+                          if (_error != null) ...<Widget>[
+                            const SizedBox(height: 12),
+                            _NoticeCard(
+                              icon: Icons.error_outline_rounded,
+                              title: _copy(
+                                locale,
+                                en: 'Availability needs attention',
+                                ar: 'Availability needs attention',
+                              ),
+                              message: _error!,
+                              color: servio.danger,
+                            ),
+                          ],
+                          if (!_hasWorkingDays) ...<Widget>[
+                            const SizedBox(height: 12),
+                            _NoticeCard(
+                              icon: Icons.event_busy_rounded,
+                              title: _copy(
+                                locale,
+                                en: 'No working days selected',
+                                ar: 'No working days selected',
+                              ),
+                              message: _copy(
+                                locale,
+                                en: 'Add at least one day before saving a bookable schedule.',
+                                ar: 'Add at least one day before saving a bookable schedule.',
+                              ),
+                              color: servio.warning,
+                            ),
+                          ],
+                          const SizedBox(height: 18),
+                          _WeeklySchedulePanel(
+                            locale: locale,
+                            days: _days,
+                            busy: _isBusy,
+                            onPresetSelected: _applyPreset,
+                            onDayChanged: _setDayEnabled,
+                            onStartTap: (day) => _pickTime(day, isStart: true),
+                            onEndTap: (day) => _pickTime(day, isStart: false),
+                          ),
+                          const SizedBox(height: 18),
+                          _CoverageCard(
+                            account: account,
+                            locale: locale,
+                            serviceAreaController: _serviceAreaCtrl,
+                            saving: _isBusy,
+                            onServiceAreaChanged: () {
+                              setState(() => _error = null);
+                            },
+                          ),
+                          const SizedBox(height: 18),
+                          TimeOffCalendarCard(
+                            availability: account?.availability ??
+                                const <AvailabilitySlot>[],
+                            blockedDates:
+                                account?.blockedDates ?? const <String>[],
+                            locale: locale,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: SafeArea(
+                top: false,
+                child: Container(
+                  padding: EdgeInsets.fromLTRB(
+                    ServioSpacing.screenPadding,
+                    12,
+                    ServioSpacing.screenPadding,
+                    12 + bottomInset,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    border: Border(
+                      top: BorderSide(
+                        color: servio.border.withValues(alpha: 0.72),
+                      ),
+                    ),
+                    boxShadow: theme.brightness == Brightness.dark
+                        ? ServioShadows.elevatedDark
+                        : ServioShadows.elevated,
+                  ),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 720),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: ServioPrimaryButton(
+                          label: _savingSchedule
+                              ? _copy(locale, en: 'Saving...', ar: 'Saving...')
+                              : _copy(
+                                  locale,
+                                  en: 'Save Availability',
+                                  ar: 'Save Availability',
+                                ),
+                          onPressed: _savingSchedule ? null : _saveAvailability,
+                          isLoading: _savingSchedule,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AvailabilityHeaderCard extends StatelessWidget {
+  const _AvailabilityHeaderCard({
+    required this.locale,
+    required this.availableNow,
+    required this.saving,
+    required this.loading,
+    required this.onChanged,
+  });
+
+  final String locale;
+  final bool availableNow;
+  final bool saving;
+  final bool loading;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+    final isDark = theme.brightness == Brightness.dark;
+    final headlineColor = isDark ? Colors.white : ServioColors.deepBrown;
+    final supportColor = headlineColor.withValues(alpha: 0.72);
+
+    return ServioCard(
+      radius: ServioRadius.lg,
+      elevated: true,
+      padding: EdgeInsets.zero,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: isDark ? ServioGradients.brand : ServioGradients.warm,
+          borderRadius: BorderRadius.circular(ServioRadius.lg),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(18),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text(
-                _copy(
-                  locale,
-                  en: 'Set your working hours and service area so customers can find you.',
-                  ar: 'حدد ساعات عملك ومنطقة خدمتك لكي يجدك العملاء.',
-                ),
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: servio.textSecondary,
-                ),
-              ),
-              const SizedBox(height: 20),
-              _AvailableNowCard(
-                locale: locale,
-                value: _availableNow,
-                saving: _saving,
-                onChanged: _setAvailableNow,
-              ),
-              if (_error != null) ...<Widget>[
-                const SizedBox(height: 12),
-                _NoticeCard(
-                  icon: Icons.error_outline_rounded,
-                  title: _copy(locale, en: 'Could not save', ar: 'تعذر الحفظ'),
-                  message: _error!,
-                  color: servio.danger,
-                ),
-              ],
-              if (!_hasWorkingDays) ...<Widget>[
-                const SizedBox(height: 12),
-                _NoticeCard(
-                  icon: Icons.event_busy_rounded,
-                  title: _copy(
-                    locale,
-                    en: 'No working days selected',
-                    ar: 'لا توجد أيام عمل محددة',
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          _copy(locale, en: 'Availability', ar: 'Availability'),
+                          style: theme.textTheme.headlineSmall?.copyWith(
+                            color: headlineColor,
+                            fontWeight: FontWeight.w900,
+                            height: 1.05,
+                          ),
+                        ),
+                        const SizedBox(height: 7),
+                        Text(
+                          _copy(
+                            locale,
+                            en: 'Set when customers can book you.',
+                            ar: 'Set when customers can book you.',
+                          ),
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: supportColor,
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  message: _copy(
-                    locale,
-                    en: 'Turn on a day to keep your schedule available for customers.',
-                    ar: 'فعّل يوماً ليظل جدولك متاحاً للعملاء.',
+                  const SizedBox(width: 12),
+                  AnimatedContainer(
+                    duration: _motion(context, ServioMotion.normal),
+                    curve: ServioMotion.spring,
+                    width: 46,
+                    height: 46,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.72),
+                      borderRadius: BorderRadius.circular(ServioRadius.md),
+                    ),
+                    child: Icon(
+                      availableNow
+                          ? Icons.online_prediction_rounded
+                          : Icons.power_settings_new_rounded,
+                      color: availableNow ? servio.success : servio.warning,
+                    ),
                   ),
-                  color: servio.warning,
-                ),
-              ],
-              const SizedBox(height: 24),
-              _SectionTitle(
-                icon: Icons.calendar_month_rounded,
-                title: _copy(
-                  locale,
-                  en: 'Weekly Schedule',
-                  ar: 'الجدول الأسبوعي',
-                ),
+                ],
               ),
-              const SizedBox(height: 12),
-              ..._days.map(
-                (day) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: _ScheduleDayCard(
-                    day: day,
-                    locale: locale,
-                    saving: _saving,
-                    onOffChanged: (isOff) => _setDayOff(day, isOff),
-                    onStartTap: () => _pickTime(day, isStart: true),
-                    onEndTap: () => _pickTime(day, isStart: false),
+              const SizedBox(height: 18),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.74),
+                  borderRadius: BorderRadius.circular(ServioRadius.md),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.8),
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              _CoverageCard(
-                account: account,
-                locale: locale,
-                serviceAreaController: _serviceAreaCtrl,
-                saving: _saving,
-                onServiceAreaChanged: () => setState(() => _error = null),
-              ),
-              const SizedBox(height: 24),
-              ServioPrimaryButton(
-                label: _copy(
-                  locale,
-                  en: 'Save Availability',
-                  ar: 'حفظ التوفر',
+                child: Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: _AvailabilityStatusPill(
+                        locale: locale,
+                        availableNow: availableNow,
+                        saving: saving || loading,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Switch.adaptive(
+                      value: availableNow,
+                      activeColor: servio.success,
+                      onChanged: saving ? null : onChanged,
+                    ),
+                  ],
                 ),
-                onPressed: canSave ? _saveAvailability : null,
-                isLoading: _saving,
               ),
             ],
           ),
@@ -301,84 +568,81 @@ class _AvailabilityManagerScreenState extends State<AvailabilityManagerScreen> {
   }
 }
 
-class _AvailableNowCard extends StatelessWidget {
-  const _AvailableNowCard({
+class _AvailabilityStatusPill extends StatelessWidget {
+  const _AvailabilityStatusPill({
     required this.locale,
-    required this.value,
+    required this.availableNow,
     required this.saving,
-    required this.onChanged,
   });
 
   final String locale;
-  final bool value;
+  final bool availableNow;
   final bool saving;
-  final ValueChanged<bool> onChanged;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
-    final statusType =
-        value ? ServioStatusChipType.success : ServioStatusChipType.warning;
+    final color = availableNow ? servio.success : servio.warning;
 
-    return ServioCard(
-      radius: ServioRadius.md,
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+    return AnimatedContainer(
+      duration: _motion(context, ServioMotion.normal),
+      curve: ServioMotion.spring,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: ServioColors.tint(color),
+        borderRadius: BorderRadius.circular(ServioRadius.full),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
+      ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: ServioColors.tint(value ? servio.success : servio.warning),
-              borderRadius: BorderRadius.circular(ServioRadius.full),
-            ),
-            child: Icon(
-              value ? Icons.check_circle_rounded : Icons.pause_circle_rounded,
-              color: value ? servio.success : servio.warning,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: <Widget>[
-                    Text(
-                      _copy(locale, en: 'Available Now', ar: 'متاح الآن'),
-                      style: theme.textTheme.titleMedium,
+          AnimatedSwitcher(
+            duration: _motion(context, ServioMotion.fast),
+            child: saving
+                ? SizedBox(
+                    key: const ValueKey<String>('saving'),
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(color),
                     ),
-                    ServioStatusChip(
-                      label: value
-                          ? _copy(locale, en: 'Active', ar: 'نشط')
-                          : _copy(locale, en: 'Paused', ar: 'متوقف'),
-                      type: statusType,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _copy(
-                    locale,
-                    en: 'Toggle off to pause new requests.',
-                    ar: 'أوقفه مؤقتاً لإيقاف الطلبات الجديدة.',
+                  )
+                : Icon(
+                    availableNow
+                        ? Icons.check_circle_rounded
+                        : Icons.pause_circle_rounded,
+                    key: ValueKey<bool>(availableNow),
+                    size: 17,
+                    color: color,
                   ),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: servio.textSecondary,
-                  ),
-                ),
-              ],
-            ),
           ),
           const SizedBox(width: 8),
-          Switch.adaptive(
-            value: value,
-            activeColor: servio.success,
-            onChanged: saving ? null : onChanged,
+          Flexible(
+            child: AnimatedSwitcher(
+              duration: _motion(context, ServioMotion.fast),
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: child,
+              ),
+              child: Text(
+                availableNow
+                    ? _copy(
+                        locale,
+                        en: 'Accepting bookings',
+                        ar: 'Accepting bookings',
+                      )
+                    : _copy(locale, en: 'Offline', ar: 'Offline'),
+                key: ValueKey<bool>(availableNow),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -386,20 +650,248 @@ class _AvailableNowCard extends StatelessWidget {
   }
 }
 
-class _ScheduleDayCard extends StatelessWidget {
-  const _ScheduleDayCard({
+class _WeeklySchedulePanel extends StatelessWidget {
+  const _WeeklySchedulePanel({
+    required this.locale,
+    required this.days,
+    required this.busy,
+    required this.onPresetSelected,
+    required this.onDayChanged,
+    required this.onStartTap,
+    required this.onEndTap,
+  });
+
+  final String locale;
+  final List<_AvailabilityDay> days;
+  final bool busy;
+  final ValueChanged<_AvailabilityPreset> onPresetSelected;
+  final void Function(_AvailabilityDay day, bool value) onDayChanged;
+  final ValueChanged<_AvailabilityDay> onStartTap;
+  final ValueChanged<_AvailabilityDay> onEndTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+
+    return ServioCard(
+      radius: ServioRadius.lg,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: ServioColors.tint(servio.accent),
+                  borderRadius: BorderRadius.circular(ServioRadius.md),
+                ),
+                child: Icon(
+                  Icons.calendar_month_rounded,
+                  color: servio.accent,
+                  size: 19,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      _copy(
+                        locale,
+                        en: 'Weekly schedule',
+                        ar: 'Weekly schedule',
+                      ),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _copy(
+                        locale,
+                        en: 'Use backend day keys and 24-hour time.',
+                        ar: 'Use backend day keys and 24-hour time.',
+                      ),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: servio.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _PresetRail(
+            locale: locale,
+            busy: busy,
+            onSelected: onPresetSelected,
+          ),
+          const SizedBox(height: 14),
+          ...days.map(
+            (day) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _ScheduleDayRow(
+                day: day,
+                locale: locale,
+                busy: busy,
+                onChanged: (value) => onDayChanged(day, value),
+                onStartTap: () => onStartTap(day),
+                onEndTap: () => onEndTap(day),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PresetRail extends StatelessWidget {
+  const _PresetRail({
+    required this.locale,
+    required this.busy,
+    required this.onSelected,
+  });
+
+  final String locale;
+  final bool busy;
+  final ValueChanged<_AvailabilityPreset> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final presets = <_PresetButtonData>[
+      _PresetButtonData(
+        preset: _AvailabilityPreset.weekdays,
+        icon: Icons.work_outline_rounded,
+        label: _copy(locale, en: 'Weekdays', ar: 'Weekdays'),
+        detail: '09:00-17:00',
+      ),
+      _PresetButtonData(
+        preset: _AvailabilityPreset.weekends,
+        icon: Icons.weekend_outlined,
+        label: _copy(locale, en: 'Weekends', ar: 'Weekends'),
+        detail: '10:00-15:00',
+      ),
+      _PresetButtonData(
+        preset: _AvailabilityPreset.everyDay,
+        icon: Icons.event_available_outlined,
+        label: _copy(locale, en: 'Every day', ar: 'Every day'),
+        detail: '09:00-17:00',
+      ),
+      _PresetButtonData(
+        preset: _AvailabilityPreset.clear,
+        icon: Icons.clear_all_rounded,
+        label: _copy(locale, en: 'Clear', ar: 'Clear'),
+        detail: _copy(locale, en: 'Schedule', ar: 'Schedule'),
+      ),
+    ];
+
+    return SizedBox(
+      height: 74,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: presets.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final preset = presets[index];
+          return _PresetButton(
+            data: preset,
+            enabled: !busy,
+            onTap: () => onSelected(preset.preset),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _PresetButton extends StatelessWidget {
+  const _PresetButton({
+    required this.data,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final _PresetButtonData data;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+    final radius = BorderRadius.circular(ServioRadius.md);
+
+    return Material(
+      color: enabled ? servio.surfaceAlt : servio.backgroundSoft,
+      borderRadius: radius,
+      child: InkWell(
+        borderRadius: radius,
+        onTap: enabled ? onTap : null,
+        child: Container(
+          width: 138,
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            border: Border.all(color: servio.border.withValues(alpha: 0.72)),
+          ),
+          child: Row(
+            children: <Widget>[
+              Icon(data.icon, size: 18, color: servio.accent),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      data.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      data.detail,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: servio.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ScheduleDayRow extends StatelessWidget {
+  const _ScheduleDayRow({
     required this.day,
     required this.locale,
-    required this.saving,
-    required this.onOffChanged,
+    required this.busy,
+    required this.onChanged,
     required this.onStartTap,
     required this.onEndTap,
   });
 
   final _AvailabilityDay day;
   final String locale;
-  final bool saving;
-  final ValueChanged<bool> onOffChanged;
+  final bool busy;
+  final ValueChanged<bool> onChanged;
   final VoidCallback onStartTap;
   final VoidCallback onEndTap;
 
@@ -407,90 +899,87 @@ class _ScheduleDayCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
-    final enabled = day.enabled && !saving;
+    final enabled = day.enabled;
+    final invalid = enabled && _minutes(day.end) <= _minutes(day.start);
 
-    return ServioCard(
-      radius: ServioRadius.sm,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      backgroundColor:
-          day.enabled ? theme.colorScheme.surface : servio.surfaceAlt,
-      borderColor:
-          day.enabled ? servio.border : servio.border.withValues(alpha: 0.55),
-      child: AnimatedOpacity(
-        duration: ServioMotion.fast,
-        opacity: saving ? 0.65 : 1,
+    return AnimatedContainer(
+      duration: _motion(context, ServioMotion.normal),
+      curve: ServioMotion.spring,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      decoration: BoxDecoration(
+        color: enabled ? theme.colorScheme.surface : servio.surfaceAlt,
+        borderRadius: BorderRadius.circular(ServioRadius.md),
+        border: Border.all(
+          color: invalid
+              ? servio.danger
+              : enabled
+                  ? servio.accent.withValues(alpha: 0.36)
+                  : servio.border.withValues(alpha: 0.72),
+        ),
+      ),
+      child: AnimatedSize(
+        duration: _motion(context, ServioMotion.normal),
+        curve: ServioMotion.spring,
+        alignment: Alignment.topCenter,
         child: Row(
           children: <Widget>[
-            _DayBadge(label: day.definition.label(locale)),
+            _DayBadge(
+              shortLabel: day.definition.label(locale),
+              fullLabel: day.definition.fullLabel(locale),
+              enabled: enabled,
+            ),
             const SizedBox(width: 8),
             Expanded(
               child: AnimatedSwitcher(
-                duration: ServioMotion.normal,
+                duration: _motion(context, ServioMotion.normal),
                 switchInCurve: ServioMotion.spring,
                 switchOutCurve: ServioMotion.standard,
-                child: day.enabled
+                transitionBuilder: (child, animation) {
+                  final offset = Tween<Offset>(
+                    begin: const Offset(0.06, 0),
+                    end: Offset.zero,
+                  ).animate(animation);
+                  return FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(position: offset, child: child),
+                  );
+                },
+                child: enabled
                     ? Row(
-                        key: ValueKey<String>('times-${day.definition.apiDay}'),
+                        key: ValueKey<String>(
+                            'enabled-${day.definition.apiDay}'),
                         children: <Widget>[
                           Expanded(
                             child: _CompactTimePill(
-                              label: _copy(
-                                locale,
-                                en: 'From',
-                                ar: '\u0645\u0646',
-                              ),
-                              time: day.start.format(context),
-                              enabled: enabled,
+                              label: _copy(locale, en: 'From', ar: 'From'),
+                              time: _formatApiTime(day.start),
+                              enabled: !busy,
                               onTap: onStartTap,
                             ),
                           ),
                           const SizedBox(width: 6),
                           Expanded(
                             child: _CompactTimePill(
-                              label: _copy(
-                                locale,
-                                en: 'Until',
-                                ar: '\u062d\u062a\u0649',
-                              ),
-                              time: day.end.format(context),
-                              enabled: enabled,
+                              label: _copy(locale, en: 'Until', ar: 'Until'),
+                              time: _formatApiTime(day.end),
+                              enabled: !busy,
+                              isError: invalid,
                               onTap: onEndTap,
                             ),
                           ),
                         ],
                       )
-                    : _DayOffSummary(
+                    : _DayOffSurface(
                         key: ValueKey<String>('off-${day.definition.apiDay}'),
                         locale: locale,
                       ),
               ),
             ),
             const SizedBox(width: 8),
-            InkWell(
-              borderRadius: BorderRadius.circular(ServioRadius.full),
-              onTap: saving ? null : () => onOffChanged(day.enabled),
-              child: Padding(
-                padding: const EdgeInsetsDirectional.fromSTEB(4, 2, 0, 2),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    Checkbox(
-                      value: !day.enabled,
-                      activeColor: servio.accent,
-                      visualDensity: VisualDensity.compact,
-                      onChanged:
-                          saving ? null : (value) => onOffChanged(value ?? false),
-                    ),
-                    Text(
-                      _copy(locale, en: 'Off', ar: '\u0625\u062c\u0627\u0632\u0629'),
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: servio.textSecondary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            Switch.adaptive(
+              value: enabled,
+              activeColor: servio.accent,
+              onChanged: busy ? null : onChanged,
             ),
           ],
         ),
@@ -505,11 +994,13 @@ class _CompactTimePill extends StatelessWidget {
     required this.time,
     required this.enabled,
     required this.onTap,
+    this.isError = false,
   });
 
   final String label;
   final String time;
   final bool enabled;
+  final bool isError;
   final VoidCallback onTap;
 
   @override
@@ -517,6 +1008,8 @@ class _CompactTimePill extends StatelessWidget {
     final theme = Theme.of(context);
     final servio = context.servio;
     final radius = BorderRadius.circular(ServioRadius.sm);
+    final borderColor =
+        isError ? servio.danger : servio.border.withValues(alpha: 0.75);
 
     return Material(
       color: enabled ? servio.surfaceAlt : servio.backgroundSoft,
@@ -528,7 +1021,7 @@ class _CompactTimePill extends StatelessWidget {
           constraints: const BoxConstraints(minHeight: ServioSpacing.tapTarget),
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           decoration: BoxDecoration(
-            border: Border.all(color: servio.border.withValues(alpha: 0.75)),
+            border: Border.all(color: borderColor),
             borderRadius: radius,
           ),
           child: Column(
@@ -540,7 +1033,8 @@ class _CompactTimePill extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.labelSmall?.copyWith(
-                  color: servio.textSecondary,
+                  color: isError ? servio.danger : servio.textSecondary,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(height: 1),
@@ -551,6 +1045,7 @@ class _CompactTimePill extends StatelessWidget {
                   time,
                   style: theme.textTheme.labelLarge?.copyWith(
                     fontWeight: FontWeight.w800,
+                    color: isError ? servio.danger : null,
                   ),
                 ),
               ),
@@ -563,31 +1058,47 @@ class _CompactTimePill extends StatelessWidget {
 }
 
 class _DayBadge extends StatelessWidget {
-  const _DayBadge({required this.label});
+  const _DayBadge({
+    required this.shortLabel,
+    required this.fullLabel,
+    required this.enabled,
+  });
 
-  final String label;
+  final String shortLabel;
+  final String fullLabel;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
 
-    return Container(
-      width: 52,
-      height: 36,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: servio.backgroundSoft,
-        borderRadius: BorderRadius.circular(ServioRadius.sm),
-        border: Border.all(color: servio.border.withValues(alpha: 0.75)),
-      ),
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Text(
-          label,
-          style: theme.textTheme.labelLarge?.copyWith(
-            color: servio.textSecondary,
-            fontWeight: FontWeight.w800,
+    return Tooltip(
+      message: fullLabel,
+      child: AnimatedContainer(
+        duration: _motion(context, ServioMotion.normal),
+        width: 50,
+        height: 42,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: enabled
+              ? ServioColors.tint(servio.accent)
+              : servio.backgroundSoft,
+          borderRadius: BorderRadius.circular(ServioRadius.sm),
+          border: Border.all(
+            color: enabled
+                ? servio.accent.withValues(alpha: 0.35)
+                : servio.border.withValues(alpha: 0.75),
+          ),
+        ),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            shortLabel,
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: enabled ? servio.accent : servio.textSecondary,
+              fontWeight: FontWeight.w900,
+            ),
           ),
         ),
       ),
@@ -595,8 +1106,8 @@ class _DayBadge extends StatelessWidget {
   }
 }
 
-class _DayOffSummary extends StatelessWidget {
-  const _DayOffSummary({required this.locale, super.key});
+class _DayOffSurface extends StatelessWidget {
+  const _DayOffSurface({required this.locale, super.key});
 
   final String locale;
 
@@ -606,8 +1117,8 @@ class _DayOffSummary extends StatelessWidget {
     final servio = context.servio;
 
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      constraints: const BoxConstraints(minHeight: ServioSpacing.tapTarget),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
         color: servio.backgroundSoft,
         borderRadius: BorderRadius.circular(ServioRadius.sm),
@@ -619,7 +1130,9 @@ class _DayOffSummary extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              _copy(locale, en: 'Day off', ar: 'يوم إجازة'),
+              _copy(locale, en: 'Day off', ar: 'Day off'),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: theme.textTheme.labelLarge?.copyWith(
                 color: servio.textSecondary,
                 fontWeight: FontWeight.w700,
@@ -655,77 +1168,68 @@ class _CoverageCard extends StatelessWidget {
         ? account!.categories
         : account?.skills ?? const <String>[];
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        _SectionTitle(
-          icon: Icons.location_on_outlined,
-          title: _copy(locale, en: 'Service Area', ar: 'منطقة الخدمة'),
-        ),
-        const SizedBox(height: 12),
-        ServioCard(
-          radius: ServioRadius.md,
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return ServioCard(
+      radius: ServioRadius.lg,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
             children: <Widget>[
-              TextField(
-                controller: serviceAreaController,
-                enabled: !saving,
-                textInputAction: TextInputAction.done,
-                decoration: InputDecoration(
-                  labelText: _copy(
-                    locale,
-                    en: 'Service Area',
-                    ar: 'منطقة الخدمة',
-                  ),
-                  hintText: _copy(
-                    locale,
-                    en: 'e.g. Cairo, Giza',
-                    ar: 'مثال: القاهرة، الجيزة',
-                  ),
-                  prefixIcon: const Icon(Icons.place_outlined),
-                ),
-                onChanged: (_) => onServiceAreaChanged(),
-              ),
-              const SizedBox(height: 18),
+              Icon(Icons.location_on_outlined, size: 19, color: servio.accent),
+              const SizedBox(width: 8),
               Text(
-                _copy(
-                  locale,
-                  en: 'Service Categories',
-                  ar: 'فئات الخدمة',
-                ),
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: servio.textSecondary,
+                _copy(locale, en: 'Service area', ar: 'Service area'),
+                style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(height: 10),
-              if (rawCategories.isEmpty)
-                _FieldSurface(
-                  icon: Icons.handyman_outlined,
-                  label: _copy(
-                    locale,
-                    en: 'No categories selected',
-                    ar: 'لا توجد فئات محددة',
-                  ),
-                )
-              else
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: rawCategories
-                      .map(
-                        (category) => _CategoryChip(
-                          label: _categoryLabel(category, locale),
-                        ),
-                      )
-                      .toList(),
-                ),
             ],
           ),
-        ),
-      ],
+          const SizedBox(height: 14),
+          TextField(
+            controller: serviceAreaController,
+            enabled: !saving,
+            textInputAction: TextInputAction.done,
+            decoration: InputDecoration(
+              labelText: _copy(locale, en: 'Service area', ar: 'Service area'),
+              hintText: _copy(locale, en: 'Cairo, Giza', ar: 'Cairo, Giza'),
+              prefixIcon: const Icon(Icons.place_outlined),
+            ),
+            onChanged: (_) => onServiceAreaChanged(),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            _copy(locale, en: 'Service categories', ar: 'Service categories'),
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: servio.textSecondary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 10),
+          if (rawCategories.isEmpty)
+            _FieldSurface(
+              icon: Icons.handyman_outlined,
+              label: _copy(
+                locale,
+                en: 'No categories selected',
+                ar: 'No categories selected',
+              ),
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: rawCategories
+                  .map(
+                    (category) => _CategoryChip(
+                      label: _categoryLabel(category, locale),
+                    ),
+                  )
+                  .toList(),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -812,7 +1316,9 @@ class _NoticeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Container(
+    return AnimatedContainer(
+      duration: _motion(context, ServioMotion.fast),
+      curve: ServioMotion.spring,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: ServioColors.tint(color),
@@ -849,32 +1355,6 @@ class _NoticeCard extends StatelessWidget {
   }
 }
 
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle({required this.icon, required this.title});
-
-  final IconData icon;
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final servio = context.servio;
-
-    return Row(
-      children: <Widget>[
-        Icon(icon, size: 18, color: servio.accent),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            title,
-            style: theme.textTheme.titleMedium,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _AvailabilityDay {
   _AvailabilityDay({
     required this.definition,
@@ -892,27 +1372,89 @@ class _AvailabilityDay {
 class _DayDefinition {
   const _DayDefinition({
     required this.apiDay,
-    required this.en,
-    required this.ar,
+    required this.labelEn,
+    required this.fullEn,
     required this.defaultOn,
+    required this.isWeekend,
   });
 
   final String apiDay;
-  final String en;
-  final String ar;
+  final String labelEn;
+  final String fullEn;
   final bool defaultOn;
+  final bool isWeekend;
 
-  String label(String locale) => _copy(locale, en: en, ar: ar);
+  bool get isWeekday => !isWeekend;
+  String label(String locale) => _copy(locale, en: labelEn, ar: labelEn);
+  String fullLabel(String locale) => _copy(locale, en: fullEn, ar: fullEn);
 }
 
+class _PresetButtonData {
+  const _PresetButtonData({
+    required this.preset,
+    required this.icon,
+    required this.label,
+    required this.detail,
+  });
+
+  final _AvailabilityPreset preset;
+  final IconData icon;
+  final String label;
+  final String detail;
+}
+
+enum _AvailabilityPreset { weekdays, weekends, everyDay, clear }
+
 const List<_DayDefinition> _dayDefinitions = <_DayDefinition>[
-  _DayDefinition(apiDay: 'monday', en: 'Mon', ar: 'إثن', defaultOn: true),
-  _DayDefinition(apiDay: 'tuesday', en: 'Tue', ar: 'ثلا', defaultOn: true),
-  _DayDefinition(apiDay: 'wednesday', en: 'Wed', ar: 'أرب', defaultOn: true),
-  _DayDefinition(apiDay: 'thursday', en: 'Thu', ar: 'خمي', defaultOn: false),
-  _DayDefinition(apiDay: 'friday', en: 'Fri', ar: 'جم', defaultOn: true),
-  _DayDefinition(apiDay: 'saturday', en: 'Sat', ar: 'سبت', defaultOn: false),
-  _DayDefinition(apiDay: 'sunday', en: 'Sun', ar: 'أحد', defaultOn: true),
+  _DayDefinition(
+    apiDay: 'saturday',
+    labelEn: 'Sat',
+    fullEn: 'Saturday',
+    defaultOn: false,
+    isWeekend: true,
+  ),
+  _DayDefinition(
+    apiDay: 'sunday',
+    labelEn: 'Sun',
+    fullEn: 'Sunday',
+    defaultOn: false,
+    isWeekend: true,
+  ),
+  _DayDefinition(
+    apiDay: 'monday',
+    labelEn: 'Mon',
+    fullEn: 'Monday',
+    defaultOn: true,
+    isWeekend: false,
+  ),
+  _DayDefinition(
+    apiDay: 'tuesday',
+    labelEn: 'Tue',
+    fullEn: 'Tuesday',
+    defaultOn: true,
+    isWeekend: false,
+  ),
+  _DayDefinition(
+    apiDay: 'wednesday',
+    labelEn: 'Wed',
+    fullEn: 'Wednesday',
+    defaultOn: true,
+    isWeekend: false,
+  ),
+  _DayDefinition(
+    apiDay: 'thursday',
+    labelEn: 'Thu',
+    fullEn: 'Thursday',
+    defaultOn: true,
+    isWeekend: false,
+  ),
+  _DayDefinition(
+    apiDay: 'friday',
+    labelEn: 'Fri',
+    fullEn: 'Friday',
+    defaultOn: true,
+    isWeekend: false,
+  ),
 ];
 
 TimeOfDay _parseApiTime(String? value, TimeOfDay fallback) {
@@ -932,20 +1474,29 @@ String _formatApiTime(TimeOfDay time) {
   return '$hour:$minute';
 }
 
+int _minutes(TimeOfDay time) => time.hour * 60 + time.minute;
+
 String _copy(String locale, {required String en, required String ar}) {
   return locale == 'ar' ? ar : en;
 }
 
+Duration _motion(BuildContext context, Duration duration) {
+  return MediaQuery.of(context).disableAnimations ? Duration.zero : duration;
+}
+
 String _categoryLabel(String value, String locale) {
   return switch (value.toLowerCase()) {
-    'plumbing' => _copy(locale, en: 'Plumbing', ar: 'السباكة'),
-    'electrical' => _copy(locale, en: 'Electrical', ar: 'الكهرباء'),
-    'painting' => _copy(locale, en: 'Painting', ar: 'الدهانات'),
-    'flooring' => _copy(locale, en: 'Flooring', ar: 'الأرضيات'),
-    'carpentry' => _copy(locale, en: 'Carpentry', ar: 'النجارة'),
-    'cleaning' => _copy(locale, en: 'Cleaning', ar: 'التنظيف'),
-    'hvac' => _copy(locale, en: 'HVAC', ar: 'التكييف'),
-    'other' => _copy(locale, en: 'Other', ar: 'أخرى'),
+    'plumbing' => _copy(locale, en: 'Plumbing', ar: 'Plumbing'),
+    'electrical' => _copy(locale, en: 'Electrical', ar: 'Electrical'),
+    'painting' => _copy(locale, en: 'Painting', ar: 'Painting'),
+    'flooring' => _copy(locale, en: 'Flooring', ar: 'Flooring'),
+    'carpentry' => _copy(locale, en: 'Carpentry', ar: 'Carpentry'),
+    'cleaning' => _copy(locale, en: 'Cleaning', ar: 'Cleaning'),
+    'hvac' => _copy(locale, en: 'HVAC', ar: 'HVAC'),
+    'appliance' => _copy(locale, en: 'Appliance', ar: 'Appliance'),
+    'handyman' => _copy(locale, en: 'Handyman', ar: 'Handyman'),
+    'renovation' => _copy(locale, en: 'Renovation', ar: 'Renovation'),
+    'other' => _copy(locale, en: 'Other', ar: 'Other'),
     _ => value,
   };
 }

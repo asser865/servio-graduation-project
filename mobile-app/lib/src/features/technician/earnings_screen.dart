@@ -17,7 +17,11 @@ class EarningsScreen extends StatefulWidget {
 
 class _EarningsScreenState extends State<EarningsScreen> {
   int _periodIndex = 0;
-  static const List<String> _periods = <String>['This Week', 'This Month', 'All Time'];
+  static const List<String> _periods = <String>[
+    'This Week',
+    'This Month',
+    'All Time'
+  ];
 
   EarningsSummary? _summary;
   bool _loading = true;
@@ -69,7 +73,8 @@ class _EarningsScreenState extends State<EarningsScreen> {
                 return GestureDetector(
                   onTap: () => setState(() => _periodIndex = index),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
                       color: active ? servio.accent : servio.backgroundSoft,
                       borderRadius: BorderRadius.circular(ServioRadius.full),
@@ -97,19 +102,22 @@ class _EarningsScreenState extends State<EarningsScreen> {
                 children: <Widget>[
                   Text(
                     'Total Earnings',
-                    style: theme.textTheme.labelLarge?.copyWith(color: Colors.white.withValues(alpha: 0.8)),
+                    style: theme.textTheme.labelLarge
+                        ?.copyWith(color: Colors.white.withValues(alpha: 0.8)),
                   ),
                   const SizedBox(height: 10),
                   _loading
                       ? const CircularProgressIndicator(color: Colors.white)
                       : Text(
                           '${earnings.toStringAsFixed(0)} EGP',
-                          style: theme.textTheme.displayLarge?.copyWith(color: Colors.white),
+                          style: theme.textTheme.displayLarge
+                              ?.copyWith(color: Colors.white),
                         ),
                   const SizedBox(height: 8),
                   Text(
                     'Pending: ${pending.toStringAsFixed(0)} EGP',
-                    style: theme.textTheme.bodyMedium?.copyWith(color: ServioColors.accentLight),
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(color: ServioColors.accentLight),
                   ),
                   const SizedBox(height: 16),
                   OutlinedButton(
@@ -201,7 +209,10 @@ class _BarColumn extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           label,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.servio.textSecondary),
+          style: Theme.of(context)
+              .textTheme
+              .bodySmall
+              ?.copyWith(color: context.servio.textSecondary),
         ),
       ],
     );
@@ -291,11 +302,19 @@ class _TransactionCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(date, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: servio.textSecondary)),
+                Text(date,
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: servio.textSecondary)),
                 const SizedBox(height: 6),
                 Text(service, style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 4),
-                Text(customer, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: servio.textSecondary)),
+                Text(customer,
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: servio.textSecondary)),
               ],
             ),
           ),
@@ -305,13 +324,18 @@ class _TransactionCard extends StatelessWidget {
             children: <Widget>[
               Text(
                 amount,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(color: servio.accent),
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(color: servio.accent),
               ),
               const SizedBox(height: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: ServioColors.tint(released ? servio.success : servio.warning),
+                  color: ServioColors.tint(
+                      released ? servio.success : servio.warning),
                   borderRadius: BorderRadius.circular(ServioRadius.full),
                 ),
                 child: Text(

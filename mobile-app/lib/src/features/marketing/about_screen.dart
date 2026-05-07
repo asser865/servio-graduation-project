@@ -23,7 +23,8 @@ class AboutScreen extends StatelessWidget {
           children: <Widget>[
             Text(
               'Your Home, Handled.',
-              style: theme.textTheme.headlineLarge?.copyWith(color: servio.accent),
+              style:
+                  theme.textTheme.headlineLarge?.copyWith(color: servio.accent),
             ),
             const SizedBox(height: 16),
             Text(
@@ -62,16 +63,28 @@ class AboutScreen extends StatelessWidget {
             const SizedBox(height: 32),
             Text('Key Features', style: theme.textTheme.titleMedium),
             const SizedBox(height: 16),
-            const _FeatureRow(icon: Icons.flash_on_rounded, title: 'Easy booking in seconds'),
-            const _FeatureRow(icon: Icons.verified_user_outlined, title: 'Thoroughly verified technicians'),
-            const _FeatureRow(icon: Icons.notifications_active_outlined, title: 'Real-time status updates'),
-            const _FeatureRow(icon: Icons.star_rate_rounded, title: 'Authentic reviews & ratings'),
+            const _FeatureRow(
+                icon: Icons.flash_on_rounded, title: 'Easy booking in seconds'),
+            const _FeatureRow(
+                icon: Icons.verified_user_outlined,
+                title: 'Thoroughly verified technicians'),
+            const _FeatureRow(
+                icon: Icons.notifications_active_outlined,
+                title: 'Real-time status updates'),
+            const _FeatureRow(
+                icon: Icons.star_rate_rounded,
+                title: 'Authentic reviews & ratings'),
             const SizedBox(height: 32),
             Text('Trust & Safety', style: theme.textTheme.titleMedium),
             const SizedBox(height: 16),
-            const _FeatureRow(icon: Icons.lock_outline_rounded, title: 'Secure, cashless payments'),
-            const _FeatureRow(icon: Icons.shield_outlined, title: 'Background-checked users'),
-            const _FeatureRow(icon: Icons.support_agent_rounded, title: 'Dedicated support system'),
+            const _FeatureRow(
+                icon: Icons.lock_outline_rounded,
+                title: 'Secure, cashless payments'),
+            const _FeatureRow(
+                icon: Icons.shield_outlined, title: 'Background-checked users'),
+            const _FeatureRow(
+                icon: Icons.support_agent_rounded,
+                title: 'Dedicated support system'),
             const SizedBox(height: 40),
           ],
         ),
@@ -90,7 +103,7 @@ class _FeatureRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
-    
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
@@ -107,7 +120,8 @@ class _FeatureRow extends StatelessWidget {
           Expanded(
             child: Text(
               title,
-              style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(fontWeight: FontWeight.w500),
             ),
           ),
         ],

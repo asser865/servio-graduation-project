@@ -62,7 +62,8 @@ const List<TechnicianModel> kDemoTechnicians = <TechnicianModel>[
     avatarInitials: 'MI',
     services: <TechnicianService>[
       TechnicianService(
-        name: BilingualText(en: 'Outlet / Switch Repair', ar: 'إصلاح مقبس / مفتاح'),
+        name: BilingualText(
+            en: 'Outlet / Switch Repair', ar: 'إصلاح مقبس / مفتاح'),
         price: BilingualText(en: '300 – 600 EGP', ar: '300 – 600 جنيه'),
         duration: BilingualText(en: '1 – 2 hrs', ar: '1 – 2 ساعة'),
       ),
@@ -100,7 +101,8 @@ const List<TechnicianModel> kDemoTechnicians = <TechnicianModel>[
     avatarInitials: 'HA',
     services: <TechnicianService>[
       TechnicianService(
-        name: BilingualText(en: 'AC Service & Cleaning', ar: 'صيانة وتنظيف تكييف'),
+        name: BilingualText(
+            en: 'AC Service & Cleaning', ar: 'صيانة وتنظيف تكييف'),
         price: BilingualText(en: '400 – 800 EGP', ar: '400 – 800 جنيه'),
         duration: BilingualText(en: '1 – 3 hrs', ar: '1 – 3 ساعات'),
       ),
@@ -134,7 +136,8 @@ const List<TechnicianModel> kDemoTechnicians = <TechnicianModel>[
     area: BilingualText(en: 'Cairo, Zamalek', ar: 'القاهرة، الزمالك'),
     verified: true,
     distance: '6.3 km',
-    availability: BilingualText(en: 'Available This Week', ar: 'متاح هذا الأسبوع'),
+    availability:
+        BilingualText(en: 'Available This Week', ar: 'متاح هذا الأسبوع'),
     avatarInitials: 'YS',
     services: <TechnicianService>[
       TechnicianService(
@@ -172,7 +175,8 @@ const List<TechnicianModel> kDemoTechnicians = <TechnicianModel>[
     area: BilingualText(en: 'Cairo, New Cairo', ar: 'القاهرة، القاهرة الجديدة'),
     verified: true,
     distance: '8.7 km',
-    availability: BilingualText(en: 'Available This Week', ar: 'متاح هذا الأسبوع'),
+    availability:
+        BilingualText(en: 'Available This Week', ar: 'متاح هذا الأسبوع'),
     avatarInitials: 'AG',
     services: <TechnicianService>[
       TechnicianService(

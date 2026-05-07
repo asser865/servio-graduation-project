@@ -3,7 +3,9 @@ import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/api/api_exception.dart';
 import '../../core/api/bookings_api.dart';
+import '../../core/models/backend_booking_model.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
@@ -51,24 +53,40 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
     if (!_termsAccepted) return;
 
     final data = widget.data;
-    final hasIds = data.technicianId.isNotEmpty && data.serviceId.isNotEmpty;
+    final canCreateBackendBooking = data.technicianId.isNotEmpty &&
+        (data.serviceId.isNotEmpty || data.category.isNotEmpty);
+    var confirmationData = data;
 
-    if (hasIds) {
+    if (canCreateBackendBooking) {
       setState(() {
         _loading = true;
         _error = null;
       });
       try {
         final client = context.read<ApiClient>();
-        await BookingsApi(client).createBooking(
+        final booking = await BookingsApi(client).createBooking(
           workerId: data.technicianId,
           serviceId: data.serviceId,
-          scheduledDate: data.scheduledDateTime ?? DateTime.now().add(const Duration(days: 1)),
+          serviceCategory: data.category,
+          serviceName: data.serviceName,
+          scheduledDate: data.scheduledDateTime ??
+              DateTime.now().add(const Duration(days: 1)),
+          scheduledTime: _backendSlotFromLabel(data.time),
+          address: data.location,
           addressCity: data.addressCity.isNotEmpty ? data.addressCity : 'Cairo',
-          addressStreet: data.addressStreet.isNotEmpty ? data.addressStreet : '',
+          addressStreet:
+              data.addressStreet.isNotEmpty ? data.addressStreet : '',
           notes: data.notes,
         );
+        confirmationData = _confirmationDataFromBackend(data, booking);
         if (!mounted) return;
+      } on ApiException catch (e) {
+        if (!mounted) return;
+        setState(() {
+          _loading = false;
+          _error = e.message;
+        });
+        return;
       } catch (e) {
         if (!mounted) return;
         setState(() {
@@ -83,7 +101,7 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
     if (!mounted) return;
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => BookingConfirmationScreen(data: data),
+        builder: (_) => BookingConfirmationScreen(data: confirmationData),
       ),
     );
   }
@@ -410,7 +428,9 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
                       opacity: _termsAccepted ? 1.0 : 0.5,
                       child: ServioPrimaryButton(
                         label: _loading ? 'Confirming…' : 'Confirm Booking',
-                        onPressed: (_termsAccepted && !_loading) ? _confirmBooking : null,
+                        onPressed: (_termsAccepted && !_loading)
+                            ? _confirmBooking
+                            : null,
                       ),
                     ),
                   ),
@@ -653,6 +673,34 @@ class _PriceLine extends StatelessWidget {
 class _TrustItem {
   const _TrustItem(this.text);
   final String text;
+}
+
+BookingFlowData _confirmationDataFromBackend(
+  BookingFlowData original,
+  BackendBooking booking,
+) {
+  final shortId = booking.id.length >= 6
+      ? booking.id.substring(booking.id.length - 6).toUpperCase()
+      : booking.id.toUpperCase();
+  return original.copyWith(
+    reference: '#SRV-$shortId',
+    amount: booking.totalAmount > 0
+        ? '${booking.totalAmount.toStringAsFixed(0)} EGP'
+        : original.amount,
+  );
+}
+
+String _backendSlotFromLabel(String label) {
+  final match = RegExp(r'(\d{1,2})(?::\d{2})?\s*(AM|PM)?', caseSensitive: false)
+      .firstMatch(label);
+  if (match == null) return '10:00';
+
+  var hour = int.tryParse(match.group(1) ?? '') ?? 10;
+  final meridiem = match.group(2)?.toUpperCase();
+  if (meridiem == 'PM' && hour < 12) hour += 12;
+  if (meridiem == 'AM' && hour == 12) hour = 0;
+  hour = hour.clamp(0, 23).toInt();
+  return '${hour.toString().padLeft(2, '0')}:00';
 }
 
 int _moneyValue(String value) {

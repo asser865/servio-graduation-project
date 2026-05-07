@@ -60,11 +60,12 @@ class _HomeBodyState extends State<_HomeBody> {
     final isDark = theme.brightness == Brightness.dark;
     final servio = context.servio;
     final bottomInset = ServioTabShell.bottomOverlayInsetOf(context);
-    
+
     final userName = context.watch<SessionProvider>().account?.name ?? 'there';
     final firstName = userName.split(' ').first;
     final recentBookings = context.watch<BookingsProvider>().upcoming;
-    final featuredTechs = context.watch<WorkersProvider>().workers.take(4).toList();
+    final featuredTechs =
+        context.watch<WorkersProvider>().workers.take(4).toList();
     final locale = context.watch<LocaleProvider>().locale.languageCode;
 
     final hour = DateTime.now().hour;
@@ -95,7 +96,8 @@ class _HomeBodyState extends State<_HomeBody> {
           },
           child: Container(
             decoration: BoxDecoration(
-              gradient: isDark ? ServioGradients.brandDark : ServioGradients.brand,
+              gradient:
+                  isDark ? ServioGradients.brandDark : ServioGradients.brand,
             ),
             child: Stack(
               children: <Widget>[
@@ -139,7 +141,8 @@ class _HomeBodyState extends State<_HomeBody> {
         ),
         RefreshIndicator(
           color: servio.accent,
-          onRefresh: () async => Future<void>.delayed(const Duration(seconds: 1)),
+          onRefresh: () async =>
+              Future<void>.delayed(const Duration(seconds: 1)),
           child: SingleChildScrollView(
             controller: _scrollController,
             physics: const AlwaysScrollableScrollPhysics(),
@@ -148,7 +151,8 @@ class _HomeBodyState extends State<_HomeBody> {
                 SafeArea(
                   bottom: false,
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: ServioSpacing.screenPadding, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: ServioSpacing.screenPadding, vertical: 16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
@@ -162,45 +166,63 @@ class _HomeBodyState extends State<_HomeBody> {
                                   Text(
                                     greeting,
                                     style: theme.textTheme.bodyMedium?.copyWith(
-                                      color: isDark ? ServioColors.navyDark.withValues(alpha: 0.7) : Colors.white70,
+                                      color: isDark
+                                          ? ServioColors.navyDark
+                                              .withValues(alpha: 0.7)
+                                          : Colors.white70,
                                     ),
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
                                     firstName,
-                                    style: theme.textTheme.headlineLarge?.copyWith(
-                                      color: isDark ? ServioColors.navyDark : Colors.white,
+                                    style:
+                                        theme.textTheme.headlineLarge?.copyWith(
+                                      color: isDark
+                                          ? ServioColors.navyDark
+                                          : Colors.white,
                                     ),
                                   ),
                                 ],
                               ),
                             ),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
                               decoration: BoxDecoration(
-                                color: (isDark ? ServioColors.navyDark : Colors.white).withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(ServioRadius.full),
+                                color: (isDark
+                                        ? ServioColors.navyDark
+                                        : Colors.white)
+                                    .withValues(alpha: 0.15),
+                                borderRadius:
+                                    BorderRadius.circular(ServioRadius.full),
                               ),
                               child: Row(
                                 children: <Widget>[
                                   Icon(
-                                    Icons.location_on_rounded, 
-                                    size: 16, 
-                                    color: isDark ? ServioColors.navyDark : Colors.white,
+                                    Icons.location_on_rounded,
+                                    size: 16,
+                                    color: isDark
+                                        ? ServioColors.navyDark
+                                        : Colors.white,
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
                                     'Cairo',
-                                    style: theme.textTheme.labelMedium?.copyWith(
-                                      color: isDark ? ServioColors.navyDark : Colors.white,
+                                    style:
+                                        theme.textTheme.labelMedium?.copyWith(
+                                      color: isDark
+                                          ? ServioColors.navyDark
+                                          : Colors.white,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
                                   const SizedBox(width: 4),
                                   Icon(
-                                    Icons.keyboard_arrow_down_rounded, 
-                                    size: 16, 
-                                    color: isDark ? ServioColors.navyDark : Colors.white,
+                                    Icons.keyboard_arrow_down_rounded,
+                                    size: 16,
+                                    color: isDark
+                                        ? ServioColors.navyDark
+                                        : Colors.white,
                                   ),
                                 ],
                               ),
@@ -209,22 +231,30 @@ class _HomeBodyState extends State<_HomeBody> {
                             GestureDetector(
                               onTap: () {
                                 Navigator.of(context).push(
-                                  MaterialPageRoute<void>(builder: (_) => const NotificationsScreen()),
+                                  MaterialPageRoute<void>(
+                                      builder: (_) =>
+                                          const NotificationsScreen()),
                                 );
                               },
                               child: Container(
                                 width: 44,
                                 height: 44,
                                 decoration: BoxDecoration(
-                                  color: (isDark ? ServioColors.navyDark : Colors.white).withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(ServioRadius.full),
+                                  color: (isDark
+                                          ? ServioColors.navyDark
+                                          : Colors.white)
+                                      .withValues(alpha: 0.15),
+                                  borderRadius:
+                                      BorderRadius.circular(ServioRadius.full),
                                 ),
                                 child: Stack(
                                   alignment: Alignment.center,
                                   children: <Widget>[
                                     Icon(
                                       Icons.notifications_none_rounded,
-                                      color: isDark ? ServioColors.navyDark : Colors.white,
+                                      color: isDark
+                                          ? ServioColors.navyDark
+                                          : Colors.white,
                                     ),
                                     Positioned(
                                       top: 10,
@@ -255,10 +285,13 @@ class _HomeBodyState extends State<_HomeBody> {
                   margin: const EdgeInsets.only(top: 48),
                   decoration: BoxDecoration(
                     color: theme.scaffoldBackgroundColor,
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(32)),
                     boxShadow: <BoxShadow>[
                       BoxShadow(
-                        color: isDark ? Colors.black.withValues(alpha: 0.4) : Colors.black.withValues(alpha: 0.05),
+                        color: isDark
+                            ? Colors.black.withValues(alpha: 0.4)
+                            : Colors.black.withValues(alpha: 0.05),
                         blurRadius: 24,
                         offset: const Offset(0, -8),
                       ),
@@ -270,23 +303,32 @@ class _HomeBodyState extends State<_HomeBody> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: ServioSpacing.screenPadding),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: ServioSpacing.screenPadding),
                           child: recentBookings.isNotEmpty
-                              ? _FloatingBookingCard(booking: recentBookings.first, locale: locale)
+                              ? _FloatingBookingCard(
+                                  booking: recentBookings.first, locale: locale)
                               : const _FloatingEmptyBookingCard(),
                         ),
                         const SizedBox(height: 24),
                         Container(
-                          color: isDark ? Colors.white.withValues(alpha: 0.015) : servio.backgroundSoft,
-                          padding: const EdgeInsets.symmetric(horizontal: ServioSpacing.screenPadding, vertical: 32),
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.015)
+                              : servio.backgroundSoft,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: ServioSpacing.screenPadding,
+                              vertical: 32),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: <Widget>[
                               ServioSectionHeading(
                                 title: locale == 'ar' ? 'الخدمات' : 'Services',
-                                actionLabel: locale == 'ar' ? 'عرض الكل' : 'See All',
+                                actionLabel:
+                                    locale == 'ar' ? 'عرض الكل' : 'See All',
                                 onActionTap: () => Navigator.of(context).push(
-                                  MaterialPageRoute<void>(builder: (_) => const ServicesMarketplaceScreen()),
+                                  MaterialPageRoute<void>(
+                                      builder: (_) =>
+                                          const ServicesMarketplaceScreen()),
                                 ),
                               ),
                               const SizedBox(height: 24),
@@ -296,16 +338,20 @@ class _HomeBodyState extends State<_HomeBody> {
                         ),
                         Container(
                           color: theme.scaffoldBackgroundColor,
-                          padding: const EdgeInsets.symmetric(horizontal: ServioSpacing.screenPadding, vertical: 32),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: ServioSpacing.screenPadding,
+                              vertical: 32),
                           child: _HeroBannerCard(
                             badgeLabel: 'NEW FEATURE',
                             title: 'AI Smart Match',
-                            body: 'Snap a photo and let AI find the perfect pro.',
+                            body:
+                                'Snap a photo and let AI find the perfect pro.',
                             ctaLabel: 'Try AI Assistant',
                             icon: Icons.auto_awesome_rounded,
                             onTap: () {
                               Navigator.of(context).push(
-                                MaterialPageRoute<void>(builder: (_) => const AiSmartMatchScreen()),
+                                MaterialPageRoute<void>(
+                                    builder: (_) => const AiSmartMatchScreen()),
                               );
                             },
                           ),
@@ -313,27 +359,38 @@ class _HomeBodyState extends State<_HomeBody> {
                         Container(
                           width: double.infinity,
                           decoration: BoxDecoration(
-                            color: isDark ? Colors.white.withValues(alpha: 0.01) : servio.backgroundSoft.withValues(alpha: 0.5),
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.01)
+                                : servio.backgroundSoft.withValues(alpha: 0.5),
                             border: Border(
-                              top: BorderSide(color: servio.border.withValues(alpha: 0.3)),
+                              top: BorderSide(
+                                  color: servio.border.withValues(alpha: 0.3)),
                             ),
                           ),
-                          padding: const EdgeInsets.fromLTRB(ServioSpacing.screenPadding, 32, 0, 48),
+                          padding: const EdgeInsets.fromLTRB(
+                              ServioSpacing.screenPadding, 32, 0, 48),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: <Widget>[
                               Padding(
-                                padding: const EdgeInsets.only(right: ServioSpacing.screenPadding),
+                                padding: const EdgeInsets.only(
+                                    right: ServioSpacing.screenPadding),
                                 child: ServioSectionHeading(
-                                  title: locale == 'ar' ? 'موصى بهم لك' : 'Recommended For You',
-                                  actionLabel: locale == 'ar' ? 'عرض الكل' : 'See All',
+                                  title: locale == 'ar'
+                                      ? 'موصى بهم لك'
+                                      : 'Recommended For You',
+                                  actionLabel:
+                                      locale == 'ar' ? 'عرض الكل' : 'See All',
                                   onActionTap: () => Navigator.of(context).push(
-                                    MaterialPageRoute<void>(builder: (_) => const TechnicianListingScreen()),
+                                    MaterialPageRoute<void>(
+                                        builder: (_) =>
+                                            const TechnicianListingScreen()),
                                   ),
                                 ),
                               ),
                               const SizedBox(height: 24),
-                              _FeaturedProfessionals(featuredTechs: featuredTechs),
+                              _FeaturedProfessionals(
+                                  featuredTechs: featuredTechs),
                             ],
                           ),
                         ),
@@ -360,11 +417,12 @@ class _HeroSearchBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
-    
+
     return GestureDetector(
       onTap: () {
         Navigator.of(context).push(
-          MaterialPageRoute<void>(builder: (_) => const SearchResultsScreen(query: '')),
+          MaterialPageRoute<void>(
+              builder: (_) => const SearchResultsScreen(query: '')),
         );
       },
       child: Container(
@@ -373,7 +431,8 @@ class _HeroSearchBar extends StatelessWidget {
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(ServioRadius.full),
-          boxShadow: isDark ? ServioShadows.elevatedDark : ServioShadows.elevated,
+          boxShadow:
+              isDark ? ServioShadows.elevatedDark : ServioShadows.elevated,
         ),
         child: Row(
           children: <Widget>[
@@ -394,7 +453,8 @@ class _HeroSearchBar extends StatelessWidget {
                 gradient: ServioGradients.accent,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 18),
+              child: const Icon(Icons.auto_awesome_rounded,
+                  color: Colors.white, size: 18),
             ),
           ],
         ),
@@ -418,10 +478,11 @@ class _FloatingBookingCard extends StatelessWidget {
     final servio = context.servio;
 
     final isInProgress = booking.status == BookingStatus.inProgress;
-    final statusType = isInProgress ? ServioStatusChipType.info : ServioStatusChipType.warning;
-    final statusLabel = isInProgress 
-      ? (locale == 'ar' ? 'قيد التنفيذ' : 'En Route') 
-      : (locale == 'ar' ? 'قادم' : 'Upcoming');
+    final statusType =
+        isInProgress ? ServioStatusChipType.info : ServioStatusChipType.warning;
+    final statusLabel = isInProgress
+        ? (locale == 'ar' ? 'قيد التنفيذ' : 'En Route')
+        : (locale == 'ar' ? 'قادم' : 'Upcoming');
 
     return ServioCard(
       radius: ServioRadius.xl,
@@ -438,7 +499,8 @@ class _FloatingBookingCard extends StatelessWidget {
                   color: ServioColors.tint(servio.accent),
                   borderRadius: BorderRadius.circular(ServioRadius.md),
                 ),
-                child: Icon(Icons.build_circle_outlined, color: servio.accent, size: 24),
+                child: Icon(Icons.build_circle_outlined,
+                    color: servio.accent, size: 24),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -454,7 +516,8 @@ class _FloatingBookingCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       booking.date,
-                      style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: servio.textSecondary),
                     ),
                   ],
                 ),
@@ -471,12 +534,14 @@ class _FloatingBookingCard extends StatelessWidget {
                 child: OutlinedButton(
                   onPressed: () {
                     Navigator.of(context).push(
-                      MaterialPageRoute<void>(builder: (_) => const MyBookingsScreen()),
+                      MaterialPageRoute<void>(
+                          builder: (_) => const MyBookingsScreen()),
                     );
                   },
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(ServioRadius.full)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(ServioRadius.full)),
                   ),
                   child: Text(locale == 'ar' ? 'التفاصيل' : 'View Details'),
                 ),
@@ -490,7 +555,8 @@ class _FloatingBookingCard extends StatelessWidget {
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(ServioRadius.full)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(ServioRadius.full)),
                   ),
                   child: Text(locale == 'ar' ? 'تتبع الطلب' : 'Track Status'),
                 ),
@@ -523,7 +589,8 @@ class _FloatingEmptyBookingCard extends StatelessWidget {
               color: servio.backgroundSoft,
               borderRadius: BorderRadius.circular(ServioRadius.md),
             ),
-            child: Icon(Icons.check_circle_outline_rounded, color: servio.textSecondary, size: 24),
+            child: Icon(Icons.check_circle_outline_rounded,
+                color: servio.textSecondary, size: 24),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -534,7 +601,8 @@ class _FloatingEmptyBookingCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   'Ready to tackle your next project?',
-                  style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: servio.textSecondary),
                 ),
               ],
             ),
@@ -547,7 +615,7 @@ class _FloatingEmptyBookingCard extends StatelessWidget {
 
 class _CategoriesGrid extends StatelessWidget {
   const _CategoriesGrid({required this.locale});
-  
+
   final String locale;
 
   @override
@@ -565,42 +633,54 @@ class _CategoriesGrid extends StatelessWidget {
           icon: Icons.cleaning_services_rounded,
           label: locale == 'ar' ? 'تنظيف' : 'Cleaning',
           onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => const ServiceDetailScreen(serviceId: 'cleaning')),
+            MaterialPageRoute<void>(
+                builder: (_) =>
+                    const ServiceDetailScreen(serviceId: 'cleaning')),
           ),
         ),
         _CategoryItem(
           icon: Icons.plumbing_rounded,
           label: locale == 'ar' ? 'سباكة' : 'Plumbing',
           onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => const ServiceDetailScreen(serviceId: 'plumbing')),
+            MaterialPageRoute<void>(
+                builder: (_) =>
+                    const ServiceDetailScreen(serviceId: 'plumbing')),
           ),
         ),
         _CategoryItem(
           icon: Icons.electrical_services_rounded,
           label: locale == 'ar' ? 'كهرباء' : 'Electrical',
           onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => const ServiceDetailScreen(serviceId: 'electrical')),
+            MaterialPageRoute<void>(
+                builder: (_) =>
+                    const ServiceDetailScreen(serviceId: 'electrical')),
           ),
         ),
         _CategoryItem(
           icon: Icons.format_paint_rounded,
           label: locale == 'ar' ? 'دهان' : 'Painting',
           onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => const ServiceDetailScreen(serviceId: 'painting')),
+            MaterialPageRoute<void>(
+                builder: (_) =>
+                    const ServiceDetailScreen(serviceId: 'painting')),
           ),
         ),
         _CategoryItem(
           icon: Icons.ac_unit_rounded,
           label: locale == 'ar' ? 'تكييف' : 'HVAC',
           onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => const ServiceDetailScreen(serviceId: 'ac-maintenance')),
+            MaterialPageRoute<void>(
+                builder: (_) =>
+                    const ServiceDetailScreen(serviceId: 'ac-maintenance')),
           ),
         ),
         _CategoryItem(
           icon: Icons.handyman_rounded,
           label: locale == 'ar' ? 'نجارة' : 'Carpentry',
           onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => const ServiceDetailScreen(serviceId: 'carpentry')),
+            MaterialPageRoute<void>(
+                builder: (_) =>
+                    const ServiceDetailScreen(serviceId: 'carpentry')),
           ),
         ),
         _CategoryItem(
@@ -611,7 +691,8 @@ class _CategoriesGrid extends StatelessWidget {
           icon: Icons.more_horiz_rounded,
           label: locale == 'ar' ? 'المزيد' : 'More',
           onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => const ServicesMarketplaceScreen()),
+            MaterialPageRoute<void>(
+                builder: (_) => const ServicesMarketplaceScreen()),
           ),
         ),
       ],
@@ -634,7 +715,8 @@ class _CategoryItem extends StatefulWidget {
   State<_CategoryItem> createState() => _CategoryItemState();
 }
 
-class _CategoryItemState extends State<_CategoryItem> with SingleTickerProviderStateMixin {
+class _CategoryItemState extends State<_CategoryItem>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scale;
 
@@ -642,7 +724,7 @@ class _CategoryItemState extends State<_CategoryItem> with SingleTickerProviderS
   void initState() {
     super.initState();
     _controller = AnimationController(
-      vsync: this, 
+      vsync: this,
       duration: ServioMotion.fast,
     );
     _scale = Tween<double>(begin: 1.0, end: 0.95).animate(
@@ -733,7 +815,8 @@ class _ProfessionalCard extends StatefulWidget {
   State<_ProfessionalCard> createState() => _ProfessionalCardState();
 }
 
-class _ProfessionalCardState extends State<_ProfessionalCard> with SingleTickerProviderStateMixin {
+class _ProfessionalCardState extends State<_ProfessionalCard>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scale;
 
@@ -745,7 +828,7 @@ class _ProfessionalCardState extends State<_ProfessionalCard> with SingleTickerP
       CurvedAnimation(parent: _controller, curve: ServioMotion.spring),
     );
   }
-  
+
   @override
   void dispose() {
     _controller.dispose();
@@ -758,7 +841,8 @@ class _ProfessionalCardState extends State<_ProfessionalCard> with SingleTickerP
     final servio = context.servio;
     final tech = widget.tech;
     final name = tech.name as String;
-    final specialty = tech.skills.isNotEmpty ? tech.skills.first as String : 'Specialist';
+    final specialty =
+        tech.skills.isNotEmpty ? tech.skills.first as String : 'Specialist';
 
     return GestureDetector(
       onTapDown: (_) => _controller.forward(),
@@ -794,21 +878,28 @@ class _ProfessionalCardState extends State<_ProfessionalCard> with SingleTickerP
                       ),
                       child: Center(
                         child: Text(
-                          name.split(' ').take(2).map((String e) => e[0]).join(),
-                          style: theme.textTheme.titleMedium?.copyWith(color: ServioColors.deepBrown),
+                          name
+                              .split(' ')
+                              .take(2)
+                              .map((String e) => e[0])
+                              .join(),
+                          style: theme.textTheme.titleMedium
+                              ?.copyWith(color: ServioColors.deepBrown),
                         ),
                       ),
                     ),
                     const Spacer(),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
                         color: ServioColors.tint(servio.success),
                         borderRadius: BorderRadius.circular(ServioRadius.full),
                       ),
                       child: Row(
                         children: <Widget>[
-                          Icon(Icons.verified_rounded, size: 14, color: servio.success),
+                          Icon(Icons.verified_rounded,
+                              size: 14, color: servio.success),
                           const SizedBox(width: 4),
                           Text(
                             'Verified',
@@ -832,12 +923,14 @@ class _ProfessionalCardState extends State<_ProfessionalCard> with SingleTickerP
                 const SizedBox(height: 4),
                 Text(
                   specialty,
-                  style: theme.textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(color: servio.textSecondary),
                 ),
                 const Spacer(),
                 Row(
                   children: <Widget>[
-                    Icon(Icons.star_rounded, size: 18, color: const Color(0xFFF59E0B)),
+                    Icon(Icons.star_rounded,
+                        size: 18, color: const Color(0xFFF59E0B)),
                     const SizedBox(width: 4),
                     Text(
                       tech.rating.toStringAsFixed(1),
@@ -846,7 +939,8 @@ class _ProfessionalCardState extends State<_ProfessionalCard> with SingleTickerP
                     const SizedBox(width: 6),
                     Text(
                       '(${tech.reviewCount})',
-                      style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: servio.textSecondary),
                     ),
                   ],
                 ),
@@ -889,7 +983,8 @@ class _HeroBannerCard extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: isDark ? ServioGradients.brandDark : ServioGradients.brand,
           borderRadius: BorderRadius.circular(ServioRadius.xl),
-          boxShadow: isDark ? ServioShadows.elevatedDark : ServioShadows.elevated,
+          boxShadow:
+              isDark ? ServioShadows.elevatedDark : ServioShadows.elevated,
         ),
         child: Stack(
           children: <Widget>[
@@ -907,7 +1002,8 @@ class _HeroBannerCard extends StatelessWidget {
               children: <Widget>[
                 if (badgeLabel != null) ...<Widget>[
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: servio.accent,
                       borderRadius: BorderRadius.circular(ServioRadius.full),
@@ -925,7 +1021,8 @@ class _HeroBannerCard extends StatelessWidget {
                 ],
                 Text(
                   title,
-                  style: theme.textTheme.headlineMedium?.copyWith(color: Colors.white),
+                  style: theme.textTheme.headlineMedium
+                      ?.copyWith(color: Colors.white),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -944,7 +1041,8 @@ class _HeroBannerCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Icon(Icons.arrow_forward_rounded, size: 16, color: servio.accent),
+                    Icon(Icons.arrow_forward_rounded,
+                        size: 16, color: servio.accent),
                   ],
                 ),
               ],

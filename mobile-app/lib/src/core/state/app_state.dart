@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../api/api_client.dart';
 import '../api/api_exception.dart';
 import '../api/auth_api.dart';
+import '../api/token_storage.dart';
 import '../api/users_api.dart';
 import '../models/booking_model.dart';
 import '../models/message_model.dart';
@@ -20,10 +23,16 @@ const String _kKeyLocale = 'servio_locale';
 // ── SessionProvider ───────────────────────────────────────────────────────────
 
 class SessionProvider extends ChangeNotifier {
-  SessionProvider(this._storage, this._apiClient);
+  SessionProvider(
+    StorageService storage,
+    this._apiClient, {
+    TokenStorage? tokenStorage,
+  })  : _storage = storage,
+        _tokenStorage = tokenStorage ?? StorageBackedTokenStorage(storage);
 
   final StorageService _storage;
   final ApiClient _apiClient;
+  final TokenStorage _tokenStorage;
   late final AuthApi _authApi = AuthApi(_apiClient);
   late final UsersApi _usersApi = UsersApi(_apiClient);
 
@@ -43,7 +52,7 @@ class SessionProvider extends ChangeNotifier {
     if (json['role'] == 'admin') {
       _storage.remove(_kKeySession);
       _storage.remove(_kKeyAccount);
-      _storage.removeSecureString(StorageService.keyAuthToken);
+      unawaited(_tokenStorage.clearToken());
       return;
     }
     try {
@@ -59,8 +68,7 @@ class SessionProvider extends ChangeNotifier {
     try {
       final session = await _authApi.login(email: email, password: password);
       _account = session.user;
-      await _storage.setSecureString(
-          StorageService.keyAuthToken, session.token);
+      await _tokenStorage.saveToken(session.token);
       await _storage.setJson(_kKeySession, session.user.toJson());
       await _storage.setJson(_kKeyAccount, session.user.toJson());
       if (rememberEmail) {
@@ -93,8 +101,7 @@ class SessionProvider extends ChangeNotifier {
         city: city,
       );
       _account = session.user;
-      await _storage.setSecureString(
-          StorageService.keyAuthToken, session.token);
+      await _tokenStorage.saveToken(session.token);
       await _storage.setJson(_kKeySession, session.user.toJson());
       await _storage.setJson(_kKeyAccount, session.user.toJson());
       notifyListeners();
@@ -128,8 +135,7 @@ class SessionProvider extends ChangeNotifier {
         availabilityType: availabilityType,
       );
       _account = session.user;
-      await _storage.setSecureString(
-          StorageService.keyAuthToken, session.token);
+      await _tokenStorage.saveToken(session.token);
       await _storage.setJson(_kKeySession, session.user.toJson());
       await _storage.setJson(_kKeyAccount, session.user.toJson());
       notifyListeners();
@@ -155,11 +161,7 @@ class SessionProvider extends ChangeNotifier {
   Future<String?> updateProfile(Map<String, dynamic> fields) async {
     try {
       await _usersApi.updateProfile(fields);
-      final refreshed = await _authApi.getMe();
-      _account = refreshed;
-      await _storage.setJson(_kKeySession, refreshed.toJson());
-      await _storage.setJson(_kKeyAccount, refreshed.toJson());
-      notifyListeners();
+      await _refreshAccount();
       return null;
     } on ApiException catch (e) {
       return e.message;
@@ -168,18 +170,23 @@ class SessionProvider extends ChangeNotifier {
     }
   }
 
-  Future<String?> updateAvailability(
-    List<Map<String, dynamic>> availability,
+  Future<String?> loadCurrentWorkerProfile() async {
+    try {
+      await _refreshAccount();
+      return null;
+    } on ApiException catch (e) {
+      return e.message;
+    } catch (_) {
+      return 'Could not load profile. Check your connection.';
+    }
+  }
+
+  Future<String?> updateWorkerAvailability(
+    List<AvailabilitySlot> availability,
   ) async {
     try {
-      await _usersApi.updateAvailability(<String, dynamic>{
-        'availability': availability,
-      });
-      final refreshed = await _authApi.getMe();
-      _account = refreshed;
-      await _storage.setJson(_kKeySession, refreshed.toJson());
-      await _storage.setJson(_kKeyAccount, refreshed.toJson());
-      notifyListeners();
+      final updated = await _usersApi.updateAvailability(availability);
+      await _setAccount(updated);
       return null;
     } on ApiException catch (e) {
       return e.message;
@@ -188,16 +195,83 @@ class SessionProvider extends ChangeNotifier {
     }
   }
 
+  Future<String?> updateAvailability(
+    List<Map<String, dynamic>> availability,
+  ) {
+    return updateWorkerAvailability(
+      availability.map(AvailabilitySlot.fromJson).toList(),
+    );
+  }
+
+  Future<String?> toggleBlockedDate(String date) async {
+    try {
+      final updated = await _usersApi.toggleBlockedDate(date);
+      await _setAccount(_account!.copyWith(blockedDates: updated));
+      return null;
+    } on ApiException catch (e) {
+      return e.message;
+    } catch (_) {
+      return 'Could not update blocked dates. Check your connection.';
+    }
+  }
+
+  Future<String?> toggleAvailableNow(bool value) async {
+    try {
+      await _usersApi.updateAvailableNow(value);
+      await _refreshAccount();
+      if (_account != null && _account!.isAvailable != value) {
+        await _setAccount(_account!.copyWith(isAvailable: value));
+      }
+      return null;
+    } on ApiException catch (e) {
+      return e.message;
+    } catch (_) {
+      return 'Could not update availability. Check your connection.';
+    }
+  }
+
+  Future<void> _refreshAccount() async {
+    final refreshed = await _usersApi.getMe();
+    await _setAccount(refreshed);
+  }
+
+  Future<void> _setAccount(UserAccount account) async {
+    _account = account;
+    await _storage.setJson(_kKeySession, account.toJson());
+    await _storage.setJson(_kKeyAccount, account.toJson());
+    notifyListeners();
+  }
+
   Future<void> logout() async {
     _account = null;
     await _storage.remove(_kKeySession);
     await _storage.remove(_kKeyAccount);
-    await _storage.removeSecureString(StorageService.keyAuthToken);
+    await _tokenStorage.clearToken();
     notifyListeners();
   }
 
-  static SessionProvider load(StorageService storage, ApiClient apiClient) {
-    final provider = SessionProvider(storage, apiClient);
+  Future<String?> deleteAccount() async {
+    try {
+      await _usersApi.deleteMe();
+      await logout();
+      return null;
+    } on ApiException catch (e) {
+      return e.message;
+    } catch (_) {
+      return 'Could not delete account. Check your connection.';
+    }
+  }
+
+  static SessionProvider load(
+    StorageService storage,
+    ApiClient apiClient, {
+    TokenStorage? tokenStorage,
+  }) {
+    final provider = SessionProvider(
+      storage,
+      apiClient,
+      tokenStorage: tokenStorage,
+    );
     provider._loadFromStorage();
     return provider;
   }

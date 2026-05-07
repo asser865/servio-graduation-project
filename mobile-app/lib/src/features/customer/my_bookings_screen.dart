@@ -120,9 +120,13 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     switch (_tabIndex) {
       case 0:
         final active = _bookings
-            .where((b) => b.status == BookingStatus.upcoming || b.status == BookingStatus.inProgress)
+            .where((b) =>
+                b.status == BookingStatus.upcoming ||
+                b.status == BookingStatus.inProgress)
             .toList();
-        if (active.isEmpty) return const _EmptyState(message: 'No active bookings yet.');
+        if (active.isEmpty) {
+          return const _EmptyState(message: 'No active bookings yet.');
+        }
         return ListView.separated(
           itemCount: active.length,
           separatorBuilder: (_, __) => const SizedBox(height: 16),
@@ -152,9 +156,13 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
         );
       case 1:
         final past = _bookings
-            .where((b) => b.status == BookingStatus.completed || b.status == BookingStatus.cancelled)
+            .where((b) =>
+                b.status == BookingStatus.completed ||
+                b.status == BookingStatus.cancelled)
             .toList();
-        if (past.isEmpty) return const _EmptyState(message: 'No booking history yet.');
+        if (past.isEmpty) {
+          return const _EmptyState(message: 'No booking history yet.');
+        }
         return ListView.separated(
           itemCount: past.length,
           separatorBuilder: (_, __) => const SizedBox(height: 16),
@@ -185,9 +193,11 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
       default:
         return ListView(
           children: const <Widget>[
-            _FavouriteTechnicianCard(name: 'Khaled Mohamed', specialty: 'Plumbing'),
+            _FavouriteTechnicianCard(
+                name: 'Khaled Mohamed', specialty: 'Plumbing'),
             SizedBox(height: 16),
-            _FavouriteTechnicianCard(name: 'Mahmoud Ibrahim', specialty: 'Electrical'),
+            _FavouriteTechnicianCard(
+                name: 'Mahmoud Ibrahim', specialty: 'Electrical'),
           ],
         );
     }
@@ -571,12 +581,15 @@ class _DetailsPair extends StatelessWidget {
 BookingModel _toBookingModel(BackendBooking b) {
   return BookingModel(
     id: b.id,
-    reference: '#${b.id.length >= 8 ? b.id.substring(0, 8).toUpperCase() : b.id.toUpperCase()}',
+    reference:
+        '#${b.id.length >= 8 ? b.id.substring(0, 8).toUpperCase() : b.id.toUpperCase()}',
     serviceName: b.serviceName.isNotEmpty ? b.serviceName : 'Service',
     technicianName: b.workerName.isNotEmpty ? b.workerName : 'Technician',
     technicianId: b.workerId,
     date: DateFormat('MMM d, y').format(b.scheduledDate),
-    time: DateFormat('h:mm a').format(b.scheduledDate),
+    time: b.scheduledTime.isNotEmpty
+        ? _displayScheduledTime(b.scheduledTime)
+        : DateFormat('h:mm a').format(b.scheduledDate),
     location: b.addressCity.isNotEmpty ? b.addressCity : 'Cairo',
     amount: 'EGP ${b.totalAmount.toStringAsFixed(0)}',
     status: _parseBookingStatus(b.status),
@@ -586,11 +599,19 @@ BookingModel _toBookingModel(BackendBooking b) {
 }
 
 BookingStatus _parseBookingStatus(String s) => switch (s) {
-  'confirmed' || 'pending' => BookingStatus.upcoming,
-  'in_progress' || 'inProgress' => BookingStatus.inProgress,
-  'completed' => BookingStatus.completed,
-  _ => BookingStatus.cancelled,
-};
+      'confirmed' || 'pending' || 'accepted' => BookingStatus.upcoming,
+      'in_progress' || 'inProgress' => BookingStatus.inProgress,
+      'completed' => BookingStatus.completed,
+      _ => BookingStatus.cancelled,
+    };
+
+String _displayScheduledTime(String value) {
+  final parts = value.split(':');
+  final hour = int.tryParse(parts.first) ?? 0;
+  final suffix = hour >= 12 ? 'PM' : 'AM';
+  final displayHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+  return '$displayHour:00 $suffix';
+}
 
 class _FavouriteTechnicianCard extends StatelessWidget {
   const _FavouriteTechnicianCard({

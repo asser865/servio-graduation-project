@@ -15,7 +15,8 @@ class TechnicianListingScreen extends StatefulWidget {
   final String? serviceId;
 
   @override
-  State<TechnicianListingScreen> createState() => _TechnicianListingScreenState();
+  State<TechnicianListingScreen> createState() =>
+      _TechnicianListingScreenState();
 }
 
 class _TechnicianListingScreenState extends State<TechnicianListingScreen> {
@@ -30,7 +31,10 @@ class _TechnicianListingScreenState extends State<TechnicianListingScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<WorkersProvider>().fetchAll();
+      context.read<WorkersProvider>().fetchAll(
+            serviceId:
+                _looksLikeMongoId(widget.serviceId) ? widget.serviceId : null,
+          );
     });
   }
 
@@ -58,7 +62,8 @@ class _TechnicianListingScreenState extends State<TechnicianListingScreen> {
                     ),
                     Text(
                       'Sort: Rating',
-                      style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: servio.textSecondary),
                     ),
                   ],
                 ),
@@ -68,20 +73,23 @@ class _TechnicianListingScreenState extends State<TechnicianListingScreen> {
               child: SizedBox(
                 height: 60,
                 child: ListView.separated(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                   scrollDirection: Axis.horizontal,
                   itemCount: _filters.length,
                   separatorBuilder: (_, __) => const SizedBox(width: 10),
                   itemBuilder: (BuildContext context, int index) {
                     return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
                       decoration: BoxDecoration(
                         color: servio.backgroundSoft,
                         borderRadius: BorderRadius.circular(ServioRadius.full),
                       ),
                       child: Text(
                         _filters[index],
-                        style: theme.textTheme.labelLarge?.copyWith(color: servio.textSecondary),
+                        style: theme.textTheme.labelLarge
+                            ?.copyWith(color: servio.textSecondary),
                       ),
                     );
                   },
@@ -89,7 +97,8 @@ class _TechnicianListingScreenState extends State<TechnicianListingScreen> {
               ),
             ),
             if (provider.loading)
-              const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
+              const SliverFillRemaining(
+                  child: Center(child: CircularProgressIndicator()))
             else if (provider.error != null)
               SliverFillRemaining(child: Center(child: Text(provider.error!)))
             else
@@ -106,7 +115,8 @@ class _TechnicianListingScreenState extends State<TechnicianListingScreen> {
                           onViewProfile: () {
                             Navigator.of(context).push(
                               MaterialPageRoute<void>(
-                                builder: (_) => TechnicianProfileScreen(technicianId: worker.id),
+                                builder: (_) => TechnicianProfileScreen(
+                                    technicianId: worker.id),
                               ),
                             );
                           },
@@ -123,6 +133,9 @@ class _TechnicianListingScreenState extends State<TechnicianListingScreen> {
     );
   }
 }
+
+bool _looksLikeMongoId(String? value) =>
+    value != null && RegExp(r'^[a-fA-F0-9]{24}$').hasMatch(value);
 
 class _TechnicianListCard extends StatelessWidget {
   const _TechnicianListCard({
@@ -156,7 +169,8 @@ class _TechnicianListCard extends StatelessWidget {
                 child: Center(
                   child: Text(
                     worker.initials,
-                    style: theme.textTheme.labelLarge?.copyWith(color: ServioColors.deepBrown),
+                    style: theme.textTheme.labelLarge
+                        ?.copyWith(color: ServioColors.deepBrown),
                   ),
                 ),
               ),
@@ -169,17 +183,20 @@ class _TechnicianListCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       worker.skills.take(2).join(', '),
-                      style: theme.textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
+                      style: theme.textTheme.bodyMedium
+                          ?.copyWith(color: servio.textSecondary),
                     ),
                     const SizedBox(height: 6),
                     Text(
                       '${worker.rating.toStringAsFixed(1)} rating  ·  (${worker.reviewCount} reviews)',
-                      style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: servio.textSecondary),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       'EGP ${worker.hourlyRate}/hr',
-                      style: theme.textTheme.titleMedium?.copyWith(color: servio.accent),
+                      style: theme.textTheme.titleMedium
+                          ?.copyWith(color: servio.accent),
                     ),
                   ],
                 ),

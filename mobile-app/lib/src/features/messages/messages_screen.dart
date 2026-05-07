@@ -50,9 +50,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
   void _openDashboard(bool isTechnician) {
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute<void>(
-        builder: (_) => isTechnician
-            ? const TechnicianShell()
-            : const CustomerShell(),
+        builder: (_) =>
+            isTechnician ? const TechnicianShell() : const CustomerShell(),
       ),
       (Route<dynamic> route) => false,
     );
@@ -167,7 +166,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
                           onTap: () {
                             context.read<MessagesProvider>().markRead(conv.id);
                             final apiConv = _apiConversations
-                                .where((a) => a.otherUserName == conv.contactName)
+                                .where(
+                                    (a) => a.otherUserName == conv.contactName)
                                 .firstOrNull;
                             Navigator.of(context).push(
                               MaterialPageRoute<void>(

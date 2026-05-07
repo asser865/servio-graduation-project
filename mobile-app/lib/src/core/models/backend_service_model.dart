@@ -15,7 +15,7 @@ class BackendService {
 
   factory BackendService.fromJson(Map<String, dynamic> json) => BackendService(
         id: (json['_id'] as String?) ?? (json['id'] as String?) ?? '',
-        name: (json['name'] as String?) ?? '',
+        name: (json['title'] as String?) ?? (json['name'] as String?) ?? '',
         category: (json['category'] as String?) ?? '',
         description: (json['description'] as String?) ?? '',
         basePrice: ((json['basePrice'] as num?) ?? 0).toDouble(),

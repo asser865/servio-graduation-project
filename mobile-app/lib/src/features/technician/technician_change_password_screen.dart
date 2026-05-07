@@ -8,10 +8,12 @@ class TechnicianChangePasswordScreen extends StatefulWidget {
   const TechnicianChangePasswordScreen({super.key});
 
   @override
-  State<TechnicianChangePasswordScreen> createState() => _TechnicianChangePasswordScreenState();
+  State<TechnicianChangePasswordScreen> createState() =>
+      _TechnicianChangePasswordScreenState();
 }
 
-class _TechnicianChangePasswordScreenState extends State<TechnicianChangePasswordScreen> {
+class _TechnicianChangePasswordScreenState
+    extends State<TechnicianChangePasswordScreen> {
   final _currentCtrl = TextEditingController();
   final _newCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
@@ -30,8 +32,8 @@ class _TechnicianChangePasswordScreenState extends State<TechnicianChangePasswor
 
   bool _isValid() {
     return _currentCtrl.text.isNotEmpty &&
-           _newCtrl.text.length >= 8 &&
-           _newCtrl.text == _confirmCtrl.text;
+        _newCtrl.text.length >= 8 &&
+        _newCtrl.text == _confirmCtrl.text;
   }
 
   @override
@@ -58,8 +60,11 @@ class _TechnicianChangePasswordScreenState extends State<TechnicianChangePasswor
                 labelText: 'Current Password',
                 prefixIcon: const Icon(Icons.lock_outline_rounded),
                 suffixIcon: IconButton(
-                  icon: Icon(_obscureCurrent ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                  onPressed: () => setState(() => _obscureCurrent = !_obscureCurrent),
+                  icon: Icon(_obscureCurrent
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined),
+                  onPressed: () =>
+                      setState(() => _obscureCurrent = !_obscureCurrent),
                 ),
               ),
             ),
@@ -72,7 +77,9 @@ class _TechnicianChangePasswordScreenState extends State<TechnicianChangePasswor
                 labelText: 'New Password',
                 prefixIcon: const Icon(Icons.lock_outline_rounded),
                 suffixIcon: IconButton(
-                  icon: Icon(_obscureNew ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                  icon: Icon(_obscureNew
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined),
                   onPressed: () => setState(() => _obscureNew = !_obscureNew),
                 ),
               ),
@@ -80,7 +87,8 @@ class _TechnicianChangePasswordScreenState extends State<TechnicianChangePasswor
             const SizedBox(height: 8),
             Text(
               'Password must be at least 8 characters long.',
-              style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: servio.textSecondary),
             ),
             const SizedBox(height: 16),
             TextField(
@@ -91,17 +99,22 @@ class _TechnicianChangePasswordScreenState extends State<TechnicianChangePasswor
                 labelText: 'Confirm Password',
                 prefixIcon: const Icon(Icons.lock_outline_rounded),
                 suffixIcon: IconButton(
-                  icon: Icon(_obscureConfirm ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                  onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                  icon: Icon(_obscureConfirm
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined),
+                  onPressed: () =>
+                      setState(() => _obscureConfirm = !_obscureConfirm),
                 ),
               ),
             ),
             const SizedBox(height: 32),
             ServioPrimaryButton(
               label: 'Update Password',
-              onPressed: _isValid() ? () {
-                Navigator.pop(context);
-              } : null,
+              onPressed: _isValid()
+                  ? () {
+                      Navigator.pop(context);
+                    }
+                  : null,
             ),
           ],
         ),

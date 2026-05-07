@@ -209,8 +209,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
               suffixIcon: _searchCtrl.text.isNotEmpty
                   ? IconButton(
                       icon: const Icon(Icons.close_rounded),
-                      onPressed: () =>
-                          setState(() => _searchCtrl.clear()),
+                      onPressed: () => setState(() => _searchCtrl.clear()),
                     )
                   : null,
               filled: true,
@@ -232,8 +231,8 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
         children: <Widget>[
           // Tab bar
           Padding(
-            padding: const EdgeInsets.fromLTRB(
-                ServioSpacing.screenPadding, 12, ServioSpacing.screenPadding, 0),
+            padding: const EdgeInsets.fromLTRB(ServioSpacing.screenPadding, 12,
+                ServioSpacing.screenPadding, 0),
             child: Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
@@ -273,9 +272,8 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                           style: theme.textTheme.labelLarge?.copyWith(
                             color:
                                 active ? servio.accent : servio.textSecondary,
-                            fontWeight: active
-                                ? FontWeight.w700
-                                : FontWeight.w500,
+                            fontWeight:
+                                active ? FontWeight.w700 : FontWeight.w500,
                           ),
                         ),
                       ),
@@ -305,8 +303,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                           horizontal: 14, vertical: 6),
                       decoration: BoxDecoration(
                         color: active ? servio.accent : servio.backgroundSoft,
-                        borderRadius:
-                            BorderRadius.circular(ServioRadius.full),
+                        borderRadius: BorderRadius.circular(ServioRadius.full),
                         border: Border.all(
                           color: active ? servio.accent : servio.border,
                         ),
@@ -322,12 +319,10 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                           Text(
                             f,
                             style: theme.textTheme.labelLarge?.copyWith(
-                              color: active
-                                  ? Colors.white
-                                  : servio.textSecondary,
-                              fontWeight: active
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
+                              color:
+                                  active ? Colors.white : servio.textSecondary,
+                              fontWeight:
+                                  active ? FontWeight.w700 : FontWeight.w500,
                             ),
                           ),
                         ],
@@ -411,16 +406,15 @@ class _ServiceCard extends StatelessWidget {
                 Row(
                   children: <Widget>[
                     Expanded(
-                      child: Text(result.name,
-                          style: theme.textTheme.titleSmall),
+                      child:
+                          Text(result.name, style: theme.textTheme.titleSmall),
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
                         color: ServioColors.tint(servio.accent),
-                        borderRadius:
-                            BorderRadius.circular(ServioRadius.full),
+                        borderRadius: BorderRadius.circular(ServioRadius.full),
                       ),
                       child: Text(
                         result.category,
@@ -443,8 +437,7 @@ class _ServiceCard extends StatelessWidget {
                 const SizedBox(height: 8),
                 Row(
                   children: <Widget>[
-                    Icon(Icons.star_rounded,
-                        color: servio.accent, size: 14),
+                    Icon(Icons.star_rounded, color: servio.accent, size: 14),
                     const SizedBox(width: 3),
                     Text(
                       result.rating.toStringAsFixed(1),
@@ -539,9 +532,7 @@ class _TechnicianCard extends StatelessWidget {
                       children: <Widget>[
                         Expanded(
                           child: Text(
-                            locale == 'ar'
-                                ? tech.name.ar
-                                : tech.name.en,
+                            locale == 'ar' ? tech.name.ar : tech.name.en,
                             style: theme.textTheme.titleSmall,
                           ),
                         ),
@@ -610,9 +601,7 @@ class _TechnicianCard extends StatelessWidget {
               ),
               const SizedBox(width: 5),
               Text(
-                locale == 'ar'
-                    ? tech.availability.ar
-                    : tech.availability.en,
+                locale == 'ar' ? tech.availability.ar : tech.availability.en,
                 style: theme.textTheme.labelSmall
                     ?.copyWith(color: servio.textSecondary),
               ),

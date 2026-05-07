@@ -124,13 +124,14 @@ class _ServioToastOverlayState extends State<_ServioToastOverlay>
                           Expanded(
                             child: Text(
                               widget.message,
-                              style:
-                                  Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurface,
-                                        height: 1.4,
-                                      ),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(
+                                    color:
+                                        Theme.of(context).colorScheme.onSurface,
+                                    height: 1.4,
+                                  ),
                             ),
                           ),
                         ],
@@ -148,10 +149,16 @@ class _ServioToastOverlayState extends State<_ServioToastOverlay>
 
   (IconData, Color) _paletteFor(ServioToastType type) {
     return switch (type) {
-      ServioToastType.success => (Icons.check_circle_rounded,  ServioColors.success),
-      ServioToastType.warning => (Icons.warning_amber_rounded, ServioColors.warning),
-      ServioToastType.info    => (Icons.info_rounded,          ServioColors.info),
-      ServioToastType.danger  => (Icons.error_rounded,         ServioColors.danger),
+      ServioToastType.success => (
+          Icons.check_circle_rounded,
+          ServioColors.success
+        ),
+      ServioToastType.warning => (
+          Icons.warning_amber_rounded,
+          ServioColors.warning
+        ),
+      ServioToastType.info => (Icons.info_rounded, ServioColors.info),
+      ServioToastType.danger => (Icons.error_rounded, ServioColors.danger),
     };
   }
 }

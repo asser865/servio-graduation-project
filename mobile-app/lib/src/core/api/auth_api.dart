@@ -1,5 +1,6 @@
 import '../models/user_account.dart';
 import 'api_client.dart';
+import 'api_endpoints.dart';
 import 'api_exception.dart';
 
 class AuthApi {
@@ -11,7 +12,7 @@ class AuthApi {
     required String email,
     required String password,
   }) async {
-    final response = await _client.post('/auth/login', <String, dynamic>{
+    final response = await _client.post(ApiEndpoints.login, <String, dynamic>{
       'email': email,
       'password': password,
     });
@@ -39,7 +40,8 @@ class AuthApi {
     required String phone,
     required String city,
   }) async {
-    final response = await _client.post('/auth/register', <String, dynamic>{
+    final response =
+        await _client.post(ApiEndpoints.register, <String, dynamic>{
       'name': name,
       'email': email,
       'password': password,
@@ -60,7 +62,8 @@ class AuthApi {
     required int hourlyRate,
     required String availabilityType,
   }) async {
-    final response = await _client.post('/auth/register', <String, dynamic>{
+    final response =
+        await _client.post(ApiEndpoints.register, <String, dynamic>{
       'name': name,
       'email': email,
       'password': password,
@@ -75,12 +78,12 @@ class AuthApi {
   }
 
   Future<UserAccount> getMe() async {
-    final response = await _client.get('/users/me');
+    final response = await _client.get(ApiEndpoints.usersMe);
     return UserAccount.fromBackend(_client.unwrapData(response));
   }
 
   Future<void> forgotPassword(String email) async {
-    await _client.post('/auth/forgot-password', <String, dynamic>{
+    await _client.post(ApiEndpoints.forgotPassword, <String, dynamic>{
       'email': email,
     });
   }

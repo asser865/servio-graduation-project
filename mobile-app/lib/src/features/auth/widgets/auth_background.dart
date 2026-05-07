@@ -51,12 +51,18 @@ class AuthBackground extends StatelessWidget {
       children: [
         const Positioned.fill(child: ColoredBox(color: Color(0xFFFAF8F5))),
         Positioned(
-          top: 0, left: 0, right: 0, height: headerEnd,
+          top: 0,
+          left: 0,
+          right: 0,
+          height: headerEnd,
           child: const DecoratedBox(
               decoration: BoxDecoration(gradient: ServioGradients.brand)),
         ),
         Positioned(
-          top: headerEnd - 22, left: 0, right: 0, height: 24,
+          top: headerEnd - 22,
+          left: 0,
+          right: 0,
+          height: 24,
           child: const DecoratedBox(
             decoration: BoxDecoration(
               color: Color(0xFFFAF8F5),
@@ -108,7 +114,8 @@ class _FullBleedAuthBackground extends StatelessWidget {
           left: 0,
           right: 0,
           height: MediaQuery.sizeOf(context).height * 0.58,
-          child: DecoratedBox(decoration: BoxDecoration(gradient: headerGradient)),
+          child:
+              DecoratedBox(decoration: BoxDecoration(gradient: headerGradient)),
         ),
         Positioned(
           top: MediaQuery.sizeOf(context).height * 0.46,

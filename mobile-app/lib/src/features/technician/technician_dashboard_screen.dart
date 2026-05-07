@@ -30,7 +30,8 @@ class TechnicianDashboardScreen extends StatelessWidget {
       body: SafeArea(
         child: RefreshIndicator(
           color: ServioColors.accent,
-          onRefresh: () async => Future<void>.delayed(const Duration(seconds: 1)),
+          onRefresh: () async =>
+              Future<void>.delayed(const Duration(seconds: 1)),
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: EdgeInsets.fromLTRB(
@@ -56,7 +57,8 @@ class TechnicianDashboardScreen extends StatelessWidget {
                   actionLabel: 'View all →',
                   onActionTap: () {
                     Navigator.of(context).push(
-                      MaterialPageRoute<void>(builder: (_) => const JobQueueScreen()),
+                      MaterialPageRoute<void>(
+                          builder: (_) => const JobQueueScreen()),
                     );
                   },
                 ),
@@ -83,11 +85,26 @@ class TechnicianDashboardScreen extends StatelessWidget {
                 // ── Upcoming Schedule ─────────────────────────────
                 const ServioSectionHeading(title: 'Upcoming Schedule'),
                 const SizedBox(height: 12),
-                const _ScheduleItem(day: '29', month: 'MAR', title: 'Plumbing — Burst Pipe', time: '10:00 AM', location: 'Maadi'),
+                const _ScheduleItem(
+                    day: '29',
+                    month: 'MAR',
+                    title: 'Plumbing — Burst Pipe',
+                    time: '10:00 AM',
+                    location: 'Maadi'),
                 const SizedBox(height: 10),
-                const _ScheduleItem(day: '30', month: 'MAR', title: 'Electrical — Panel Upgrade', time: '02:30 PM', location: 'Nasr City'),
+                const _ScheduleItem(
+                    day: '30',
+                    month: 'MAR',
+                    title: 'Electrical — Panel Upgrade',
+                    time: '02:30 PM',
+                    location: 'Nasr City'),
                 const SizedBox(height: 10),
-                const _ScheduleItem(day: '02', month: 'APR', title: 'Air Conditioning', time: '09:00 AM', location: 'Heliopolis'),
+                const _ScheduleItem(
+                    day: '02',
+                    month: 'APR',
+                    title: 'Air Conditioning',
+                    time: '09:00 AM',
+                    location: 'Heliopolis'),
                 const SizedBox(height: 24),
 
                 // ── Recent Activity ───────────────────────────────
@@ -96,7 +113,8 @@ class TechnicianDashboardScreen extends StatelessWidget {
                   actionLabel: 'View all →',
                   onActionTap: () {
                     Navigator.of(context).push(
-                      MaterialPageRoute<void>(builder: (_) => const EarningsScreen()),
+                      MaterialPageRoute<void>(
+                          builder: (_) => const EarningsScreen()),
                     );
                   },
                 ),
@@ -166,7 +184,9 @@ class _WelcomeBanner extends StatelessWidget {
                     Text(
                       _greeting,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: isDark ? ServioColors.navyDark.withValues(alpha: 0.7) : Colors.white70,
+                        color: isDark
+                            ? ServioColors.navyDark.withValues(alpha: 0.7)
+                            : Colors.white70,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -180,7 +200,9 @@ class _WelcomeBanner extends StatelessWidget {
                     Text(
                       'You have 2 new job requests waiting.',
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: isDark ? ServioColors.navyDark.withValues(alpha: 0.7) : Colors.white70,
+                        color: isDark
+                            ? ServioColors.navyDark.withValues(alpha: 0.7)
+                            : Colors.white70,
                       ),
                     ),
                   ],
@@ -190,14 +212,16 @@ class _WelcomeBanner extends StatelessWidget {
               GestureDetector(
                 onTap: () {
                   Navigator.of(context).push(
-                    MaterialPageRoute<void>(builder: (_) => const NotificationsScreen()),
+                    MaterialPageRoute<void>(
+                        builder: (_) => const NotificationsScreen()),
                   );
                 },
                 child: Container(
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: (isDark ? ServioColors.navyDark : Colors.white).withValues(alpha: 0.15),
+                    color: (isDark ? ServioColors.navyDark : Colors.white)
+                        .withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(ServioRadius.full),
                   ),
                   child: Stack(
@@ -237,7 +261,8 @@ class _WelcomeBanner extends StatelessWidget {
                   isDark: isDark,
                   onTap: () {
                     Navigator.of(context).push(
-                      MaterialPageRoute<void>(builder: (_) => const JobQueueScreen()),
+                      MaterialPageRoute<void>(
+                          builder: (_) => const JobQueueScreen()),
                     );
                   },
                 ),
@@ -251,7 +276,9 @@ class _WelcomeBanner extends StatelessWidget {
                   isDark: isDark,
                   onTap: () {
                     Navigator.of(context).push(
-                      MaterialPageRoute<void>(builder: (_) => const TechnicianSettingsProfileScreen()),
+                      MaterialPageRoute<void>(
+                          builder: (_) =>
+                              const TechnicianSettingsProfileScreen()),
                     );
                   },
                 ),
@@ -282,9 +309,7 @@ class _BannerActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fg = isDark ? ServioColors.navyDark : Colors.white;
-    final bg = filled
-        ? fg.withValues(alpha: 0.2)
-        : Colors.transparent;
+    final bg = filled ? fg.withValues(alpha: 0.2) : Colors.transparent;
 
     return GestureDetector(
       onTap: onTap,
@@ -329,28 +354,44 @@ class _StatCardGrid extends StatelessWidget {
       children: <Widget>[
         Row(
           children: const <Widget>[
-            Expanded(child: _StatCard(
-              label: 'Total Jobs', value: '47', change: '+3 this month',
-              icon: Icons.check_box_outlined, iconColor: ServioColors.accent,
+            Expanded(
+                child: _StatCard(
+              label: 'Total Jobs',
+              value: '47',
+              change: '+3 this month',
+              icon: Icons.check_box_outlined,
+              iconColor: ServioColors.accent,
             )),
             SizedBox(width: 12),
-            Expanded(child: _StatCard(
-              label: 'This Month', value: 'EGP 3,200', change: '+EGP 800 vs last',
-              icon: Icons.payments_outlined, iconColor: ServioColors.success,
+            Expanded(
+                child: _StatCard(
+              label: 'This Month',
+              value: 'EGP 3,200',
+              change: '+EGP 800 vs last',
+              icon: Icons.payments_outlined,
+              iconColor: ServioColors.success,
             )),
           ],
         ),
         const SizedBox(height: 12),
         Row(
           children: const <Widget>[
-            Expanded(child: _StatCard(
-              label: 'Avg Rating', value: '4.8', change: 'Based on 24 reviews',
-              icon: Icons.star_border_rounded, iconColor: Color(0xFFF59E0B),
+            Expanded(
+                child: _StatCard(
+              label: 'Avg Rating',
+              value: '4.8',
+              change: 'Based on 24 reviews',
+              icon: Icons.star_border_rounded,
+              iconColor: Color(0xFFF59E0B),
             )),
             SizedBox(width: 12),
-            Expanded(child: _StatCard(
-              label: 'Pending Requests', value: '2', change: 'Action needed',
-              icon: Icons.pending_actions_rounded, iconColor: Color(0xFF6E56CF),
+            Expanded(
+                child: _StatCard(
+              label: 'Pending Requests',
+              value: '2',
+              change: 'Action needed',
+              icon: Icons.pending_actions_rounded,
+              iconColor: Color(0xFF6E56CF),
               changeColor: Color(0xFF6E56CF),
             )),
           ],
@@ -358,15 +399,24 @@ class _StatCardGrid extends StatelessWidget {
         const SizedBox(height: 12),
         Row(
           children: const <Widget>[
-            Expanded(child: _StatCard(
-              label: 'Pending Proposals', value: '2', change: 'Awaiting review',
-              icon: Icons.assignment_outlined, iconColor: Color(0xFFF59E0B),
+            Expanded(
+                child: _StatCard(
+              label: 'Pending Proposals',
+              value: '2',
+              change: 'Awaiting review',
+              icon: Icons.assignment_outlined,
+              iconColor: Color(0xFFF59E0B),
             )),
             SizedBox(width: 12),
-            Expanded(child: _StatCard(
-              label: 'Outstanding', value: '1,350 EGP', change: 'Due 31 Mar',
-              icon: Icons.credit_card_rounded, iconColor: Color(0xFFD97706),
-              changeColor: Color(0xFFD97706), highlight: true,
+            Expanded(
+                child: _StatCard(
+              label: 'Outstanding',
+              value: '1,350 EGP',
+              change: 'Due 31 Mar',
+              icon: Icons.credit_card_rounded,
+              iconColor: Color(0xFFD97706),
+              changeColor: Color(0xFFD97706),
+              highlight: true,
             )),
           ],
         ),
@@ -422,7 +472,8 @@ class _StatCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             label,
-            style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: servio.textSecondary),
           ),
           const SizedBox(height: 6),
           Text(
@@ -489,14 +540,23 @@ class _IncomingRequestCard extends StatelessWidget {
                 Wrap(
                   spacing: 4,
                   children: <Widget>[
-                    Text(customer, style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary)),
-                    Text('·', style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary)),
-                    Text(location, style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary)),
-                    Text('·', style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary)),
-                    Text(price, style: theme.textTheme.bodySmall?.copyWith(
-                      color: servio.accent,
-                      fontWeight: FontWeight.w600,
-                    )),
+                    Text(customer,
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(color: servio.textSecondary)),
+                    Text('·',
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(color: servio.textSecondary)),
+                    Text(location,
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(color: servio.textSecondary)),
+                    Text('·',
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(color: servio.textSecondary)),
+                    Text(price,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: servio.accent,
+                          fontWeight: FontWeight.w600,
+                        )),
                   ],
                 ),
               ],
@@ -578,15 +638,19 @@ class _ScheduleItem extends StatelessWidget {
                   children: <Widget>[
                     Text(
                       time,
-                      style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: servio.textSecondary),
                     ),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 6),
-                      child: Text('·', style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary)),
+                      child: Text('·',
+                          style: theme.textTheme.bodySmall
+                              ?.copyWith(color: servio.textSecondary)),
                     ),
                     Text(
                       location,
-                      style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: servio.textSecondary),
                     ),
                   ],
                 ),
@@ -633,7 +697,10 @@ class _ActivityCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   customer,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: servio.textSecondary),
                 ),
                 const SizedBox(height: 8),
                 ServioStatusChip(label: statusLabel, type: statusType),
@@ -643,7 +710,10 @@ class _ActivityCard extends StatelessWidget {
           const SizedBox(width: 12),
           Text(
             amount,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(color: servio.accent),
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(color: servio.accent),
           ),
         ],
       ),

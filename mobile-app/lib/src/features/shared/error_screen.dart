@@ -60,8 +60,7 @@ class _ErrorScreenState extends State<ErrorScreen>
                 scale: Tween<double>(begin: 0.6, end: 1.0).animate(
                   CurvedAnimation(
                     parent: _entranceController,
-                    curve: const Interval(0.0, 0.5,
-                        curve: ServioMotion.spring),
+                    curve: const Interval(0.0, 0.5, curve: ServioMotion.spring),
                   ),
                 ),
                 child: FadeTransition(
@@ -120,8 +119,7 @@ class _ErrorScreenState extends State<ErrorScreen>
                   end: Offset.zero,
                 ).animate(CurvedAnimation(
                   parent: _entranceController,
-                  curve: const Interval(0.3, 0.7,
-                      curve: ServioMotion.spring),
+                  curve: const Interval(0.3, 0.7, curve: ServioMotion.spring),
                 )),
                 child: FadeTransition(
                   opacity: CurvedAnimation(

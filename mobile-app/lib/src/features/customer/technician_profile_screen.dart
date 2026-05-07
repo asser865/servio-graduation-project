@@ -155,6 +155,8 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
     final worker = _worker!;
     final workerName = worker.displayName;
     final serviceLabels = worker.serviceLabels;
+    final primaryBackendService =
+        worker.services.isNotEmpty ? worker.services.first : null;
     final primaryService = serviceLabels.isNotEmpty ? serviceLabels.first : '';
     final availabilityLabel =
         _availabilityLabel(worker.availabilityType, locale);
@@ -352,7 +354,9 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
                         icon: Icons.map_rounded,
                         title: _copy(locale,
                             en: 'Service coverage', ar: 'نطاق الخدمة'),
-                        subtitle: _copy(locale, en: 'View areas on map', ar: 'عرض المناطق على الخريطة'),
+                        subtitle: _copy(locale,
+                            en: 'View areas on map',
+                            ar: 'عرض المناطق على الخريطة'),
                         expanded: _expandedSections.contains(4),
                         onTap: () => _toggleSection(4),
                         child: _CoverageCard(
@@ -413,6 +417,10 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
                                     data: BookingFlowData(
                                       technicianName: workerName,
                                       technicianId: worker.id,
+                                      serviceId:
+                                          primaryBackendService?.id ?? '',
+                                      category:
+                                          primaryBackendService?.category ?? '',
                                       serviceName: primaryService.isNotEmpty
                                           ? primaryService
                                           : _copy(locale,
@@ -573,15 +581,20 @@ class _ProfileHero extends StatelessWidget {
                               const SizedBox(height: 6),
                               Row(
                                 children: <Widget>[
-                                  Icon(Icons.place_rounded, size: 14, color: Colors.white.withValues(alpha: 0.78)),
+                                  Icon(Icons.place_rounded,
+                                      size: 14,
+                                      color:
+                                          Colors.white.withValues(alpha: 0.78)),
                                   const SizedBox(width: 4),
                                   Expanded(
                                     child: Text(
                                       locationLabel,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: theme.textTheme.bodyMedium?.copyWith(
-                                        color: Colors.white.withValues(alpha: 0.78),
+                                      style:
+                                          theme.textTheme.bodyMedium?.copyWith(
+                                        color: Colors.white
+                                            .withValues(alpha: 0.78),
                                       ),
                                     ),
                                   ),
@@ -672,7 +685,9 @@ class _ProfileSnapshotCard extends StatelessWidget {
                   icon: Icons.work_history_outlined,
                   label: _copy(locale, en: 'Experience', ar: 'الخبرة'),
                   value: yearsExperience > 0
-                      ? _copy(locale, en: '$yearsExperience yrs', ar: '$yearsExperience سنوات')
+                      ? _copy(locale,
+                          en: '$yearsExperience yrs',
+                          ar: '$yearsExperience سنوات')
                       : _copy(locale, en: 'New', ar: 'جديد'),
                 ),
               ),
@@ -896,27 +911,18 @@ class _AccordionSection extends StatelessWidget {
 
 // ── Mini Chip ─────────────────────────────────────────────────────────────────
 
-enum _ChipTone { neutral, success, warning }
-
 class _MiniChip extends StatelessWidget {
   const _MiniChip({
     required this.label,
-    this.tone = _ChipTone.neutral,
   });
 
   final String label;
-  final _ChipTone tone;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
-
-    final color = switch (tone) {
-      _ChipTone.success => servio.success,
-      _ChipTone.warning => servio.warning,
-      _ChipTone.neutral => servio.accent,
-    };
+    final color = servio.accent;
     final availableWidth = MediaQuery.sizeOf(context).width - 88;
     final maxLabelWidth = availableWidth < 120
         ? 120.0
@@ -1131,19 +1137,27 @@ class _CoverageCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final areas = area.split(',').map((String e) => e.trim()).where((String e) => e.isNotEmpty).toList();
+    final areas = area
+        .split(',')
+        .map((String e) => e.trim())
+        .where((String e) => e.isNotEmpty)
+        .toList();
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(ServioRadius.lg),
-        border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.2)),
-        image: const DecorationImage(
-          image: AssetImage('assets/images/map_pattern.png'),
-          fit: BoxFit.cover,
-          opacity: 0.05,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: <Color>[
+            theme.colorScheme.surface,
+            theme.colorScheme.primary.withValues(alpha: 0.05),
+          ],
         ),
+        borderRadius: BorderRadius.circular(ServioRadius.lg),
+        border:
+            Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.2)),
       ),
       child: Stack(
         children: <Widget>[
@@ -1161,7 +1175,8 @@ class _CoverageCard extends StatelessWidget {
             children: <Widget>[
               Row(
                 children: <Widget>[
-                  Icon(Icons.share_location_rounded, color: theme.colorScheme.primary, size: 20),
+                  Icon(Icons.share_location_rounded,
+                      color: theme.colorScheme.primary, size: 20),
                   const SizedBox(width: 8),
                   Text(
                     _copy(locale, en: 'Operating Areas', ar: 'مناطق العمل'),
@@ -1176,28 +1191,36 @@ class _CoverageCard extends StatelessWidget {
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: areas.map((String a) => Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(ServioRadius.md),
-                    border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.2)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      Icon(Icons.location_city_rounded, size: 14, color: theme.colorScheme.primary),
-                      const SizedBox(width: 6),
-                      Text(
-                        a,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                )).toList(),
+                children: areas
+                    .map((String a) => Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primary
+                                .withValues(alpha: 0.1),
+                            borderRadius:
+                                BorderRadius.circular(ServioRadius.md),
+                            border: Border.all(
+                                color: theme.colorScheme.primary
+                                    .withValues(alpha: 0.2)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: <Widget>[
+                              Icon(Icons.location_city_rounded,
+                                  size: 14, color: theme.colorScheme.primary),
+                              const SizedBox(width: 6),
+                              Text(
+                                a,
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: theme.colorScheme.primary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ))
+                    .toList(),
               ),
             ],
           ),
@@ -1327,44 +1350,6 @@ class _AvatarInitials extends StatelessWidget {
               color: ServioColors.deepBrown,
               fontWeight: FontWeight.w700,
             ),
-      ),
-    );
-  }
-}
-
-class _HeroPill extends StatelessWidget {
-  const _HeroPill({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsetsDirectional.fromSTEB(10, 7, 12, 7),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.13),
-        borderRadius: BorderRadius.circular(ServioRadius.full),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Icon(icon, size: 15, color: Colors.white),
-          const SizedBox(width: 6),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 220),
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-          ),
-        ],
       ),
     );
   }

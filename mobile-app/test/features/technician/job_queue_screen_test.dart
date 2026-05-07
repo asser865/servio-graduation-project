@@ -81,12 +81,16 @@ Widget _wrap(Widget child, {required ApiClient client}) {
 
 /// Builds an [ApiClient] with [mockHttp] and a real (mock-prefs) storage.
 /// Call after [SharedPreferences.setMockInitialValues].
-Future<ApiClient> _buildClient(http.Client mockHttp) async {
+Future<ApiClient> _buildClient(
+  http.Client mockHttp, {
+  Duration? timeout = const Duration(seconds: 20),
+}) async {
   final storage = await StorageService.init();
   return ApiClient(
     storage: storage,
     httpClient: mockHttp,
     baseUrl: 'http://localhost',
+    timeout: timeout,
   );
 }
 
@@ -133,14 +137,15 @@ void main() {
     // This avoids registering a real timer that would cause a "pending timer" error.
     final completer = Completer<http.Response>();
     final slowClient = MockClient((_) => completer.future);
-    final client = await _buildClient(slowClient);
+    final client = await _buildClient(slowClient, timeout: null);
 
     await tester.pumpWidget(_wrap(const JobQueueScreen(), client: client));
     await tester.pump(); // single frame — still loading
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
   });
 
-  testWidgets('displays service name on job card after loading', (tester) async {
+  testWidgets('displays service name on job card after loading',
+      (tester) async {
     final client = await _buildClient(
       _mockClient([_booking(status: 'accepted', serviceName: 'Plumbing')]),
     );
@@ -207,7 +212,8 @@ void main() {
     expect(find.text('Electrical'), findsNothing);
   });
 
-  testWidgets('shows empty state message when no jobs on current tab', (tester) async {
+  testWidgets('shows empty state message when no jobs on current tab',
+      (tester) async {
     final client = await _buildClient(_mockClient([]));
 
     await tester.pumpWidget(_wrap(const JobQueueScreen(), client: client));
@@ -217,8 +223,10 @@ void main() {
     expect(find.textContaining('No jobs'), findsOneWidget);
   });
 
-  testWidgets('shows error message and retry button on API failure', (tester) async {
-    final errorClient = MockClient((_) async => http.Response('server error', 500));
+  testWidgets('shows error message and retry button on API failure',
+      (tester) async {
+    final errorClient =
+        MockClient((_) async => http.Response('server error', 500));
     final client = await _buildClient(errorClient);
 
     await tester.pumpWidget(_wrap(const JobQueueScreen(), client: client));
@@ -228,7 +236,8 @@ void main() {
     expect(find.text('Retry'), findsOneWidget);
   });
 
-  testWidgets('retry button re-fetches and shows jobs on success', (tester) async {
+  testWidgets('retry button re-fetches and shows jobs on success',
+      (tester) async {
     int callCount = 0;
     final flakyHttp = MockClient((_) async {
       callCount++;

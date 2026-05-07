@@ -186,7 +186,6 @@ class TechnicianSettingsProfileScreen extends StatelessWidget {
       ),
     );
   }
-
 }
 
 // ── Professional details card ─────────────────────────────────────────────────

@@ -19,11 +19,26 @@ class ServioStatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (Color fg, Color bg) = switch (type) {
-      ServioStatusChipType.success => (ServioColors.success, ServioColors.tint(ServioColors.success)),
-      ServioStatusChipType.warning => (ServioColors.warning, ServioColors.tint(ServioColors.warning)),
-      ServioStatusChipType.info    => (ServioColors.info,    ServioColors.tint(ServioColors.info)),
-      ServioStatusChipType.danger  => (ServioColors.danger,  ServioColors.tint(ServioColors.danger)),
-      ServioStatusChipType.neutral => (ServioColors.accent,  ServioColors.tint(ServioColors.accent)),
+      ServioStatusChipType.success => (
+          ServioColors.success,
+          ServioColors.tint(ServioColors.success)
+        ),
+      ServioStatusChipType.warning => (
+          ServioColors.warning,
+          ServioColors.tint(ServioColors.warning)
+        ),
+      ServioStatusChipType.info => (
+          ServioColors.info,
+          ServioColors.tint(ServioColors.info)
+        ),
+      ServioStatusChipType.danger => (
+          ServioColors.danger,
+          ServioColors.tint(ServioColors.danger)
+        ),
+      ServioStatusChipType.neutral => (
+          ServioColors.accent,
+          ServioColors.tint(ServioColors.accent)
+        ),
     };
 
     return Container(
@@ -35,10 +50,10 @@ class ServioStatusChip extends StatelessWidget {
       child: Text(
         label,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: fg,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.2,
-        ),
+              color: fg,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2,
+            ),
       ),
     );
   }

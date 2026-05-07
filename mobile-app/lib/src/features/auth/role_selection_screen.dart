@@ -73,8 +73,8 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                       end: Offset.zero,
                     ).animate(CurvedAnimation(
                       parent: _entranceController,
-                      curve: const Interval(0.0, 0.55,
-                          curve: ServioMotion.spring),
+                      curve:
+                          const Interval(0.0, 0.55, curve: ServioMotion.spring),
                     )),
                     child: FadeTransition(
                       opacity: CurvedAnimation(
@@ -112,8 +112,8 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                       end: Offset.zero,
                     ).animate(CurvedAnimation(
                       parent: _entranceController,
-                      curve: const Interval(0.2, 0.75,
-                          curve: ServioMotion.spring),
+                      curve:
+                          const Interval(0.2, 0.75, curve: ServioMotion.spring),
                     )),
                     child: FadeTransition(
                       opacity: CurvedAnimation(
@@ -246,8 +246,7 @@ class _RoleCard extends StatelessWidget {
     final subtitleColor = isDark
         ? Colors.white.withValues(alpha: 0.40)
         : ServioColors.textSecondaryLight;
-    final checkColor =
-        isDark ? ServioColors.accentLight : ServioColors.accent;
+    final checkColor = isDark ? ServioColors.accentLight : ServioColors.accent;
 
     return GestureDetector(
       onTap: onTap,

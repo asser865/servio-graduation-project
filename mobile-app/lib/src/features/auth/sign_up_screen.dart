@@ -300,21 +300,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   color: _isSubmittedStep
                       ? ServioColors.tint(servio.success)
                       : ServioColors.tint(servio.accent),
-                  borderRadius:
-                      BorderRadius.circular(ServioRadius.md),
+                  borderRadius: BorderRadius.circular(ServioRadius.md),
                   border: Border.all(
-                    color: (_isSubmittedStep
-                            ? servio.success
-                            : servio.accent)
+                    color: (_isSubmittedStep ? servio.success : servio.accent)
                         .withValues(alpha: 0.2),
                   ),
                 ),
                 child: Icon(
                   _stepIcon(),
                   size: 22,
-                  color: _isSubmittedStep
-                      ? servio.success
-                      : servio.accent,
+                  color: _isSubmittedStep ? servio.success : servio.accent,
                 ),
               ),
             ),
@@ -374,8 +369,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
           ServioPrimaryButton(
             label: 'Back to Sign In',
             isLoading: _submitting,
-            onPressed:
-                _submitting ? null : _finishTechnicianSubmitted,
+            onPressed: _submitting ? null : _finishTechnicianSubmitted,
           ),
       ],
     );
@@ -389,7 +383,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
     return Scaffold(
       backgroundColor: (_step <= 1 && isDark)
           ? const Color(0xFF1E2633)
-          : (isDark ? ServioColors.backgroundDark : ServioColors.backgroundLight),
+          : (isDark
+              ? ServioColors.backgroundDark
+              : ServioColors.backgroundLight),
       body: Stack(
         children: <Widget>[
           // ── Background — dark immersion for steps 0–1, gradient header for 2+ ──
@@ -1130,12 +1126,9 @@ class _AvailabilityStep extends StatelessWidget {
                     child: Text(
                       option,
                       textAlign: TextAlign.center,
-                      style:
-                          Theme.of(context).textTheme.labelLarge?.copyWith(
-                                color: active
-                                    ? Colors.white
-                                    : servio.textSecondary,
-                              ),
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                            color: active ? Colors.white : servio.textSecondary,
+                          ),
                     ),
                   ),
                 ),
@@ -1237,8 +1230,7 @@ class _ApplicationSubmitted extends StatelessWidget {
               color: ServioColors.tint(servio.success),
               shape: BoxShape.circle,
             ),
-            child:
-                Icon(Icons.check_rounded, color: servio.success, size: 38),
+            child: Icon(Icons.check_rounded, color: servio.success, size: 38),
           ),
           const SizedBox(height: 16),
           Text('Next Steps', style: theme.textTheme.titleMedium),
