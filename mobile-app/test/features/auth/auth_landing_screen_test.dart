@@ -5,7 +5,10 @@ import 'package:servio_mobile_app/src/features/auth/widgets/auth_background.dart
 
 Widget _build({Brightness brightness = Brightness.dark}) => MaterialApp(
       theme: ThemeData(brightness: brightness),
-      home: const AuthLandingScreen(),
+      home: const MediaQuery(
+        data: MediaQueryData(disableAnimations: true),
+        child: AuthLandingScreen(),
+      ),
     );
 
 void main() {

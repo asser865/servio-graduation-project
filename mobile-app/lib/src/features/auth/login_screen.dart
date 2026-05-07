@@ -132,41 +132,36 @@ class _LoginScreenState extends State<LoginScreen>
       body: Stack(
         children: <Widget>[
           const Positioned.fill(
-            child: AuthBackground(lightHeaderHeight: 210),
+            child: AuthBackground(fullBleed: true),
           ),
-
           SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: ServioSpacing.screenPadding),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  const SizedBox(height: 20),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final horizontalPadding =
+                    constraints.maxWidth >= 700 ? 32.0 : 20.0;
+                final minContentHeight = constraints.maxHeight > 116
+                    ? constraints.maxHeight - 116
+                    : 0.0;
 
-                  // ── Back button (left-aligned) ─────────────────
-                  Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: GestureDetector(
-                      onTap: () => Navigator.of(context).pop(),
-                      child: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.10),
-                          borderRadius:
-                              BorderRadius.circular(ServioRadius.full),
-                        ),
-                        child: const Icon(
-                          Icons.arrow_back_rounded,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
-                    ),
+                return SingleChildScrollView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding,
+                    0,
+                    horizontalPadding,
+                    24,
                   ),
-
-                  const SizedBox(height: 24),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: minContentHeight),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 480),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: <Widget>[
+                  const SizedBox(height: 86),
 
                   // ── Brand icon mark ────────────────────────────
                   FadeTransition(
@@ -254,6 +249,7 @@ class _LoginScreenState extends State<LoginScreen>
                         curve: const Interval(0.25, 0.75),
                       ),
                       child: AuthCard(
+                        frosted: true,
                         padding: const EdgeInsets.all(20),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -479,7 +475,45 @@ class _LoginScreenState extends State<LoginScreen>
                   ),
 
                   const SizedBox(height: 12),
-                ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                ServioSpacing.screenPadding,
+                18,
+                ServioSpacing.screenPadding,
+                0,
+              ),
+              child: Align(
+                alignment: AlignmentDirectional.topStart,
+                child: GestureDetector(
+                  onTap: () => Navigator.of(context).pop(),
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(ServioRadius.full),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.18),
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.arrow_back_rounded,
+                      color: Colors.white,
+                      size: 21,
+                    ),
+                  ),
+                ),
               ),
             ),
           ),

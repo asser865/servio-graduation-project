@@ -10,21 +10,30 @@ class AuthCard extends StatelessWidget {
     super.key,
     required this.child,
     this.padding = const EdgeInsets.all(20),
+    this.frosted = false,
   });
 
   final Widget child;
   final EdgeInsetsGeometry padding;
+  final bool frosted;
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0x12FFFFFF) : Colors.white,
+        color: isDark
+            ? const Color(0x12FFFFFF)
+            : (frosted ? Colors.white.withValues(alpha: 0.78) : Colors.white),
         border: Border.all(
-          color: isDark ? const Color(0x1CFFFFFF) : ServioColors.borderLight,
+          color: isDark
+              ? const Color(0x1CFFFFFF)
+              : (frosted
+                  ? Colors.white.withValues(alpha: 0.86)
+                  : ServioColors.borderLight),
         ),
-        borderRadius: BorderRadius.circular(ServioRadius.lg),
+        borderRadius:
+            BorderRadius.circular(frosted ? ServioRadius.xl : ServioRadius.lg),
         boxShadow: isDark ? null : ServioShadows.elevated,
       ),
       child: Padding(padding: padding, child: child),
