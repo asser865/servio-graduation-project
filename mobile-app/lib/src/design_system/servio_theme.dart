@@ -80,6 +80,7 @@ final class ServioTheme {
     final base = ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
+      fontFamily: 'Inter',
       scaffoldBackgroundColor: ServioColors.backgroundLight,
       splashFactory: NoSplash.splashFactory,
       textTheme: textTheme.apply(
@@ -182,6 +183,7 @@ final class ServioTheme {
     final base = ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
+      fontFamily: 'Inter',
       scaffoldBackgroundColor: ServioColors.backgroundDark,
       splashFactory: NoSplash.splashFactory,
       textTheme: textTheme.apply(

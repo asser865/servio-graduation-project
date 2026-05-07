@@ -5,12 +5,13 @@ import '../../core/models/user_account.dart';
 import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
-import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
 import '../customer/customer_shell.dart';
 import '../technician/technician_shell.dart';
 import 'forgot_password_screen.dart';
 import 'role_selection_screen.dart';
+import 'widgets/auth_background.dart';
+import 'widgets/auth_card.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -124,57 +125,43 @@ class _LoginScreenState extends State<LoginScreen>
     final theme = Theme.of(context);
     final servio = context.servio;
     final isDark = theme.brightness == Brightness.dark;
-    final onGradient = isDark ? ServioColors.navyDark : Colors.white;
 
     return Scaffold(
+      backgroundColor:
+          isDark ? const Color(0xFF1E2633) : ServioColors.backgroundLight,
       body: Stack(
         children: <Widget>[
-          // ── Gradient header ───────────────────────────────────
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: MediaQuery.of(context).padding.top + 280,
-            child: Container(
-              decoration: BoxDecoration(
-                gradient:
-                    isDark ? ServioGradients.brandDark : ServioGradients.brand,
-              ),
-            ),
+          const Positioned.fill(
+            child: AuthBackground(fullBleed: true),
           ),
-
           SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: ServioSpacing.screenPadding),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  const SizedBox(height: 20),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final horizontalPadding =
+                    constraints.maxWidth >= 700 ? 32.0 : 20.0;
+                final minContentHeight = constraints.maxHeight > 116
+                    ? constraints.maxHeight - 116
+                    : 0.0;
 
-                  // ── Back button (left-aligned) ─────────────────
-                  Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: GestureDetector(
-                      onTap: () => Navigator.of(context).pop(),
-                      child: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.15),
-                          borderRadius:
-                              BorderRadius.circular(ServioRadius.full),
-                        ),
-                        child: Icon(
-                          Icons.arrow_back_rounded,
-                          color: onGradient,
-                          size: 20,
-                        ),
-                      ),
-                    ),
+                return SingleChildScrollView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding,
+                    0,
+                    horizontalPadding,
+                    24,
                   ),
-
-                  const SizedBox(height: 24),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: minContentHeight),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 480),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: <Widget>[
+                  const SizedBox(height: 86),
 
                   // ── Brand icon mark ────────────────────────────
                   FadeTransition(
@@ -194,10 +181,10 @@ class _LoginScreenState extends State<LoginScreen>
                             width: 1.5,
                           ),
                         ),
-                        child: Icon(
+                        child: const Icon(
                           Icons.person_outline_rounded,
                           size: 28,
-                          color: onGradient,
+                          color: Colors.white,
                         ),
                       ),
                     ),
@@ -226,7 +213,8 @@ class _LoginScreenState extends State<LoginScreen>
                             'Welcome back',
                             textAlign: TextAlign.center,
                             style: theme.textTheme.displayLarge?.copyWith(
-                              color: onGradient,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
                               height: 1.1,
                             ),
                           ),
@@ -235,7 +223,7 @@ class _LoginScreenState extends State<LoginScreen>
                             'Sign in to continue.',
                             textAlign: TextAlign.center,
                             style: theme.textTheme.bodyMedium?.copyWith(
-                              color: onGradient.withValues(alpha: 0.7),
+                              color: Colors.white.withValues(alpha: 0.45),
                             ),
                           ),
                         ],
@@ -260,10 +248,9 @@ class _LoginScreenState extends State<LoginScreen>
                         parent: _entranceController,
                         curve: const Interval(0.25, 0.75),
                       ),
-                      child: ServioCard(
-                        elevated: true,
-                        radius: ServioRadius.xl,
-                        padding: const EdgeInsets.all(24),
+                      child: AuthCard(
+                        frosted: true,
+                        padding: const EdgeInsets.all(20),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: <Widget>[
@@ -279,14 +266,20 @@ class _LoginScreenState extends State<LoginScreen>
                                 Text(
                                   'YOUR CREDENTIALS',
                                   style: theme.textTheme.labelSmall?.copyWith(
-                                    color: servio.textSecondary,
+                                    color: isDark
+                                        ? ServioColors.accentLight.withValues(alpha: 0.65)
+                                        : ServioColors.accent,
                                     letterSpacing: 0.8,
                                   ),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 10),
-                            Divider(color: servio.border),
+                            Divider(
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.10)
+                                  : ServioColors.borderLight,
+                            ),
                             const SizedBox(height: 18),
 
                             // Error banner
@@ -382,7 +375,13 @@ class _LoginScreenState extends State<LoginScreen>
                   // ── Social auth ────────────────────────────────
                   Row(
                     children: <Widget>[
-                      Expanded(child: Divider(color: servio.border)),
+                      Expanded(
+                        child: Divider(
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.10)
+                              : ServioColors.borderLight,
+                        ),
+                      ),
                       Padding(
                         padding:
                             const EdgeInsets.symmetric(horizontal: 16),
@@ -392,7 +391,13 @@ class _LoginScreenState extends State<LoginScreen>
                               ?.copyWith(color: servio.textSecondary),
                         ),
                       ),
-                      Expanded(child: Divider(color: servio.border)),
+                      Expanded(
+                        child: Divider(
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.10)
+                              : ServioColors.borderLight,
+                        ),
+                      ),
                     ],
                   ),
 
@@ -403,6 +408,15 @@ class _LoginScreenState extends State<LoginScreen>
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: () {},
+                          style: isDark
+                              ? OutlinedButton.styleFrom(
+                                  side: const BorderSide(
+                                      color: Color(0x1CFFFFFF)),
+                                  backgroundColor: const Color(0x0DFFFFFF),
+                                  foregroundColor:
+                                      Colors.white.withValues(alpha: 0.60),
+                                )
+                              : null,
                           icon: const Icon(Icons.g_mobiledata_rounded,
                               size: 22),
                           label: const Text('Google'),
@@ -412,6 +426,15 @@ class _LoginScreenState extends State<LoginScreen>
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: () {},
+                          style: isDark
+                              ? OutlinedButton.styleFrom(
+                                  side: const BorderSide(
+                                      color: Color(0x1CFFFFFF)),
+                                  backgroundColor: const Color(0x0DFFFFFF),
+                                  foregroundColor:
+                                      Colors.white.withValues(alpha: 0.60),
+                                )
+                              : null,
                           icon: const Icon(Icons.apple_rounded, size: 22),
                           label: const Text('Apple'),
                         ),
@@ -420,7 +443,11 @@ class _LoginScreenState extends State<LoginScreen>
                   ),
 
                   const SizedBox(height: 20),
-                  Divider(color: servio.border),
+                  Divider(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.10)
+                        : ServioColors.borderLight,
+                  ),
 
                   // ── Sign-up row ────────────────────────────────
                   Row(
@@ -428,8 +455,11 @@ class _LoginScreenState extends State<LoginScreen>
                     children: <Widget>[
                       Text(
                         'New to SERVIO?',
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(color: servio.textSecondary),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.35)
+                              : ServioColors.textSecondaryLight,
+                        ),
                       ),
                       TextButton(
                         onPressed: () {
@@ -445,7 +475,45 @@ class _LoginScreenState extends State<LoginScreen>
                   ),
 
                   const SizedBox(height: 12),
-                ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                ServioSpacing.screenPadding,
+                18,
+                ServioSpacing.screenPadding,
+                0,
+              ),
+              child: Align(
+                alignment: AlignmentDirectional.topStart,
+                child: GestureDetector(
+                  onTap: () => Navigator.of(context).pop(),
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(ServioRadius.full),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.18),
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.arrow_back_rounded,
+                      color: Colors.white,
+                      size: 21,
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
