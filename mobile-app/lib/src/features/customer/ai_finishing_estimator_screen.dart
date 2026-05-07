@@ -189,12 +189,723 @@ String _fmtInt(num n) => n.round().toString().replaceAllMapped(
   (_) => ',',
 );
 
-// ── Screen placeholder (replaced in Task 2) ────────────────────────────────────
+// ── Main screen ────────────────────────────────────────────────────────────────
 
-class AiFinishingEstimatorScreen extends StatelessWidget {
+class AiFinishingEstimatorScreen extends StatefulWidget {
   const AiFinishingEstimatorScreen({super.key});
 
   @override
-  Widget build(BuildContext context) =>
-      const Scaffold(body: Center(child: CircularProgressIndicator()));
+  State<AiFinishingEstimatorScreen> createState() =>
+      _AiFinishingEstimatorScreenState();
+}
+
+class _AiFinishingEstimatorScreenState
+    extends State<AiFinishingEstimatorScreen> {
+  int _step = 0;
+
+  // Step 1
+  String? _roomType;
+
+  // Step 2
+  bool _isMetric = true;
+  final TextEditingController _lengthCtrl = TextEditingController();
+  final TextEditingController _widthCtrl  = TextEditingController();
+  final TextEditingController _heightCtrl = TextEditingController(text: '2.7');
+  String? _lengthError;
+  String? _widthError;
+  String? _heightError;
+
+  // Step 3
+  String? _finishLevel;
+
+  // Step 4 (computed on entering step 4)
+  EstimatorResult? _result;
+
+  @override
+  void initState() {
+    super.initState();
+    // Rebuild whenever dimension text changes (for live preview + button enable)
+    _lengthCtrl.addListener(_onDimChange);
+    _widthCtrl.addListener(_onDimChange);
+    _heightCtrl.addListener(_onDimChange);
+  }
+
+  void _onDimChange() => setState(() {});
+
+  @override
+  void dispose() {
+    _lengthCtrl.dispose();
+    _widthCtrl.dispose();
+    _heightCtrl.dispose();
+    super.dispose();
+  }
+
+  // ── Geometry helpers ────────────────────────────────────────────────────────
+
+  double _toM(String val) {
+    final double v = double.tryParse(val.trim()) ?? 0;
+    return _isMetric ? v : v * 0.3048;
+  }
+
+  double get _floorArea =>
+      _toM(_lengthCtrl.text) * _toM(_widthCtrl.text);
+
+  double get _wallArea {
+    final double l = _toM(_lengthCtrl.text);
+    final double w = _toM(_widthCtrl.text);
+    final double h = _toM(_heightCtrl.text);
+    return 2 * (l + w) * h;
+  }
+
+  // ── Validation ──────────────────────────────────────────────────────────────
+
+  bool get _dimsAllPositive {
+    final double l = double.tryParse(_lengthCtrl.text.trim()) ?? 0;
+    final double w = double.tryParse(_widthCtrl.text.trim()) ?? 0;
+    final double h = double.tryParse(_heightCtrl.text.trim()) ?? 0;
+    return l > 0 && w > 0 && h > 0;
+  }
+
+  bool _validateDims() {
+    final double maxLW = _isMetric ? 50.0  : 164.0;
+    final double minH  = _isMetric ?  1.0  :   3.3;
+    final double maxH  = _isMetric ? 10.0  :  32.8;
+    final String unit  = _isMetric ? 'm'   : 'ft';
+
+    final double l = double.tryParse(_lengthCtrl.text.trim()) ?? 0;
+    final double w = double.tryParse(_widthCtrl.text.trim())  ?? 0;
+    final double h = double.tryParse(_heightCtrl.text.trim()) ?? 0;
+
+    bool valid = true;
+    String? lErr, wErr, hErr;
+
+    if (l <= 0 || l > maxLW) {
+      lErr = 'Enter a value between 0.5 and $maxLW $unit';
+      valid = false;
+    }
+    if (w <= 0 || w > maxLW) {
+      wErr = 'Enter a value between 0.5 and $maxLW $unit';
+      valid = false;
+    }
+    if (h < minH || h > maxH) {
+      hErr = 'Enter a value between $minH and $maxH $unit';
+      valid = false;
+    }
+
+    setState(() {
+      _lengthError = lErr;
+      _widthError  = wErr;
+      _heightError = hErr;
+    });
+    return valid;
+  }
+
+  // ── Navigation ──────────────────────────────────────────────────────────────
+
+  bool get _canContinue {
+    switch (_step) {
+      case 0: return _roomType != null;
+      case 1: return _dimsAllPositive;
+      case 2: return _finishLevel != null;
+      default: return false;
+    }
+  }
+
+  void _onContinue() {
+    if (_step == 1 && !_validateDims()) return;
+    setState(() {
+      _step++;
+      if (_step == 3) {
+        _result = calcCosts(
+          roomType:    _roomType!,
+          finishLevel: _finishLevel!,
+          floorArea:   _floorArea,
+        );
+      }
+    });
+  }
+
+  void _onBack() {
+    if (_step > 0) setState(() => _step--);
+  }
+
+  void _reset() {
+    setState(() {
+      _step        = 0;
+      _roomType    = null;
+      _finishLevel = null;
+      _result      = null;
+      _isMetric    = true;
+      _lengthCtrl.clear();
+      _widthCtrl.clear();
+      _heightCtrl.text = '2.7';
+      _lengthError = null;
+      _widthError  = null;
+      _heightError = null;
+    });
+  }
+
+  // ── Build ────────────────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    final ServioThemeExtension servio = context.servio;
+    final double progress = (_step + 1) / 4;
+    final bool isResults = _step == 3;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Cost Estimator'),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        leading: (_step > 0 && !isResults)
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_rounded),
+                onPressed: _onBack,
+              )
+            : null,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(ServioSpacing.screenPadding),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Text(
+              'Step ${_step + 1} of 4',
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: servio.textSecondary),
+            ),
+            const SizedBox(height: 10),
+            LayoutBuilder(
+              builder: (BuildContext ctx, BoxConstraints c) => Stack(
+                children: <Widget>[
+                  Container(
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: servio.backgroundSoft,
+                      borderRadius: BorderRadius.circular(ServioRadius.full),
+                    ),
+                  ),
+                  AnimatedContainer(
+                    duration: ServioMotion.normal,
+                    curve: ServioMotion.spring,
+                    height: 8,
+                    width: c.maxWidth * progress,
+                    decoration: BoxDecoration(
+                      gradient: ServioGradients.accent,
+                      borderRadius: BorderRadius.circular(ServioRadius.full),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            AnimatedSwitcher(
+              duration: ServioMotion.micro,
+              transitionBuilder: (Widget child, Animation<double> anim) =>
+                  FadeTransition(opacity: anim, child: child),
+              child: _buildStep(),
+            ),
+            const SizedBox(height: 24),
+            if (!isResults) ...<Widget>[
+              ServioPrimaryButton(
+                label: _step == 2 ? 'Calculate Estimate' : 'Continue',
+                onPressed: _canContinue ? _onContinue : null,
+              ),
+              if (_step > 0) ...<Widget>[
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: _onBack,
+                  child: Text(
+                    'Back',
+                    style: TextStyle(color: servio.textSecondary),
+                  ),
+                ),
+              ],
+            ],
+            const SizedBox(height: 32),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStep() {
+    return switch (_step) {
+      0 => _StepRoomType(
+          key: const ValueKey<int>(0),
+          selectedRoomType: _roomType,
+          onSelect: (String rt) => setState(() => _roomType = rt),
+        ),
+      1 => _StepDimensions(
+          key: const ValueKey<int>(1),
+          isMetric: _isMetric,
+          onUnitChange: (bool v) => setState(() {
+            _isMetric    = v;
+            _lengthError = null;
+            _widthError  = null;
+            _heightError = null;
+          }),
+          lengthCtrl:  _lengthCtrl,
+          widthCtrl:   _widthCtrl,
+          heightCtrl:  _heightCtrl,
+          lengthError: _lengthError,
+          widthError:  _widthError,
+          heightError: _heightError,
+          floorArea:   _floorArea,
+          wallArea:    _wallArea,
+        ),
+      2 => _StepFinishLevel(
+          key: const ValueKey<int>(2),
+          selectedLevel: _finishLevel,
+          onSelect: (String lvl) => setState(() => _finishLevel = lvl),
+        ),
+      _ => _StepResults(
+          key: const ValueKey<int>(3),
+          result:      _result!,
+          roomType:    _roomType!,
+          finishLevel: _finishLevel!,
+          floorArea:   _floorArea,
+          wallArea:    _wallArea,
+          onReset:     _reset,
+        ),
+    };
+  }
+}
+
+// ── Step 1: Room type ──────────────────────────────────────────────────────────
+
+class _StepRoomType extends StatelessWidget {
+  const _StepRoomType({
+    super.key,
+    required this.selectedRoomType,
+    required this.onSelect,
+  });
+
+  final String?               selectedRoomType;
+  final ValueChanged<String>  onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final ServioThemeExtension servio = context.servio;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text('Select Room Type',
+            style: Theme.of(context).textTheme.headlineMedium),
+        const SizedBox(height: 8),
+        Text(
+          'Choose the room you want to estimate.',
+          style: Theme.of(context)
+              .textTheme
+              .bodyMedium
+              ?.copyWith(color: servio.textSecondary),
+        ),
+        const SizedBox(height: 8),
+        const ServioStatusChip(label: 'AI POWERED'),
+        const SizedBox(height: 20),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: _kRooms.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount:   2,
+            crossAxisSpacing: 12,
+            mainAxisSpacing:  12,
+            childAspectRatio: 1.5,
+          ),
+          itemBuilder: (BuildContext context, int index) {
+            final _RoomOption room     = _kRooms[index];
+            final bool        selected = room.key == selectedRoomType;
+
+            return GestureDetector(
+              onTap: () => onSelect(room.key),
+              child: AnimatedContainer(
+                duration: ServioMotion.micro,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? servio.accent
+                      : Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(ServioRadius.md),
+                  border: Border.all(
+                    color: selected ? servio.accent : servio.border,
+                    width: selected ? 1.5 : 1.0,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment:  MainAxisAlignment.center,
+                  children: <Widget>[
+                    Icon(
+                      room.icon,
+                      color: selected ? Colors.white : servio.accent,
+                      size: 28,
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      room.label,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            color: selected ? Colors.white : null,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+// ── Step 2: Dimensions ─────────────────────────────────────────────────────────
+
+class _StepDimensions extends StatelessWidget {
+  const _StepDimensions({
+    super.key,
+    required this.isMetric,
+    required this.onUnitChange,
+    required this.lengthCtrl,
+    required this.widthCtrl,
+    required this.heightCtrl,
+    this.lengthError,
+    this.widthError,
+    this.heightError,
+    required this.floorArea,
+    required this.wallArea,
+  });
+
+  final bool                    isMetric;
+  final ValueChanged<bool>      onUnitChange;
+  final TextEditingController   lengthCtrl;
+  final TextEditingController   widthCtrl;
+  final TextEditingController   heightCtrl;
+  final String?                 lengthError;
+  final String?                 widthError;
+  final String?                 heightError;
+  final double                  floorArea;
+  final double                  wallArea;
+
+  String get _unit => isMetric ? 'm' : 'ft';
+
+  String _fmtArea(double sqm) => isMetric
+      ? '${sqm.toStringAsFixed(1)} m²'
+      : '${(sqm / 0.0929).toStringAsFixed(1)} ft²';
+
+  @override
+  Widget build(BuildContext context) {
+    final ServioThemeExtension servio      = context.servio;
+    final bool                 showPreview = floorArea > 0 && wallArea > 0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text('Room Dimensions',
+            style: Theme.of(context).textTheme.headlineMedium),
+        const SizedBox(height: 8),
+        const ServioStatusChip(label: 'AI POWERED'),
+        const SizedBox(height: 20),
+        // Unit toggle
+        ServioCard(
+          padding:         const EdgeInsets.all(6),
+          radius:          ServioRadius.full,
+          backgroundColor: servio.backgroundSoft,
+          borderColor:     Colors.transparent,
+          child: Row(
+            children: <Widget>[
+              _UnitBtn(
+                label:  'Meters',
+                active: isMetric,
+                onTap:  () => onUnitChange(true),
+              ),
+              _UnitBtn(
+                label:  'Feet',
+                active: !isMetric,
+                onTap:  () => onUnitChange(false),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        TextField(
+          controller:       lengthCtrl,
+          keyboardType:     const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters:  <TextInputFormatter>[
+            FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+          ],
+          decoration: InputDecoration(
+            labelText: 'Length',
+            suffixText: _unit,
+            errorText: lengthError,
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller:       widthCtrl,
+          keyboardType:     const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters:  <TextInputFormatter>[
+            FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+          ],
+          decoration: InputDecoration(
+            labelText: 'Width',
+            suffixText: _unit,
+            errorText: widthError,
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller:       heightCtrl,
+          keyboardType:     const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters:  <TextInputFormatter>[
+            FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+          ],
+          decoration: InputDecoration(
+            labelText:   'Ceiling Height',
+            suffixText:  _unit,
+            errorText:   heightError,
+            helperText:  isMetric ? 'Standard: 2.7 m' : 'Standard: 8.9 ft',
+          ),
+        ),
+        // Live area preview
+        AnimatedSize(
+          duration: ServioMotion.normal,
+          curve:    ServioMotion.spring,
+          child: showPreview
+              ? Padding(
+                  padding: const EdgeInsets.only(top: 16),
+                  child: ServioCard(
+                    backgroundColor: servio.backgroundSoft,
+                    child: Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: _AreaPill(
+                            label: 'Floor Area',
+                            value: _fmtArea(floorArea),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _AreaPill(
+                            label: 'Wall Area',
+                            value: _fmtArea(wallArea),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : const SizedBox.shrink(),
+        ),
+      ],
+    );
+  }
+}
+
+class _UnitBtn extends StatelessWidget {
+  const _UnitBtn({
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  final String       label;
+  final bool         active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final ServioThemeExtension servio = context.servio;
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: ServioMotion.micro,
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: active ? servio.accent : Colors.transparent,
+            borderRadius: BorderRadius.circular(ServioRadius.full),
+          ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: active ? Colors.white : servio.textSecondary,
+                ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AreaPill extends StatelessWidget {
+  const _AreaPill({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          label,
+          style: Theme.of(context)
+              .textTheme
+              .bodySmall
+              ?.copyWith(color: context.servio.textSecondary),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: Theme.of(context)
+              .textTheme
+              .titleMedium
+              ?.copyWith(color: context.servio.accent),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Step 3: Finishing level ────────────────────────────────────────────────────
+
+class _StepFinishLevel extends StatelessWidget {
+  const _StepFinishLevel({
+    super.key,
+    required this.selectedLevel,
+    required this.onSelect,
+  });
+
+  final String?              selectedLevel;
+  final ValueChanged<String> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final ServioThemeExtension servio = context.servio;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text('Finishing Level',
+            style: Theme.of(context).textTheme.headlineMedium),
+        const SizedBox(height: 8),
+        Text(
+          'Select the quality tier for your project.',
+          style: Theme.of(context)
+              .textTheme
+              .bodyMedium
+              ?.copyWith(color: servio.textSecondary),
+        ),
+        const SizedBox(height: 20),
+        ...List<Widget>.generate(_kLevels.length, (int i) {
+          final _LevelOption lvl      = _kLevels[i];
+          final bool         selected = lvl.key == selectedLevel;
+
+          return Padding(
+            padding: EdgeInsets.only(bottom: i < _kLevels.length - 1 ? 12 : 0),
+            child: GestureDetector(
+              onTap: () => onSelect(lvl.key),
+              child: AnimatedContainer(
+                duration: ServioMotion.micro,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? servio.accent.withValues(alpha: 0.08)
+                      : Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(ServioRadius.card),
+                  border: Border.all(
+                    color: selected ? servio.accent : servio.border,
+                    width: selected ? 1.5 : 1.0,
+                  ),
+                ),
+                child: Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text(
+                            lvl.label,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
+                                  color: selected ? servio.accent : null,
+                                ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            lvl.description,
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(color: servio.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: <Widget>[
+                        Text(
+                          '~${lvl.totalPerSqm} EGP/m²',
+                          style: Theme.of(context)
+                              .textTheme
+                              .labelLarge
+                              ?.copyWith(
+                                color: selected
+                                    ? servio.accent
+                                    : servio.textSecondary,
+                              ),
+                        ),
+                        if (selected) ...<Widget>[
+                          const SizedBox(height: 4),
+                          Icon(
+                            Icons.check_circle_rounded,
+                            color: servio.accent,
+                            size: 18,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+}
+
+// ── Step 4 placeholder (added in Task 3) ───────────────────────────────────────
+
+class _StepResults extends StatelessWidget {
+  const _StepResults({
+    super.key,
+    required this.result,
+    required this.roomType,
+    required this.finishLevel,
+    required this.floorArea,
+    required this.wallArea,
+    required this.onReset,
+  });
+
+  final EstimatorResult result;
+  final String          roomType;
+  final String          finishLevel;
+  final double          floorArea;
+  final double          wallArea;
+  final VoidCallback    onReset;
+
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
 }
