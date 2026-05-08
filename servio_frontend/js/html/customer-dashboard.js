@@ -4,14 +4,21 @@
 import { showToast } from '../components/toast.js';
 import { revealAll } from '../components/scroll-reveal.js';
 import { getInitials } from '../utils/string.js';
-import { getMe, updateMe, updateEmail, deleteMe, updatePassword } from '../api/users.js';
+import { getMe, updateMe, updateEmail, deleteMe, updatePassword, addAddress, updateAddress, deleteAddress } from '../api/users.js';
 import { clearSession } from '../api/client.js';
 import { uploadPublicFile } from '../api/uploads.js';
 import { getMyBookings, cancelBooking } from '../api/bookings.js';
-// No customer-facing review fetch endpoint exists on backend
+import { getMyReviews, createReview } from '../api/reviews.js';
 
+const STAR_SVG = (fill = '#F59E0B', size = 14) =>
+  `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="${fill}" stroke="${fill}" stroke-width="0"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
+
+const EMPTY_STAR_SVG = (size = 14) =>
+  `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="#d1d5db" stroke-width="1.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
 
 const TAB_KEY = 'servio_activeTab_customer';
+let _bookingSnapshotBuilt = false;
+let _historyLoaded = false;
 
 // Holds the uploaded avatar URL between file-select and form-save
 let _pendingPhotoUrl = null;
@@ -87,9 +94,29 @@ function initTabs() {
     sessionStorage.setItem(TAB_KEY, id);
   }
 
-  tabs.forEach(tab => tab.addEventListener('click', () => showTab(tab.dataset.tab)));
+  tabs.forEach(tab => tab.addEventListener('click', () => {
+    showTab(tab.dataset.tab);
+    if (tab.dataset.tab === 'history' && !_historyLoaded) {
+      _historyLoaded = true;
+      loadHistoryData().catch(err => {
+        console.error('[History]', err);
+        const root = document.getElementById('historyListRoot');
+        if (root) root.innerHTML = '<div class="history-error-state"><p>Failed to load history. Please refresh.</p></div>';
+      });
+    }
+  }));
   document.querySelectorAll('.dash-mobile-tab').forEach(btn => {
-    btn.addEventListener('click', () => showTab(btn.dataset.mobileTab));
+    btn.addEventListener('click', () => {
+      showTab(btn.dataset.mobileTab);
+      if (btn.dataset.mobileTab === 'history' && !_historyLoaded) {
+        _historyLoaded = true;
+        loadHistoryData().catch(err => {
+          console.error('[History]', err);
+          const root = document.getElementById('historyListRoot');
+          if (root) root.innerHTML = '<div class="history-error-state"><p>Failed to load history. Please refresh.</p></div>';
+        });
+      }
+    });
   });
 
   // data-tab-link buttons (Quick Actions → Bookings, Favourites, etc.)
@@ -131,6 +158,15 @@ function initTabs() {
   // Restore saved tab
   const saved = sessionStorage.getItem(TAB_KEY) || 'overview';
   showTab(saved);
+  if (saved === 'history' && !_historyLoaded) {
+    _historyLoaded = true;
+    loadHistoryData().catch(err => {
+      console.error('[History]', err);
+      const root = document.getElementById('historyListRoot');
+      if (root) root.innerHTML = '<div class="history-error-state"><p>Failed to load history. Please refresh.</p></div>';
+    });
+  }
+  updateNotifBadge();
 }
 
 /* ── Populate profile info ──────────────────────────────── */
@@ -256,21 +292,14 @@ function populateProfile() {
     const settingsEmail = document.getElementById('settings-email');
     if (settingsEmail) settingsEmail.value = user.email || '';
 
-    if (user.address) {
-      const fullAddr = [user.address.street, user.address.city, user.address.state, user.address.zipCode].filter(Boolean).join(', ');
-      const addrHomeVal = document.getElementById('addr-home-value');
-      if (addrHomeVal && fullAddr) {
-        addrHomeVal.textContent = fullAddr;
-        addrHomeVal.removeAttribute('data-i18n');
-      }
-      
+    window.__servio_user_addresses = Array.isArray(user.addresses) ? user.addresses : [];
+    renderAddressList();
+
+    const firstAddr = window.__servio_user_addresses[0];
+    if (firstAddr) {
+      const full = [firstAddr.street, firstAddr.city, firstAddr.state].filter(Boolean).join(', ');
       const addrProfEl = document.getElementById('profile-address');
-      if(addrProfEl && fullAddr){
-          addrProfEl.textContent = fullAddr;
-      }
-      
-      // We will also store the true object into a global so the edit form can access it
-      window.__servio_user_address = user.address;
+      if (addrProfEl && full) addrProfEl.textContent = full;
     }
 
     // Update session in localStorage with fresh data
@@ -290,57 +319,590 @@ function populateProfile() {
 
 /* ── Live bookings & reviews data from API ──────────────── */
 async function loadBookingsData() {
+  const activePane = document.querySelector('#bookings-stab-bar .stab-btn--active')?.dataset.stab || 'bookings-active';
   try {
-    const res = await getMyBookings();
-    const bookings = res.bookings || [];
+    const res = await getMyBookings({ limit: 200 });
+    const bookings = res?.bookings || [];
 
-    // Update stats
-    const active = bookings.filter(b => ['pending','accepted','in_progress'].includes(b.status));
-    const completed = bookings.filter(b => b.status === 'completed');
-    const tEl = document.querySelector('[data-stat="total-bookings"]');
-    const aEl = document.querySelector('[data-stat="active-bookings"]');
-    if (tEl) tEl.textContent = String(bookings.length);
-    if (aEl) aEl.textContent = String(active.length);
-
-    // Render bookings into the active-bookings panel
-    const activeRoot = document.getElementById('activeBookingsRoot') || document.querySelector('[data-panel="bookings"] .dash-card-list, [data-panel="bookings"] .bookings-list');
-    if (activeRoot && bookings.length) {
-      const _t = typeof window.t === 'function' ? window.t : k => k;
-      const STATUS_MAP = { pending:'Booked', accepted:'Confirmed', in_progress:'In Progress', completed:'Complete', cancelled:'Cancelled' };
-      activeRoot.innerHTML = bookings.slice(0, 20).map(b => {
-        const status = STATUS_MAP[b.status] || b.status || 'Booked';
-        const date = b.scheduledDate ? new Date(b.scheduledDate).toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric'}) : '—';
-        const workerName = b.worker?.name || '—';
-        const svcTitle = b.service?.title || b.serviceId || 'Service';
-        return `<div class="booking-card" data-booking-card data-booking-status="${b.status}">
-          <div class="booking-card__header">
-            <span class="booking-card__service">${svcTitle}</span>
-            <span class="booking-card__status booking-card__status--${b.status}">${status}</span>
-          </div>
-          <div class="booking-card__meta">
-            <span>${date}</span>
-            <span>${workerName}</span>
-          </div>
-          <div class="booking-card__actions">
-            <a class="btn btn--sm" href="./booking-details.html?id=${b._id}">View Details</a>
-          </div>
-        </div>`;
-      }).join('');
+    if (!_bookingSnapshotBuilt) {
+      _buildSnapshot(bookings);
+      _bookingSnapshotBuilt = true;
+    } else {
+      _diffAndNotify(bookings);
     }
 
-    // No endpoint exists to fetch a customer's submitted reviews — clear the panel
-    const reviewRoot = document.querySelector('[data-panel="reviews"] .dash-card-list, [data-panel="reviews"] .reviews-list');
-    if (reviewRoot) {
-      reviewRoot.innerHTML = '<p class="empty-state">No reviews yet.</p>';
+    renderBookingsTab(bookings);
+    populateStats(bookings);
+    _restoreSubTab(activePane);
+  } catch (err) {
+    console.error('[Bookings]', err);
+    const pane = document.getElementById('stab-bookings-active');
+    if (pane) pane.innerHTML = `<div class="bookings-error-state"><p>Failed to load bookings. Please refresh.</p></div>`;
+  }
+}
+
+function _buildSnapshot(bookings) {
+  const snap = {};
+  bookings.forEach(b => { if (b._id) snap[b._id] = b.status; });
+  try { localStorage.setItem('servio_booking_snapshot', JSON.stringify(snap)); } catch (_) {}
+}
+
+function _diffAndNotify(bookings) {
+  let snap;
+  try { snap = JSON.parse(localStorage.getItem('servio_booking_snapshot') || '{}'); } catch { snap = {}; }
+
+  const NOTIF_MAP = {
+    accepted:    { type: 'booking_confirmed',   title: 'Booking Confirmed',   body: (svc, tech) => `${svc} with ${tech} is confirmed` },
+    in_progress: { type: 'booking_in_progress', title: 'Technician En Route', body: (svc, tech) => `${tech} is on the way` },
+    completed:   { type: 'booking_completed',   title: 'Service Completed',   body: (svc) => `Tap to rate your ${svc} experience` },
+    cancelled:   { type: 'booking_cancelled',   title: 'Booking Cancelled',   body: (svc) => `${svc} has been cancelled` },
+    rejected:    { type: 'booking_rejected',    title: 'Request Declined',    body: (svc) => `${svc} request was not accepted` },
+  };
+
+  let notifs = _getStoredNotifications();
+  let changed = false;
+
+  bookings.forEach(b => {
+    if (!b._id) return;
+    const newStatus = b.status;
+    const oldStatus = snap[b._id];
+    if (newStatus === oldStatus) return;
+
+    const cfg = NOTIF_MAP[newStatus];
+    if (!cfg) { snap[b._id] = newStatus; return; }
+
+    const notifId = `${b._id}_${newStatus}`;
+    if (notifs.some(n => n.id === notifId)) { snap[b._id] = newStatus; return; }
+
+    const svc = b.service?.title || b.serviceCategory || 'Service';
+    const tech = b.worker?.name || 'your technician';
+
+    notifs.unshift({
+      id: notifId,
+      type: cfg.type,
+      title: cfg.title,
+      body: cfg.body(svc, tech),
+      bookingId: b._id,
+      status: newStatus,
+      timestamp: new Date().toISOString(),
+      read: false,
+    });
+    notifs.splice(50);
+    snap[b._id] = newStatus;
+    changed = true;
+  });
+
+  _saveNotifications(notifs);
+  try { localStorage.setItem('servio_booking_snapshot', JSON.stringify(snap)); } catch (_) {}
+
+  if (changed) {
+    renderNotifications();
+    updateNotifBadge();
+  }
+}
+
+async function loadHistoryData() {
+  const root = document.getElementById('historyListRoot');
+  if (!root) return;
+  root.innerHTML = '<div class="bookings-loading-state">Loading history…</div>';
+
+  const [bookings, reviews] = await Promise.all([
+    getMyBookings({ status: 'completed,cancelled,rejected', limit: 200 }).then(r => r?.bookings || []),
+    getMyReviews().catch(() => []),
+  ]);
+
+  root.innerHTML = '';
+  if (!bookings.length) {
+    root.innerHTML = '<div class="history-empty-state"><p>No completed bookings yet.</p></div>';
+    return;
+  }
+
+  bookings.forEach(b => {
+    const review = reviews.find(r => r.booking?.toString() === b._id?.toString());
+    const card = buildHistoryCard(b, review);
+    root.appendChild(card);
+  });
+
+  // Update stats
+  const countEl = document.getElementById('histStatCount');
+  if (countEl) countEl.textContent = bookings.length;
+  const spentEl = document.getElementById('histStatSpent');
+  if (spentEl) spentEl.textContent = bookings.reduce((s, b) => s + (b.totalPrice || 0), 0) + ' EGP';
+  const topEl = document.getElementById('histStatTopCategory');
+  if (topEl) {
+    const freq = {};
+    bookings.forEach(b => { const c = b.serviceCategory || b.service?.category || ''; if (c) freq[c] = (freq[c] || 0) + 1; });
+    const top = Object.entries(freq).sort((a, b) => b[1] - a[1])[0];
+    if (top) { topEl.textContent = top[0]; topEl.removeAttribute('data-i18n'); }
+  }
+
+  revealAll(root);
+
+  // Wire invoice toggles
+  root.querySelectorAll('[data-invoice-toggle]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const card = btn.closest('.history-card-v2');
+      if (!card) return;
+      card.classList.toggle('is-expanded');
+    });
+  });
+
+  // Wire rating submit buttons
+  root.querySelectorAll('[data-submit-review]').forEach(btn => {
+    const rateBlock = btn.closest('[data-rate-block]');
+    rateBlock.querySelectorAll('input[type="radio"]').forEach(radio => {
+      radio.addEventListener('change', () => { btn.disabled = false; });
+    });
+    btn.addEventListener('click', () => submitReview(btn));
+  });
+}
+
+function buildHistoryCard(b, review) {
+  const category = b.service?.category || b.serviceCategory || '';
+  const title    = b.service?.title || b.serviceCategory || 'Service';
+  const workerName = b.worker?.name || '—';
+  const dateStr  = b.scheduledDate
+    ? new Date(b.scheduledDate).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })
+    : '—';
+  const priceRaw     = b.totalPrice != null ? String(b.totalPrice).replace('$', '').trim() : '—';
+  const paymentMethod = b.paymentMethod === 'cash' ? 'Cash' : 'Credit Card';
+  const ref          = `#${(b._id || '').slice(-6).toUpperCase()}`;
+  const isCompleted  = b.status === 'completed';
+  const isCancelled  = b.status === 'cancelled' || b.status === 'rejected';
+  const rating       = review?.rating ?? 0;
+  const comment      = review?.comment || '';
+
+  // Service icon — use site SVG assets, fall back to a wrench SVG
+  const CAT_ICON_MAP = {
+    plumb:   '../assets/icons/service-plumbing.svg',
+    electr:  '../assets/icons/service-electrical.svg',
+    clean:   '../assets/icons/service-cleaning.svg',
+    carp:    '../assets/icons/service-carpentry.svg',
+    ac:      '../assets/icons/service-ac-repair.svg',
+    appli:   '../assets/icons/service-appliance-installation.svg',
+  };
+  const catLow   = category.toLowerCase();
+  const iconSrc  = Object.entries(CAT_ICON_MAP).find(([k]) => catLow.includes(k))?.[1] || null;
+  const iconHtml = iconSrc
+    ? `<img src="${iconSrc}" alt="${title}" class="history-v2__icon-img" />`
+    : `<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`;
+
+  // Static star display for rated bookings
+  const staticStars = rating
+    ? Array.from({ length: 5 }, (_, i) =>
+        i < rating ? STAR_SVG('#F59E0B', 15) : EMPTY_STAR_SVG(15)
+      ).join('')
+    : '';
+
+  // Rating section markup
+  let ratingSection = '';
+  if (isCompleted && rating) {
+    ratingSection = `
+      <div class="history-v2__rating-display">
+        <div class="history-v2__rating-stars" aria-label="${rating} out of 5 stars">${staticStars}</div>
+      </div>
+      ${comment ? `<p class="history-v2__comment">"${comment}"</p>` : ''}`;
+  } else if (isCompleted && !rating) {
+    // Interactive rating widget — CSS-only star picker (RTL trick: reversed flex + sibling combinator)
+    const uid = (b._id || Math.random().toString(36).slice(2)).slice(-8);
+    ratingSection = `
+      <div class="history-v2__rate-block" data-rate-block>
+        <span class="history-v2__rate-label">Rate this service</span>
+        <div class="history-v2__stars-picker" role="radiogroup" aria-label="Star rating">
+          ${[5,4,3,2,1].map(n => `
+            <input type="radio" name="rating-${uid}" id="star-${uid}-${n}" value="${n}" />
+            <label for="star-${uid}-${n}" aria-label="${n} star${n > 1 ? 's' : ''}">
+              ${EMPTY_STAR_SVG(22)}
+            </label>`).join('')}
+        </div>
+        <textarea class="history-v2__comment-input" placeholder="Share your experience (optional)" rows="2" maxlength="1000"></textarea>
+        <button class="history-v2__submit-btn" data-submit-review data-booking-id="${b._id}" disabled>Submit Review</button>
+      </div>`;
+  }
+
+  // Payment icon SVG
+  const payIcon = paymentMethod === 'Cash'
+    ? `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M22 10H2"/></svg>`
+    : `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>`;
+
+  const el = document.createElement('article');
+  el.className = 'history-card-v2';
+  el.dataset.category = category;
+  el.dataset.payment  = paymentMethod;
+  el.dataset.date     = b.scheduledDate || '';
+  el.dataset.rating   = String(rating);
+
+  el.innerHTML = `
+    <div class="history-v2__main">
+      <div class="history-v2__icon">${iconHtml}</div>
+      <div class="history-v2__info">
+        <h4 class="history-v2__title">
+          ${title} <small class="history-v2__id">${ref}</small>
+          ${isCancelled ? `<span class="history-v2__status-badge badge-cancelled">Cancelled</span>` : ''}
+        </h4>
+        <p class="history-v2__provider">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          ${workerName}
+          <span class="dot-sep"></span>
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          ${dateStr}
+        </p>
+        ${ratingSection}
+      </div>
+    </div>
+    <div class="history-v2__meta">
+      <span class="history-v2__payment-badge">
+        <span class="history-v2__payment-icon">${payIcon}</span>
+        ${paymentMethod}
+      </span>
+      <div class="history-v2__price">${priceRaw !== '—' ? priceRaw + ' EGP' : '—'}</div>
+    </div>
+    <div class="history-v2__actions">
+      <button class="btn btn--sm btn--outline" data-invoice-toggle>
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        View Invoice
+      </button>
+    </div>
+    <div class="history-v2__expanded">
+      <div class="history-v2__expanded-inner">
+        <div class="invoice-grid">
+          <div class="invoice-breakdown">
+            <h5 class="invoice-breakdown__title">Cost Breakdown</h5>
+            <div class="invoice-item"><span>${title}</span><span>${priceRaw !== '—' ? priceRaw + ' EGP' : '—'}</span></div>
+            <div class="invoice-item is-total"><span>Total Paid</span><span>${priceRaw !== '—' ? priceRaw + ' EGP' : '—'}</span></div>
+          </div>
+          <div class="invoice-details">
+            <h5 class="invoice-breakdown__title">Payment</h5>
+            <div class="payment-method-footer">
+              <div class="payment-method-box">
+                <span class="history-v2__payment-icon">${payIcon}</span>
+                <p>Paid with ${paymentMethod}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  return el;
+}
+
+async function submitReview(btn) {
+  const card       = btn.closest('.history-card-v2');
+  const rateBlock  = card.querySelector('[data-rate-block]');
+  const bookingId  = btn.dataset.bookingId;
+  const ratingInput = rateBlock.querySelector('input[type="radio"]:checked');
+  const textarea   = rateBlock.querySelector('.history-v2__comment-input');
+
+  if (!ratingInput) return;
+
+  const rating  = parseInt(ratingInput.value, 10);
+  const comment = textarea.value.trim();
+
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+
+  try {
+    await createReview(bookingId, rating, comment);
+
+    const staticStars = Array.from({ length: 5 }, (_, i) =>
+      i < rating ? STAR_SVG('#F59E0B', 15) : EMPTY_STAR_SVG(15)
+    ).join('');
+
+    rateBlock.outerHTML = `
+      <div class="history-v2__rating-display">
+        <div class="history-v2__rating-stars" aria-label="${rating} out of 5 stars">${staticStars}</div>
+      </div>
+      ${comment ? `<p class="history-v2__comment">"${comment}"</p>` : ''}`;
+
+    card.dataset.rating = String(rating);
+    showToast('Review submitted. Thank you!', 'success');
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = 'Submit Review';
+    if (err.status === 409) {
+      showToast('You already reviewed this booking.', 'info');
+    } else {
+      showToast(err.message || 'Failed to submit review.', 'error');
     }
-  } catch (_) {}
+  }
+}
+
+function renderBookingsTab(bookings) {
+  const STATUS_TO_PANE = {
+    accepted: 'stab-bookings-active', in_progress: 'stab-bookings-active',
+    pending: 'stab-bookings-pending',
+  };
+  const paneIds = ['stab-bookings-active', 'stab-bookings-pending'];
+  const EMPTY = {
+    'stab-bookings-active': 'No active bookings.',
+    'stab-bookings-pending': 'No pending bookings.',
+  };
+
+  const openInvoiceIds = new Set();
+  const panes = {};
+  paneIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      // Find open invoices before wiping
+      el.querySelectorAll('.booking-card').forEach(card => {
+        const panel = card.querySelector('.booking-card__invoice-panel');
+        if (panel && panel.classList.contains('is-open') && card.dataset.bookingId) {
+          openInvoiceIds.add(card.dataset.bookingId);
+        }
+      });
+      el.innerHTML = ''; 
+      panes[id] = el;
+    }
+  });
+
+  bookings.forEach(b => {
+    const paneId = STATUS_TO_PANE[b.status];
+    const pane = paneId && panes[paneId];
+    if (!pane) return;
+    const card = buildBookingCard(b);
+    if (card) {
+      if (openInvoiceIds.has(b._id)) {
+        const panel = card.querySelector('.booking-card__invoice-panel');
+        const btn = card.querySelector('[data-invoice-toggle]');
+        if (panel) panel.classList.add('is-open');
+        if (btn) btn.textContent = 'Hide Invoice';
+      }
+      pane.appendChild(card);
+    }
+  });
+
+  paneIds.forEach(id => {
+    const pane = panes[id];
+    if (!pane) return;
+    if (!pane.children.length) {
+      pane.innerHTML = `<div class="bookings-empty-state"><p>${EMPTY[id]}</p></div>`;
+    } else {
+      wireBookingCardEvents(pane);
+      revealAll(pane);
+    }
+  });
+}
+
+function getServiceIconSVG(category) {
+  const c = (category || '').toLowerCase();
+  if (c.includes('plumb') || c.includes('pipe') || c.includes('water')) {
+    return `<svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"/><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"/></svg>`;
+  }
+  if (c.includes('elec') || c.includes('wiring') || c.includes('power')) {
+    return `<svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`;
+  }
+  if (c.includes('hvac') || c.includes('ac') || c.includes('air') || c.includes('cool') || c.includes('heat')) {
+    return `<svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="9.5" y1="9.5" x2="14.5" y2="14.5"/><line x1="14.5" y1="9.5" x2="9.5" y2="14.5"/></svg>`;
+  }
+  if (c.includes('clean')) {
+    return `<svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`;
+  }
+  return `<svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`;
+}
+
+function buildBookingCard(b) {
+  if (!b._id) return null;
+
+  const STATUS_FILTER = {
+    pending: 'pending', accepted: 'confirmed', in_progress: 'confirmed',
+    completed: 'completed', cancelled: 'cancelled', rejected: 'cancelled'
+  };
+  const BADGE_CONFIG = {
+    pending:     { label: 'Booked',      style: 'background:rgba(234,179,8,0.1);color:#eab308;border-color:rgba(234,179,8,0.3)' },
+    accepted:    { label: 'Confirmed',   style: '' },
+    in_progress: { label: 'In Progress', style: 'background:rgba(180,160,50,0.1);color:#eab308;border-color:#eab308' },
+    completed:   { label: 'Completed',   style: 'background:rgba(34,197,94,0.1);color:#22c55e;border-color:rgba(34,197,94,0.3)' },
+    cancelled:   { label: 'Cancelled',   style: 'background:rgba(156,163,175,0.1);color:#9ca3af;border-color:rgba(156,163,175,0.3)' },
+    rejected:    { label: 'Declined',    style: 'background:rgba(156,163,175,0.1);color:#9ca3af;border-color:rgba(156,163,175,0.3)' }
+  };
+  const STEPPER_CONFIG = {
+    pending:     { done: 0, active: 0, fill: '0%' },
+    accepted:    { done: 1, active: 1, fill: '33%' },
+    in_progress: { done: 2, active: 2, fill: '66%' },
+    completed:   { done: 4, active: -1, fill: '100%' }
+  };
+
+  const status = b.status || 'pending';
+  const isCancelled = status === 'cancelled' || status === 'rejected';
+  const badge = BADGE_CONFIG[status] || BADGE_CONFIG.pending;
+  const stepperCfg = STEPPER_CONFIG[status] || null;
+  const filterStatus = STATUS_FILTER[status] || 'pending';
+
+  const title = b.service?.title || b.serviceCategory || 'Service';
+  const category = b.service?.category || b.serviceCategory || '';
+  const workerName = b.worker?.name || '—';
+  const formattedDate = b.scheduledDate
+    ? new Date(b.scheduledDate).toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' })
+    : '—';
+  const priceRaw = b.totalPrice != null ? String(b.totalPrice).replace('$', '').trim() : '—';
+  const price = priceRaw;
+  const paymentMethod = b.paymentMethod === 'cash' ? 'Cash' : 'Credit Card';
+  const bookingRef = `#${b._id.slice(-6).toUpperCase()}`;
+
+  // Avatar
+  let avatarHTML;
+  if (b.worker?.profileImage) {
+    avatarHTML = `<img src="${b.worker.profileImage}" alt="${workerName}" class="provider-avatar">`;
+  } else if (b.worker?.name) {
+    const initials = b.worker.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+    avatarHTML = `<span class="provider-avatar provider-avatar--initials">${initials}</span>`;
+  } else {
+    avatarHTML = '';
+  }
+
+  // View profile link
+  const workerId = (b.worker && typeof b.worker === 'object' ? (b.worker._id || b.worker.id) : b.worker) || '';
+
+  const viewProfileHTML = workerId
+    ? `<a href="./technician-profile.html?id=${workerId}" class="provider-view-profile">View Profile</a>`
+    : '';
+
+  // PIN
+  const pinStr = b.pin ? String(b.pin) : '----';
+  const pinHTML = pinStr.split('').slice(0, 4).map(d => `<span class="pin-code__digit">${d}</span>`).join('');
+
+  // Stepper
+  const checkSVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="20 6 9 17 4 12"/></svg>`;
+  const STEP_LABELS = ['Booked', 'Confirmed', 'En Route', 'Completed'];
+  let stepperHTML;
+  if (!stepperCfg) {
+    stepperHTML = `<div class="booking-card__progress-wrap"><p style="color:var(--color-text-muted,#9ca3af);font-size:0.8rem;font-weight:600;padding:8px 0;margin:0;">Booking ${badge.label}</p></div>`;
+  } else {
+    const stepsHTML = STEP_LABELS.map((lbl, i) => {
+      const isDone = i < stepperCfg.done;
+      const isActive = stepperCfg.active !== -1 && i === stepperCfg.active && !isDone;
+      const cls = `tracking-step${isDone ? ' is-done' : isActive ? ' is-active' : ''}`;
+      return `<div class="${cls}"><div class="step-marker">${isDone ? checkSVG : ''}</div><span class="step-label">${lbl}</span></div>`;
+    }).join('');
+    stepperHTML = `<div class="booking-card__progress-wrap"><div class="tracking-status"><div class="tracking-track"><div class="tracking-track-fill" style="width:${stepperCfg.fill}"></div></div><div class="tracking-steps">${stepsHTML}</div></div></div>`;
+  }
+
+  // Cancel button
+  let cancelHTML = '';
+  if (status === 'pending' || status === 'accepted') {
+    const cancelType = status === 'pending' ? 'pending' : 'confirmed';
+    const cancelLabel = status === 'pending' ? 'Withdraw Request' : 'Cancel Booking';
+    cancelHTML = `<button class="btn btn--cancel" type="button" data-cancel-booking="${b._id}" data-cancel-type="${cancelType}">${cancelLabel}</button>`;
+  }
+
+  // Invoice panel
+  const invoiceHTML = !isCancelled ? `<div class="booking-card__invoice-panel"><div class="invoice-content"><p class="invoice-content__title">Invoice ${bookingRef}</p><div class="invoice-table"><div class="invoice-table__row"><span>${title}</span><span>${price !== '—' ? price + ' EGP' : '—'}</span></div><div class="invoice-table__row"><span>Service Date</span><span>${formattedDate}</span></div><div class="invoice-table__row"><span>Platform Fee</span><span>0 EGP</span></div><div class="invoice-table__row is-total"><span>Total</span><span>${price !== '—' ? price + ' EGP' : '—'}</span></div></div><div class="booking-card__invoice-footer"><p>Payment Method: <strong>${paymentMethod}</strong></p></div></div></div>` : '';
+
+  const div = document.createElement('div');
+  div.className = 'booking-card';
+  div.dataset.bookingId = b._id;
+  div.dataset.bookingCard = '';
+  div.dataset.bookingStatus = filterStatus;
+  if (b.scheduledDate) div.dataset.bookingDate = b.scheduledDate;
+
+  div.innerHTML = `
+    <div class="booking-card__inner">
+      <div class="booking-card__body">
+        <div class="booking-card__header">
+          <div class="booking-card__title-grp">
+            <div class="booking-card__service-row">
+              <div class="booking-card__header-icon">${getServiceIconSVG(category)}</div>
+              <h3 class="booking-card__title">${title}</h3>
+            </div>
+            <div class="booking-card__provider-wrap">
+              ${avatarHTML}
+              <div class="booking-card__provider-info">
+                <span class="provider-tech-label">Technician</span>
+                <span class="provider-name">${workerName}</span>
+              </div>
+              ${viewProfileHTML}
+            </div>
+          </div>
+          <span class="booking-card__status-badge"${badge.style ? ` style="${badge.style}"` : ''}>${badge.label}</span>
+        </div>
+        <div class="booking-card__grid">
+          <div class="booking-grid-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <div><span class="booking-grid-box__label">Service Date</span><span class="booking-grid-box__value">${formattedDate}</span></div>
+          </div>
+          <div class="booking-grid-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <div><span class="booking-grid-box__label">Time Slot</span><span class="booking-grid-box__value">${b.scheduledTime || '—'}</span></div>
+          </div>
+          <div class="booking-grid-box booking-grid-box--full">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <div><span class="booking-grid-box__label">Service Address</span><span class="booking-grid-box__value">${b.address || '—'}</span></div>
+          </div>
+        </div>
+        ${stepperHTML}
+      </div>
+      <div class="booking-card__sidebar">
+        <div class="sidebar-box">
+          <div class="sidebar-box__header">Your PIN</div>
+          <div class="pin-code">${pinHTML}</div>
+        </div>
+        <div class="sidebar-box sidebar-box--amount">
+          <div class="sidebar-box__header">Amount</div>
+          <div class="price-display">
+            <span class="price-display__value">${price}</span>
+            ${price !== '—' ? `<span class="price-display__currency">EGP</span>` : ''}
+          </div>
+        </div>
+        <div class="booking-card__actions">
+          <a class="btn btn--view-details" href="./booking-details.html?id=${b._id}">View Details</a>
+          ${!isCancelled ? `<button class="btn btn--invoice" type="button" data-invoice-toggle>View Invoice</button>` : ''}
+          ${!isCancelled ? `<a class="btn btn--chat" href="./messages.html?booking=${b._id}">Chat</a>` : ''}
+          ${cancelHTML}
+        </div>
+      </div>
+    </div>
+    ${invoiceHTML}`;
+  return div;
+}
+
+function wireBookingCardEvents(root) {
+  if (root.dataset.eventsWired === 'true') return;
+  root.dataset.eventsWired = 'true';
+
+  root.addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-cancel-booking]');
+    if (!btn) return;
+    const bookingId = btn.dataset.cancelBooking;
+    const type = btn.dataset.cancelType || 'confirmed';
+    const msg = type === 'pending'
+      ? (typeof window.t === 'function' ? window.t('confirm_withdraw') : 'Withdraw this pending request? You can submit a new booking anytime.')
+      : (typeof window.t === 'function' ? window.t('confirm_cancel') : 'Cancel this confirmed visit? You may need to book a new slot if you still need the service.');
+    if (!confirm(msg)) return;
+    btn.disabled = true;
+    try {
+      await cancelBooking(bookingId);
+      const card = btn.closest('.booking-card');
+      if (card) {
+        card.style.transition = 'opacity 0.3s, transform 0.3s';
+        card.style.opacity = '0';
+        card.style.transform = 'translateX(8px)';
+        setTimeout(() => { card.remove(); }, 300);
+      }
+      showToast(type === 'pending' ? 'Request withdrawn.' : 'Booking cancelled.', 'info');
+    } catch (err) {
+      btn.disabled = false;
+      showToast(err.message || 'Failed to cancel booking.', 'error');
+    }
+  });
+
+  root.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-invoice-toggle]');
+    if (!btn) return;
+    const panel = btn.closest('.booking-card')?.querySelector('.booking-card__invoice-panel');
+    if (!panel) return;
+    const isOpen = panel.classList.toggle('is-open');
+    btn.textContent = isOpen ? 'Hide Invoice' : 'View Invoice';
+  });
 }
 
 /* ── Stats ──────────────────────────────────────────────── */
-async function populateStats() {
+async function populateStats(bookings = null) {
   try {
-    const res = await getMyBookings({ limit: 100 });
-    const bookings = res.bookings || [];
+    if (!bookings) {
+      const res = await getMyBookings({ limit: 100 });
+      bookings = res?.bookings || [];
+    }
 
     const total     = bookings.length;
     const active    = bookings.filter(b => ['pending','accepted','in_progress'].includes(b.status)).length;
@@ -401,18 +963,129 @@ function updateWelcomeText() {
   }
 }
 
-/* ── Notifications: mark all read ──────────────────────── */
+/* ── Notifications: localStorage persistence ─────────── */
+function _getStoredNotifications() {
+  try { return JSON.parse(localStorage.getItem('servio_notifications') || '[]'); } catch { return []; }
+}
+
+function _saveNotifications(arr) {
+  try {
+    localStorage.setItem('servio_notifications', JSON.stringify(arr));
+  } catch (e) {
+    if (e.name === 'QuotaExceededError') {
+      arr.splice(25);
+      try { localStorage.setItem('servio_notifications', JSON.stringify(arr)); } catch (_) {}
+    }
+  }
+}
+
+function _setBadge(el, count) {
+  if (!el) return;
+  let badge = el.querySelector('.notif-badge');
+  if (!badge) {
+    badge = document.createElement('span');
+    badge.className = 'notif-badge';
+    el.appendChild(badge);
+  }
+  badge.textContent = count;
+  badge.hidden = count === 0;
+}
+
+function updateNotifBadge() {
+  const notifs = _getStoredNotifications();
+  const unread = notifs.filter(n => !n.read).length;
+  _setBadge(document.getElementById('tab-notifications'), unread);
+  const mobileBtn = document.querySelector('[data-mobile-tab="notifications"]');
+  if (mobileBtn) _setBadge(mobileBtn, unread);
+}
+
+function renderNotifications() {
+  const list = document.getElementById('notif-list');
+  if (!list) return;
+  const notifs = _getStoredNotifications();
+
+  if (!notifs.length) {
+    list.innerHTML = '<div class="notif-empty-state"><p>No notifications yet.</p></div>';
+    return;
+  }
+
+  const TYPE_ICON = {
+    booking_confirmed:   `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#22A05A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+    booking_in_progress: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#6E56CF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+    booking_completed:   `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+    booking_cancelled:   `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
+    booking_rejected:    `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
+  };
+
+  const STATUS_TO_SUBTAB = {
+    accepted: 'bookings-active', in_progress: 'bookings-active',
+    pending: 'bookings-pending', completed: 'bookings-completed',
+    cancelled: 'bookings-cancelled', rejected: 'bookings-cancelled',
+  };
+
+  list.innerHTML = '';
+  notifs.forEach(n => {
+    const el = document.createElement('div');
+    el.className = `notif-card-v2${n.read ? '' : ' is-unread'}`;
+    el.dataset.notifId = n.id;
+
+    const timeStr = n.timestamp ? new Date(n.timestamp).toLocaleString() : '';
+    const icon = TYPE_ICON[n.type] || TYPE_ICON.booking_confirmed;
+    const subtab = STATUS_TO_SUBTAB[n.status] || 'bookings-active';
+
+    el.innerHTML = `
+      <div class="notif-card-v2__icon notif-card-v2__icon--booking">${icon}</div>
+      <div class="notif-card-v2__body">
+        <p class="notif-card-v2__title">${n.title}</p>
+        <p class="notif-card-v2__desc">${n.body}</p>
+        <div class="notif-card-v2__actions">
+          <button class="btn btn--sm" type="button" data-notif-view-booking="${subtab}">View Booking</button>
+          <button class="btn btn--sm btn--danger-ghost" type="button" data-notif-dismiss="${n.id}">Dismiss</button>
+        </div>
+        <p class="notif-card-v2__time">${timeStr}</p>
+      </div>`;
+    list.appendChild(el);
+  });
+
+  list.addEventListener('click', (e) => {
+    const viewBtn = e.target.closest('[data-notif-view-booking]');
+    if (viewBtn) {
+      const subtab = viewBtn.dataset.notifViewBooking;
+      document.querySelector('[data-tab="bookings"]')?.click();
+      setTimeout(() => {
+        const btn = document.querySelector(`#bookings-stab-bar [data-stab="${subtab}"]`);
+        btn?.click();
+      }, 50);
+      return;
+    }
+    const dismissBtn = e.target.closest('[data-notif-dismiss]');
+    if (dismissBtn) {
+      const id = dismissBtn.dataset.notifDismiss;
+      let notifs = _getStoredNotifications();
+      notifs = notifs.filter(n => n.id !== id);
+      _saveNotifications(notifs);
+      dismissBtn.closest('.notif-card-v2')?.remove();
+      if (!list.querySelector('.notif-card-v2')) {
+        list.innerHTML = '<div class="notif-empty-state"><p>No notifications yet.</p></div>';
+      }
+      updateNotifBadge();
+    }
+  }, { once: false });
+}
+
 function initNotifications() {
   const markAllBtn = document.getElementById('mark-all-read');
-  if (!markAllBtn) return;
-  markAllBtn.addEventListener('click', () => {
-    document.querySelectorAll('.notif-card--unread').forEach(el => el.classList.remove('notif-card--unread'));
-    document.querySelectorAll('.notif-card-v2.is-unread').forEach(el => el.classList.remove('is-unread'));
-    document.querySelectorAll('.notif-card__dot:not(.notif-card__dot--read)').forEach(el => {
-      el.classList.add('notif-card__dot--read');
+  if (markAllBtn) {
+    markAllBtn.addEventListener('click', () => {
+      const notifs = _getStoredNotifications().map(n => ({ ...n, read: true }));
+      _saveNotifications(notifs);
+      renderNotifications();
+      updateNotifBadge();
+      showToast(typeof window.t === 'function' ? window.t('toast_notif_read') : 'All notifications marked as read.', 'success');
     });
-    showToast(typeof window.t === 'function' ? window.t('toast_notif_read') : 'All notifications marked as read.', 'success');
-  });
+  }
+  renderNotifications();
+  updateNotifBadge();
 }
 
 /* ── Settings: photo upload ─────────────────────────────── */
@@ -865,6 +1538,8 @@ function initDashLogout() {
   btn.addEventListener('click', () => {
     try {
       localStorage.removeItem('servio_session');
+      localStorage.removeItem('servio_notifications');
+      localStorage.removeItem('servio_booking_snapshot');
     } catch (_) { /* ignore */ }
     window.location.href = './login.html?redirect=' + encodeURIComponent(window.location.pathname + window.location.search);
   });
@@ -1112,7 +1787,7 @@ populateStats();
 updateWelcomeText();
 
 initTabs();
-initBookingFilter();
+initBookingSubTabs();
 initHistoryPanel();
 initFavouritesPanel();
 initNotificationActions();
@@ -1133,6 +1808,44 @@ initAddressTab();
 initAccountTab();
 initDashLogout();
 
+/* ── Bookings sub-tab switching ─────────────────────────── */
+function initBookingSubTabs() {
+  const bar = document.getElementById('bookings-stab-bar');
+  if (!bar) return;
+  bar.addEventListener('click', (e) => {
+    const btn = e.target.closest('.stab-btn');
+    if (!btn) return;
+    const target = btn.dataset.stab;
+    bar.querySelectorAll('.stab-btn').forEach(b => {
+      b.classList.toggle('stab-btn--active', b === btn);
+      b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
+    });
+    document.querySelectorAll('#panel-bookings .stab-pane').forEach(p => {
+      const isTarget = p.id === 'stab-' + target;
+      p.classList.toggle('stab-pane--active', isTarget);
+      if (isTarget) p.removeAttribute('hidden');
+      else p.setAttribute('hidden', '');
+    });
+  });
+}
+
+function _restoreSubTab(stabValue) {
+  const bar = document.getElementById('bookings-stab-bar');
+  if (!bar || !stabValue) return;
+  const btn = bar.querySelector(`[data-stab="${stabValue}"]`);
+  if (!btn) return;
+  bar.querySelectorAll('.stab-btn').forEach(b => {
+    b.classList.toggle('stab-btn--active', b === btn);
+    b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
+  });
+  document.querySelectorAll('#panel-bookings .stab-pane').forEach(p => {
+    const isTarget = p.id === 'stab-' + stabValue;
+    p.classList.toggle('stab-pane--active', isTarget);
+    if (isTarget) p.removeAttribute('hidden');
+    else p.setAttribute('hidden', '');
+  });
+}
+
 /* ── Settings horizontal tab switching ─────────────────── */
 function initSettingsTabs() {
   const bar = document.getElementById('settings-tab-bar');
@@ -1145,7 +1858,7 @@ function initSettingsTabs() {
       b.classList.toggle('stab-btn--active', b === btn);
       b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
     });
-    document.querySelectorAll('.stab-pane').forEach(p => {
+    document.querySelectorAll('#panel-settings .stab-pane').forEach(p => {
       const isTarget = p.id === 'stab-' + target;
       p.classList.toggle('stab-pane--active', isTarget);
       if (isTarget) p.removeAttribute('hidden');
@@ -1446,79 +2159,120 @@ function initThemeCards() {
 }
 
 /* ── Addresses tab ──────────────────────────────────────── */
-function initAddressTab() {
-  const formWrap   = document.getElementById('addr-form-wrap');
-  const btnAdd     = document.getElementById('btn-addr-add');
-  const btnCancel  = document.getElementById('btn-addr-cancel');
-  const btnSave    = document.getElementById('btn-addr-save');
-  const formTitle  = document.getElementById('addr-form-title');
-  if (!formWrap) return;
-
-  const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
-  let currentAddrTarget = null;
-
-  function openForm(target) {
-    currentAddrTarget = target;
-    formTitle.textContent = _t('cust_addr_edit_title');
-    
-    // We pre-fill from our window global
-    const userAddr = window.__servio_user_address || {};
-    
-    document.getElementById('addr-input-street').value   = userAddr.street || '';
-    document.getElementById('addr-input-district').value = userAddr.state || '';
-    document.getElementById('addr-input-city').value     = userAddr.city || '';
-    
-    formWrap.removeAttribute('hidden');
-    btnAdd.setAttribute('hidden', '');
-    document.getElementById('addr-input-street').focus();
+function renderAddressList() {
+  const list = document.getElementById('addr-list');
+  if (!list) return;
+  const addresses = window.__servio_user_addresses || [];
+  if (addresses.length === 0) {
+    list.innerHTML = '<p class="settings-section__desc" style="margin:0">No saved addresses yet. Add one below.</p>';
+    return;
   }
+  list.innerHTML = addresses.map(addr => {
+    const full = [addr.street, addr.city, addr.state].filter(Boolean).join(', ');
+    return `
+      <div class="addr-card" data-addr-id="${addr._id}">
+        <div class="addr-card__icon">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        </div>
+        <div class="addr-card__body">
+          <span class="addr-card__type">${addr.label || 'Address'}</span>
+          <span class="addr-card__value">${full || '—'}</span>
+        </div>
+        <button type="button" class="btn-addr-edit" data-addr-id="${addr._id}" aria-label="Edit address">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          <span>Edit</span>
+        </button>
+        <button type="button" class="btn-addr-delete" data-addr-id="${addr._id}" aria-label="Delete address" style="margin-left:4px;background:none;border:none;cursor:pointer;color:var(--color-error,#e53);">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        </button>
+      </div>`;
+  }).join('');
+
+  // Wire edit buttons
+  list.querySelectorAll('.btn-addr-edit').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.addrId;
+      const addr = (window.__servio_user_addresses || []).find(a => a._id === id);
+      if (addr) openAddressForm(addr);
+    });
+  });
+
+  // Wire delete buttons
+  list.querySelectorAll('.btn-addr-delete').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.addrId;
+      if (!confirm('Delete this address?')) return;
+      try {
+        await deleteAddress(id);
+        window.__servio_user_addresses = (window.__servio_user_addresses || []).filter(a => a._id !== id);
+        renderAddressList();
+        showToast('Address deleted.', 'success');
+      } catch (err) {
+        showToast(err.response?.data?.message || 'Failed to delete address', 'error');
+      }
+    });
+  });
+}
+
+let _editingAddrId = null;
+
+function openAddressForm(addr) {
+  const formWrap = document.getElementById('addr-form-wrap');
+  const btnAdd   = document.getElementById('btn-addr-add');
+  const formTitle = document.getElementById('addr-form-title');
+  if (!formWrap) return;
+  _editingAddrId = addr ? addr._id : null;
+  if (formTitle) formTitle.textContent = addr ? 'Edit Address' : 'Add Address';
+  document.getElementById('addr-input-label').value    = addr?.label   || '';
+  document.getElementById('addr-input-street').value   = addr?.street  || '';
+  document.getElementById('addr-input-district').value = addr?.state   || '';
+  document.getElementById('addr-input-city').value     = addr?.city    || '';
+  formWrap.removeAttribute('hidden');
+  if (btnAdd) btnAdd.setAttribute('hidden', '');
+  document.getElementById('addr-input-street').focus();
+}
+
+function initAddressTab() {
+  const formWrap  = document.getElementById('addr-form-wrap');
+  const btnAdd    = document.getElementById('btn-addr-add');
+  const btnCancel = document.getElementById('btn-addr-cancel');
+  const btnSave   = document.getElementById('btn-addr-save');
+  if (!formWrap) return;
 
   function closeForm() {
     formWrap.setAttribute('hidden', '');
-    btnAdd.removeAttribute('hidden');
-    currentAddrTarget = null;
+    if (btnAdd) btnAdd.removeAttribute('hidden');
+    _editingAddrId = null;
   }
 
-  // Edit buttons on each card
-  document.querySelectorAll('.btn-addr-edit').forEach(btn => {
-    btn.addEventListener('click', () => openForm(btn.dataset.addrTarget));
-  });
+  btnAdd?.addEventListener('click', () => openAddressForm(null));
+  btnCancel?.addEventListener('click', closeForm);
 
-  btnAdd.addEventListener('click', () => openForm('other-' + Date.now()));
-  btnCancel.addEventListener('click', closeForm);
-
-  btnSave.addEventListener('click', async () => {
-    if (!currentAddrTarget) return;
-    const street   = document.getElementById('addr-input-street').value.trim();
-    const state    = document.getElementById('addr-input-district').value.trim();
-    const city     = document.getElementById('addr-input-city').value.trim();
+  btnSave?.addEventListener('click', async () => {
+    const label  = document.getElementById('addr-input-label').value.trim();
+    const street = document.getElementById('addr-input-street').value.trim();
+    const state  = document.getElementById('addr-input-district').value.trim();
+    const city   = document.getElementById('addr-input-city').value.trim();
     if (!street) { document.getElementById('addr-input-street').focus(); return; }
 
     try {
-      const address = { street, city, state, zipCode: window.__servio_user_address?.zipCode || '' };
-      await updateMe({ address });
-      window.__servio_user_address = address;
-      
-      const session = JSON.parse(localStorage.getItem('servio_session') || '{}');
-      session.address = address;
-      localStorage.setItem('servio_session', JSON.stringify(session));
-
-      const full = [street, city, state].filter(Boolean).join(', ');
-      const valueEl = document.getElementById('addr-home-value');
-      if (valueEl) valueEl.textContent = full;
-      
-      const addrProfEl = document.getElementById('profile-address');
-      if(addrProfEl) addrProfEl.textContent = full;
-
+      if (_editingAddrId) {
+        const updated = await updateAddress(_editingAddrId, { label, street, city, state });
+        window.__servio_user_addresses = (window.__servio_user_addresses || []).map(
+          a => a._id === _editingAddrId ? updated : a
+        );
+      } else {
+        const created = await addAddress({ label, street, city, state });
+        window.__servio_user_addresses = [...(window.__servio_user_addresses || []), created];
+      }
+      renderAddressList();
       closeForm();
-      showToast(_t('toast_addr_saved') || 'Address saved successfully.', 'success');
+      showToast('Address saved.', 'success');
     } catch (err) {
       console.error('Failed to save address:', err);
       showToast(err.response?.data?.message || err.message || 'Failed to save address', 'error');
     }
   });
-
-  // Note: Values set dynamically by populateProfile
 }
 
 /* ── Account tab (export / deactivate / delete) ─────────── */
