@@ -32,7 +32,8 @@ import { initBackToTop } from "./components/back-to-top.js";
   const isAdminPage = path.includes('admin-dashboard');
   const isTechPage  = path.includes('technician-dashboard');
   const isCustPage  = path.includes('customer-dashboard');
-  const isAuthPage  = path.includes('login.html') || path.includes('signup.html');
+  const isAuthPage  = path.includes('login.html') || path.includes('signup.html')
+                   || path.includes('forgot-password.html') || path.includes('reset-password.html');
 
   if (isAuthPage) return;
 

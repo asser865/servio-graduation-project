@@ -31,6 +31,13 @@ void main() {
         'hourlyRate': 450,
         'isVerified': true,
         'availabilityType': 'weekdays',
+        'availability': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'day': 'monday',
+            'from': '12:00',
+            'to': '17:00',
+          },
+        ],
       });
 
       expect(worker.id, 'worker1');
@@ -39,6 +46,8 @@ void main() {
       expect(worker.rating, 4.7);
       expect(worker.reviewCount, 12);
       expect(worker.yearsExperience, 6);
+      expect(worker.availability.single.day, 'monday');
+      expect(worker.availability.single.from, '12:00');
       expect(worker.serviceLabels, <String>['Drain Cleaning', 'AC Tune Up']);
     });
 

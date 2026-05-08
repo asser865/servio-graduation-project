@@ -98,8 +98,10 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
       switch (job.status) {
         case 'pending':
           actionLabel = 'Accept Job';
-          onPressed = () => _updateStatus('confirmed');
+          onPressed = () => _updateStatus('accepted');
+        case 'accepted':
         case 'confirmed':
+        case 'scheduled':
           actionLabel = 'Start Job - Mark In Progress';
           onPressed = () => _updateStatus('in_progress');
         case 'in_progress':

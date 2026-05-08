@@ -20,6 +20,9 @@ const createValidation = [
 // POST /api/v1/reviews — authenticated user only
 router.post('/', protect, authorize('user'), validate(createValidation), reviewController.createReview);
 
+// GET /api/v1/reviews/my — authenticated user only
+router.get('/my', protect, authorize('user'), reviewController.getMyReviews);
+
 // GET /api/v1/reviews/worker/:workerId — public
 router.get('/worker/:workerId', reviewController.getWorkerReviews);
 

@@ -565,49 +565,9 @@
               <p class="dash-panel__subtitle" data-i18n="tech_reviews_sub">Feedback from your customers.</p>
             </div>
 
-            <div class="reviews-summary" data-reveal>
-              <div class="reviews-summary__rating">4.8</div>
-              <div>
-                <div class="reviews-summary__stars">★★★★★</div>
-                <div class="reviews-summary__count" data-i18n="tech_reviews_count">Based on 24 reviews</div>
-              </div>
-            </div>
+            <div class="reviews-summary" id="tech-dash-reviews-summary" data-reveal></div>
 
-            <div class="review-card" data-reveal>
-              <div class="review-card__header">
-                <div class="review-card__avatar">AH</div>
-                <div class="review-card__meta">
-                  <p class="review-card__name">Ahmed Hassan</p>
-                  <p class="review-card__date">15 Mar 2026</p>
-                </div>
-              </div>
-              <div class="review-card__stars">★★★★★</div>
-              <p class="review-card__text" data-i18n="tech_review_text_1">"Very professional and fixed the issue quickly. Highly recommend!"</p>
-            </div>
-
-            <div class="review-card" data-reveal>
-              <div class="review-card__header">
-                <div class="review-card__avatar">SM</div>
-                <div class="review-card__meta">
-                  <p class="review-card__name">Sara Mohamed</p>
-                  <p class="review-card__date">10 Mar 2026</p>
-                </div>
-              </div>
-              <div class="review-card__stars">★★★★☆</div>
-              <p class="review-card__text" data-i18n="tech_review_text_2">"Good work overall, arrived on time and completed the job well."</p>
-            </div>
-
-            <div class="review-card" data-reveal>
-              <div class="review-card__header">
-                <div class="review-card__avatar">LN</div>
-                <div class="review-card__meta">
-                  <p class="review-card__name">Laila Nasser</p>
-                  <p class="review-card__date">2 Mar 2026</p>
-                </div>
-              </div>
-              <div class="review-card__stars">★★★★★</div>
-              <p class="review-card__text" data-i18n="tech_review_text_3">"Excellent service, very clean and thorough. Will definitely book again."</p>
-            </div>
+            <div id="tech-dash-reviews-list"></div>
           </section>
 
           <!-- ── Verification panel ── -->
@@ -736,14 +696,7 @@
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
                 <span data-i18n="tech_stab_notifications">Notifications</span>
               </button>
-              <button class="stab-btn" role="tab" aria-selected="false" aria-controls="stab-language" data-stab="language" id="stab-btn-language">
-                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-                <span data-i18n="tech_stab_language">Language</span>
-              </button>
-              <button class="stab-btn" role="tab" aria-selected="false" aria-controls="stab-appearance" data-stab="appearance" id="stab-btn-appearance">
-                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-                <span data-i18n="tech_stab_appearance">Appearance</span>
-              </button>
+
               <button class="stab-btn" role="tab" aria-selected="false" aria-controls="stab-services" data-stab="services" id="stab-btn-services">
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
                 <span data-i18n="tech_stab_services">Services</span>
@@ -1148,89 +1101,6 @@
 
             </div><!-- /stab-notifications -->
 
-            <!-- ══════════════════════════════════════════
-                 TAB 4 — LANGUAGE & REGION
-            ══════════════════════════════════════════ -->
-            <div class="stab-pane" id="stab-language" role="tabpanel" aria-labelledby="stab-btn-language" hidden>
-
-              <div class="settings-section">
-                <h2 class="settings-section__heading">
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-                  <span data-i18n="tech_lang_title">Language &amp; Region</span>
-                </h2>
-                <p class="settings-section__desc" data-i18n="tech_lang_desc">Choose your preferred language. The interface will update instantly.</p>
-
-                <div class="lang-cards" role="radiogroup" aria-label="Language selection" id="lang-cards">
-                  <button type="button" class="lang-card" data-lang="en" role="radio" aria-checked="false" id="lang-card-en">
-                    <span class="lang-card__flag" aria-hidden="true">🇬🇧</span>
-                    <span class="lang-card__name">English</span>
-                    <span class="lang-card__native">English</span>
-                    <span class="lang-card__dir" data-i18n="tech_lang_ltr">Left to right</span>
-                    <svg class="lang-card__check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
-                  </button>
-                  <button type="button" class="lang-card" data-lang="ar" role="radio" aria-checked="false" id="lang-card-ar">
-                    <span class="lang-card__flag" aria-hidden="true">🇪🇬</span>
-                    <span class="lang-card__name">Arabic</span>
-                    <span class="lang-card__native">العربية</span>
-                    <span class="lang-card__dir" data-i18n="tech_lang_rtl">Right to left</span>
-                    <svg class="lang-card__check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
-                  </button>
-                </div>
-              </div>
-
-            </div><!-- /stab-language -->
-
-            <!-- ══════════════════════════════════════════
-                 TAB 5 — APPEARANCE
-            ══════════════════════════════════════════ -->
-            <div class="stab-pane" id="stab-appearance" role="tabpanel" aria-labelledby="stab-btn-appearance" hidden>
-
-              <div class="settings-section">
-                <h2 class="settings-section__heading">
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-                  <span data-i18n="tech_appearance_title">Appearance</span>
-                </h2>
-                <p class="settings-section__desc" data-i18n="tech_appearance_desc">Choose how SERVIO looks for you. Your preference is saved on this device.</p>
-
-                <div class="theme-cards" role="radiogroup" aria-label="Theme selection" id="theme-cards">
-                  <button type="button" class="theme-card" data-theme-choice="light" role="radio" aria-checked="false" id="theme-card-light">
-                    <div class="theme-card__preview theme-card__preview--light">
-                      <div class="thp-bar"></div>
-                      <div class="thp-content">
-                        <div class="thp-line thp-line--lg"></div>
-                        <div class="thp-line thp-line--sm"></div>
-                      </div>
-                    </div>
-                    <span class="theme-card__label" data-i18n="tech_theme_light">Light</span>
-                    <svg class="theme-card__check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
-                  </button>
-                  <button type="button" class="theme-card" data-theme-choice="dark" role="radio" aria-checked="false" id="theme-card-dark">
-                    <div class="theme-card__preview theme-card__preview--dark">
-                      <div class="thp-bar"></div>
-                      <div class="thp-content">
-                        <div class="thp-line thp-line--lg"></div>
-                        <div class="thp-line thp-line--sm"></div>
-                      </div>
-                    </div>
-                    <span class="theme-card__label" data-i18n="tech_theme_dark">Dark</span>
-                    <svg class="theme-card__check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
-                  </button>
-                  <button type="button" class="theme-card" data-theme-choice="system" role="radio" aria-checked="false" id="theme-card-system">
-                    <div class="theme-card__preview theme-card__preview--system">
-                      <div class="thp-half thp-half--light">
-                        <div class="thp-bar"></div>
-                      </div>
-                      <div class="thp-half thp-half--dark">
-                        <div class="thp-bar"></div>
-                      </div>
-                    </div>
-                    <span class="theme-card__label" data-i18n="tech_theme_system">System Default</span>
-                    <svg class="theme-card__check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
-                  </button>
-                </div>
-              </div>
-
-            </div><!-- /stab-appearance -->
 
             <!-- ══════════════════════════════════════════
                  TAB 6 — SERVICES

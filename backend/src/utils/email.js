@@ -310,4 +310,121 @@ async function sendTechAvailableEmail(toEmail, techName, serviceCategory, bookin
   });
 }
 
-module.exports = { sendPasswordResetEmail, sendTechAvailableEmail };
+async function sendSubscriptionConfirmEmail(toEmail, serviceCategory, serviceKey) {
+  const transporter    = buildTransporter();
+  const displayCategory = serviceCategory.charAt(0).toUpperCase() + serviceCategory.slice(1);
+  const listingUrl     = `${process.env.FRONTEND_URL || 'http://127.0.0.1:5502/temp_repo/servio_frontend'}/html/technician-listing.html?service=${serviceKey}`;
+
+  if (!transporter) {
+    console.log('\n─── NOTIFY SUBSCRIPTION CONFIRM (dev — no SMTP configured) ───');
+    console.log(`To: ${toEmail} | Category: ${displayCategory}`);
+    console.log('───────────────────────────────────────────────────────────────\n');
+    return;
+  }
+
+  await transporter.sendMail({
+    from:    process.env.SMTP_FROM || `"SERVIO" <${process.env.SMTP_USER}>`,
+    to:      toEmail,
+    subject: `You're on the list — ${displayCategory} technician notifications`,
+    html: `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Notification Subscription — SERVIO</title>
+</head>
+<body style="margin:0;padding:0;background-color:#FAF8F5;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#FAF8F5;padding:40px 16px;">
+    <tr>
+      <td align="center">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0"
+               style="max-width:560px;background:#ffffff;border-radius:20px;
+                      box-shadow:0 14px 36px rgba(34,40,49,0.10);overflow:hidden;">
+          <tr>
+            <td style="background:#3C2415;padding:36px 40px 32px;text-align:center;">
+              <table align="center" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="padding-right:12px;">
+                    <table cellpadding="0" cellspacing="0" border="0" style="background:rgba(227,213,202,0.2);border-radius:12px;">
+                      <tr>
+                        <td width="42" height="42" align="center" valign="middle" style="font-size:24px;">🛡️</td>
+                      </tr>
+                    </table>
+                  </td>
+                  <td>
+                    <span style="font-size:26px;font-weight:800;color:#E3D5CA;letter-spacing:2px;">SERVIO</span>
+                  </td>
+                </tr>
+              </table>
+              <div style="width:48px;height:3px;background:#9A8C73;border-radius:2px;margin:20px auto 0;"></div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:40px 40px 32px;">
+              <table align="center" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:24px;">
+                <tr>
+                  <td width="80" height="80" align="center" valign="middle"
+                      style="background:#F3EDE7;border:2px solid #E3D5CA;border-radius:40px;font-size:40px;">
+                    🔔
+                  </td>
+                </tr>
+              </table>
+              <h1 style="margin:0 0 12px;font-size:24px;font-weight:700;color:#222831;text-align:center;letter-spacing:-0.3px;">
+                You're on the list!
+              </h1>
+              <p style="margin:0 0 8px;font-size:15px;color:#6B6560;text-align:center;line-height:1.6;">
+                We'll send you an email the moment a verified
+                <strong style="color:#3C2415;">${displayCategory}</strong> technician comes online.
+              </p>
+              <p style="margin:0 0 28px;font-size:14px;color:#9A8C73;text-align:center;line-height:1.6;">
+                No action needed — just keep an eye on your inbox.
+              </p>
+              <table align="center" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:28px;">
+                <tr>
+                  <td>
+                    <a href="${listingUrl}"
+                       style="display:inline-block;padding:16px 44px;background:#3C2415;
+                              color:#E3D5CA;font-size:15px;font-weight:700;
+                              text-decoration:none;border-radius:14px;">
+                      View Listing →
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F7F3EF;border-radius:12px;">
+                <tr>
+                  <td style="padding:16px 20px;">
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td width="24" valign="top" style="font-size:18px;">ℹ️</td>
+                        <td style="padding-left:12px;font-size:13px;color:#6B6560;line-height:1.5;">
+                          This subscription expires after <strong style="color:#3C2415;">30 days</strong>
+                          or once a technician becomes available.
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="background:#F7F3EF;border-top:1px solid #DDD5CC;padding:24px 40px;text-align:center;">
+              <p style="margin:0;font-size:12px;color:#9A8C73;">
+                © 2026 SERVIO — Home Services Marketplace
+              </p>
+              <p style="margin:8px 0 0;font-size:11px;color:#C4B9B0;">
+                You received this because you subscribed to availability notifications on SERVIO.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+  });
+}
+
+module.exports = { sendPasswordResetEmail, sendTechAvailableEmail, sendSubscriptionConfirmEmail };

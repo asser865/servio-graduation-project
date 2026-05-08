@@ -95,3 +95,4 @@ class UsersApi {
     await _client.delete(ApiEndpoints.usersMe);
   }
 }
+

@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/bookings_api.dart';
 import '../../core/models/backend_booking_model.dart';
+import '../../core/models/user_account.dart';
+import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
@@ -43,11 +45,58 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
       _error = null;
     });
     final client = context.read<ApiClient>();
+    final session = context.read<SessionProvider>();
+    var workerId = session.account?.id.trim() ?? '';
+
+    if (workerId.isEmpty || session.account?.role != UserRole.technician) {
+      final profileError = await session.loadCurrentWorkerProfile();
+      if (!mounted) return;
+      if (profileError != null) {
+        setState(() {
+          _error = profileError;
+          _loading = false;
+        });
+        return;
+      }
+      workerId = session.account?.id.trim() ?? '';
+    }
+
+    if (workerId.isEmpty || session.account?.role != UserRole.technician) {
+      _logJobQueueDebug('Missing authenticated technician session.');
+      setState(() {
+        _error = 'Log in as a technician to view assigned jobs.';
+        _loading = false;
+      });
+      return;
+    }
+
+    _logJobQueueDebug('Authenticated worker id: $workerId');
+    _logJobQueueDebug(
+      'Booking query: GET /bookings/worker?limit=50&workerId=$workerId '
+      '(backend filters Booking.worker)',
+    );
+
     try {
-      final jobs = await BookingsApi(client).getWorkerBookings();
+      final jobs = await BookingsApi(client).getWorkerBookings(
+        workerId: workerId,
+      );
+      final assignedJobs =
+          jobs.where((job) => _isAssignedToWorker(job, workerId)).toList();
+      final hiddenCount = jobs.length - assignedJobs.length;
+      if (hiddenCount > 0) {
+        _logJobQueueDebug(
+          'Filtered out $hiddenCount booking(s) whose worker id did not '
+          'match $workerId.',
+        );
+      }
+      _logJobQueueDebug(
+        'Backend response count: ${jobs.length}; assigned count: '
+        '${assignedJobs.length}.',
+      );
       if (!mounted) return;
       setState(() {
-        _jobs = jobs;
+        _jobs = assignedJobs;
+        _tabIndex = _firstTabWithJobs(assignedJobs) ?? _tabIndex;
         _loading = false;
       });
     } catch (e) {
@@ -60,14 +109,28 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
   }
 
   List<BackendBooking> _jobsForTab(int tab) {
-    const statusMap = <int, String>{
-      0: 'pending',
-      1: 'accepted',
-      2: 'in_progress',
-      3: 'completed',
+    return _jobsForTabFrom(_jobs, tab);
+  }
+
+  List<BackendBooking> _jobsForTabFrom(List<BackendBooking> jobs, int tab) {
+    const statusMap = <int, Set<String>>{
+      0: <String>{'pending'},
+      1: <String>{'accepted', 'confirmed', 'scheduled'},
+      2: <String>{'in_progress', 'inprogress', 'active', 'started'},
+      3: <String>{'completed', 'done'},
     };
-    final status = statusMap[tab] ?? '';
-    return _jobs.where((j) => j.status == status).toList();
+    final statuses = statusMap[tab] ?? const <String>{};
+    return jobs
+        .where((job) => statuses.contains(_normalizedStatus(job.status)))
+        .toList();
+  }
+
+  int? _firstTabWithJobs(List<BackendBooking> jobs) {
+    if (_jobsForTabFrom(jobs, _tabIndex).isNotEmpty) return _tabIndex;
+    for (var index = 0; index < _tabs.length; index += 1) {
+      if (_jobsForTabFrom(jobs, index).isNotEmpty) return index;
+    }
+    return null;
   }
 
   Future<void> _updateJobStatus(String jobId, String status) async {
@@ -196,7 +259,9 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
                             if (filteredJobs.isEmpty) {
                               return Center(
                                 child: Text(
-                                  'No jobs in this category',
+                                  _jobs.isEmpty
+                                      ? 'No jobs assigned to you yet.'
+                                      : 'No ${_tabs[_tabIndex].toLowerCase()} jobs assigned to you.',
                                   style: Theme.of(context)
                                       .textTheme
                                       .bodyMedium
@@ -257,14 +322,20 @@ class _JobCard extends StatelessWidget {
   final VoidCallback? onDecline;
 
   ServioStatusChipType _chipType(String status) {
-    switch (status) {
+    switch (_normalizedStatus(status)) {
       case 'pending':
         return ServioStatusChipType.warning;
       case 'accepted':
+      case 'confirmed':
+      case 'scheduled':
         return ServioStatusChipType.info;
       case 'in_progress':
+      case 'inprogress':
+      case 'active':
+      case 'started':
         return ServioStatusChipType.info;
       case 'completed':
+      case 'done':
         return ServioStatusChipType.success;
       default:
         return ServioStatusChipType.warning;
@@ -272,14 +343,20 @@ class _JobCard extends StatelessWidget {
   }
 
   String _chipLabel(String status) {
-    switch (status) {
+    switch (_normalizedStatus(status)) {
       case 'pending':
         return 'Pending';
       case 'accepted':
+      case 'confirmed':
+      case 'scheduled':
         return 'Confirmed';
       case 'in_progress':
+      case 'inprogress':
+      case 'active':
+      case 'started':
         return 'In Progress';
       case 'completed':
+      case 'done':
         return 'Completed';
       case 'cancelled':
         return 'Cancelled';
@@ -389,4 +466,26 @@ class _JobCard extends StatelessWidget {
       ),
     );
   }
+}
+
+bool _isAssignedToWorker(BackendBooking job, String workerId) {
+  final bookingWorkerId = job.workerId.trim();
+  final matches = bookingWorkerId == workerId;
+  if (!matches) {
+    _logJobQueueDebug(
+      'Skipping booking ${job.id}: worker id "$bookingWorkerId" does not '
+      'match authenticated worker "$workerId".',
+    );
+  }
+  return matches;
+}
+
+String _normalizedStatus(String status) =>
+    status.trim().toLowerCase().replaceAll('-', '_');
+
+void _logJobQueueDebug(String message) {
+  assert(() {
+    debugPrint('[JobQueue] $message');
+    return true;
+  }());
 }

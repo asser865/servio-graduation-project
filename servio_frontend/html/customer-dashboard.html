@@ -452,416 +452,15 @@
     <p class="dash-panel__subtitle" data-i18n="cust_bookings_sub">Manage your upcoming and active service requests.</p>
   </div>
 
-  <div class="booking-filter-bar" data-reveal>
-    <button class="booking-filter-btn is-active" type="button" data-booking-filter="all" data-i18n="cust_filter_all">All</button>
-    <button class="booking-filter-btn" type="button" data-booking-filter="confirmed" data-i18n="cust_filter_active">Active</button>
-    <button class="booking-filter-btn" type="button" data-booking-filter="pending" data-i18n="cust_filter_pending">Pending</button>
-    <button class="booking-filter-btn" type="button" data-booking-filter="completed" data-i18n="cust_filter_completed">Completed</button>
+  <nav class="stab-bar" role="tablist" aria-label="Booking sections" id="bookings-stab-bar">
+    <button class="stab-btn stab-btn--active" role="tab" aria-selected="true" aria-controls="stab-bookings-active" data-stab="bookings-active">Active</button>
+    <button class="stab-btn" role="tab" aria-selected="false" aria-controls="stab-bookings-pending" data-stab="bookings-pending">Pending</button>
+  </nav>
+
+  <div class="stab-pane stab-pane--active" id="stab-bookings-active" role="tabpanel">
+    <div class="bookings-loading-state">Loading your bookings…</div>
   </div>
-
-  <p class="dash-section-title" data-reveal data-i18n="cust_active_upcoming">Active &amp; Upcoming</p>
-
-  <div class="booking-group__cards" data-reveal data-booking-group>
-      <!-- Card 1: Confirmed (Plumbing) -->
-      <div class="booking-card" data-booking-card data-booking-status="confirmed" data-booking-date="2024-03-15">
-        <div class="booking-card__inner">
-          <div class="booking-card__body">
-            <div class="booking-card__header">
-              <div class="booking-card__title-grp">
-                <div class="booking-card__service-row">
-                  <div class="booking-card__header-icon">
-                    <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"/>
-                      <path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"/>
-                    </svg>
-                  </div>
-                  <h3 class="booking-card__title" data-i18n="cust_booking_title_pipe_repair">Pipe Repair &amp; Maintenance</h3>
-                </div>
-                <div class="booking-card__provider-wrap">
-                  <img src="https://i.pravatar.cc/150?u=omar" alt="Omar" class="provider-avatar">
-                  <div class="booking-card__provider-info">
-                    <span class="provider-tech-label" data-i18n="cust_technician_label">Technician</span>
-                    <span class="provider-name">Omar Tarek</span>
-                  </div>
-                  <a href="./technician-profile.html" class="provider-view-profile" data-i18n="cust_view_profile">View Profile</a>
-                </div>
-              </div>
-              <span class="booking-card__status-badge" data-i18n="status_confirmed">Confirmed</span>
-            </div>
-
-            <div class="booking-card__grid">
-              <div class="booking-grid-box">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                <div>
-                  <span class="booking-grid-box__label" data-i18n="cust_service_date">Service Date</span>
-                  <span class="booking-grid-box__value">March 15, 2024</span>
-                </div>
-              </div>
-              <div class="booking-grid-box">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                <div>
-                  <span class="booking-grid-box__label" data-i18n="cust_time_slot">Time Slot</span>
-                  <span class="booking-grid-box__value">10:00 AM - 12:00 PM</span>
-                </div>
-              </div>
-              <div class="booking-grid-box booking-grid-box--full">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                <div>
-                  <span class="booking-grid-box__label" data-i18n="cust_service_address">Service Address</span>
-                  <span class="booking-grid-box__value">123 Nile Street, Maadi, Cairo</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="booking-card__progress-wrap">
-              <div class="tracking-status">
-                <div class="tracking-track">
-                  <div class="tracking-track-fill" style="width: 66%;"></div>
-                </div>
-                <div class="tracking-steps">
-                  <div class="tracking-step is-done">
-                    <div class="step-marker">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
-                    </div>
-                    <span class="step-label" data-i18n="cust_step_booked">Booked</span>
-                    <span class="step-time" data-i18n="timeline_2h_ago">2h ago</span>
-                  </div>
-                  <div class="tracking-step is-done">
-                    <div class="step-marker">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
-                    </div>
-                    <span class="step-label" data-i18n="cust_step_confirmed">Confirmed</span>
-                    <span class="step-time" data-i18n="timeline_1h_ago">1h ago</span>
-                  </div>
-                  <div class="tracking-step is-active">
-                    <div class="step-marker"></div>
-                    <span class="step-label" data-i18n="cust_step_enroute">En Route</span>
-                    <span class="step-time" data-i18n="timeline_now">Now</span>
-                  </div>
-                  <div class="tracking-step">
-                    <div class="step-marker"></div>
-                    <span class="step-label" data-i18n="cust_step_completed">Completed</span>
-                    <span class="step-time"></span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="booking-card__sidebar">
-            <div class="sidebar-box">
-              <div class="sidebar-box__header">
-                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                <span data-i18n="cust_arrival_pin">Arrival PIN</span>
-              </div>
-              <div class="pin-code">
-                <span class="pin-code__digit">2</span>
-                <span class="pin-code__digit">9</span>
-                <span class="pin-code__digit">1</span>
-                <span class="pin-code__digit">6</span>
-              </div>
-            </div>
-            <div class="sidebar-box sidebar-box--amount">
-              <div class="sidebar-box__header">
-                <span data-i18n="cust_total_amount">Total Amount</span>
-              </div>
-              <div class="price-display">
-                <span class="price-display__value">500.00</span>
-                <span class="price-display__currency">EGP</span>
-              </div>
-            </div>
-            <div class="booking-card__actions">
-              <a href="./booking-details.html" class="btn btn--view-details btn--full" data-i18n="cust_view_details">View Details</a>
-              <button class="btn btn--invoice btn--full" type="button" data-invoice-toggle data-i18n="cust_view_invoice">View Invoice</button>
-              <a href="./messages.html" class="btn btn--chat btn--full" data-i18n="cust_chat_tech">Chat with Technician</a>
-              <button class="btn btn--cancel btn--full" type="button" data-cancel-booking data-i18n="cust_cancel">Cancel</button>
-            </div>
-          </div>
-        </div>
-        <!-- Collapsible Invoice Section -->
-        <div class="booking-card__invoice-panel">
-          <div class="invoice-content">
-            <h4 class="invoice-content__title" data-i18n="cust_invoice_breakdown">Service Invoice Breakdown</h4>
-            <div class="invoice-table">
-              <div class="invoice-table__row"><span data-i18n="cust_invoice_pipe_ins">Pipe Inspection</span><span>250.00 EGP</span></div>
-              <div class="invoice-table__row"><span data-i18n="cust_invoice_leak_rep">Leak Repair</span><span>150.00 EGP</span></div>
-              <div class="invoice-table__row"><span data-i18n="cust_invoice_parts">Parts & Materials</span><span>100.00 EGP</span></div>
-              <div class="invoice-table__row is-total"><span data-i18n="cust_grand_total">Grand Total</span><span>500.00 EGP</span></div>
-            </div>
-            <div class="booking-card__invoice-footer">
-              <p><span data-i18n="cust_payment_method">Payment Method</span>: <strong data-i18n="cust_pay_card_visa">Credit Card (Ending 4242)</strong></p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Card 2: In-Progress (Electrical) -->
-      <div class="booking-card" data-booking-card data-booking-status="pending" data-booking-date="2024-03-18">
-        <div class="booking-card__inner">
-          <div class="booking-card__body">
-            <div class="booking-card__header">
-              <div class="booking-card__title-grp">
-                <div class="booking-card__service-row">
-                  <div class="booking-card__header-icon">
-                    <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>
-                    </svg>
-                  </div>
-                  <h3 class="booking-card__title" data-i18n="cust_booking_title_elec_inspection">Electrical Panel Inspection</h3>
-                </div>
-                <div class="booking-card__provider-wrap">
-                  <img src="https://i.pravatar.cc/150?u=khaled" alt="Khaled" class="provider-avatar">
-                  <div class="booking-card__provider-info">
-                    <span class="provider-tech-label" data-i18n="cust_technician_label">Technician</span>
-                    <span class="provider-name">Khaled Samir</span>
-                  </div>
-                  <a href="./technician-profile.html" class="provider-view-profile" data-i18n="cust_view_profile">View Profile</a>
-                </div>
-              </div>
-              <span class="booking-card__status-badge" style="background:rgba(180,160,50,0.1); color:#eab308; border-color:#eab308;" data-i18n="status_in_progress">In Progress</span>
-            </div>
-
-            <div class="booking-card__grid">
-              <div class="booking-grid-box">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                <div>
-                  <span class="booking-grid-box__label" data-i18n="cust_service_date">Service Date</span>
-                  <span class="booking-grid-box__value">March 18, 2024</span>
-                </div>
-              </div>
-              <div class="booking-grid-box">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                <div>
-                  <span class="booking-grid-box__label" data-i18n="cust_time_slot">Time Slot</span>
-                  <span class="booking-grid-box__value">2:00 PM - 4:00 PM</span>
-                </div>
-              </div>
-              <div class="booking-grid-box booking-grid-box--full">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                <div>
-                  <span class="booking-grid-box__label" data-i18n="cust_service_address">Service Address</span>
-                  <span class="booking-grid-box__value">456 Pyramids View Street, Giza</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="booking-card__progress-wrap">
-              <div class="tracking-status">
-                <div class="tracking-track">
-                  <div class="tracking-track-fill" style="width: 100%;"></div>
-                </div>
-                <div class="tracking-steps">
-                  <div class="tracking-step is-done">
-                    <div class="step-marker">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
-                    </div>
-                    <span class="step-label" data-i18n="cust_step_booked">Booked</span>
-                    <span class="step-time" data-i18n="timeline_4h_ago">4h ago</span>
-                  </div>
-                  <div class="tracking-step is-done">
-                    <div class="step-marker">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
-                    </div>
-                    <span class="step-label" data-i18n="cust_step_confirmed">Confirmed</span>
-                    <span class="step-time" data-i18n="timeline_3h_ago">3h ago</span>
-                  </div>
-                  <div class="tracking-step is-done">
-                    <div class="step-marker">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
-                    </div>
-                    <span class="step-label" data-i18n="cust_step_enroute">En Route</span>
-                    <span class="step-time">1h ago</span>
-                  </div>
-                  <div class="tracking-step is-active">
-                    <div class="step-marker"></div>
-                    <span class="step-label" data-i18n="cust_step_completed">Completed</span>
-                    <span class="step-time">In Progress</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="booking-card__sidebar">
-            <div class="sidebar-box">
-              <div class="sidebar-box__header">
-                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                <span data-i18n="cust_arrival_pin">Arrival PIN</span>
-              </div>
-              <div class="pin-code">
-                <span class="pin-code__digit">7</span>
-                <span class="pin-code__digit">3</span>
-                <span class="pin-code__digit">6</span>
-                <span class="pin-code__digit">4</span>
-              </div>
-            </div>
-            <div class="sidebar-box sidebar-box--amount">
-              <div class="sidebar-box__header">
-                <span data-i18n="cust_total_amount">Total Amount</span>
-              </div>
-              <div class="price-display">
-                <span class="price-display__value">900.00</span>
-                <span class="price-display__currency">EGP</span>
-              </div>
-            </div>
-            <div class="booking-card__actions">
-              <a href="./booking-details.html" class="btn btn--view-details btn--full" data-i18n="cust_view_details">View Details</a>
-              <button class="btn btn--invoice btn--full" type="button" data-invoice-toggle data-i18n="cust_view_invoice">View Invoice</button>
-              <a href="./messages.html" class="btn btn--chat btn--full" data-i18n="cust_chat_tech">Chat with Technician</a>
-              <button class="btn btn--cancel btn--full" type="button" data-cancel-booking data-i18n="cust_cancel">Cancel</button>
-            </div>
-          </div>
-        </div>
-        <!-- Collapsible Invoice Section -->
-        <div class="booking-card__invoice-panel">
-          <div class="invoice-content">
-            <h4 class="invoice-content__title" data-i18n="cust_invoice_breakdown">Service Invoice Breakdown</h4>
-            <div class="invoice-table">
-              <div class="invoice-table__row"><span data-i18n="cust_invoice_panel_ins">Panel Inspection</span><span>400.00 EGP</span></div>
-              <div class="invoice-table__row"><span data-i18n="cust_invoice_wiring">Wiring Optimization</span><span>500.00 EGP</span></div>
-              <div class="invoice-table__row is-total"><span data-i18n="cust_grand_total">Grand Total</span><span>900.00 EGP</span></div>
-            </div>
-            <div class="booking-card__invoice-footer">
-              <p><span data-i18n="cust_payment_method">Payment Method</span>: <strong data-i18n="cust_pay_cash_arrival">Cash on Arrival</strong></p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Card 3: Pending/Confirmed (AC Maintenance) -->
-      <div class="booking-card" data-booking-card data-booking-status="confirmed" data-booking-date="2024-03-22">
-        <div class="booking-card__inner">
-          <div class="booking-card__body">
-            <div class="booking-card__header">
-              <div class="booking-card__title-grp">
-                <div class="booking-card__service-row">
-                  <div class="booking-card__header-icon">
-                    <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M2 12h20"/>
-                      <path d="M12 2v20"/>
-                      <path d="m20 16-4-4 4-4"/>
-                      <path d="m4 8 4 4-4 4"/>
-                      <path d="m16 4-4 4-4-4"/>
-                      <path d="m8 20 4-4 4 4"/>
-                    </svg>
-                  </div>
-                  <h3 class="booking-card__title" data-i18n="cust_booking_title_ac_cleaning">Central AC Deep Cleaning</h3>
-                </div>
-                <div class="booking-card__provider-wrap">
-                  <img src="https://i.pravatar.cc/150?u=sara" alt="Sara" class="provider-avatar">
-                  <div class="booking-card__provider-info">
-                    <span class="provider-tech-label" data-i18n="cust_technician_label">Technician</span>
-                    <span class="provider-name">Sara Mahmoud</span>
-                  </div>
-                  <a href="./technician-profile.html" class="provider-view-profile" data-i18n="cust_view_profile">View Profile</a>
-                </div>
-              </div>
-              <span class="booking-card__status-badge" data-i18n="status_confirmed">Confirmed</span>
-            </div>
-
-            <div class="booking-card__grid">
-              <div class="booking-grid-box">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                <div>
-                  <span class="booking-grid-box__label" data-i18n="cust_service_date">Service Date</span>
-                  <span class="booking-grid-box__value">March 22, 2024</span>
-                </div>
-              </div>
-              <div class="booking-grid-box">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                <div>
-                  <span class="booking-grid-box__label" data-i18n="cust_time_slot">Time Slot</span>
-                  <span class="booking-grid-box__value">11:00 AM - 1:00 PM</span>
-                </div>
-              </div>
-              <div class="booking-grid-box booking-grid-box--full">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                <div>
-                  <span class="booking-grid-box__label" data-i18n="cust_service_address">Service Address</span>
-                  <span class="booking-grid-box__value">789 Heliopolis Heights, Cairo</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="booking-card__progress-wrap">
-              <div class="tracking-status">
-                <div class="tracking-track">
-                  <div class="tracking-track-fill" style="width: 33%;"></div>
-                </div>
-                <div class="tracking-steps">
-                  <div class="tracking-step is-done">
-                    <div class="step-marker">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
-                    </div>
-                    <span class="step-label" data-i18n="cust_step_booked">Booked</span>
-                    <span class="step-time" data-i18n="cust_notif_time_yesterday">Yesterday</span>
-                  </div>
-                  <div class="tracking-step is-active">
-                    <div class="step-marker"></div>
-                    <span class="step-label" data-i18n="cust_step_confirmed">Confirmed</span>
-                    <span class="step-time" data-i18n="timeline_just_now">Just Now</span>
-                  </div>
-                  <div class="tracking-step">
-                    <div class="step-marker"></div>
-                    <span class="step-label" data-i18n="cust_step_enroute">En Route</span>
-                    <span class="step-time"></span>
-                  </div>
-                  <div class="tracking-step">
-                    <div class="step-marker"></div>
-                    <span class="step-label" data-i18n="cust_step_completed">Completed</span>
-                    <span class="step-time"></span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="booking-card__sidebar">
-            <div class="sidebar-box">
-              <div class="sidebar-box__header">
-                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                <span data-i18n="cust_arrival_pin">Arrival PIN</span>
-              </div>
-              <div class="pin-code">
-                <span class="pin-code__digit">1</span>
-                <span class="pin-code__digit">0</span>
-                <span class="pin-code__digit">4</span>
-                <span class="pin-code__digit">7</span>
-              </div>
-            </div>
-            <div class="sidebar-box sidebar-box--amount">
-              <div class="sidebar-box__header">
-                <span data-i18n="cust_total_amount">Total Amount</span>
-              </div>
-              <div class="price-display">
-                <span class="price-display__value">1,200</span>
-                <span class="price-display__currency">EGP</span>
-              </div>
-            </div>
-            <div class="booking-card__actions">
-              <a href="./booking-details.html" class="btn btn--view-details btn--full" data-i18n="cust_view_details">View Details</a>
-              <button class="btn btn--invoice btn--full" type="button" data-invoice-toggle data-i18n="cust_view_invoice">View Invoice</button>
-              <a href="./messages.html" class="btn btn--chat btn--full" data-i18n="cust_chat_tech">Chat with Technician</a>
-              <button class="btn btn--cancel btn--full" type="button" data-cancel-booking data-i18n="cust_cancel">Cancel</button>
-            </div>
-          </div>
-        </div>
-        <!-- Collapsible Invoice Section -->
-        <div class="booking-card__invoice-panel">
-          <div class="invoice-content">
-            <h4 class="invoice-content__title" data-i18n="cust_invoice_breakdown">Service Invoice Breakdown</h4>
-            <div class="invoice-table">
-              <div class="invoice-table__row"><span data-i18n="cust_invoice_ac_clean">Deep Cleaning Base</span><span>800.00 EGP</span></div>
-              <div class="invoice-table__row"><span data-i18n="cust_invoice_filter">Filter Replacement</span><span>400.00 EGP</span></div>
-              <div class="invoice-table__row is-total"><span data-i18n="cust_grand_total">Grand Total</span><span>1,200.00 EGP</span></div>
-            </div>
-            <div class="booking-card__invoice-footer">
-              <p><span data-i18n="cust_payment_method">Payment Method</span>: <strong data-i18n="cust_pay_wallet">SERVIO Wallet</strong></p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+  <div class="stab-pane" id="stab-bookings-pending" role="tabpanel" hidden></div>
 </section>
 
         <!-- History panel -->
@@ -874,15 +473,15 @@
   <!-- History Stats -->
   <div class="history-stats reveal">
     <div class="history-stat-card">
-      <span class="history-stat-card__value">12</span>
+      <span class="history-stat-card__value" id="histStatCount">—</span>
       <span class="history-stat-card__label" data-i18n="cust_hist_bookings_done">Bookings Completed</span>
     </div>
     <div class="history-stat-card">
-      <span class="history-stat-card__value">4,250 EGP</span>
+      <span class="history-stat-card__value" id="histStatSpent">—</span>
       <span class="history-stat-card__label" data-i18n="cust_hist_amount_spent">Total Amount Spent</span>
     </div>
     <div class="history-stat-card">
-      <span class="history-stat-card__value" data-i18n="cust_hist_top_svc_val">Plumbing</span>
+      <span class="history-stat-card__value" id="histStatTopCategory" data-i18n="cust_hist_top_svc_val">—</span>
       <span class="history-stat-card__label" data-i18n="cust_hist_most_used">Most Used Service</span>
     </div>
   </div>
@@ -917,251 +516,9 @@
   </div>
 
   <div class="history-card-items-list" id="historyListRoot" data-reveal>
-    
-    <!-- Card #S-2847 -->
-    <article class="history-card-v2" data-category="Plumbing" data-payment="Credit Card" data-date="2026-03-15" data-rating="5">
-      <div class="history-v2__main">
-        <div class="history-v2__icon">🔧</div>
-        <div class="history-v2__info">
-          <h4 class="history-v2__title"><span data-i18n="cust_hist_cat_plumb">Plumbing</span> <small class="history-v2__id">#S-2847</small></h4>
-          <p class="history-v2__provider"><span data-i18n="cust_hist_tech_khaled">Khaled Mohamed</span> <span class="dot-sep"></span> <span data-i18n="cust_hist_date_mar15">15 Mar 2026</span></p>
-        </div>
-      </div>
-      <div class="history-v2__meta">
-        <span class="history-v2__payment-badge" data-i18n="cust_pay_card">Credit Card</span>
-        <div class="history-v2__price" data-i18n="cust_hist_price_650">650 EGP</div>
-      </div>
-      <div class="history-v2__actions">
-        <button class="btn btn--sm btn--outline" data-invoice-toggle data-i18n="cust_view_invoice">View Invoice</button>
-        <a href="./booking.html" class="btn btn--sm btn--primary" data-i18n="cust_rebook">Re-book</a>
-      </div>
-
-      <div class="history-v2__expanded">
-        <div class="invoice-grid">
-           <div class="invoice-breakdown">
-              <h5 class="invoice-breakdown__title" data-i18n="cust_cost_breakdown">Cost Breakdown</h5>
-              <div class="invoice-item"><span data-i18n="cust_hist_callout">Standard Call-out</span> <span data-i18n="cust_hist_price_300">300 EGP</span></div>
-              <div class="invoice-item"><span data-i18n="cust_hist_sealant">Pipe Sealant Replacement</span> <span data-i18n="cust_hist_price_250">250 EGP</span></div>
-              <div class="invoice-item"><span data-i18n="cust_hist_vat_14">VAT (14%)</span> <span data-i18n="cust_hist_price_100">100 EGP</span></div>
-              <div class="invoice-item is-total"><span data-i18n="cust_total_paid">Total Paid</span> <span data-i18n="cust_hist_price_650">650 EGP</span></div>
-           </div>
-           <div class="invoice-details">
-              <h5 class="invoice-breakdown__title" data-i18n="cust_trans_verified">Transaction Verified</h5>
-              <div class="payment-method-footer">
-                 <div class="payment-method-box">
-                    <span class="payment-method-box__icon">💳</span>
-                    <div class="payment-method-box__details">
-                       <span data-i18n="cust_hist_paid_visa">Paid with Visa</span>
-                       <small class="card-number">**** 4242</small>
-                    </div>
-                 </div>
-                 <button class="btn-download-receipt">📥 Download PDF</button>
-              </div>
-           </div>
-        </div>
-      </div>
-    </article>
-
-    <!-- Card #S-2779 -->
-    <article class="history-card-v2" data-category="HVAC" data-payment="Credit Card" data-date="2026-03-10" data-rating="5">
-      <div class="history-v2__main">
-        <div class="history-v2__icon">❄️</div>
-        <div class="history-v2__info">
-          <h4 class="history-v2__title"><span data-i18n="cust_hist_cat_hvac">A/C Maintenance</span> <small class="history-v2__id">#S-2779</small></h4>
-          <p class="history-v2__provider"><span data-i18n="cust_hist_tech_hassan">Hassan Ali</span> <span class="dot-sep"></span> <span data-i18n="cust_hist_date_mar10">10 Mar 2026</span></p>
-        </div>
-      </div>
-      <div class="history-v2__meta">
-        <span class="history-v2__payment-badge" data-i18n="cust_pay_card">Credit Card</span>
-        <div class="history-v2__price" data-i18n="cust_hist_price_1100">1,100 EGP</div>
-      </div>
-      <div class="history-v2__actions">
-        <button class="btn btn--sm btn--outline" data-invoice-toggle data-i18n="cust_view_invoice">View Invoice</button>
-        <a href="./booking.html" class="btn btn--sm btn--primary" data-i18n="cust_rebook">Re-book</a>
-      </div>
-
-      <div class="history-v2__expanded">
-        <div class="invoice-grid">
-           <div class="invoice-breakdown">
-              <h5 class="invoice-breakdown__title" data-i18n="cust_cost_breakdown">Cost Breakdown</h5>
-              <div class="invoice-item"><span data-i18n="cust_hist_ac_clean">A/C Unit Cleaning</span> <span data-i18n="cust_hist_price_700">700 EGP</span></div>
-              <div class="invoice-item"><span data-i18n="cust_hist_gas_refill">Gas Refill</span> <span data-i18n="cust_hist_price_400">400 EGP</span></div>
-              <div class="invoice-item is-total"><span data-i18n="cust_total_paid">Total Paid</span> <span data-i18n="cust_hist_price_1100">1,100 EGP</span></div>
-           </div>
-           <div class="invoice-details">
-              <h5 class="invoice-breakdown__title" data-i18n="cust_trans_verified">Transaction Verified</h5>
-              <div class="payment-method-footer">
-                 <div class="payment-method-box">
-                    <span class="payment-method-box__icon">💳</span>
-                    <div class="payment-method-box__details">
-                       <span data-i18n="cust_hist_paid_master">Paid with Mastercard</span>
-                       <small class="card-number">**** 8890</small>
-                    </div>
-                 </div>
-                 <button class="btn-download-receipt">📥 Download PDF</button>
-              </div>
-           </div>
-        </div>
-      </div>
-    </article>
-
-    <!-- Card #S-2831 -->
-    <article class="history-card-v2" data-category="Carpentry" data-payment="Cash" data-date="2026-03-05" data-rating="4">
-      <div class="history-v2__main">
-        <div class="history-v2__icon">🪚</div>
-        <div class="history-v2__info">
-          <h4 class="history-v2__title"><span data-i18n="cust_hist_cat_carp">Carpentry</span> <small class="history-v2__id">#S-2831</small></h4>
-          <p class="history-v2__provider"><span data-i18n="cust_hist_tech_youssef_s">Youssef Samir</span> <span class="dot-sep"></span> <span data-i18n="cust_hist_date_mar05">05 Mar 2026</span></p>
-        </div>
-      </div>
-      <div class="history-v2__meta">
-        <span class="history-v2__payment-badge" data-i18n="cust_pay_cash">Cash</span>
-        <div class="history-v2__price" data-i18n="cust_hist_price_750">750 EGP</div>
-      </div>
-      <div class="history-v2__actions">
-        <button class="btn btn--sm btn--outline" data-invoice-toggle data-i18n="cust_view_invoice">View Invoice</button>
-        <a href="./booking.html" class="btn btn--sm btn--primary" data-i18n="cust_rebook">Re-book</a>
-      </div>
-
-      <div class="history-v2__expanded">
-        <div class="invoice-grid">
-           <div class="invoice-breakdown">
-              <h5 class="invoice-breakdown__title" data-i18n="cust_cost_breakdown">Cost Breakdown</h5>
-              <div class="invoice-item"><span data-i18n="cust_hist_furn_assembly">Furniture Assembly</span> <span data-i18n="cust_hist_price_600">600 EGP</span></div>
-              <div class="invoice-item"><span data-i18n="cust_hist_materials">Materials Fee</span> <span data-i18n="cust_hist_price_150">150 EGP</span></div>
-              <div class="invoice-item is-total"><span data-i18n="cust_total_paid">Total Paid</span> <span data-i18n="cust_hist_price_750">750 EGP</span></div>
-           </div>
-           <div class="invoice-details">
-              <h5 class="invoice-breakdown__title" data-i18n="cust_pay_collected">Payment Collected</h5>
-              <div class="payment-method-footer">
-                 <div class="payment-method-box">
-                    <span>💵</span>
-                    <p><span data-i18n="cust_hist_paid_cash">Paid with Cash</span><br><small data-i18n="cust_hist_direct_tech">Direct to Tech</small></p>
-                 </div>
-                 <button class="btn-download-receipt">📥 Download PDF</button>
-              </div>
-           </div>
-        </div>
-      </div>
-    </article>
-
-    <!-- Card #S-2804 -->
-    <article class="history-card-v2" data-category="Painting" data-payment="Cash" data-date="2026-03-10" data-rating="5">
-      <div class="history-v2__main">
-        <div class="history-v2__icon">🎨</div>
-        <div class="history-v2__info">
-          <h4 class="history-v2__title"><span data-i18n="cust_hist_cat_paint">Interior Painting</span> <small class="history-v2__id">#S-2804</small></h4>
-          <p class="history-v2__provider"><span data-i18n="cust_hist_tech_youssef_a">Youssef Ali</span> <span class="dot-sep"></span> <span data-i18n="cust_hist_date_mar10">10 Mar 2026</span></p>
-        </div>
-      </div>
-      <div class="history-v2__meta">
-        <span class="history-v2__payment-badge" data-i18n="cust_pay_cash">Cash</span>
-        <div class="history-v2__price" data-i18n="cust_hist_price_1800">1,800 EGP</div>
-      </div>
-      <div class="history-v2__actions">
-        <button class="btn btn--sm btn--outline" data-invoice-toggle data-i18n="cust_view_invoice">View Invoice</button>
-        <a href="./booking.html" class="btn btn--sm btn--primary" data-i18n="cust_rebook">Re-book</a>
-      </div>
-
-      <div class="history-v2__expanded">
-        <div class="invoice-grid">
-           <div class="invoice-breakdown">
-              <h5 class="invoice-breakdown__title" data-i18n="cust_cost_breakdown">Cost Breakdown</h5>
-              <div class="invoice-item"><span data-i18n="cust_hist_room_paint">Single Room Paint</span> <span data-i18n="cust_hist_price_1200">1,200 EGP</span></div>
-              <div class="invoice-item"><span data-i18n="cust_hist_materials_colors">Materials & Colors</span> <span data-i18n="cust_hist_price_600">600 EGP</span></div>
-              <div class="invoice-item is-total"><span data-i18n="cust_total_paid">Total Paid</span> <span data-i18n="cust_hist_price_1800">1,800 EGP</span></div>
-           </div>
-           <div class="invoice-details">
-              <h5 class="invoice-breakdown__title" data-i18n="cust_pay_collected">Payment Collected</h5>
-              <div class="payment-method-footer">
-                 <div class="payment-method-box">
-                    <span>💵</span>
-                    <p><span data-i18n="cust_hist_paid_cash_v2">Paid with Cash</span><br><small data-i18n="cust_hist_direct_tech">Direct to Tech</small></p>
-                 </div>
-                 <button class="btn-download-receipt">📥 Download PDF</button>
-              </div>
-           </div>
-        </div>
-      </div>
-    </article>
-
-    <!-- Card #S-2801 -->
-    <article class="history-card-v2" data-category="Cleaning" data-payment="Cash" data-date="2026-03-01" data-rating="5">
-      <div class="history-v2__main">
-        <div class="history-v2__icon">🧹</div>
-        <div class="history-v2__info">
-          <h4 class="history-v2__title"><span data-i18n="cust_hist_cat_clean">Deep Cleaning</span> <small class="history-v2__id">#S-2801</small></h4>
-          <p class="history-v2__provider"><span data-i18n="cust_hist_tech_nour">Nour Cleaning</span> <span class="dot-sep"></span> <span data-i18n="cust_hist_date_mar01">01 Mar 2026</span></p>
-        </div>
-      </div>
-      <div class="history-v2__meta">
-        <span class="history-v2__payment-badge" data-i18n="cust_pay_cash">Cash</span>
-        <div class="history-v2__price" data-i18n="cust_hist_price_450">450 EGP</div>
-      </div>
-      <div class="history-v2__actions">
-        <button class="btn btn--sm btn--outline" data-invoice-toggle data-i18n="cust_view_invoice">View Invoice</button>
-        <a href="./booking.html" class="btn btn--sm btn--primary" data-i18n="cust_rebook">Re-book</a>
-      </div>
-
-      <div class="history-v2__expanded">
-        <div class="invoice-grid">
-           <div class="invoice-breakdown">
-              <h5 class="invoice-breakdown__title" data-i18n="cust_cost_breakdown">Cost Breakdown</h5>
-              <div class="invoice-item"><span data-i18n="cust_hist_deep_clean">Deep House Cleaning</span> <span data-i18n="cust_hist_price_450">450 EGP</span></div>
-              <div class="invoice-item is-total"><span data-i18n="cust_total_paid">Total Paid</span> <span data-i18n="cust_hist_price_450">450 EGP</span></div>
-           </div>
-           <div class="invoice-details">
-              <h5 class="invoice-breakdown__title" data-i18n="cust_pay_collected">Payment Collected</h5>
-              <div class="payment-method-footer">
-                 <div class="payment-method-box">
-                    <span>💵</span>
-                    <p><span data-i18n="cust_hist_paid_cash_v2">Paid with Cash</span><br><small data-i18n="cust_hist_direct_tech">Direct to Tech</small></p>
-                 </div>
-                 <button class="btn-download-receipt">📥 Download PDF</button>
-              </div>
-           </div>
-        </div>
-      </div>
-    </article>
-
-    <!-- Card #S-2785 -->
-    <article class="history-card-v2" data-category="Plumbing" data-payment="Credit Card" data-date="2026-02-12" data-rating="5">
-      <div class="history-v2__main">
-        <div class="history-v2__icon">🔧</div>
-        <div class="history-v2__info">
-          <h4 class="history-v2__title"><span data-i18n="cust_hist_cat_plumb">Plumbing</span> <small class="history-v2__id">#S-2785</small></h4>
-          <p class="history-v2__provider"><span data-i18n="cust_hist_tech_mohamed_a">Mohamed Ali</span> <span class="dot-sep"></span> <span data-i18n="cust_hist_date_feb12">12 Feb 2026</span></p>
-        </div>
-      </div>
-      <div class="history-v2__meta">
-        <span class="history-v2__payment-badge" data-i18n="cust_pay_card">Credit Card</span>
-        <div class="history-v2__price" data-i18n="cust_hist_price_250">250 EGP</div>
-      </div>
-      <div class="history-v2__actions">
-        <button class="btn btn--sm btn--outline" data-invoice-toggle data-i18n="cust_view_invoice">View Invoice</button>
-        <a href="./booking.html" class="btn btn--sm btn--primary" data-i18n="cust_rebook">Re-book</a>
-      </div>
-
-      <div class="history-v2__expanded">
-        <div class="invoice-grid">
-           <div class="invoice-breakdown">
-              <h5 class="invoice-breakdown__title" data-i18n="cust_cost_breakdown">Cost Breakdown</h5>
-              <div class="invoice-item"><span>Emergency Leak Fix</span> <span>250 EGP</span></div>
-              <div class="invoice-item is-total"><span data-i18n="cust_total_paid">Total Paid</span> <span>250 EGP</span></div>
-           </div>
-           <div class="invoice-details">
-              <h5 class="invoice-breakdown__title">Transaction Verified</h5>
-              <div class="payment-method-footer">
-                 <div class="payment-method-box">
-                    <span>💳</span>
-                    <p>Paid with Visa<br><small>**** 1122</small></p>
-                 </div>
-                 <button class="btn-download-receipt">📥 Download PDF</button>
-              </div>
-           </div>
-        </div>
-      </div>
-    </article>
+    <div class="history-empty-state" hidden>
+      <p>No completed bookings yet.</p>
+    </div>
   </div>
 </section>
 
@@ -1236,48 +593,9 @@
     </div>
   </div>
 
-  <p class="notif-category-label" data-i18n="cust_nav_bookings">Bookings</p>
-
-  <div class="notif-card-v2 is-unread" data-reveal>
-    <div class="notif-card-v2__icon notif-card-v2__icon--booking">
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#22A05A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
-    </div>
-    <div class="notif-card-v2__body">
-      <p class="notif-card-v2__title" data-i18n="cust_notif_title_booking_conf">Booking Confirmed</p>
-      <p class="notif-card-v2__desc" data-i18n="cust_notif_desc_booking_conf">Your Plumbing — Pipe Repair with Omar Tarek on 25 Mar has been confirmed.</p>
-      <div class="notif-card-v2__actions">
-        <button class="btn btn--sm" type="button" data-tab-link="bookings" data-i18n="cust_view_booking">View Booking</button>
-        <button class="btn btn--sm btn--danger-ghost" type="button" data-i18n="cust_dismiss">Dismiss</button>
-      </div>
-      <p class="notif-card-v2__time" data-i18n="cust_notif_time_2h">2 hours ago</p>
-    </div>
-  </div>
-
-  <div class="notif-card-v2" data-reveal>
-    <div class="notif-card-v2__icon notif-card-v2__icon--info">
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#6E56CF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-    </div>
-    <div class="notif-card-v2__body">
-      <p class="notif-card-v2__title" data-i18n="cust_notif_title_tech_assigned">Technician Assigned</p>
-      <p class="notif-card-v2__desc" data-i18n="cust_notif_desc_tech_assigned">Khaled Samir has been assigned to your Electrical — Wiring Check on 28 Mar.</p>
-      <div class="notif-card-v2__actions">
-        <button class="btn btn--sm" type="button" data-tab-link="bookings" data-i18n="cust_view_booking">View Booking</button>
-        <button class="btn btn--sm btn--danger-ghost" type="button" data-i18n="cust_dismiss">Dismiss</button>
-      </div>
-      <p class="notif-card-v2__time" data-i18n="cust_notif_time_yesterday">Yesterday</p>
-    </div>
-  </div>
-
-  <p class="notif-category-label" style="margin-top:24px;" data-i18n="cust_notif_cat_account">Account</p>
-
-  <div class="notif-card-v2" data-reveal>
-    <div class="notif-card-v2__icon notif-card-v2__icon--system">
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#9A8C73" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M5.34 17.66l-1.41 1.41M21 12h-2M5 12H3M18.36 18.36l-1.41-1.41M7.05 7.05L5.64 5.64M12 3V1M12 21v2"/></svg>
-    </div>
-    <div class="notif-card-v2__body">
-      <p class="notif-card-v2__title" data-i18n="cust_notif_title_profile_upd">Profile Updated</p>
-      <p class="notif-card-v2__desc" data-i18n="cust_notif_desc_profile_upd">Your profile information was updated successfully.</p>
-      <p class="notif-card-v2__time" data-i18n="cust_notif_time_3d">3 days ago</p>
+  <div id="notif-list">
+    <div class="notif-empty-state" hidden>
+      <p>No notifications yet.</p>
     </div>
   </div>
 
@@ -1301,6 +619,14 @@
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
       <span data-i18n="cust_stab_security">Security</span>
     </button>
+    <button class="stab-btn" role="tab" aria-selected="false" aria-controls="stab-addresses" data-stab="addresses" id="stab-btn-addresses">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+      <span data-i18n="cust_stab_addresses">Addresses</span>
+    </button>
+    <button class="stab-btn" role="tab" aria-selected="false" aria-controls="stab-payment-methods" data-stab="payment-methods" id="stab-btn-payment-methods">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+      <span>Payment Methods</span>
+    </button>
     <button class="stab-btn" role="tab" aria-selected="false" aria-controls="stab-notifications" data-stab="notifications" id="stab-btn-notifications">
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
       <span data-i18n="cust_stab_notifications">Notifications</span>
@@ -1308,14 +634,6 @@
     <button class="stab-btn" role="tab" aria-selected="false" aria-controls="stab-language" data-stab="language" id="stab-btn-language">
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
       <span data-i18n="cust_stab_language">Language</span>
-    </button>
-    <button class="stab-btn" role="tab" aria-selected="false" aria-controls="stab-appearance" data-stab="appearance" id="stab-btn-appearance">
-      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-      <span data-i18n="cust_stab_appearance">Appearance</span>
-    </button>
-    <button class="stab-btn" role="tab" aria-selected="false" aria-controls="stab-addresses" data-stab="addresses" id="stab-btn-addresses">
-      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-      <span data-i18n="cust_stab_addresses">Addresses</span>
     </button>
     <button class="stab-btn" role="tab" aria-selected="false" aria-controls="stab-account" data-stab="account" id="stab-btn-account">
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
@@ -1738,57 +1056,6 @@
 
   </div><!-- /stab-language -->
 
-  <!-- ══════════════════════════════════════════
-       TAB 5 — APPEARANCE
-  ══════════════════════════════════════════ -->
-  <div class="stab-pane" id="stab-appearance" role="tabpanel" aria-labelledby="stab-btn-appearance" hidden>
-
-    <div class="settings-section">
-      <h2 class="settings-section__heading">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-        <span data-i18n="cust_appearance_title">Appearance</span>
-      </h2>
-      <p class="settings-section__desc" data-i18n="cust_appearance_desc">Choose how SERVIO looks for you. Your preference is saved on this device.</p>
-
-      <div class="theme-cards" role="radiogroup" aria-label="Theme selection" id="theme-cards">
-        <button type="button" class="theme-card" data-theme-choice="light" role="radio" aria-checked="false" id="theme-card-light">
-          <div class="theme-card__preview theme-card__preview--light">
-            <div class="thp-bar"></div>
-            <div class="thp-content">
-              <div class="thp-line thp-line--lg"></div>
-              <div class="thp-line thp-line--sm"></div>
-            </div>
-          </div>
-          <span class="theme-card__label" data-i18n="cust_theme_light">Light</span>
-          <svg class="theme-card__check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
-        </button>
-        <button type="button" class="theme-card" data-theme-choice="dark" role="radio" aria-checked="false" id="theme-card-dark">
-          <div class="theme-card__preview theme-card__preview--dark">
-            <div class="thp-bar"></div>
-            <div class="thp-content">
-              <div class="thp-line thp-line--lg"></div>
-              <div class="thp-line thp-line--sm"></div>
-            </div>
-          </div>
-          <span class="theme-card__label" data-i18n="cust_theme_dark">Dark</span>
-          <svg class="theme-card__check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
-        </button>
-        <button type="button" class="theme-card" data-theme-choice="system" role="radio" aria-checked="false" id="theme-card-system">
-          <div class="theme-card__preview theme-card__preview--system">
-            <div class="thp-half thp-half--light">
-              <div class="thp-bar"></div>
-            </div>
-            <div class="thp-half thp-half--dark">
-              <div class="thp-bar"></div>
-            </div>
-          </div>
-          <span class="theme-card__label" data-i18n="cust_theme_system">System Default</span>
-          <svg class="theme-card__check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
-        </button>
-      </div>
-    </div>
-
-  </div><!-- /stab-appearance -->
 
   <!-- ══════════════════════════════════════════
        TAB 6 — ADDRESSES
@@ -1803,34 +1070,7 @@
       <p class="settings-section__desc" data-i18n="cust_addr_desc">Save your frequently used addresses for faster booking. Select one at checkout.</p>
 
       <div class="addr-list" id="addr-list">
-        <!-- Home address -->
-        <div class="addr-card" data-addr-id="home">
-          <div class="addr-card__icon addr-card__icon--home">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-          </div>
-          <div class="addr-card__body">
-            <span class="addr-card__type" data-i18n="cust_addr_home">Home</span>
-            <span class="addr-card__value" id="addr-home-value" data-i18n="cust_addr_not_set">Not set yet — add your home address</span>
-          </div>
-          <button type="button" class="btn-addr-edit" data-addr-target="home" aria-label="Edit home address">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            <span data-i18n="cust_addr_edit">Edit</span>
-          </button>
-        </div>
-        <!-- Work address -->
-        <div class="addr-card" data-addr-id="work">
-          <div class="addr-card__icon addr-card__icon--work">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
-          </div>
-          <div class="addr-card__body">
-            <span class="addr-card__type" data-i18n="cust_addr_work">Work</span>
-            <span class="addr-card__value" id="addr-work-value" data-i18n="cust_addr_not_set">Not set yet — add your work address</span>
-          </div>
-          <button type="button" class="btn-addr-edit" data-addr-target="work" aria-label="Edit work address">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            <span data-i18n="cust_addr_edit">Edit</span>
-          </button>
-        </div>
+        <!-- Dynamically rendered by initAddressTab() -->
       </div>
 
       <!-- Add address form (toggled) -->
@@ -1838,6 +1078,12 @@
         <div class="addr-form-header">
           <span class="addr-form-title" id="addr-form-title" data-i18n="cust_addr_edit_title">Edit Address</span>
           <button type="button" class="btn-addr-cancel" id="btn-addr-cancel" data-i18n="cust_addr_cancel">Cancel</button>
+        </div>
+        <div class="form-row">
+          <div class="form-field form-field--full">
+            <label class="form-label" for="addr-input-label">Label (e.g. Home, Work, Office)</label>
+            <input class="form-input" type="text" id="addr-input-label" placeholder="e.g. Home" />
+          </div>
         </div>
         <div class="form-row">
           <div class="form-field form-field--full">
@@ -1904,6 +1150,70 @@
     </div>
 
   </div><!-- /stab-account -->
+
+  <!-- ══════════════════════════════════════════
+       TAB — PAYMENT METHODS
+  ══════════════════════════════════════════ -->
+  <div class="stab-pane" id="stab-payment-methods" role="tabpanel" aria-labelledby="stab-btn-payment-methods" hidden>
+
+    <div class="settings-section">
+      <div class="settings-section__header">
+        <div>
+          <h2 class="settings-section__heading">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+            <span>Payment Methods</span>
+          </h2>
+          <p class="settings-section__desc">Manage your saved cards. Up to 3 cards allowed.</p>
+        </div>
+        <button type="button" class="btn btn--sm btn--outline" id="pm-add-btn">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:5px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add Card
+        </button>
+      </div>
+
+      <!-- Card tiles -->
+      <div id="pm-card-list" style="display:flex;flex-direction:column;gap:12px;margin-top:16px;"></div>
+
+      <!-- Empty state -->
+      <div id="pm-empty" style="display:none;text-align:center;padding:40px 20px;">
+        <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="#555" stroke-width="1.5" style="margin-bottom:12px"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+        <p style="color:#888;margin-bottom:16px">No saved cards yet.</p>
+      </div>
+
+      <!-- Add card inline form -->
+      <div id="pm-add-form-wrap" style="display:none;margin-top:16px;background:#111;border:1px solid #2a2a2a;border-radius:12px;padding:20px;">
+        <h3 style="font-size:15px;font-weight:600;margin-bottom:16px;">New Card</h3>
+        <div class="form-field" style="margin-bottom:12px;">
+          <label class="form-label" for="pm-card-holder">Cardholder Name <span class="required-mark">*</span></label>
+          <input class="form-input" type="text" id="pm-card-holder" placeholder="As it appears on your card" autocomplete="cc-name" />
+        </div>
+        <div class="form-field" style="margin-bottom:12px;">
+          <label class="form-label" for="pm-card-number">Card Number <span class="required-mark">*</span></label>
+          <input class="form-input" type="text" id="pm-card-number" placeholder="1234 5678 9012 3456" maxlength="19" inputmode="numeric" autocomplete="cc-number" />
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+          <div class="form-field">
+            <label class="form-label" for="pm-expiry">Expiry <span class="required-mark">*</span></label>
+            <input class="form-input" type="text" id="pm-expiry" placeholder="MM / YY" maxlength="7" inputmode="numeric" autocomplete="cc-exp" />
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="pm-cvv">CVV <span class="required-mark">*</span></label>
+            <input class="form-input" type="text" id="pm-cvv" placeholder="123" maxlength="4" inputmode="numeric" autocomplete="cc-csc" />
+          </div>
+        </div>
+        <div class="form-field" style="margin-bottom:16px;">
+          <label class="form-label" for="pm-label">Label <span style="color:#aaa;font-size:12px">(optional)</span></label>
+          <input class="form-input" type="text" id="pm-label" placeholder="e.g. My Visa" maxlength="40" />
+        </div>
+        <div id="pm-form-error" style="display:none;color:#e74c3c;font-size:13px;margin-bottom:12px;"></div>
+        <div style="display:flex;gap:10px;">
+          <button type="button" class="btn btn--sm btn--outline" id="pm-cancel-add-btn" style="flex:1">Cancel</button>
+          <button type="button" class="btn btn--sm" id="pm-save-card-btn" style="flex:2;background:#f5a623;color:#000;border:none;font-weight:700;">Save Card</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
 
         </section>
 
