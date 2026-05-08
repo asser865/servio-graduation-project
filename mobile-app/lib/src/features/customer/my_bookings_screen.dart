@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/api/bookings_api.dart';
-import '../../core/models/backend_booking_model.dart';
 import '../../core/models/booking_model.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
@@ -44,7 +42,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     try {
       final client = context.read<ApiClient>();
       final raw = await BookingsApi(client).getMyBookings();
-      _bookings = raw.map(_toBookingModel).toList();
+      _bookings = raw.map(BookingModel.fromBackend).toList();
     } catch (_) {
       _error = 'Could not load bookings.';
     } finally {
@@ -578,40 +576,6 @@ class _DetailsPair extends StatelessWidget {
   }
 }
 
-BookingModel _toBookingModel(BackendBooking b) {
-  return BookingModel(
-    id: b.id,
-    reference:
-        '#${b.id.length >= 8 ? b.id.substring(0, 8).toUpperCase() : b.id.toUpperCase()}',
-    serviceName: b.serviceName.isNotEmpty ? b.serviceName : 'Service',
-    technicianName: b.workerName.isNotEmpty ? b.workerName : 'Technician',
-    technicianId: b.workerId,
-    date: DateFormat('MMM d, y').format(b.scheduledDate),
-    time: b.scheduledTime.isNotEmpty
-        ? _displayScheduledTime(b.scheduledTime)
-        : DateFormat('h:mm a').format(b.scheduledDate),
-    location: b.addressCity.isNotEmpty ? b.addressCity : 'Cairo',
-    amount: 'EGP ${b.totalAmount.toStringAsFixed(0)}',
-    status: _parseBookingStatus(b.status),
-    pin: '0000',
-    notes: b.notes,
-  );
-}
-
-BookingStatus _parseBookingStatus(String s) => switch (s) {
-      'confirmed' || 'pending' || 'accepted' => BookingStatus.upcoming,
-      'in_progress' || 'inProgress' => BookingStatus.inProgress,
-      'completed' => BookingStatus.completed,
-      _ => BookingStatus.cancelled,
-    };
-
-String _displayScheduledTime(String value) {
-  final parts = value.split(':');
-  final hour = int.tryParse(parts.first) ?? 0;
-  final suffix = hour >= 12 ? 'PM' : 'AM';
-  final displayHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
-  return '$displayHour:00 $suffix';
-}
 
 class _FavouriteTechnicianCard extends StatelessWidget {
   const _FavouriteTechnicianCard({

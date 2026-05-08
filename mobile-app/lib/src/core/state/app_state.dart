@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../api/api_client.dart';
 import '../api/api_exception.dart';
 import '../api/auth_api.dart';
+import '../api/bookings_api.dart';
 import '../api/token_storage.dart';
 import '../api/users_api.dart';
 import '../models/booking_model.dart';
@@ -348,14 +349,18 @@ class LocaleProvider extends ChangeNotifier {
 // ── BookingsProvider ──────────────────────────────────────────────────────────
 
 class BookingsProvider extends ChangeNotifier {
-  BookingsProvider(this._storage) {
-    _load();
+  BookingsProvider(this._storage, this._api) {
+    _loadCached();
+    refresh();
   }
 
   final StorageService _storage;
+  final BookingsApi _api;
   final List<BookingModel> _bookings = <BookingModel>[];
+  bool _loading = false;
 
   List<BookingModel> get all => List<BookingModel>.unmodifiable(_bookings);
+  bool get isLoading => _loading;
 
   List<BookingModel> get upcoming => _bookings
       .where((b) =>
@@ -369,9 +374,26 @@ class BookingsProvider extends ChangeNotifier {
           b.status == BookingStatus.cancelled)
       .toList();
 
-  void _load() {
+  void _loadCached() {
     final list = _storage.getJsonList(_kKeyBookings);
     _bookings.addAll(list.map(BookingModel.fromJson));
+  }
+
+  Future<void> refresh() async {
+    _loading = true;
+    notifyListeners();
+    try {
+      final raw = await _api.getMyBookings();
+      _bookings
+        ..clear()
+        ..addAll(raw.map(BookingModel.fromBackend));
+      await _save();
+    } catch (_) {
+      // keep cached data on error
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
   }
 
   Future<void> _save() async {
@@ -379,12 +401,6 @@ class BookingsProvider extends ChangeNotifier {
       _kKeyBookings,
       _bookings.map((b) => b.toJson()).toList(),
     );
-  }
-
-  Future<void> add(BookingModel booking) async {
-    _bookings.insert(0, booking);
-    await _save();
-    notifyListeners();
   }
 
   Future<void> updateStatus(String bookingId, BookingStatus status) async {

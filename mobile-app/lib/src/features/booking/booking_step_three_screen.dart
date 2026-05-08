@@ -683,6 +683,7 @@ BookingFlowData _confirmationDataFromBackend(
       ? booking.id.substring(booking.id.length - 6).toUpperCase()
       : booking.id.toUpperCase();
   return original.copyWith(
+    backendId: booking.id,
     reference: '#SRV-$shortId',
     amount: booking.totalAmount > 0
         ? '${booking.totalAmount.toStringAsFixed(0)} EGP'

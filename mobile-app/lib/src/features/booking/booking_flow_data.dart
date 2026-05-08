@@ -5,6 +5,7 @@ class BookingFlowData {
     this.technicianName = 'Ahmed Nabil',
     this.technicianId = '',
     this.serviceId = '',
+    this.backendId = '',
     this.specialty = 'Plumbing Specialist',
     this.priceLabel = '850 EGP - 1,200 EGP',
     this.hourlyRate = '350 EGP / hour',
@@ -25,6 +26,7 @@ class BookingFlowData {
   final String technicianName;
   final String technicianId;
   final String serviceId;
+  final String backendId;
   final String specialty;
   final String priceLabel;
   final String hourlyRate;
@@ -45,6 +47,7 @@ class BookingFlowData {
     String? technicianName,
     String? technicianId,
     String? serviceId,
+    String? backendId,
     String? specialty,
     String? priceLabel,
     String? hourlyRate,
@@ -65,6 +68,7 @@ class BookingFlowData {
       technicianName: technicianName ?? this.technicianName,
       technicianId: technicianId ?? this.technicianId,
       serviceId: serviceId ?? this.serviceId,
+      backendId: backendId ?? this.backendId,
       specialty: specialty ?? this.specialty,
       priceLabel: priceLabel ?? this.priceLabel,
       hourlyRate: hourlyRate ?? this.hourlyRate,

@@ -1,3 +1,7 @@
+import 'package:intl/intl.dart';
+
+import 'backend_booking_model.dart';
+
 enum BookingStatus { upcoming, inProgress, completed, cancelled }
 
 class BookingModel {
@@ -61,6 +65,24 @@ class BookingModel {
         'notes': notes,
       };
 
+  factory BookingModel.fromBackend(BackendBooking b) => BookingModel(
+        id: b.id,
+        reference:
+            '#${b.id.length >= 8 ? b.id.substring(0, 8).toUpperCase() : b.id.toUpperCase()}',
+        serviceName: b.serviceName.isNotEmpty ? b.serviceName : 'Service',
+        technicianName: b.workerName.isNotEmpty ? b.workerName : 'Technician',
+        technicianId: b.workerId,
+        date: DateFormat('MMM d, y').format(b.scheduledDate),
+        time: b.scheduledTime.isNotEmpty
+            ? _displayScheduledTime(b.scheduledTime)
+            : DateFormat('h:mm a').format(b.scheduledDate),
+        location: b.addressCity.isNotEmpty ? b.addressCity : 'Cairo',
+        amount: 'EGP ${b.totalAmount.toStringAsFixed(0)}',
+        status: _parseBookingStatus(b.status),
+        pin: '0000',
+        notes: b.notes,
+      );
+
   factory BookingModel.fromJson(Map<String, dynamic> json) => BookingModel(
         id: json['id'] as String,
         reference: json['reference'] as String,
@@ -78,4 +100,19 @@ class BookingModel {
         pin: json['pin'] as String,
         notes: (json['notes'] as String?) ?? '',
       );
+}
+
+BookingStatus _parseBookingStatus(String s) => switch (s) {
+      'confirmed' || 'pending' || 'accepted' => BookingStatus.upcoming,
+      'in_progress' || 'inProgress' => BookingStatus.inProgress,
+      'completed' => BookingStatus.completed,
+      _ => BookingStatus.cancelled,
+    };
+
+String _displayScheduledTime(String value) {
+  final parts = value.split(':');
+  final hour = int.tryParse(parts.first) ?? 0;
+  final suffix = hour >= 12 ? 'PM' : 'AM';
+  final displayHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+  return '$displayHour:00 $suffix';
 }
