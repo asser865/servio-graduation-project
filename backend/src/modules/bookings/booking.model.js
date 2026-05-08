@@ -98,6 +98,12 @@ const bookingSchema = new mongoose.Schema(
       type:  String,
       trim:  true,
     },
+
+    paymentMeta: {
+      last4:    { type: String },
+      cardType: { type: String },
+      label:    { type: String },
+    },
   },
   { timestamps: true }
 );

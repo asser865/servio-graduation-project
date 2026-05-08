@@ -7,6 +7,7 @@ import { getInitials } from '../utils/string.js';
 import { getMe, updateMe, updatePassword, updateEmail, deleteMe, updateAvailability, toggleAvailableNow, toggleBlockedDate } from '../api/users.js';
 import { uploadPublicFile } from '../api/uploads.js';
 import { getWorkerBookings, updateBookingStatus } from '../api/bookings.js';
+import { getWorkerReviews } from '../api/reviews.js';
 import { getServices } from '../api/services.js';
 
 const TAB_KEY = 'servio_activeTab_technician';
@@ -804,52 +805,84 @@ async function initJobQueue() {
     return;
   }
 
-  const active = bookings.filter(b => !['completed','rejected','cancelled'].includes(b.status));
-  const done   = bookings.filter(b =>  ['completed','rejected','cancelled'].includes(b.status));
+  const pending = bookings.filter(b => b.status === 'pending');
+  const ongoing = bookings.filter(b => ['accepted','in_progress'].includes(b.status));
+  const done    = bookings.filter(b => ['completed','rejected','cancelled'].includes(b.status));
 
-  const activeSorted = active.sort((a, b) => {
-    const order = { pending: 0, accepted: 1, in_progress: 2 };
-    return (order[a.status] ?? 9) - (order[b.status] ?? 9);
-  });
+  // Default tab: show active if exists, else pending, else done
+  const defaultTab = ongoing.length ? 'active' : pending.length ? 'pending' : 'done';
+
+  function badgeHtml(n) {
+    return n > 0 ? `<span class="jq-tab-badge">${n}</span>` : '';
+  }
+
+  function makePane(id, items, emptyMsg) {
+    const pane = document.createElement('div');
+    pane.id = `stab-jq-${id}`;
+    pane.className = 'stab-pane jq-tab-pane';
+    if (id !== defaultTab) pane.setAttribute('hidden', '');
+    else pane.classList.add('stab-pane--active');
+
+    if (items.length === 0) {
+      pane.innerHTML = `<div class="jq-empty-state"><svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="#6b7280" stroke-width="1.5" opacity="0.4"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg><p>${emptyMsg}</p></div>`;
+    } else {
+      const list = document.createElement('div');
+      list.className = 'jq-queue-list';
+      items.forEach(b => {
+        try { list.appendChild(buildJobCard(b, _t)); }
+        catch (e) { console.error('[Job Queue] card error', b._id, e); }
+      });
+      pane.appendChild(list);
+    }
+    return pane;
+  }
 
   container.innerHTML = '';
 
-  // ── Active jobs ──
-  const activeList = document.createElement('div');
-  activeList.id = 'jq-active-list';
-  if (activeSorted.length === 0) {
-    activeList.innerHTML = `<div class="jq-empty-state">
-      <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="#6b7280" stroke-width="1.5" opacity="0.4"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>
-      <p>No active jobs right now.</p>
-    </div>`;
-  }
-  activeSorted.forEach(b => {
-    try { activeList.appendChild(buildJobCard(b, _t)); }
-    catch (e) { console.error('[Job Queue] card error', b._id, e); }
-  });
-  container.appendChild(activeList);
+  // ── Tab bar ──
+  const tabBar = document.createElement('nav');
+  tabBar.id = 'jq-tab-bar';
+  tabBar.className = 'stab-bar jq-stab-bar';
+  tabBar.setAttribute('role', 'tablist');
+  tabBar.innerHTML = `
+    <button class="stab-btn${defaultTab === 'pending' ? ' stab-btn--active' : ''}" role="tab"
+      aria-selected="${defaultTab === 'pending'}" data-stab="jq-pending">
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l2 2"/></svg>
+      Awaiting Response${badgeHtml(pending.length)}
+    </button>
+    <button class="stab-btn${defaultTab === 'active' ? ' stab-btn--active' : ''}" role="tab"
+      aria-selected="${defaultTab === 'active'}" data-stab="jq-active">
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="13 2 13 9 20 9"/><path d="M21 3L13 11l-4-4L2 14"/></svg>
+      Active Jobs${badgeHtml(ongoing.length)}
+    </button>
+    <button class="stab-btn${defaultTab === 'done' ? ' stab-btn--active' : ''}" role="tab"
+      aria-selected="${defaultTab === 'done'}" data-stab="jq-done">
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg>
+      Completed${badgeHtml(done.length)}
+    </button>`;
+  container.appendChild(tabBar);
 
-  // ── Completed / inactive section ──
-  const doneSection = document.createElement('div');
-  doneSection.id = 'jq-completed-section';
-  doneSection.className = 'jq-completed-section';
-  doneSection.style.display = done.length > 0 ? 'block' : 'none';
-  doneSection.innerHTML = `
-    <div class="jq-premium-divider">
-      <div class="jq-divider-line"></div>
-      <div class="jq-divider-content">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>
-        <span>Completed &amp; Inactive</span>
-      </div>
-      <div class="jq-divider-line"></div>
-    </div>
-    <div class="jq-completed-list"></div>`;
-  const completedList = doneSection.querySelector('.jq-completed-list');
-  done.forEach(b => {
-    try { completedList.appendChild(buildJobCard(b, _t)); }
-    catch (e) { console.error('[Job Queue] card error', b._id, e); }
+  // ── Panes ──
+  container.appendChild(makePane('pending', pending, 'No pending requests.'));
+  container.appendChild(makePane('active',  ongoing, 'No active jobs right now.'));
+  container.appendChild(makePane('done',    done,    'No completed jobs yet.'));
+
+  // ── Tab switching ──
+  tabBar.addEventListener('click', e => {
+    const btn = e.target.closest('.stab-btn');
+    if (!btn) return;
+    const target = btn.dataset.stab;
+    tabBar.querySelectorAll('.stab-btn').forEach(b => {
+      b.classList.toggle('stab-btn--active', b === btn);
+      b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
+    });
+    container.querySelectorAll('.jq-tab-pane').forEach(p => {
+      const isTarget = p.id === 'stab-' + target;
+      p.classList.toggle('stab-pane--active', isTarget);
+      if (isTarget) p.removeAttribute('hidden');
+      else p.setAttribute('hidden', '');
+    });
   });
-  container.appendChild(doneSection);
 
   wireArrivalFlows(container);
   revealAll(container);
@@ -968,35 +1001,39 @@ function buildJobCard(b, _t) {
     flowHtml = `
       <div class="jq-flow" data-booking-id="${id}" data-pin="${pin}" data-customer="${customer}" data-address="${address}">
         <div class="jq-section" data-section="accepted">
-          <div class="jq-premium-nav-card">
+          <div class="jq-accepted-action-bar">
             <div class="jq-nav-info">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="12" r="3"/></svg>
               <span class="truncate">${address}</span>
             </div>
-            <a class="btn-premium btn-premium--accent btn-premium--sm" href="${mapsUrl}" target="_blank" rel="noopener">
-              Navigate
-            </a>
+            <div class="jq-accepted-actions">
+              <a class="btn-premium btn-premium--accent btn-premium--sm" href="${mapsUrl}" target="_blank" rel="noopener">Navigate</a>
+              <button class="btn-premium btn-premium--primary btn-premium--sm" data-flow-action="on-my-way">
+                I'm On My Way
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              </button>
+            </div>
           </div>
-          <button class="btn-premium btn-premium--primary btn-premium--lg" data-flow-action="on-my-way">
-            I'm On My Way
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-          </button>
         </div>
         <div class="jq-section" data-section="en-route" hidden>
-          <div class="jq-premium-status-banner jq-premium-status-banner--blue">
-            <div class="jq-pulse-indicator">
-              <span class="pulse-dot"></span>
-              <span class="pulse-ring"></span>
+          <div class="jq-accepted-action-bar">
+            <div class="jq-nav-info">
+              <div class="jq-pulse-indicator jq-pulse-indicator--sm">
+                <span class="pulse-dot"></span>
+                <span class="pulse-ring"></span>
+              </div>
+              <span class="jq-enroute-label">EN ROUTE</span>
+              <span class="jq-enroute-sep">·</span>
+              <span class="truncate">${address}</span>
             </div>
-            <div class="jq-banner-text">
-              <label>EN ROUTE</label>
-              <p>${address}</p>
+            <div class="jq-accepted-actions">
+              <a class="btn-premium btn-premium--blue btn-premium--sm" href="${mapsUrl}" target="_blank" rel="noopener">Maps</a>
+              <button class="btn-premium btn-premium--primary btn-premium--sm" data-flow-action="arrived">
+                I've Arrived
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
             </div>
-            <a class="btn-premium btn-premium--blue btn-premium--sm" href="${mapsUrl}" target="_blank" rel="noopener">Maps</a>
           </div>
-          <button class="btn-premium btn-premium--primary btn-premium--lg" data-flow-action="arrived">
-            I've Arrived at Location
-          </button>
         </div>
         <div class="jq-section" data-section="arrived" hidden>
           <div class="jq-premium-pin-card">
@@ -1009,13 +1046,18 @@ function buildJobCard(b, _t) {
             </div>
           </div>
           <div class="jq-premium-pin-group" data-pin-group>
-            <input type="text" inputmode="numeric" maxlength="1" class="jq-pin-input-box" autocomplete="off"/>
-            <input type="text" inputmode="numeric" maxlength="1" class="jq-pin-input-box" autocomplete="off"/>
-            <input type="text" inputmode="numeric" maxlength="1" class="jq-pin-input-box" autocomplete="off"/>
-            <input type="text" inputmode="numeric" maxlength="1" class="jq-pin-input-box" autocomplete="off"/>
+            <input type="text" inputmode="numeric" maxlength="1" class="jq-pin-box" autocomplete="off"/>
+            <input type="text" inputmode="numeric" maxlength="1" class="jq-pin-box" autocomplete="off"/>
+            <input type="text" inputmode="numeric" maxlength="1" class="jq-pin-box" autocomplete="off"/>
+            <input type="text" inputmode="numeric" maxlength="1" class="jq-pin-box" autocomplete="off"/>
           </div>
-          <p class="jq-pin-error-text" hidden>Incorrect PIN — please try again.</p>
-          <button class="btn-premium btn-premium--amber btn-premium--lg" data-flow-action="start-job">Verify & Start Job</button>
+          <p class="jq-pin-error" hidden>Incorrect PIN — please try again.</p>
+          <div class="jq-flow-footer">
+            <button class="btn-premium btn-premium--amber" data-flow-action="start-job">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              Verify &amp; Start Job
+            </button>
+          </div>
         </div>
         <div class="jq-section" data-section="in-progress" hidden>
           <div class="jq-premium-timer-card">
@@ -1031,10 +1073,12 @@ function buildJobCard(b, _t) {
               ${phoneRow}
             </div>
           </div>
-          <button class="btn-premium btn-premium--emerald btn-premium--lg" data-flow-action="complete">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-            Mark Job Complete
-          </button>
+          <div class="jq-flow-footer">
+            <button class="btn-premium btn-premium--emerald" data-flow-action="complete">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Mark Job Complete
+            </button>
+          </div>
         </div>
         <div class="jq-section" data-section="complete-confirm" hidden>
           <div class="jq-premium-confirm-card">
@@ -1188,6 +1232,7 @@ function wireArrivalFlows(container) {
         box.addEventListener('input', e => {
           const v = e.target.value.replace(/\D/g, '');
           e.target.value = v;
+          box.classList.toggle('is-filled', !!v);
           if (v && i < boxes.length - 1) boxes[i + 1].focus();
         });
         box.addEventListener('keydown', e => {
@@ -1381,7 +1426,7 @@ function wireArrivalFlows(container) {
           const pg = flow.querySelector('[data-pin-group]');
           if (pg) { pg.classList.remove('jq-pin--shake'); void pg.offsetWidth; pg.classList.add('jq-pin--shake'); }
           if (errEl) errEl.hidden = false;
-          boxes.forEach(b => b.value = '');
+          boxes.forEach(b => { b.value = ''; b.classList.remove('is-filled'); });
           boxes[0]?.focus();
           return;
         }
@@ -1420,7 +1465,7 @@ function wireArrivalFlows(container) {
       }
 
       if (action === 'submit-complete') {
-        const notes = flow.querySelector('.jq-notes-input')?.value?.trim() || '';
+        const notes = flow.querySelector('.jq-notes-textarea')?.value?.trim() || '';
         btn.disabled = true; btn.textContent = 'Submitting…';
         try {
           await updateBookingStatus(bookingId, 'completed');
@@ -1433,7 +1478,7 @@ function wireArrivalFlows(container) {
 
           const card = flow.closest('.jq-premium-card');
           if (card) {
-            card.className = 'jq-premium-card jq-premium-card--completed jq-premium-card--done-anim';
+            card.className = 'jq-premium-card jq-premium-card--completed jq-premium-card--done-anim is-visible';
             card.removeAttribute('data-status');
             card.innerHTML = `
               <div class="jq-done-banner">
@@ -2628,6 +2673,70 @@ function initNotifPanel() {
 
 // ── Top-level async initialization ───────────────────────────────────────────────
 // Fetches live user data first, then seeds the availability UI with real data
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+async function initReviewsTab(workerId) {
+  const summaryEl = document.getElementById('tech-dash-reviews-summary');
+  const listEl    = document.getElementById('tech-dash-reviews-list');
+  if (!summaryEl || !listEl) return;
+
+  listEl.innerHTML = `<p style="padding:1rem;opacity:0.6">Loading reviews…</p>`;
+
+  let reviews = [];
+  try {
+    reviews = await getWorkerReviews(workerId);
+  } catch (_) {
+    listEl.innerHTML = `<p style="padding:1rem;opacity:0.6">Could not load reviews.</p>`;
+    return;
+  }
+
+  if (!reviews.length) {
+    summaryEl.hidden = true;
+    listEl.innerHTML = `<p style="padding:1rem;opacity:0.6">No reviews yet.</p>`;
+    return;
+  }
+
+  const avg = (reviews.reduce((s, r) => s + (r.rating || 0), 0) / reviews.length).toFixed(1);
+  const fullStars = Math.round(avg);
+  const stars = Array.from({ length: 5 }, (_, i) => i < fullStars ? '★' : '☆').join('');
+  summaryEl.hidden = false;
+  summaryEl.innerHTML = `
+    <div class="reviews-summary__rating">${avg}</div>
+    <div>
+      <div class="reviews-summary__stars">${stars}</div>
+      <div class="reviews-summary__count">Based on ${reviews.length} review${reviews.length !== 1 ? 's' : ''}</div>
+    </div>`;
+
+  listEl.innerHTML = reviews.map(r => {
+    const name     = escapeHtml(r.user?.name || 'Customer');
+    const initials = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    const comment  = escapeHtml(r.comment || '');
+    const date     = r.createdAt
+      ? new Date(r.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+      : '';
+    const starCount = Math.round(r.rating || 0);
+    const starHtml  = Array.from({ length: 5 }, (_, i) =>
+      i < starCount ? '★' : '☆'
+    ).join('');
+    return `
+      <div class="review-card" data-reveal>
+        <div class="review-card__header">
+          <div class="review-card__avatar">${initials}</div>
+          <div class="review-card__meta">
+            <p class="review-card__name">${name}</p>
+            <p class="review-card__date">${date}</p>
+          </div>
+        </div>
+        <div class="review-card__stars">${starHtml}</div>
+        ${comment ? `<p class="review-card__text">"${comment}"</p>` : ''}
+      </div>`;
+  }).join('');
+}
+
 async function initDashboard() {
   populateProfile();
   updateWelcomeText();
@@ -2666,6 +2775,7 @@ async function initDashboard() {
     // Populate service area input
     const saInput = document.getElementById('service-area');
     if (saInput && liveServiceArea) saInput.value = liveServiceArea;
+    if (user?._id) initReviewsTab(user._id);
   } catch (_) {
     // Fall back to cached data
     const acc = getAccount();

@@ -287,15 +287,15 @@
 .header__right .btn--header-login:hover,
 .header__right .btn--header-signup:hover,
 .header__right .btn--header-theme:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(34, 40, 49, 0.15);
+  transform: translateY(-4px) translateX(-2px);
+  box-shadow: 2px 5px 0 0 var(--color-text);
 }
 
 .header__right .btn--header-login:active,
 .header__right .btn--header-signup:active,
 .header__right .btn--header-theme:active {
-  transform: translateY(0px);
-  box-shadow: none;
+  transform: translateY(2px) translateX(1px);
+  box-shadow: 0 0 0 0 var(--color-text);
 }
 
 .header__right .btn--header-theme {

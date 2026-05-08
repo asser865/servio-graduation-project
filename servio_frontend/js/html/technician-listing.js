@@ -171,33 +171,53 @@ function initNotifyMe(serviceKey) {
 // ── Render cards ──────────────────────────────────────────────────────────────
 
 async function renderCards(serviceKey, lang) {
-  const techGrid = document.getElementById('tech-grid');
+  const techGrid      = document.getElementById('tech-grid');
   if (!techGrid) return;
 
-  techGrid.innerHTML = '<p style="padding:2rem;text-align:center">Loading...</p>';
+  const pagination    = document.querySelector('.pagination');
+  const resultsHeader = document.querySelector('.results-header');
+
+  if (pagination)    pagination.style.display    = 'none';
+  if (resultsHeader) resultsHeader.style.display = 'none';
+
+  techGrid.innerHTML = `
+    <div style="padding:3rem;text-align:center;display:flex;flex-direction:column;
+                align-items:center;gap:1rem;">
+      <div style="width:48px;height:48px;border:4px solid #E3D5CA;border-top-color:#3C2415;
+                  border-radius:50%;animation:listing-spin 0.8s linear infinite;"></div>
+      <p style="color:#6B6560;font-size:0.95rem;margin:0;">Finding available technicians…</p>
+    </div>`;
 
   let workers = [];
   try {
     const res = await getWorkers({ category: serviceKey });
-    // api client already unwraps { success, data } → res IS the data object directly
     workers = res?.workers || res?.data?.workers || [];
   } catch (err) {
     console.error('getWorkers error:', err);
-    techGrid.innerHTML = '<p style="padding:2rem;text-align:center">Could not load technicians. Please try again.</p>';
+    techGrid.innerHTML = `
+      <div style="padding:3rem;text-align:center;display:flex;flex-direction:column;
+                  align-items:center;gap:0.75rem;">
+        <div style="font-size:2rem;">⚠️</div>
+        <p style="color:#6B6560;font-size:0.95rem;margin:0;">Could not load technicians. Please try again.</p>
+      </div>`;
     return;
   }
 
   if (!workers.length) {
-    const noOnlineState = document.getElementById('no-online-state');
+    techGrid.innerHTML = '';
+    const noOnlineState    = document.getElementById('no-online-state');
     const filterEmptyState = document.getElementById('empty-state');
-    if (noOnlineState)     noOnlineState.style.display  = 'flex';
-    if (filterEmptyState)  filterEmptyState.style.display = 'none';
+    if (noOnlineState)    noOnlineState.style.display    = 'flex';
+    if (filterEmptyState) filterEmptyState.style.display = 'none';
     const resultCount = document.getElementById('result-count');
     if (resultCount) resultCount.textContent = '0';
     return;
   }
+
   const noOnlineState = document.getElementById('no-online-state');
   if (noOnlineState) noOnlineState.style.display = 'none';
+  if (pagination)    pagination.style.display    = '';
+  if (resultsHeader) resultsHeader.style.display = '';
 
   _cachedWorkers = workers;
   techGrid.innerHTML = workers.map((worker, i) => buildCardFromAPI(worker, serviceKey, lang, i * 50)).join('');

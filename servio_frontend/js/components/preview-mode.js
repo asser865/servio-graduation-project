@@ -9,6 +9,8 @@ const EXCLUDED_SEGMENTS = [
   'dashboard',
   'login',
   'signup',
+  'forgot-password',
+  'reset-password',
   'messages',
   'booking-history',
   'booking-confirmation',
