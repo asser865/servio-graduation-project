@@ -18,9 +18,10 @@
 })();
 
 import { animate, stagger } from 'https://cdn.jsdelivr.net/npm/motion@12.38.0/+esm';
-import { getWorker, getMe }  from '../api/users.js';
+import { getWorker, getMe, addAddress }  from '../api/users.js';
 import { getServices }       from '../api/services.js';
 import { createBooking, getWorkerBookedSlots } from '../api/bookings.js';
+import { openCardPickerModal, closeCardPickerModal } from '../components/card-picker-modal.js';
 
 // ─── URL params ───────────────────────────────────────────────────────────────
 
@@ -315,7 +316,12 @@ confirmBtn?.addEventListener('click', (e) => {
   collectStep2();
 
   if (state.data.payment === 'online') {
-    openPaymentModal();
+    const rate  = state.worker?.hourlyRate || 0;
+    const total = (rate * 1.10).toFixed(2);
+    openCardPickerModal(total, async (paymentMeta) => {
+      state.data.paymentMeta = paymentMeta;
+      await finalizeBooking();
+    });
   } else {
     animate(confirmBtn, { scale: [1, 0.95, 1.02, 1] }, { duration: 0.3 });
     setTimeout(() => finalizeBooking(), 320);
@@ -885,9 +891,17 @@ addrForm?.addEventListener('submit', (e) => {
 
   state.addresses.push(newAddr);
   state.data.address = full;
-  
+
   renderAddresses();
   closeAddressModal();
+
+  // Persist to user's saved addresses list
+  addAddress({ label, street, city, state: stateVal }).then(saved => {
+    if (saved?._id) {
+      const card = state.addresses.find(a => a.id === newAddr.id);
+      if (card) card.id = saved._id;
+    }
+  }).catch(() => {});
   
   // Visual feedback on the newly selected card
   setTimeout(() => {
@@ -988,129 +1002,6 @@ async function init() {
 
 init().catch(err => console.error('Booking init error:', err));
 
-// ─── Payment modal ────────────────────────────────────────────────────────────
-
-function openPaymentModal() {
-  const rate  = state.worker?.hourlyRate || 0;
-  const total = (rate * 1.10).toFixed(2);
-  setText('payModalAmount', `Total: ${total} EGP`);
-
-  const overlay = document.getElementById('paymentModalOverlay');
-  const modal   = document.getElementById('paymentModal');
-  if (!overlay || !modal) return;
-
-  overlay.hidden = false;
-  document.body.style.overflow = 'hidden';
-
-  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    animate(overlay, { opacity: [0, 1] }, { duration: 0.25 });
-    animate(modal, { opacity: [0, 1], y: [30, 0], scale: [0.95, 1] }, { duration: 0.35, easing: [0.22, 1, 0.36, 1] });
-  }
-
-  document.getElementById('pmCardHolder')?.focus();
-}
-
-function closePaymentModal() {
-  const overlay = document.getElementById('paymentModalOverlay');
-  if (!overlay) return;
-  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    animate(overlay, { opacity: [1, 0] }, { duration: 0.2 }).then(() => {
-      overlay.hidden = true;
-      document.body.style.overflow = '';
-      resetPaymentModal();
-    });
-  } else {
-    overlay.hidden = true;
-    document.body.style.overflow = '';
-    resetPaymentModal();
-  }
-}
-
-function resetPaymentModal() {
-  const form       = document.getElementById('payModalForm');
-  const processing = document.getElementById('payModalProcessing');
-  const success    = document.getElementById('payModalSuccess');
-  const errorMsg   = document.getElementById('payModalErrorMsg');
-  if (form)       { form.hidden = false; }
-  if (processing) { processing.hidden = true; }
-  if (success)    { success.hidden = true; }
-  if (errorMsg)   { errorMsg.style.display = 'none'; errorMsg.textContent = ''; }
-  ['pmCardHolder', 'pmCardNumber', 'pmExpiry', 'pmCVV'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = '';
-  });
-}
-
-function validatePaymentForm() {
-  const name = document.getElementById('pmCardHolder')?.value.trim() || '';
-  const num  = (document.getElementById('pmCardNumber')?.value || '').replace(/\s/g, '');
-  const exp  = document.getElementById('pmExpiry')?.value.trim() || '';
-  const cvv  = document.getElementById('pmCVV')?.value.trim() || '';
-
-  if (!name)                                          return 'Please enter the cardholder name.';
-  if (num.length !== 16 || !/^\d+$/.test(num))       return 'Please enter a valid 16-digit card number.';
-  if (!/^\d{2}\s*\/\s*\d{2}$/.test(exp))             return 'Please enter a valid expiry (MM / YY).';
-  if (cvv.length < 3 || !/^\d+$/.test(cvv))          return 'Please enter a valid CVV.';
-  return null;
-}
-
-// Card number formatting
-document.getElementById('pmCardNumber')?.addEventListener('input', (e) => {
-  const raw = e.target.value.replace(/\D/g, '').slice(0, 16);
-  e.target.value = raw.replace(/(.{4})/g, '$1 ').trim();
-});
-
-document.getElementById('pmExpiry')?.addEventListener('input', (e) => {
-  const raw = e.target.value.replace(/\D/g, '').slice(0, 4);
-  e.target.value = raw.length > 2 ? raw.slice(0, 2) + ' / ' + raw.slice(2) : raw;
-});
-
-// Pay Now
-document.getElementById('payModalSubmit')?.addEventListener('click', async () => {
-  const error = validatePaymentForm();
-  const errorMsg = document.getElementById('payModalErrorMsg');
-  if (error) {
-    if (errorMsg) { errorMsg.textContent = error; errorMsg.style.display = 'block'; }
-    return;
-  }
-  if (errorMsg) { errorMsg.style.display = 'none'; }
-
-  const form       = document.getElementById('payModalForm');
-  const processing = document.getElementById('payModalProcessing');
-  const success    = document.getElementById('payModalSuccess');
-
-  if (form)       form.hidden = true;
-  if (processing) processing.hidden = false;
-
-  await new Promise(resolve => setTimeout(resolve, 2000));
-
-  if (processing) processing.hidden = true;
-  if (success) {
-    success.hidden = false;
-    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      animate(success, { opacity: [0, 1], scale: [0.9, 1] }, { duration: 0.4 });
-    }
-  }
-});
-
-document.getElementById('payModalContinue')?.addEventListener('click', async () => {
-  closePaymentModal();
-  await finalizeBooking();
-});
-
-document.getElementById('payModalClose')?.addEventListener('click', closePaymentModal);
-
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') {
-    const overlay = document.getElementById('paymentModalOverlay');
-    if (overlay && !overlay.hidden) closePaymentModal();
-  }
-});
-
-document.getElementById('paymentModalOverlay')?.addEventListener('click', (e) => {
-  if (e.target === e.currentTarget) closePaymentModal();
-});
-
 // ─── Finalize booking ─────────────────────────────────────────────────────────
 
 async function finalizeBooking() {
@@ -1134,6 +1025,7 @@ async function finalizeBooking() {
         scheduledTime:   state.selectedTime || '',
         address:         state.data.address,
         description:     document.getElementById('bookNotes')?.value.trim() || '',
+        ...(state.data.paymentMeta ? { paymentMeta: state.data.paymentMeta } : {}),
       };
       const res = await createBooking(payload);
       bookingId = res.data?._id || res._id || res.data?.booking?._id || null;
