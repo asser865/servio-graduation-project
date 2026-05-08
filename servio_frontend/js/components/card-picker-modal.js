@@ -233,13 +233,20 @@ document.getElementById('cpConfirmBtn')?.addEventListener('click', () => {
   if (!card) return;
   showView('cpProcessing');
   setTimeout(async () => {
-    showView('cpSuccess');
-    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      const s = document.getElementById('cpSuccess');
-      if (s) animate(s, { opacity: [0, 1], scale: [0.9, 1] }, { duration: 0.4 });
-    }
-    if (typeof _onConfirm === 'function') {
-      await _onConfirm({ last4: card.last4, cardType: card.cardType, label: card.label || '' });
+    try {
+      if (typeof _onConfirm === 'function') {
+        await _onConfirm({ last4: card.last4, cardType: card.cardType, label: card.label || '' });
+      }
+      showView('cpSuccess');
+      if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        const s = document.getElementById('cpSuccess');
+        if (s) animate(s, { opacity: [0, 1], scale: [0.9, 1] }, { duration: 0.4 });
+      }
+    } catch (err) {
+      const errEl = document.getElementById('cpAddErrorMsg');
+      const msg = err?.data?.message || err?.message || 'Booking failed. Please try again.';
+      showView('cpListView');
+      if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; }
     }
   }, 1800);
 });

@@ -36,6 +36,10 @@ yarn-error.log*
 # OS files
 Thumbs.db
 
+# Graphify output (kept outside repo)
+graphify-out/
+
 .claude
 .DS_Store
 CLAUDE.md
+.gitattributes

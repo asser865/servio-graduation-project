@@ -2,6 +2,10 @@
    Technician Listing — Card Design (matches Servio reference)
    ═══════════════════════════════════════════════════════════════ */
 
+@keyframes listing-spin {
+  to { transform: rotate(360deg); }
+}
+
 /* ── Hero ──────────────────────────────────────────────────────── */
 
 .hero-technicians {

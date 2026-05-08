@@ -20,7 +20,7 @@ const createReview = async (req, res) => {
   if (!booking) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Booking not found.');
   }
-  if (booking.user.toString() !== userId) {
+  if (booking.user.toString() !== userId.toString()) {
     throw new ApiError(StatusCodes.FORBIDDEN, 'You can only review your own bookings.');
   }
   if (booking.status !== 'completed') {
@@ -37,6 +37,13 @@ const createReview = async (req, res) => {
   });
 
   return ApiResponse.success(res, StatusCodes.CREATED, 'Review submitted successfully.', review);
+};
+
+// ── GET MY REVIEWS (User Only) ────────────────────────────────────────────────
+// WHAT: Fetches all reviews submitted by the authenticated user.
+const getMyReviews = async (req, res) => {
+  const reviews = await Review.find({ user: req.user.id }).select('booking rating comment');
+  return ApiResponse.success(res, StatusCodes.OK, 'Reviews retrieved.', { reviews });
 };
 
 // ── GET WORKER REVIEWS (Public) ──────────────────────────────────────────────
@@ -59,4 +66,4 @@ const deleteReview = async (req, res) => {
   return ApiResponse.success(res, StatusCodes.OK, 'Review deleted.', null);
 };
 
-module.exports = { createReview, getWorkerReviews, deleteReview };
+module.exports = { createReview, getMyReviews, getWorkerReviews, deleteReview };

@@ -500,7 +500,6 @@ const getAnalytics = async (req, res) => {
 
 // ── GET PAYMENT ANALYTICS (Admin Only) ────────────────────────────────────────
 // WHAT: Financial dashboard for admins — revenue, escrow, refunds, disputes.
-// HOW:  GET /api/v1/users/analytics/payments
 const getPaymentAnalytics = async (req, res) => {
   const twelveMonthsAgo = new Date();
   twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
@@ -514,35 +513,30 @@ const getPaymentAnalytics = async (req, res) => {
     paymentStatusStats,
     revenueByMonth,
   ] = await Promise.all([
-    // Sum of all platform fees from released payments (actual revenue)
     Payment.aggregate([
       { $match: { status: 'released' } },
       { $group: { _id: null, total: { $sum: '$platformFee' } } },
     ]),
-    // Total funds currently held in escrow
     Payment.aggregate([
       { $match: { status: { $in: ['held', 'disputed'] } } },
       { $group: { _id: null, total: { $sum: '$amount' } } },
     ]),
-    // Total refunded amount
     Payment.aggregate([
       { $match: { status: 'refunded' } },
       { $group: { _id: null, total: { $sum: '$amount' } } },
     ]),
     Dispute.countDocuments({}),
     Dispute.countDocuments({ status: 'open' }),
-    // Payment count grouped by status
     Payment.aggregate([
       { $group: { _id: '$status', count: { $sum: 1 } } },
     ]),
-    // Monthly revenue (platform fee) for last 12 months
     Payment.aggregate([
       { $match: { status: 'released', createdAt: { $gte: twelveMonthsAgo } } },
       {
         $group: {
-          _id:     { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },
+          _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },
           revenue: { $sum: '$platformFee' },
-          count:   { $sum: 1 },
+          count: { $sum: 1 },
         },
       },
       { $sort: { '_id.year': 1, '_id.month': 1 } },
@@ -553,10 +547,11 @@ const getPaymentAnalytics = async (req, res) => {
     acc[item._id] = item.count;
     return acc;
   }, {});
+
   return ApiResponse.success(res, StatusCodes.OK, 'Payment analytics retrieved.', {
-    totalRevenue:    revenueResult[0]?.total  || 0,
-    totalEscrow:     totalEscrow[0]?.total    || 0,
-    totalRefunded:   totalRefunded[0]?.total  || 0,
+    totalRevenue: revenueResult[0]?.total || 0,
+    totalEscrow: totalEscrow[0]?.total || 0,
+    totalRefunded: totalRefunded[0]?.total || 0,
     totalDisputes,
     openDisputes,
     paymentsByStatus,
@@ -580,6 +575,44 @@ const toggleBlockedDate = async (req, res) => {
   return ApiResponse.success(res, StatusCodes.OK, 'Blocked dates updated.', { blockedDates: user.blockedDates });
 };
 
+const addAddress = async (req, res) => {
+  const { label, street, city, state, zipCode } = req.body;
+  if (!street) throw new ApiError(StatusCodes.BAD_REQUEST, 'Street is required.');
+  const user = await User.findById(req.user.id);
+  if (!user) throw new ApiError(StatusCodes.NOT_FOUND, 'User not found.');
+  user.addresses.push({ label: label || 'Address', street, city, state, zipCode });
+  await user.save({ validateModifiedOnly: true });
+  const added = user.addresses[user.addresses.length - 1];
+  return ApiResponse.success(res, StatusCodes.CREATED, 'Address added.', added);
+};
+
+const updateAddress = async (req, res) => {
+  const { addrId } = req.params;
+  const { label, street, city, state, zipCode } = req.body;
+  const user = await User.findById(req.user.id);
+  if (!user) throw new ApiError(StatusCodes.NOT_FOUND, 'User not found.');
+  const addr = user.addresses.id(addrId);
+  if (!addr) throw new ApiError(StatusCodes.NOT_FOUND, 'Address not found.');
+  if (label   !== undefined) addr.label   = label;
+  if (street  !== undefined) addr.street  = street;
+  if (city    !== undefined) addr.city    = city;
+  if (state   !== undefined) addr.state   = state;
+  if (zipCode !== undefined) addr.zipCode = zipCode;
+  await user.save({ validateModifiedOnly: true });
+  return ApiResponse.success(res, StatusCodes.OK, 'Address updated.', addr);
+};
+
+const deleteAddress = async (req, res) => {
+  const { addrId } = req.params;
+  const user = await User.findById(req.user.id);
+  if (!user) throw new ApiError(StatusCodes.NOT_FOUND, 'User not found.');
+  const addr = user.addresses.id(addrId);
+  if (!addr) throw new ApiError(StatusCodes.NOT_FOUND, 'Address not found.');
+  user.addresses.pull({ _id: addrId });
+  await user.save({ validateModifiedOnly: true });
+  return ApiResponse.success(res, StatusCodes.OK, 'Address deleted.');
+};
+
 module.exports = {
   getWorkers,
   getWorkerProfile,
@@ -598,4 +631,7 @@ module.exports = {
   deleteUser,
   getAnalytics,
   getPaymentAnalytics,
+  addAddress,
+  updateAddress,
+  deleteAddress,
 };

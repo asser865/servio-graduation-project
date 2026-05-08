@@ -171,7 +171,9 @@ const createBooking = async (userId, data) => {
  */
 const getUserBookings = async (userId, { status, page = 1, limit = 10 }) => {
   const filter = { user: userId };
-  if (status) filter.status = status;
+  if (status) {
+    filter.status = status.includes(',') ? { $in: status.split(',') } : status;
+  }
 
   const skip = (Number(page) - 1) * Number(limit);
 
@@ -195,7 +197,9 @@ const getUserBookings = async (userId, { status, page = 1, limit = 10 }) => {
  */
 const getWorkerBookings = async (workerId, { status, page = 1, limit = 10 }) => {
   const filter = { worker: workerId };
-  if (status) filter.status = status;
+  if (status) {
+    filter.status = status.includes(',') ? { $in: status.split(',') } : status;
+  }
 
   const skip = (Number(page) - 1) * Number(limit);
 
@@ -269,10 +273,13 @@ const updateBookingStatus = async (bookingId, newStatus, actorId, actorRole) => 
     throw new ApiError(StatusCodes.BAD_REQUEST, 'You can only cancel a booking that is still pending.');
   }
 
-  booking.status = newStatus;
-  await booking.save();
+  const updated = await Booking.findByIdAndUpdate(
+    bookingId,
+    { status: newStatus },
+    { new: true, runValidators: false }
+  );
 
-  return booking;
+  return updated;
 };
 
 const getBookingById = async (bookingId, requestingUser) => {

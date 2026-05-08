@@ -22,6 +22,7 @@ import { getWorker, getMe, addAddress }  from '../api/users.js';
 import { getServices }       from '../api/services.js';
 import { createBooking, getWorkerBookedSlots } from '../api/bookings.js';
 import { openCardPickerModal, closeCardPickerModal } from '../components/card-picker-modal.js';
+import { showToast } from '../components/toast.js';
 
 // ─── URL params ───────────────────────────────────────────────────────────────
 
@@ -312,6 +313,16 @@ confirmBtn?.addEventListener('click', (e) => {
     );
     return;
   }
+  if (!state.selectedTime) {
+    showToast('Please select a time slot before confirming.', 'error');
+    goToStep(1);
+    return;
+  }
+  if (!state.data.date) {
+    showToast('Please select a date before confirming.', 'error');
+    goToStep(1);
+    return;
+  }
   collectStep1();
   collectStep2();
 
@@ -323,6 +334,7 @@ confirmBtn?.addEventListener('click', (e) => {
       await finalizeBooking();
     });
   } else {
+    state.data.paymentMeta = null;
     animate(confirmBtn, { scale: [1, 0.95, 1.02, 1] }, { duration: 0.3 });
     setTimeout(() => finalizeBooking(), 320);
   }
@@ -1039,7 +1051,10 @@ async function finalizeBooking() {
       else if (msg.includes('not available on this day')) userMsg = 'This technician doesn\'t work on the selected day.';
       else if (msg.includes('time slot'))                userMsg = 'Please select a valid time slot.';
       else if (msg.includes('already booked'))           userMsg = 'This time slot was just taken — please pick another time.';
-      alert(userMsg);
+      showToast(userMsg, 'error');
+      if (msg.includes('time slot') || msg.includes('already booked') || msg.includes('outside technician') || msg.includes('not available on this day') || msg.includes('today or in the future') || msg.includes('30 days in advance')) {
+        goToStep(1);
+      }
       return;
     }
   }

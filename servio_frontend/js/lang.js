@@ -3045,6 +3045,8 @@
       tech_earn_job_elec_wiring:     'Electrical — Wiring Inspection',
       /* Availability */
       tech_saved_msg:                'Saved!',
+      tech_schedule_saved_msg:       'Schedule saved successfully!',
+      tech_save_schedule:            'Save Schedule',
       tech_day_mon:                  'Mon',
       tech_day_tue:                  'Tue',
       tech_day_wed:                  'Wed',
@@ -6119,6 +6121,8 @@
       tech_earn_job_elec_wiring:     'كهرباء — فحص الأسلاك',
       /* Availability */
       tech_saved_msg:                'تم الحفظ!',
+      tech_schedule_saved_msg:       'تم حفظ الجدول بنجاح!',
+      tech_save_schedule:            'حفظ الجدول',
       tech_day_mon:                  'الاثنين',
       tech_day_tue:                  'الثلاثاء',
       tech_day_wed:                  'الأربعاء',

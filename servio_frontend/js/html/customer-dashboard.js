@@ -9,6 +9,7 @@ import { clearSession } from '../api/client.js';
 import { uploadPublicFile } from '../api/uploads.js';
 import { getMyBookings, cancelBooking } from '../api/bookings.js';
 import { getMyReviews, createReview } from '../api/reviews.js';
+import { getSavedCards, addSavedCard, deleteSavedCard, setDefaultCard } from '../api/savedCards.js';
 
 const STAR_SVG = (fill = '#F59E0B', size = 14) =>
   `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="${fill}" stroke="${fill}" stroke-width="0"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
@@ -56,6 +57,184 @@ function getErrorMessage(err, fallback) {
     || err?.data?.message
     || err?.message
     || fallback;
+}
+
+/* ── Payment Methods ────────────────────────────────────── */
+const PM_CARD_ICONS = {
+  visa:       '<svg viewBox="0 0 48 16" width="34" height="12" fill="none" aria-hidden="true"><text x="0" y="12" font-size="12" font-weight="800" fill="#1a1f71" font-family="Arial">VISA</text></svg>',
+  mastercard: '<svg viewBox="0 0 32 20" width="28" height="18" aria-hidden="true"><circle cx="12" cy="10" r="10" fill="#eb001b"/><circle cx="20" cy="10" r="10" fill="#f79e1b" fill-opacity="0.85"/></svg>',
+  amex:       '<svg viewBox="0 0 48 16" width="34" height="12" fill="none" aria-hidden="true"><text x="0" y="12" font-size="10" font-weight="700" fill="#2e77bc" font-family="Arial">AMEX</text></svg>',
+  other:      '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>',
+};
+
+function detectPmCardType(num) {
+  const first = num.replace(/\D/g, '')[0];
+  if (first === '4') return 'visa';
+  if (first === '5') return 'mastercard';
+  if (first === '3') return 'amex';
+  return 'other';
+}
+
+function initPaymentMethods() {
+  const list        = document.getElementById('pm-card-list');
+  const empty       = document.getElementById('pm-empty');
+  const addBtn      = document.getElementById('pm-add-btn');
+  const formWrap    = document.getElementById('pm-add-form-wrap');
+  const cancelBtn   = document.getElementById('pm-cancel-add-btn');
+  const saveBtn     = document.getElementById('pm-save-card-btn');
+  const formError   = document.getElementById('pm-form-error');
+
+  if (!list) return;
+
+  let _cardOpInFlight = false;
+
+  function renderCards(cards) {
+    list.innerHTML = '';
+    const atLimit = cards.length >= 3;
+
+    if (addBtn) {
+      addBtn.disabled = atLimit;
+      addBtn.title    = atLimit ? 'Maximum 3 cards reached' : '';
+    }
+
+    if (cards.length === 0) {
+      if (empty) empty.style.display = 'block';
+      return;
+    }
+    if (empty) empty.style.display = 'none';
+
+    cards.forEach(card => {
+      const icon = PM_CARD_ICONS[card.cardType] || PM_CARD_ICONS.other;
+      const tile = document.createElement('div');
+      tile.style.cssText = `
+        display:flex;align-items:center;gap:14px;padding:14px 16px;
+        background:#111;border:1px solid #2a2a2a;border-radius:12px;
+      `;
+      tile.innerHTML = `
+        <span style="flex-shrink:0">${icon}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:14px">•••• •••• •••• ${card.last4}</div>
+          <div style="font-size:12px;color:#aaa;margin-top:3px">
+            ${card.label ? card.label + ' · ' : ''}Exp ${card.expiry}
+          </div>
+        </div>
+        ${card.isDefault
+          ? '<span style="font-size:11px;background:rgba(245,166,35,.15);color:#f5a623;border:1px solid rgba(245,166,35,.3);border-radius:4px;padding:2px 8px;flex-shrink:0">Default</span>'
+          : `<button class="btn btn--sm btn--outline pm-set-default" data-id="${card._id}" style="font-size:12px;padding:4px 10px;flex-shrink:0">Set Default</button>`
+        }
+        <button class="btn btn--sm btn--ghost pm-delete" data-id="${card._id}" aria-label="Delete card" style="flex-shrink:0;color:#e74c3c;padding:6px;">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+        </button>
+      `;
+      list.appendChild(tile);
+    });
+
+    list.querySelectorAll('.pm-set-default').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (_cardOpInFlight) return;
+        _cardOpInFlight = true;
+        btn.disabled = true;
+        try {
+          await setDefaultCard(btn.dataset.id);
+          const res = await getSavedCards();
+          renderCards(res.data || res || []);
+          showToast('Default card updated.', 'success');
+        } catch {
+          showToast('Failed to update default card.', 'error');
+          btn.disabled = false;
+        } finally {
+          _cardOpInFlight = false;
+        }
+      });
+    });
+
+    list.querySelectorAll('.pm-delete').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (_cardOpInFlight) return;
+        if (!confirm('Remove this card from your saved cards?')) return;
+        _cardOpInFlight = true;
+        btn.disabled = true;
+        try {
+          await deleteSavedCard(btn.dataset.id);
+          const res = await getSavedCards();
+          renderCards(res.data || res || []);
+          showToast('Card removed.', 'success');
+        } catch {
+          showToast('Failed to remove card.', 'error');
+          btn.disabled = false;
+        } finally {
+          _cardOpInFlight = false;
+        }
+      });
+    });
+  }
+
+  function showAddForm() {
+    if (formWrap) formWrap.style.display = 'block';
+    if (formError) { formError.style.display = 'none'; formError.textContent = ''; }
+    ['pm-card-holder', 'pm-card-number', 'pm-expiry', 'pm-cvv', 'pm-label'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    document.getElementById('pm-card-holder')?.focus();
+  }
+
+  function hideAddForm() {
+    if (formWrap) formWrap.style.display = 'none';
+  }
+
+  addBtn?.addEventListener('click', () => { if (!addBtn.disabled) showAddForm(); });
+  cancelBtn?.addEventListener('click', hideAddForm);
+
+  document.getElementById('pm-card-number')?.addEventListener('input', (e) => {
+    const raw = e.target.value.replace(/\D/g, '').slice(0, 16);
+    e.target.value = raw.replace(/(.{4})/g, '$1 ').trim();
+  });
+
+  document.getElementById('pm-expiry')?.addEventListener('input', (e) => {
+    const raw = e.target.value.replace(/\D/g, '').slice(0, 4);
+    e.target.value = raw.length > 2 ? raw.slice(0, 2) + ' / ' + raw.slice(2) : raw;
+  });
+
+  saveBtn?.addEventListener('click', async () => {
+    const name   = document.getElementById('pm-card-holder')?.value.trim() || '';
+    const rawNum = (document.getElementById('pm-card-number')?.value || '').replace(/\s/g, '');
+    const exp    = document.getElementById('pm-expiry')?.value.trim() || '';
+    const cvv    = document.getElementById('pm-cvv')?.value.trim() || '';
+    const label  = document.getElementById('pm-label')?.value.trim() || '';
+
+    if (!name) { if (formError) { formError.textContent = 'Cardholder name is required.'; formError.style.display = 'block'; } return; }
+    if (rawNum.length !== 16 || !/^\d+$/.test(rawNum)) { if (formError) { formError.textContent = 'Please enter a valid 16-digit card number.'; formError.style.display = 'block'; } return; }
+    if (!/^\d{2}\s*\/\s*\d{2}$/.test(exp)) { if (formError) { formError.textContent = 'Please enter a valid expiry (MM / YY).'; formError.style.display = 'block'; } return; }
+    if (cvv.length < 3 || !/^\d+$/.test(cvv)) { if (formError) { formError.textContent = 'Please enter a valid CVV.'; formError.style.display = 'block'; } return; }
+
+    if (formError) formError.style.display = 'none';
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving…';
+
+    try {
+      await addSavedCard({
+        last4:    rawNum.slice(-4),
+        cardType: detectPmCardType(rawNum),
+        expiry:   exp.replace(/\s/g, ''),
+        label,
+      });
+      const res = await getSavedCards();
+      renderCards(res.data || res || []);
+      hideAddForm();
+      showToast('Card saved successfully.', 'success');
+    } catch (err) {
+      const msg = err?.data?.message || err?.message || 'Failed to save card.';
+      if (formError) { formError.textContent = msg; formError.style.display = 'block'; }
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save Card';
+    }
+  });
+
+  getSavedCards()
+    .then(res => renderCards(res.data || res || []))
+    .catch(() => renderCards([]));
 }
 
 /* ── Tab switching ──────────────────────────────────────── */
@@ -450,6 +629,7 @@ async function loadHistoryData() {
   // Wire rating submit buttons
   root.querySelectorAll('[data-submit-review]').forEach(btn => {
     const rateBlock = btn.closest('[data-rate-block]');
+    if (!rateBlock) return;
     rateBlock.querySelectorAll('input[type="radio"]').forEach(radio => {
       radio.addEventListener('change', () => { btn.disabled = false; });
     });
@@ -472,25 +652,23 @@ function buildHistoryCard(b, review) {
   const rating       = review?.rating ?? 0;
   const comment      = review?.comment || '';
 
-  // Service icon — use site SVG assets, fall back to a wrench SVG
-  const CAT_ICON_MAP = {
-    plumb:   '../assets/icons/service-plumbing.svg',
-    electr:  '../assets/icons/service-electrical.svg',
-    clean:   '../assets/icons/service-cleaning.svg',
-    carp:    '../assets/icons/service-carpentry.svg',
-    ac:      '../assets/icons/service-ac-repair.svg',
-    appli:   '../assets/icons/service-appliance-installation.svg',
+  // Service icon — inline SVGs matching the services marketplace page
+  const CAT_ICON_SVG = {
+    plumb:  `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"/><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"/></svg>`,
+    electr: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>`,
+    clean:  `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg>`,
+    carp:   `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 12-8.373 8.373a1 1 0 1 1-3-3L12 9"/><path d="m18 15 4-4"/><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172V7l-2.26-2.26a6 6 0 0 0-4.202-1.756L9 2.96l.92.82A6.18 6.18 0 0 1 12 8.4V10l2 2h1.172a2 2 0 0 1 1.414.586L18 14"/></svg>`,
+    ac:     `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20"/><path d="M12 2v20"/><path d="m20 16-4-4 4-4"/><path d="m4 8 4 4-4 4"/><path d="m16 4-4 4-4-4"/><path d="m8 20 4-4 4 4"/></svg>`,
+    appli:  `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="20" x="3" y="2" rx="2"/><circle cx="12" cy="13" r="5"/><path d="M6 6h.01"/><path d="M9 6h.01"/></svg>`,
   };
   const catLow   = category.toLowerCase();
-  const iconSrc  = Object.entries(CAT_ICON_MAP).find(([k]) => catLow.includes(k))?.[1] || null;
-  const iconHtml = iconSrc
-    ? `<img src="${iconSrc}" alt="${title}" class="history-v2__icon-img" />`
-    : `<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`;
+  const catKey   = Object.keys(CAT_ICON_SVG).find(k => catLow.includes(k));
+  const iconHtml = CAT_ICON_SVG[catKey] || `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`;
 
   // Static star display for rated bookings
   const staticStars = rating
     ? Array.from({ length: 5 }, (_, i) =>
-        i < rating ? STAR_SVG('#F59E0B', 15) : EMPTY_STAR_SVG(15)
+        i < rating ? STAR_SVG('var(--color-accent)', 22) : EMPTY_STAR_SVG(22)
       ).join('')
     : '';
 
@@ -498,25 +676,27 @@ function buildHistoryCard(b, review) {
   let ratingSection = '';
   if (isCompleted && rating) {
     ratingSection = `
-      <div class="history-v2__rating-display">
+      <div class="history-v2__comment-block">
         <div class="history-v2__rating-stars" aria-label="${rating} out of 5 stars">${staticStars}</div>
-      </div>
-      ${comment ? `<p class="history-v2__comment">"${comment}"</p>` : ''}`;
+        ${comment ? `<p class="history-v2__comment-text">"${comment}"</p>` : ''}
+      </div>`;
   } else if (isCompleted && !rating) {
     // Interactive rating widget — CSS-only star picker (RTL trick: reversed flex + sibling combinator)
     const uid = (b._id || Math.random().toString(36).slice(2)).slice(-8);
     ratingSection = `
       <div class="history-v2__rate-block" data-rate-block>
         <span class="history-v2__rate-label">Rate this service</span>
-        <div class="history-v2__stars-picker" role="radiogroup" aria-label="Star rating">
-          ${[5,4,3,2,1].map(n => `
-            <input type="radio" name="rating-${uid}" id="star-${uid}-${n}" value="${n}" />
-            <label for="star-${uid}-${n}" aria-label="${n} star${n > 1 ? 's' : ''}">
-              ${EMPTY_STAR_SVG(22)}
-            </label>`).join('')}
+        <div class="history-v2__rate-block-col">
+          <div class="history-v2__stars-picker" role="radiogroup" aria-label="Star rating">
+            ${[5,4,3,2,1].map(n => `
+              <input type="radio" name="rating-${uid}" id="star-${uid}-${n}" value="${n}" />
+              <label for="star-${uid}-${n}" aria-label="${n} star${n > 1 ? 's' : ''}">
+                ${EMPTY_STAR_SVG(28)}
+              </label>`).join('')}
+          </div>
+          <textarea class="history-v2__comment-input" placeholder="Share your experience (optional)" rows="2" maxlength="1000"></textarea>
+          <button class="history-v2__submit-btn" data-submit-review data-booking-id="${b._id}" disabled>Submit Review</button>
         </div>
-        <textarea class="history-v2__comment-input" placeholder="Share your experience (optional)" rows="2" maxlength="1000"></textarea>
-        <button class="history-v2__submit-btn" data-submit-review data-booking-id="${b._id}" disabled>Submit Review</button>
       </div>`;
   }
 
@@ -531,38 +711,43 @@ function buildHistoryCard(b, review) {
   el.dataset.payment  = paymentMethod;
   el.dataset.date     = b.scheduledDate || '';
   el.dataset.rating   = String(rating);
+  el.dataset.cat      = catKey || 'default';
 
   el.innerHTML = `
-    <div class="history-v2__main">
-      <div class="history-v2__icon">${iconHtml}</div>
-      <div class="history-v2__info">
-        <h4 class="history-v2__title">
-          ${title} <small class="history-v2__id">${ref}</small>
-          ${isCancelled ? `<span class="history-v2__status-badge badge-cancelled">Cancelled</span>` : ''}
-        </h4>
-        <p class="history-v2__provider">
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-          ${workerName}
-          <span class="dot-sep"></span>
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          ${dateStr}
-        </p>
-        ${ratingSection}
+    <div class="history-v2__top-row">
+      <div class="history-v2__main">
+        <div class="history-v2__icon">${iconHtml}</div>
+        <div class="history-v2__info">
+          <div class="history-v2__title-row">
+            <h4 class="history-v2__title">${title}</h4>
+            <small class="history-v2__id">${ref}</small>
+            ${isCancelled ? `<span class="history-v2__status-badge badge-cancelled">Cancelled</span>` : ''}
+            ${isCompleted && !isCancelled ? `<span class="history-v2__status-badge badge-completed">Completed</span>` : ''}
+          </div>
+          <p class="history-v2__provider">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            ${workerName}
+            <span class="dot-sep"></span>
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            ${dateStr}
+          </p>
+        </div>
+      </div>
+      <div class="history-v2__meta">
+        <div class="history-v2__price">${priceRaw !== '—' ? priceRaw + ' EGP' : '—'}</div>
+        <span class="history-v2__payment-badge">
+          <span class="history-v2__payment-icon">${payIcon}</span>
+          ${paymentMethod}
+        </span>
+      </div>
+      <div class="history-v2__actions">
+        <button class="btn btn--sm btn--outline" data-invoice-toggle>
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          View Invoice
+        </button>
       </div>
     </div>
-    <div class="history-v2__meta">
-      <span class="history-v2__payment-badge">
-        <span class="history-v2__payment-icon">${payIcon}</span>
-        ${paymentMethod}
-      </span>
-      <div class="history-v2__price">${priceRaw !== '—' ? priceRaw + ' EGP' : '—'}</div>
-    </div>
-    <div class="history-v2__actions">
-      <button class="btn btn--sm btn--outline" data-invoice-toggle>
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-        View Invoice
-      </button>
-    </div>
+    ${ratingSection ? `<div class="history-v2__review-section">${ratingSection}</div>` : ''}
     <div class="history-v2__expanded">
       <div class="history-v2__expanded-inner">
         <div class="invoice-grid">
@@ -590,6 +775,7 @@ function buildHistoryCard(b, review) {
 async function submitReview(btn) {
   const card       = btn.closest('.history-card-v2');
   const rateBlock  = card.querySelector('[data-rate-block]');
+  if (!rateBlock) return;
   const bookingId  = btn.dataset.bookingId;
   const ratingInput = rateBlock.querySelector('input[type="radio"]:checked');
   const textarea   = rateBlock.querySelector('.history-v2__comment-input');
@@ -606,14 +792,14 @@ async function submitReview(btn) {
     await createReview(bookingId, rating, comment);
 
     const staticStars = Array.from({ length: 5 }, (_, i) =>
-      i < rating ? STAR_SVG('#F59E0B', 15) : EMPTY_STAR_SVG(15)
+      i < rating ? STAR_SVG('var(--color-accent)', 22) : EMPTY_STAR_SVG(22)
     ).join('');
 
     rateBlock.outerHTML = `
-      <div class="history-v2__rating-display">
+      <div class="history-v2__comment-block">
         <div class="history-v2__rating-stars" aria-label="${rating} out of 5 stars">${staticStars}</div>
-      </div>
-      ${comment ? `<p class="history-v2__comment">"${comment}"</p>` : ''}`;
+        ${comment ? `<p class="history-v2__comment-text">"${comment}"</p>` : ''}
+      </div>`;
 
     card.dataset.rating = String(rating);
     showToast('Review submitted. Thank you!', 'success');
@@ -1868,6 +2054,14 @@ function initSettingsTabs() {
   });
   // Run once on load so the bar shows the correct percentage immediately
   updateProfileCompleteness();
+
+  let _pmInitialized = false;
+  document.getElementById('stab-btn-payment-methods')?.addEventListener('click', () => {
+    if (!_pmInitialized) {
+      _pmInitialized = true;
+      initPaymentMethods();
+    }
+  });
 }
 
 /* ── Security form — Change Password ─────────────────────── */
