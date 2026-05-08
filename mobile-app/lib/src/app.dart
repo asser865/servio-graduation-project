@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
 import 'core/api/api_client.dart';
+import 'core/api/bookings_api.dart';
 import 'core/api/token_storage.dart';
 import 'core/services/storage_service.dart';
 import 'core/state/app_state.dart';
@@ -41,7 +42,10 @@ class ServioApp extends StatelessWidget {
           create: (_) => LocaleProvider(storage),
         ),
         ChangeNotifierProvider<BookingsProvider>(
-          create: (_) => BookingsProvider(storage),
+          create: (ctx) => BookingsProvider(
+            storage,
+            BookingsApi(ctx.read<ApiClient>()),
+          ),
         ),
         ChangeNotifierProvider<MessagesProvider>(
           create: (_) => MessagesProvider(),

@@ -85,7 +85,7 @@ class UsersApi {
     required String newEmail,
     required String currentPassword,
   }) async {
-    await _client.patch('/users/me/email', <String, dynamic>{
+    await _client.patch(ApiEndpoints.usersMeEmail, <String, dynamic>{
       'newEmail': newEmail,
       'currentPassword': currentPassword,
     });

@@ -6,6 +6,7 @@ import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
+import '../auth/auth_landing_screen.dart';
 
 const String _deleteConfirmationWord = 'delete';
 
@@ -412,7 +413,10 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
       });
       return;
     }
-    Navigator.of(context).pop();
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(builder: (_) => const AuthLandingScreen()),
+      (Route<dynamic> _) => false,
+    );
   }
 }
 

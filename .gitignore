@@ -6,6 +6,14 @@ dist/
 build/
 out/
 
+# Graphify local outputs
+# mtime-based; breaks after git clone
+graphify-out/manifest.json
+# local only
+graphify-out/cost.json
+# Optional: commit for speed; ignore to keep repo small
+# graphify-out/cache/
+
 # Environment variables
 .env
 .env.local
@@ -42,4 +50,6 @@ graphify-out/
 .claude
 .DS_Store
 CLAUDE.md
+docs/
+skills-lock.json
 .gitattributes

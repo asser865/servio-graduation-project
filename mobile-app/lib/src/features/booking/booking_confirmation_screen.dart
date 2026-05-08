@@ -32,7 +32,6 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
   late final AnimationController _checkController;
   late final AnimationController _pulseController;
   late final Animation<double> _checkScale;
-  late final BookingModel _booking;
 
   // The 4-digit PIN generated once per booking.
   late final String _pin;
@@ -59,23 +58,9 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
     );
     _checkController.forward();
 
-    _booking = BookingModel(
-      id: 'bk_${DateTime.now().millisecondsSinceEpoch}',
-      reference: widget.data.reference,
-      serviceName: widget.data.serviceName,
-      technicianName: widget.data.technicianName,
-      technicianId: 'tech_unknown',
-      date: widget.data.date,
-      time: widget.data.time,
-      location: widget.data.location,
-      amount: widget.data.amount,
-      status: BookingStatus.upcoming,
-      pin: _pin,
-    );
-
-    // Persist the new booking after the first frame so Provider is ready.
+    // Refresh provider after first frame so home screen shows real backend data.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<BookingsProvider>().add(_booking);
+      context.read<BookingsProvider>().refresh();
     });
   }
 
@@ -149,7 +134,7 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
                   Navigator.of(ctx).pop();
                   context
                       .read<BookingsProvider>()
-                      .updateStatus(_booking.id, BookingStatus.cancelled);
+                      .updateStatus(widget.data.backendId, BookingStatus.cancelled);
                   Navigator.of(context).pushAndRemoveUntil(
                     MaterialPageRoute<void>(
                         builder: (_) => const CustomerShell()),

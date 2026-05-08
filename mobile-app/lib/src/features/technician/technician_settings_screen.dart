@@ -9,6 +9,7 @@ import '../shared/account_screen.dart';
 import 'technician_edit_profile_screen.dart';
 import 'technician_notification_settings_screen.dart';
 import 'technician_security_screen.dart';
+import 'payout_summary_screen.dart';
 
 class TechnicianSettingsScreen extends StatelessWidget {
   const TechnicianSettingsScreen({super.key});
@@ -59,6 +60,17 @@ class TechnicianSettingsScreen extends StatelessWidget {
                   label: 'My Addresses',
                   subtitle: 'Saved home and work locations',
                   onTap: () => _showPlaceholder(context, 'My Addresses'),
+                ),
+                _NavTile(
+                  icon: Icons.account_balance_wallet_rounded,
+                  iconColor: servio.accent,
+                  label: 'Payout Summary',
+                  subtitle: 'Track earnings, payouts, and completed jobs',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const PayoutSummaryScreen(),
+                    ),
+                  ),
                 ),
               ],
             ),

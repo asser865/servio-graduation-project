@@ -10,6 +10,7 @@ import 'customer_security_screen.dart';
 import 'edit_profile_screen.dart';
 import 'my_addresses_screen.dart';
 import 'notification_settings_screen.dart';
+import 'saved_payments_screen.dart';
 
 class CustomerSettingsScreen extends StatelessWidget {
   const CustomerSettingsScreen({super.key});
@@ -62,6 +63,17 @@ class CustomerSettingsScreen extends StatelessWidget {
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
                       builder: (_) => const MyAddressesScreen(),
+                    ),
+                  ),
+                ),
+                _NavTile(
+                  icon: Icons.credit_card_rounded,
+                  iconColor: servio.accent,
+                  label: 'My Payments',
+                  subtitle: 'Manage saved cards and payment methods',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const SavedPaymentsScreen(),
                     ),
                   ),
                 ),
