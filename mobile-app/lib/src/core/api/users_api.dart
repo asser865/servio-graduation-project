@@ -89,7 +89,10 @@ class UsersApi {
       'newEmail': newEmail,
       'currentPassword': currentPassword,
     });
+  }
+
   Future<void> deleteMe() async {
     await _client.delete(ApiEndpoints.usersMe);
   }
 }
+

@@ -1,3 +1,5 @@
+import '../../core/models/user_account.dart';
+
 class BookingFlowData {
   const BookingFlowData({
     this.serviceName = 'Plumbing Repair Visit',
@@ -8,6 +10,7 @@ class BookingFlowData {
     this.specialty = 'Plumbing Specialist',
     this.priceLabel = '850 EGP - 1,200 EGP',
     this.hourlyRate = '350 EGP / hour',
+    this.technicianAvailability = const <AvailabilitySlot>[],
     this.date = '26/03/2026',
     this.time = '10:00 AM - 11:00 AM',
     this.scheduledDateTime,
@@ -28,6 +31,7 @@ class BookingFlowData {
   final String specialty;
   final String priceLabel;
   final String hourlyRate;
+  final List<AvailabilitySlot> technicianAvailability;
   final String date;
   final String time;
   final DateTime? scheduledDateTime;
@@ -48,6 +52,7 @@ class BookingFlowData {
     String? specialty,
     String? priceLabel,
     String? hourlyRate,
+    List<AvailabilitySlot>? technicianAvailability,
     String? date,
     String? time,
     DateTime? scheduledDateTime,
@@ -68,6 +73,8 @@ class BookingFlowData {
       specialty: specialty ?? this.specialty,
       priceLabel: priceLabel ?? this.priceLabel,
       hourlyRate: hourlyRate ?? this.hourlyRate,
+      technicianAvailability:
+          technicianAvailability ?? this.technicianAvailability,
       date: date ?? this.date,
       time: time ?? this.time,
       scheduledDateTime: scheduledDateTime ?? this.scheduledDateTime,
@@ -80,4 +87,56 @@ class BookingFlowData {
       amount: amount ?? this.amount,
     );
   }
+
+  bool get requiresTechnicianAvailabilityCheck =>
+      technicianId.trim().isNotEmpty || technicianAvailability.isNotEmpty;
+
+  AvailabilitySlot? technicianAvailabilityFor(DateTime date) {
+    final day = _weekdayKey(date);
+    for (final slot in technicianAvailability) {
+      if (_normalizeDay(slot.day) == day && _hasWorkingHours(slot)) {
+        return slot;
+      }
+    }
+    return null;
+  }
+
+  bool isTechnicianAvailableOn(DateTime date) {
+    if (!requiresTechnicianAvailabilityCheck) return true;
+    return technicianAvailabilityFor(date) != null;
+  }
+
+  bool get isScheduledDateAvailable {
+    final scheduled = scheduledDateTime;
+    if (scheduled == null) return !requiresTechnicianAvailabilityCheck;
+    return isTechnicianAvailableOn(scheduled);
+  }
+}
+
+const List<String> _weekdayKeys = <String>[
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+  'sunday',
+];
+
+String _weekdayKey(DateTime date) => _weekdayKeys[date.weekday - 1];
+
+String _normalizeDay(String value) =>
+    value.trim().toLowerCase().replaceAll(RegExp(r'[\s_-]+'), '');
+
+bool _hasWorkingHours(AvailabilitySlot slot) {
+  final from = _hourValue(slot.from);
+  final to = _hourValue(slot.to);
+  return from != null && to != null && from < to;
+}
+
+int? _hourValue(String value) {
+  final match = RegExp(r'^\s*(\d{1,2})').firstMatch(value);
+  final hour = int.tryParse(match?.group(1) ?? '');
+  if (hour == null || hour < 0 || hour > 24) return null;
+  return hour;
 }

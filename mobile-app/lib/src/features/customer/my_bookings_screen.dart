@@ -327,160 +327,186 @@ class BookingDetailsScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final servio = context.servio;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Booking Details'),
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(ServioSpacing.screenPadding),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            const Align(
-              alignment: Alignment.centerLeft,
-              child: ServioStatusChip(
-                label: 'In Progress',
-                type: ServioStatusChipType.info,
-              ),
-            ),
-            const SizedBox(height: 20),
-            ServioCard(
-              radius: ServioRadius.lg,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const <Widget>[
-                  _TimelineRow(
-                      label: 'Booking Placed',
-                      complete: true,
-                      meta: '25/03/2026 05:30 PM'),
-                  _TimelineRow(
-                      label: 'Payment Confirmed',
-                      complete: true,
-                      meta: 'Held in Escrow'),
-                  _TimelineRow(
-                      label: 'Technician En Route',
-                      complete: true,
-                      meta: 'Arriving soon'),
-                  _TimelineRow(
-                      label: 'In Progress',
-                      active: true,
-                      meta: 'Current stage'),
-                  _TimelineRow(label: 'Completed', meta: 'Upcoming'),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            ServioCard(
-              child: Column(
-                children: <Widget>[
-                  Row(
-                    children: <Widget>[
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          gradient: ServioGradients.warm,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: servio.accent, width: 2),
-                        ),
-                        child: const Center(child: Text('AN')),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            Text(data.technicianName,
-                                style: theme.textTheme.titleMedium),
-                            const SizedBox(height: 4),
-                            Text(
-                              '4.9 rating',
-                              style: theme.textTheme.bodySmall
-                                  ?.copyWith(color: servio.textSecondary),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: <Widget>[
-                      Expanded(
-                        child: TextButton(
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => ChatScreen(
-                                    contactName: data.technicianName),
-                              ),
-                            );
-                          },
-                          child: const Text('Message'),
-                        ),
-                      ),
-                      Expanded(
-                          child: TextButton(
-                              onPressed: () {}, child: const Text('Call'))),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            ServioCard(
-              child: Column(
-                children: <Widget>[
-                  _DetailsPair(label: 'Service', value: data.serviceName),
-                  _DetailsPair(label: 'Date', value: data.date),
-                  _DetailsPair(label: 'Time', value: data.time),
-                  _DetailsPair(label: 'Location', value: data.location),
-                  _DetailsPair(
-                      label: 'Total', value: data.amount, highlight: true),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              height: 160,
-              decoration: BoxDecoration(
-                gradient: ServioGradients.warm,
-                borderRadius: BorderRadius.circular(ServioRadius.lg),
-              ),
-              child: Center(
-                child: Text(
-                  'Map Preview',
-                  style: theme.textTheme.titleMedium
-                      ?.copyWith(color: servio.accent),
+    return PopScope<Object?>(
+      canPop: Navigator.of(context).canPop(),
+      onPopInvokedWithResult: (bool didPop, Object? result) {
+        if (!didPop) _leaveDetails(context);
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded),
+            tooltip: 'Back to bookings',
+            onPressed: () => _leaveDetails(context),
+          ),
+          title: const Text('Booking Details'),
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        ),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(ServioSpacing.screenPadding),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: ServioStatusChip(
+                  label: 'In Progress',
+                  type: ServioStatusChipType.info,
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
-            OutlinedButton(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => WriteReviewScreen(
-                      technicianName: data.technicianName,
-                      jobSummary: data.serviceName,
-                    ),
-                  ),
-                );
-              },
-              child: const Text('Write a Review'),
-            ),
-            const SizedBox(height: 10),
-            OutlinedButton(
-              onPressed: () => Navigator.of(context).pop(),
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(color: servio.danger),
-                foregroundColor: servio.danger,
+              const SizedBox(height: 20),
+              ServioCard(
+                radius: ServioRadius.lg,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const <Widget>[
+                    _TimelineRow(
+                        label: 'Booking Placed',
+                        complete: true,
+                        meta: '25/03/2026 05:30 PM'),
+                    _TimelineRow(
+                        label: 'Payment Confirmed',
+                        complete: true,
+                        meta: 'Held in Escrow'),
+                    _TimelineRow(
+                        label: 'Technician En Route',
+                        complete: true,
+                        meta: 'Arriving soon'),
+                    _TimelineRow(
+                        label: 'In Progress',
+                        active: true,
+                        meta: 'Current stage'),
+                    _TimelineRow(label: 'Completed', meta: 'Upcoming'),
+                  ],
+                ),
               ),
-              child: const Text('Cancel Booking'),
-            ),
-          ],
+              const SizedBox(height: 16),
+              ServioCard(
+                child: Column(
+                  children: <Widget>[
+                    Row(
+                      children: <Widget>[
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            gradient: ServioGradients.warm,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: servio.accent, width: 2),
+                          ),
+                          child: const Center(child: Text('AN')),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(data.technicianName,
+                                  style: theme.textTheme.titleMedium),
+                              const SizedBox(height: 4),
+                              Text(
+                                '4.9 rating',
+                                style: theme.textTheme.bodySmall
+                                    ?.copyWith(color: servio.textSecondary),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: TextButton(
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => ChatScreen(
+                                      contactName: data.technicianName),
+                                ),
+                              );
+                            },
+                            child: const Text('Message'),
+                          ),
+                        ),
+                        Expanded(
+                            child: TextButton(
+                                onPressed: () {}, child: const Text('Call'))),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              ServioCard(
+                child: Column(
+                  children: <Widget>[
+                    _DetailsPair(label: 'Service', value: data.serviceName),
+                    _DetailsPair(label: 'Date', value: data.date),
+                    _DetailsPair(label: 'Time', value: data.time),
+                    _DetailsPair(label: 'Location', value: data.location),
+                    _DetailsPair(
+                        label: 'Total', value: data.amount, highlight: true),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                height: 160,
+                decoration: BoxDecoration(
+                  gradient: ServioGradients.warm,
+                  borderRadius: BorderRadius.circular(ServioRadius.lg),
+                ),
+                child: Center(
+                  child: Text(
+                    'Map Preview',
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(color: servio.accent),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              OutlinedButton(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => WriteReviewScreen(
+                        technicianName: data.technicianName,
+                        jobSummary: data.serviceName,
+                      ),
+                    ),
+                  );
+                },
+                child: const Text('Write a Review'),
+              ),
+              const SizedBox(height: 10),
+              OutlinedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: servio.danger),
+                  foregroundColor: servio.danger,
+                ),
+                child: const Text('Cancel Booking'),
+              ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  void _leaveDetails(BuildContext context) {
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) {
+      navigator.pop();
+      return;
+    }
+
+    navigator.pushReplacement(
+      MaterialPageRoute<void>(
+        builder: (_) => const MyBookingsScreen(),
       ),
     );
   }
