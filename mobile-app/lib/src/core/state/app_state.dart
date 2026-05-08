@@ -170,6 +170,24 @@ class SessionProvider extends ChangeNotifier {
     }
   }
 
+  Future<String?> updateEmail({
+    required String newEmail,
+    required String currentPassword,
+  }) async {
+    try {
+      await _usersApi.updateEmail(
+        newEmail: newEmail,
+        currentPassword: currentPassword,
+      );
+      await logout();
+      return null;
+    } on ApiException catch (e) {
+      return e.message;
+    } catch (_) {
+      return 'Could not update email. Check your connection.';
+    }
+  }
+
   Future<String?> loadCurrentWorkerProfile() async {
     try {
       await _refreshAccount();

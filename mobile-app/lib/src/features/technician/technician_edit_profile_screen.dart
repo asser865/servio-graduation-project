@@ -71,7 +71,18 @@ class _TechnicianEditProfileScreenState
 
   Future<void> _save() async {
     setState(() => _saving = true);
-    final account = context.read<SessionProvider>().account;
+    final session = context.read<SessionProvider>();
+    final account = session.account;
+
+    final newEmail = _emailCtrl.text.trim().toLowerCase();
+    final emailChanged = newEmail != (account?.email ?? '');
+
+    if (emailChanged) {
+      setState(() => _saving = false);
+      await _handleEmailChange(newEmail);
+      return;
+    }
+
     final fields = <String, dynamic>{};
 
     if (_nameCtrl.text.trim() != (account?.name ?? '')) {
@@ -112,7 +123,7 @@ class _TechnicianEditProfileScreenState
       return;
     }
 
-    final error = await context.read<SessionProvider>().updateProfile(fields);
+    final error = await session.updateProfile(fields);
     if (!mounted) return;
     setState(() => _saving = false);
     if (error != null) {
@@ -121,6 +132,80 @@ class _TechnicianEditProfileScreenState
       );
     } else {
       Navigator.pop(context);
+    }
+  }
+
+  Future<void> _handleEmailChange(String newEmail) async {
+    final passwordCtrl = TextEditingController();
+    bool obscure = true;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Confirm Email Change'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text('New email: $newEmail'),
+              const SizedBox(height: 16),
+              const Text('Enter your current password to confirm:'),
+              const SizedBox(height: 8),
+              TextField(
+                controller: passwordCtrl,
+                obscureText: obscure,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: 'Current Password',
+                  suffixIcon: IconButton(
+                    icon: Icon(obscure
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined),
+                    onPressed: () =>
+                        setDialogState(() => obscure = !obscure),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Confirm'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (!mounted || confirmed != true) return;
+    if (passwordCtrl.text.isEmpty) return;
+
+    setState(() => _saving = true);
+    final error = await context.read<SessionProvider>().updateEmail(
+          newEmail: newEmail,
+          currentPassword: passwordCtrl.text,
+        );
+    passwordCtrl.dispose();
+    if (!mounted) return;
+    setState(() => _saving = false);
+
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error), backgroundColor: Colors.red),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'Email updated. Please log in again with your new email.'),
+        ),
+      );
     }
   }
 
@@ -190,7 +275,6 @@ class _TechnicianEditProfileScreenState
             const SizedBox(height: 16),
             TextField(
               controller: _emailCtrl,
-              enabled: false,
               keyboardType: TextInputType.emailAddress,
               decoration: const InputDecoration(
                 labelText: 'Email Address',
