@@ -41,6 +41,16 @@ const userSchema = new mongoose.Schema(
       zipCode:{ type: String, trim: true },
     },
 
+    addresses: [
+      {
+        label:   { type: String, trim: true, default: 'Address' },
+        street:  { type: String, trim: true },
+        city:    { type: String, trim: true },
+        state:   { type: String, trim: true },
+        zipCode: { type: String, trim: true },
+      },
+    ],
+
     // Never returned in queries by default — use .select('+password') explicitly
     password: {
       type:     String,

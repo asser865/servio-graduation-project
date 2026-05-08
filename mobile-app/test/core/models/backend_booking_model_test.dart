@@ -43,6 +43,19 @@ void main() {
       expect(booking.totalAmount, equals(350.0));
     });
 
+    test('parses totalAmount from fallback amount fields', () {
+      final totalAmountJson = Map<String, dynamic>.from(fullJson)
+        ..remove('totalPrice')
+        ..['totalAmount'] = 420;
+      final amountJson = Map<String, dynamic>.from(fullJson)
+        ..remove('totalPrice')
+        ..remove('totalAmount')
+        ..['amount'] = 175;
+
+      expect(BackendBooking.fromJson(totalAmountJson).totalAmount, equals(420));
+      expect(BackendBooking.fromJson(amountJson).totalAmount, equals(175));
+    });
+
     test('parses notes from description field', () {
       final booking = BackendBooking.fromJson(fullJson);
       expect(booking.notes, equals('Fix leaking pipe under sink'));
@@ -63,7 +76,33 @@ void main() {
       expect(booking.workerId, equals('worker456'));
     });
 
-    test('workerName is empty when worker is a raw id string (not populated)', () {
+    test('parses worker id from assignment aliases', () {
+      final workerIdJson = Map<String, dynamic>.from(fullJson)
+        ..remove('worker')
+        ..['workerId'] = 'worker-from-workerId';
+      final technicianIdJson = Map<String, dynamic>.from(fullJson)
+        ..remove('worker')
+        ..['technicianId'] = 'worker-from-technicianId';
+      final assignedToJson = Map<String, dynamic>.from(fullJson)
+        ..remove('worker')
+        ..['assignedTo'] = {'_id': 'worker-from-assignedTo'};
+
+      expect(
+        BackendBooking.fromJson(workerIdJson).workerId,
+        equals('worker-from-workerId'),
+      );
+      expect(
+        BackendBooking.fromJson(technicianIdJson).workerId,
+        equals('worker-from-technicianId'),
+      );
+      expect(
+        BackendBooking.fromJson(assignedToJson).workerId,
+        equals('worker-from-assignedTo'),
+      );
+    });
+
+    test('workerName is empty when worker is a raw id string (not populated)',
+        () {
       final booking = BackendBooking.fromJson(fullJson);
       expect(booking.workerName, equals(''));
     });
@@ -85,7 +124,8 @@ void main() {
 
     test('parses scheduledDate correctly', () {
       final booking = BackendBooking.fromJson(fullJson);
-      expect(booking.scheduledDate, equals(DateTime.parse('2026-06-01T10:00:00.000Z')));
+      expect(booking.scheduledDate,
+          equals(DateTime.parse('2026-06-01T10:00:00.000Z')));
     });
 
     test('handles missing optional fields with safe defaults', () {

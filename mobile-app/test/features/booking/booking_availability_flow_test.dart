@@ -1,0 +1,146 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import 'package:servio_mobile_app/src/core/models/user_account.dart';
+import 'package:servio_mobile_app/src/design_system/servio_theme.dart';
+import 'package:servio_mobile_app/src/features/booking/booking_flow_data.dart';
+import 'package:servio_mobile_app/src/features/booking/booking_step_three_screen.dart';
+import 'package:servio_mobile_app/src/features/booking/booking_step_two_screen.dart';
+
+void main() {
+  testWidgets('date picker disables weekly day-off dates', (tester) async {
+    final data = BookingFlowData(
+      technicianId: 'worker1',
+      technicianAvailability: const <AvailabilitySlot>[
+        AvailabilitySlot(day: 'monday', from: '12:00', to: '17:00'),
+        AvailabilitySlot(day: 'tuesday', from: '09:00', to: '17:00'),
+      ],
+    );
+
+    await tester.pumpWidget(_wrap(BookingStepTwoScreen(data: data)));
+    await tester.pumpAndSettle();
+
+    final days = _visibleBookingDays();
+    final saturday = days.firstWhere((day) => day.weekday == DateTime.saturday);
+    final sunday = days.firstWhere((day) => day.weekday == DateTime.sunday);
+    final firstAvailable = days.firstWhere(
+      (day) =>
+          day.weekday == DateTime.monday || day.weekday == DateTime.tuesday,
+    );
+    final firstHour = firstAvailable.weekday == DateTime.monday ? 12 : 9;
+
+    expect(
+      find.byKey(ValueKey<String>(
+        'booking-date-${_dateKey(saturday)}-unavailable',
+      )),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(ValueKey<String>(
+        'booking-date-${_dateKey(sunday)}-unavailable',
+      )),
+      findsOneWidget,
+    );
+    expect(find.text(_slotLabel(firstHour)), findsOneWidget);
+
+    await tester.tap(find.byKey(ValueKey<String>(
+      'booking-date-${_dateKey(saturday)}-unavailable',
+    )));
+    await tester.pumpAndSettle();
+
+    expect(find.text(_slotLabel(firstHour)), findsOneWidget);
+    expect(find.text('Technician is not available on this day'), findsNothing);
+  });
+
+  testWidgets('date picker blocks booking when no weekdays are available',
+      (tester) async {
+    await tester.pumpWidget(_wrap(const BookingStepTwoScreen(
+      data: BookingFlowData(technicianId: 'worker1'),
+    )));
+    await tester.pumpAndSettle();
+
+    expect(
+        find.text('Technician is not available on this day'), findsOneWidget);
+
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Review & Confirm'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('review step blocks stale unavailable scheduled dates',
+      (tester) async {
+    final days = _visibleBookingDays();
+    final unavailableDate =
+        days.firstWhere((day) => day.weekday == DateTime.saturday);
+
+    await tester.pumpWidget(_wrap(BookingStepThreeScreen(
+      data: BookingFlowData(
+        technicianId: 'worker1',
+        serviceId: 'service1',
+        serviceName: 'Drain Cleaning',
+        category: 'plumbing',
+        scheduledDateTime: unavailableDate,
+        date: DateTime(unavailableDate.year, unavailableDate.month,
+                unavailableDate.day)
+            .toIso8601String(),
+        time: '10:00 AM - 11:00 AM',
+        technicianAvailability: const <AvailabilitySlot>[
+          AvailabilitySlot(day: 'monday', from: '12:00', to: '17:00'),
+        ],
+      ),
+    )));
+    await tester.pumpAndSettle();
+
+    expect(
+        find.text('Technician is not available on this day'), findsOneWidget);
+
+    await tester.ensureVisible(find.byType(Checkbox));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(Checkbox));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Confirm Booking'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Confirm Booking'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Booking Confirmed!'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+}
+
+Widget _wrap(Widget child) {
+  return MaterialApp(
+    theme: ServioTheme.light(),
+    home: child,
+  );
+}
+
+List<DateTime> _visibleBookingDays() {
+  final firstDay = DateTime.now().add(const Duration(days: 1));
+  final normalizedFirstDay =
+      DateTime(firstDay.year, firstDay.month, firstDay.day);
+  return List<DateTime>.generate(
+    7,
+    (index) => normalizedFirstDay.add(Duration(days: index)),
+  );
+}
+
+String _dateKey(DateTime value) {
+  final year = value.year.toString().padLeft(4, '0');
+  final month = value.month.toString().padLeft(2, '0');
+  final day = value.day.toString().padLeft(2, '0');
+  return '$year-$month-$day';
+}
+
+String _slotLabel(int hour) => '${_hourLabel(hour)} - ${_hourLabel(hour + 1)}';
+
+String _hourLabel(int hour) {
+  final normalizedHour = hour % 24;
+  final suffix = normalizedHour >= 12 ? 'PM' : 'AM';
+  final displayHour = normalizedHour == 0
+      ? 12
+      : (normalizedHour > 12 ? normalizedHour - 12 : normalizedHour);
+  return '$displayHour:00 $suffix';
+}

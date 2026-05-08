@@ -5,6 +5,7 @@
 
 import { animate, stagger } from 'https://cdn.jsdelivr.net/npm/motion@12.38.0/+esm';
 import { getWorker } from '../api/users.js';
+import { getWorkerReviews } from '../api/reviews.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -198,29 +199,73 @@ function render(worker, lang) {
 
 // ── Render reviews ─────────────────────────────────────────────────────────────
 
+function renderRatingBars(reviews) {
+  const container = el('rating-bars');
+  if (!container) return;
+
+  const total = reviews.length;
+  if (!total) {
+    container.innerHTML = '';
+    return;
+  }
+
+  const counts = [5, 4, 3, 2, 1].map(n => ({
+    n,
+    count: reviews.filter(r => Math.round(r.rating) === n).length,
+  }));
+
+  const max = Math.max(...counts.map(c => c.count), 1);
+
+  container.innerHTML = counts.map(({ n, count }) => {
+    const pct = Math.round((count / total) * 100);
+    const barWidth = Math.round((count / max) * 100);
+    const isLow = n <= 2;
+    return `
+      <div class="rating-bar-row">
+        <span class="rating-bar-label">${n}</span>
+        <div class="rating-bar-track">
+          <div class="rating-bar-fill${isLow ? ' rating-bar-fill--low' : ''}" style="width:${barWidth}%"></div>
+        </div>
+        <span class="rating-bar-count">${count}</span>
+      </div>`;
+  }).join('');
+}
+
 function renderReviews(reviews, lang) {
   const isAr = lang === 'ar';
   const container = el('reviews-list');
   if (!container) return;
 
   if (!reviews || !reviews.length) {
-    container.innerHTML = `<p style="padding:1rem">${isAr ? 'لا توجد تقييمات بعد.' : 'No reviews yet.'}</p>`;
+    container.innerHTML = `<p style="padding:1rem;opacity:0.6">${isAr ? 'لا توجد تقييمات بعد.' : 'No reviews yet.'}</p>`;
     return;
   }
 
   container.innerHTML = reviews.map(r => {
     const reviewer = escapeHtml(r.user?.name || 'Customer');
-    const comment = escapeHtml(r.comment || '');
-    const stars = '★'.repeat(Math.round(r.rating || 0)) + '☆'.repeat(5 - Math.round(r.rating || 0));
-    const date = r.createdAt ? new Date(r.createdAt).toLocaleDateString(isAr ? 'ar-EG' : 'en-US') : '';
+    const initials  = reviewer.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    const comment   = escapeHtml(r.comment || '');
+    const date      = r.createdAt
+      ? new Date(r.createdAt).toLocaleDateString(isAr ? 'ar-EG' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+      : '';
+    const starCount = Math.round(r.rating || 0);
+    const stars = Array.from({ length: 5 }, (_, i) =>
+      i < starCount
+        ? `<svg viewBox="0 0 24 24" width="14" height="14" fill="#F59E0B"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`
+        : `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#d1d5db" stroke-width="1.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`
+    ).join('');
+
     return `
       <div class="review-card">
         <div class="review-card__header">
-          <span class="review-card__name">${reviewer}</span>
-          <span class="review-card__stars">${stars}</span>
-          <span class="review-card__date">${date}</span>
+          <div class="review-card__initials" aria-hidden="true">${initials}</div>
+          <div class="review-card__author-info">
+            <div class="review-card__name">${reviewer}</div>
+            <div class="review-card__date">${date}</div>
+          </div>
+          <div class="review-card__stars" aria-label="${starCount} out of 5 stars">${stars}</div>
         </div>
-        <p class="review-card__body">${comment}</p>
+        ${comment ? `<p class="review-card__text">${comment}</p>` : ''}
       </div>`;
   }).join('');
 }
@@ -360,10 +405,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   const getLang = () => window.__lang || document.documentElement.lang || 'en';
 
   try {
-    const res = await getWorker(techId);
-    // api client already unwraps { success, data } → res IS the data object directly
+    const [res, reviews] = await Promise.all([
+      getWorker(techId),
+      getWorkerReviews(techId).catch(() => []),
+    ]);
     const worker = res?.worker || res?.data?.worker;
-    const reviews = res?.reviews || res?.data?.reviews || [];
 
     if (!worker) {
       console.error('Worker not found in response:', res);
@@ -373,11 +419,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     render(worker, getLang());
     renderReviews(reviews, getLang());
+    renderRatingBars(reviews);
 
     document.addEventListener('langchange', e => {
       const lang = e.detail?.lang || getLang();
       render(worker, lang);
       renderReviews(reviews, lang);
+      renderRatingBars(reviews);
     });
 
     // Wire all Book Now buttons

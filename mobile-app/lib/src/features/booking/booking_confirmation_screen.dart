@@ -499,11 +499,10 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
               // ── Action stack ─────────────────────────────────────────────────
               ServioPrimaryButton(
                 label: 'View Booking Details',
-                onPressed: () => Navigator.of(context).pushAndRemoveUntil(
+                onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => BookingDetailsScreen(data: widget.data),
                   ),
-                  (route) => false,
                 ),
               ),
               const SizedBox(height: 12),

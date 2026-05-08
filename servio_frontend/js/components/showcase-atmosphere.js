@@ -105,8 +105,7 @@ export function initShowcaseAtmosphere(selector = '.auth-showcase', particleCoun
   }
 
   function loop() {
-    const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
-    ctx.fillStyle = isDark ? 'rgba(16, 8, 6, 0.18)' : 'rgba(253, 252, 251, 0.18)';
+    ctx.fillStyle = 'rgba(16, 8, 6, 0.18)';
     ctx.fillRect(0, 0, W, H);
     t += 0.0018;
     particles.forEach(p => { p.update(); p.draw(); });

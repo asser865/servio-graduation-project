@@ -1,8 +1,9 @@
 'use strict';
 
-const { StatusCodes } = require('http-status-codes');
-const NotifyRequest   = require('./notifyRequest.model');
-const ApiResponse     = require('../../utils/ApiResponse');
+const { StatusCodes }              = require('http-status-codes');
+const NotifyRequest                = require('./notifyRequest.model');
+const ApiResponse                  = require('../../utils/ApiResponse');
+const { sendSubscriptionConfirmEmail } = require('../../utils/email');
 
 // POST /api/v1/notify
 const subscribe = async (req, res) => {
@@ -18,6 +19,11 @@ const subscribe = async (req, res) => {
   }
 
   await NotifyRequest.create({ email, userId, serviceCategory: category, serviceArea: serviceArea.trim() });
+
+  sendSubscriptionConfirmEmail(email, category, category).catch(err =>
+    console.error('[notify] Failed to send subscription confirm email:', err.message)
+  );
+
   return ApiResponse.success(res, StatusCodes.CREATED, 'You will be notified when a technician becomes available.', { subscribed: true });
 };
 

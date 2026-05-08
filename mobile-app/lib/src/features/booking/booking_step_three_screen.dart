@@ -53,6 +53,13 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
     if (!_termsAccepted) return;
 
     final data = widget.data;
+    if (!data.isScheduledDateAvailable) {
+      setState(() {
+        _error = 'Technician is not available on this day';
+      });
+      return;
+    }
+
     final canCreateBackendBooking = data.technicianId.isNotEmpty &&
         (data.serviceId.isNotEmpty || data.category.isNotEmpty);
     var confirmationData = data;
@@ -116,6 +123,11 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
     final total = _moneyValue(widget.data.amount);
     final platformFee = (total * 0.05).round();
     final baseRate = total - platformFee;
+    final availabilityError = widget.data.isScheduledDateAvailable
+        ? null
+        : 'Technician is not available on this day';
+    final visibleError = availabilityError ?? _error;
+    final canConfirm = _termsAccepted && !_loading && availabilityError == null;
 
     final bgColor = Theme.of(context).scaffoldBackgroundColor;
 
@@ -317,7 +329,7 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
               const SizedBox(height: 20),
 
               // ── Error banner ────────────────────────────────────────────────
-              if (_error != null) ...<Widget>[
+              if (visibleError != null) ...<Widget>[
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -331,7 +343,7 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          _error!,
+                          visibleError,
                           style: theme.textTheme.bodySmall
                               ?.copyWith(color: ServioColors.danger),
                         ),
@@ -425,12 +437,10 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
                   Expanded(
                     flex: 2,
                     child: Opacity(
-                      opacity: _termsAccepted ? 1.0 : 0.5,
+                      opacity: canConfirm ? 1.0 : 0.5,
                       child: ServioPrimaryButton(
                         label: _loading ? 'Confirming…' : 'Confirm Booking',
-                        onPressed: (_termsAccepted && !_loading)
-                            ? _confirmBooking
-                            : null,
+                        onPressed: canConfirm ? _confirmBooking : null,
                       ),
                     ),
                   ),

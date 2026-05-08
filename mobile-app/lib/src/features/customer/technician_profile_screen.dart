@@ -5,6 +5,7 @@ import '../../core/api/api_client.dart';
 import '../../core/api/reviews_api.dart';
 import '../../core/api/users_api.dart';
 import '../../core/models/backend_worker_model.dart';
+import '../../core/models/user_account.dart';
 import '../../core/state/app_state.dart';
 import '../../core/state/workers_state.dart';
 import '../../design_system/servio_theme_extension.dart';
@@ -305,6 +306,7 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
                         onTap: () => _toggleSection(2),
                         child: _AvailabilityPanel(
                           availabilityType: worker.availabilityType,
+                          availability: worker.availability,
                           locale: locale,
                         ),
                       ),
@@ -427,6 +429,9 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
                                               en: 'Service visit',
                                               ar: 'زيارة خدمة'),
                                       specialty: primaryService,
+                                      hourlyRate: rateLabel,
+                                      technicianAvailability:
+                                          worker.availability,
                                     ),
                                   ),
                                 ),
@@ -962,31 +967,53 @@ class _MiniChip extends StatelessWidget {
 class _AvailabilityPanel extends StatelessWidget {
   const _AvailabilityPanel({
     required this.availabilityType,
+    required this.availability,
     required this.locale,
   });
 
   final String availabilityType;
+  final List<AvailabilitySlot> availability;
   final String locale;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
+    final availableDays = availability
+        .where(_availabilityHasWorkingHours)
+        .map((slot) => _normalizeAvailabilityDay(slot.day))
+        .where((day) => day.isNotEmpty)
+        .toSet();
+    final hasWeeklyAvailability = availableDays.isNotEmpty;
 
-    final label = switch (availabilityType) {
-      'weekdays' =>
-        _copy(locale, en: 'Available weekdays', ar: 'متاح أيام الأسبوع'),
-      'weekends' => _copy(locale,
-          en: 'Available weekends', ar: 'متاح في عطلات نهاية الأسبوع'),
-      'both' =>
-        _copy(locale, en: 'Available all week', ar: 'متاح طوال الأسبوع'),
-      _ => _copy(locale, en: 'Flexible schedule', ar: 'جدول مرن'),
-    };
+    final label = hasWeeklyAvailability
+        ? _copy(
+            locale,
+            en: 'Available ${availableDays.length} days a week',
+            ar: 'Available ${availableDays.length} days a week',
+          )
+        : switch (availabilityType) {
+            'weekdays' =>
+              _copy(locale, en: 'Available weekdays', ar: 'متاح أيام الأسبوع'),
+            'weekends' => _copy(locale,
+                en: 'Available weekends', ar: 'متاح في عطلات نهاية الأسبوع'),
+            'both' =>
+              _copy(locale, en: 'Available all week', ar: 'متاح طوال الأسبوع'),
+            _ => _copy(locale, en: 'Flexible schedule', ar: 'جدول مرن'),
+          };
 
     final weekdays =
         availabilityType == 'weekdays' || availabilityType == 'both';
     final weekends =
         availabilityType == 'weekends' || availabilityType == 'both';
+
+    bool isAvailable(String day) {
+      if (hasWeeklyAvailability) return availableDays.contains(day);
+      return switch (day) {
+        'saturday' || 'sunday' => weekends,
+        _ => weekdays,
+      };
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1022,31 +1049,31 @@ class _AvailabilityPanel extends StatelessWidget {
           children: <Widget>[
             _AvailabilityPill(
               day: _copy(locale, en: 'Mon', ar: 'إث'),
-              available: weekdays,
+              available: isAvailable('monday'),
             ),
             _AvailabilityPill(
               day: _copy(locale, en: 'Tue', ar: 'ثل'),
-              available: weekdays,
+              available: isAvailable('tuesday'),
             ),
             _AvailabilityPill(
               day: _copy(locale, en: 'Wed', ar: 'أر'),
-              available: weekdays,
+              available: isAvailable('wednesday'),
             ),
             _AvailabilityPill(
               day: _copy(locale, en: 'Thu', ar: 'خم'),
-              available: weekdays,
+              available: isAvailable('thursday'),
             ),
             _AvailabilityPill(
               day: _copy(locale, en: 'Fri', ar: 'جم'),
-              available: weekdays,
+              available: isAvailable('friday'),
             ),
             _AvailabilityPill(
               day: _copy(locale, en: 'Sat', ar: 'سب'),
-              available: weekends,
+              available: isAvailable('saturday'),
             ),
             _AvailabilityPill(
               day: _copy(locale, en: 'Sun', ar: 'أح'),
-              available: weekends,
+              available: isAvailable('sunday'),
             ),
           ],
         ),
@@ -1451,6 +1478,22 @@ IconData _specialtyIcon(String specialty) {
     'flooring' => Icons.grid_on_rounded,
     _ => Icons.handyman_rounded,
   };
+}
+
+String _normalizeAvailabilityDay(String value) =>
+    value.trim().toLowerCase().replaceAll(RegExp(r'[\s_-]+'), '');
+
+bool _availabilityHasWorkingHours(AvailabilitySlot slot) {
+  final from = _availabilityHourValue(slot.from);
+  final to = _availabilityHourValue(slot.to);
+  return from != null && to != null && from < to;
+}
+
+int? _availabilityHourValue(String value) {
+  final match = RegExp(r'^\s*(\d{1,2})').firstMatch(value);
+  final hour = int.tryParse(match?.group(1) ?? '');
+  if (hour == null || hour < 0 || hour > 24) return null;
+  return hour;
 }
 
 String _availabilityLabel(String availabilityType, String locale) {

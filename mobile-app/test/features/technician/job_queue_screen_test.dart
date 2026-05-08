@@ -6,10 +6,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:provider/provider.dart';
+import 'package:provider/single_child_widget.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:servio_mobile_app/src/core/api/api_client.dart';
+import 'package:servio_mobile_app/src/core/models/user_account.dart';
 import 'package:servio_mobile_app/src/core/services/storage_service.dart';
+import 'package:servio_mobile_app/src/core/state/app_state.dart';
 import 'package:servio_mobile_app/src/design_system/servio_theme_extension.dart';
 import 'package:servio_mobile_app/src/design_system/servio_tokens.dart';
 import 'package:servio_mobile_app/src/features/technician/job_queue_screen.dart';
@@ -22,6 +25,7 @@ import 'package:servio_mobile_app/src/features/technician/job_queue_screen.dart'
 Map<String, dynamic> _booking({
   String id = 'booking1',
   String status = 'accepted',
+  String workerId = 'worker456',
   String serviceName = 'Plumbing',
   String customerName = 'Ahmed Hassan',
   String address = '12 Tahrir St, Cairo',
@@ -33,7 +37,7 @@ Map<String, dynamic> _booking({
       'scheduledDate': '2026-06-01T10:00:00.000Z',
       'totalPrice': totalPrice,
       'description': 'Fix leaking pipe',
-      'worker': 'worker456',
+      'worker': workerId,
       'service': {
         '_id': 'service789',
         'title': serviceName,
@@ -49,11 +53,18 @@ Map<String, dynamic> _booking({
       'address': address,
     };
 
+StorageService? _storage;
+
 /// Wraps [child] in a [Provider<ApiClient>] and a [MaterialApp] that
 /// includes the [ServioThemeExtension].
 Widget _wrap(Widget child, {required ApiClient client}) {
-  return Provider<ApiClient>(
-    create: (_) => client,
+  return MultiProvider(
+    providers: <SingleChildWidget>[
+      Provider<ApiClient>.value(value: client),
+      ChangeNotifierProvider<SessionProvider>(
+        create: (_) => SessionProvider.load(_storage!, client),
+      ),
+    ],
     child: MaterialApp(
       theme: ThemeData(
         useMaterial3: true,
@@ -86,6 +97,7 @@ Future<ApiClient> _buildClient(
   Duration? timeout = const Duration(seconds: 20),
 }) async {
   final storage = await StorageService.init();
+  _storage = storage;
   return ApiClient(
     storage: storage,
     httpClient: mockHttp,
@@ -129,7 +141,18 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() {
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({
+      'servio_session': jsonEncode(
+        const UserAccount(
+          id: 'worker456',
+          name: 'Tech Worker',
+          email: 'tech@example.com',
+          phone: '01000000000',
+          role: UserRole.technician,
+        ).toJson(),
+      ),
+    });
+    _storage = null;
   });
 
   testWidgets('shows loading indicator while fetching', (tester) async {
@@ -154,10 +177,6 @@ void main() {
     await tester.pump();
     await tester.pumpAndSettle();
 
-    // Default tab is Pending (index 0). Switch to Confirmed to see accepted jobs.
-    await tester.tap(find.text('Confirmed'));
-    await tester.pumpAndSettle();
-
     expect(find.text('Plumbing'), findsOneWidget);
   });
 
@@ -168,9 +187,6 @@ void main() {
 
     await tester.pumpWidget(_wrap(const JobQueueScreen(), client: client));
     await tester.pump();
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.text('Confirmed'));
     await tester.pumpAndSettle();
 
     expect(find.text('Fatima Ali'), findsOneWidget);
@@ -210,6 +226,51 @@ void main() {
     // Default tab is Pending (index 0)
     expect(find.text('Carpentry'), findsOneWidget);
     expect(find.text('Electrical'), findsNothing);
+  });
+
+  testWidgets('shows only bookings assigned to logged-in worker',
+      (tester) async {
+    final client = await _buildClient(
+      _mockClient([
+        _booking(id: 'mine', workerId: 'worker456', serviceName: 'Mine Job'),
+        _booking(id: 'other', workerId: 'worker999', serviceName: 'Other Job'),
+      ]),
+    );
+
+    await tester.pumpWidget(_wrap(const JobQueueScreen(), client: client));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Mine Job'), findsOneWidget);
+    expect(find.text('Other Job'), findsNothing);
+  });
+
+  testWidgets('sends logged-in worker id in worker bookings query',
+      (tester) async {
+    Uri? capturedUri;
+    final httpClient = MockClient((request) async {
+      capturedUri = request.url;
+      return http.Response(
+        jsonEncode({
+          'success': true,
+          'message': 'ok',
+          'data': {
+            'bookings': [_booking(status: 'pending')],
+            'pagination': {'total': 1, 'page': 1, 'pages': 1},
+          },
+        }),
+        200,
+        headers: {'content-type': 'application/json'},
+      );
+    });
+    final client = await _buildClient(httpClient);
+
+    await tester.pumpWidget(_wrap(const JobQueueScreen(), client: client));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(capturedUri?.path, contains('/bookings/worker'));
+    expect(capturedUri?.queryParameters['workerId'], equals('worker456'));
   });
 
   testWidgets('shows empty state message when no jobs on current tab',
