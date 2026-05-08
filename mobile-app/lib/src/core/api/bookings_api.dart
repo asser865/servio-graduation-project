@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import '../models/backend_booking_model.dart';
 import 'api_client.dart';
 import 'api_endpoints.dart';
@@ -26,23 +28,33 @@ class BookingsApi {
         .toList();
   }
 
-  Future<List<BackendBooking>> getWorkerBookings({String? status}) async {
+  Future<List<BackendBooking>> getWorkerBookings({
+    String? status,
+    String? workerId,
+  }) async {
     final qs = Uri(
       queryParameters: <String, String>{
         'limit': '50',
         if (status != null && status.isNotEmpty) 'status': status,
+        if (workerId != null && workerId.trim().isNotEmpty)
+          'workerId': workerId.trim(),
       },
     ).query;
-    final data = _client.unwrapData(
-      await _client.get('${ApiEndpoints.workerBookings}?$qs'),
+    final path = '${ApiEndpoints.workerBookings}?$qs';
+    _debugLog(
+      'GET $path (backend assignment field: worker, auth worker id: '
+      '${workerId?.trim() ?? '<unknown>'})',
     );
-    final list = (data['bookings'] as List<dynamic>?) ??
-        (data['data'] as List<dynamic>?) ??
-        <dynamic>[];
-    return list
+    final data = _client.unwrapData(
+      await _client.get(path),
+    );
+    final list = _bookingListFrom(data);
+    final bookings = list
         .whereType<Map<String, dynamic>>()
         .map(BackendBooking.fromJson)
         .toList();
+    _debugLog('Worker bookings response count: ${bookings.length}');
+    return bookings;
   }
 
   Future<BackendBooking> createBooking({
@@ -124,4 +136,23 @@ String _normalizeScheduledTime(String value) {
   if (meridiem == 'AM' && hour == 12) hour = 0;
   hour = hour.clamp(0, 23).toInt();
   return '${hour.toString().padLeft(2, '0')}:00';
+}
+
+List<dynamic> _bookingListFrom(Map<String, dynamic> data) {
+  for (final key in <String>['bookings', 'data', 'items', 'results']) {
+    final value = data[key];
+    if (value is List<dynamic>) return value;
+    if (value is Map<String, dynamic>) {
+      final nested = _bookingListFrom(value);
+      if (nested.isNotEmpty) return nested;
+    }
+  }
+  return const <dynamic>[];
+}
+
+void _debugLog(String message) {
+  assert(() {
+    developer.log(message, name: 'Servio.BookingsApi');
+    return true;
+  }());
 }

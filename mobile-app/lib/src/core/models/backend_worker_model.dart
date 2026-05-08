@@ -1,3 +1,5 @@
+import 'user_account.dart';
+
 class BackendWorkerService {
   const BackendWorkerService({
     required this.id,
@@ -49,6 +51,7 @@ class BackendWorker {
     required this.isVerified,
     required this.yearsExperience,
     required this.availabilityType,
+    required this.availability,
   });
 
   final String id;
@@ -66,6 +69,7 @@ class BackendWorker {
   final bool isVerified;
   final int yearsExperience;
   final String availabilityType;
+  final List<AvailabilitySlot> availability;
 
   String get displayName => name.trim().isNotEmpty ? name.trim() : 'Technician';
 
@@ -117,7 +121,17 @@ class BackendWorker {
         isVerified: (json['isVerified'] as bool?) ?? false,
         yearsExperience: ((json['yearsExperience'] as num?) ?? 0).toInt(),
         availabilityType: _stringValue(json['availabilityType']),
+        availability: _availabilityList(json['availability']),
       );
+}
+
+List<AvailabilitySlot> _availabilityList(dynamic value) {
+  if (value is! List<dynamic>) return const <AvailabilitySlot>[];
+  return value
+      .whereType<Map<dynamic, dynamic>>()
+      .map((item) => AvailabilitySlot.fromJson(Map<String, dynamic>.from(item)))
+      .where((slot) => slot.day.trim().isNotEmpty)
+      .toList();
 }
 
 List<String> _stringList(dynamic value) {

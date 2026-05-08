@@ -35,12 +35,27 @@ class BackendBooking {
     // worker is a raw ObjectId string (not populated by getWorkerBookings)
     final worker = json['worker'];
     String workerName = '';
-    String workerId = '';
+    String workerId = _firstAssignmentId(<dynamic>[
+      json['workerId'],
+      json['technicianId'],
+      json['assignedTo'],
+      json['assignedWorker'],
+    ]);
     if (worker is Map<String, dynamic>) {
       workerName = (worker['name'] as String?) ?? '';
-      workerId = (worker['_id'] as String?) ?? '';
+      workerId = _firstStringValue(<dynamic>[
+        worker['_id'],
+        worker['id'],
+        workerId,
+      ]);
     } else if (worker is String) {
       workerId = worker;
+    }
+    if (workerId.isEmpty) {
+      workerId = _firstAssignmentId(<dynamic>[
+        json['assignedTo'],
+        json['assignedWorker'],
+      ]);
     }
 
     // service is a populated object { _id, title, category, basePrice, priceUnit }
@@ -82,7 +97,11 @@ class BackendBooking {
           DateTime.tryParse((json['scheduledDate'] as String?) ?? '') ??
               DateTime.now(),
       scheduledTime: (json['scheduledTime'] as String?) ?? '',
-      totalAmount: ((json['totalPrice'] as num?) ?? 0).toDouble(),
+      totalAmount: (((json['totalPrice'] as num?) ??
+                  (json['totalAmount'] as num?) ??
+                  (json['amount'] as num?)) ??
+              0)
+          .toDouble(),
       notes: (json['description'] as String?) ?? '',
       workerName: workerName,
       workerId: workerId,
@@ -94,4 +113,27 @@ class BackendBooking {
       customerId: customerId,
     );
   }
+}
+
+String _assignmentIdFrom(dynamic value) {
+  if (value is String) return value;
+  if (value is Map<String, dynamic>) {
+    return _firstStringValue(<dynamic>[value['_id'], value['id']]);
+  }
+  return '';
+}
+
+String _firstAssignmentId(List<dynamic> values) {
+  for (final value in values) {
+    final id = _assignmentIdFrom(value);
+    if (id.trim().isNotEmpty) return id.trim();
+  }
+  return '';
+}
+
+String _firstStringValue(List<dynamic> values) {
+  for (final value in values) {
+    if (value is String && value.trim().isNotEmpty) return value.trim();
+  }
+  return '';
 }
