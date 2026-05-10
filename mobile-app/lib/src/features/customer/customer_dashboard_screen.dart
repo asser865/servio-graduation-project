@@ -1807,7 +1807,7 @@ class _VerificationBox extends StatelessWidget {
       decoration: BoxDecoration(
         color: ServioColors.tint(servio.success),
         borderRadius: BorderRadius.circular(ServioRadius.sm),
-        border: Border.all(color: servio.success.withValues(alpha: 0.3)),
+        border: Border.all(color: servio.success.withValues(alpha: 0.18)),
       ),
       child: Row(
         children: <Widget>[

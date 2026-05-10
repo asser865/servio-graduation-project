@@ -19,9 +19,12 @@ class ServicesMarketplaceScreen extends StatefulWidget {
       _ServicesMarketplaceScreenState();
 }
 
+enum _SortOrder { relevance, priceLow, priceHigh, nameAZ }
+
 class _ServicesMarketplaceScreenState extends State<ServicesMarketplaceScreen> {
   int _selectedCategory = 0;
   bool _gridMode = false;
+  _SortOrder _sortOrder = _SortOrder.relevance;
 
   static const List<String> _categories = <String>[
     'All',
@@ -31,6 +34,13 @@ class _ServicesMarketplaceScreenState extends State<ServicesMarketplaceScreen> {
     'HVAC',
     'Carpentry',
   ];
+
+  static const Map<_SortOrder, String> _sortLabels = <_SortOrder, String>{
+    _SortOrder.relevance: 'Relevance',
+    _SortOrder.priceLow: 'Price: Low → High',
+    _SortOrder.priceHigh: 'Price: High → Low',
+    _SortOrder.nameAZ: 'Name: A–Z',
+  };
 
   @override
   void initState() {
@@ -48,6 +58,104 @@ class _ServicesMarketplaceScreenState extends State<ServicesMarketplaceScreen> {
     );
   }
 
+  void _showFilterSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (BuildContext sheetCtx) {
+        final theme = Theme.of(sheetCtx);
+        final servio = sheetCtx.servio;
+        final surface = theme.colorScheme.surface;
+
+        return StatefulBuilder(
+          builder: (BuildContext ctx, StateSetter setSheet) {
+            return Container(
+              decoration: BoxDecoration(
+                color: surface,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
+              ),
+              padding: EdgeInsets.fromLTRB(
+                24, 12, 24,
+                MediaQuery.of(ctx).viewInsets.bottom + 32,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  // Handle
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 20),
+                      decoration: BoxDecoration(
+                        color: servio.border,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  Text('Sort by', style: theme.textTheme.titleMedium),
+                  const SizedBox(height: 12),
+                  ..._SortOrder.values.map((order) {
+                    final active = _sortOrder == order;
+                    return GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () {
+                        setState(() => _sortOrder = order);
+                        Navigator.of(ctx).pop();
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Row(
+                          children: <Widget>[
+                            Expanded(
+                              child: Text(
+                                _sortLabels[order]!,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: active
+                                      ? servio.accent
+                                      : theme.colorScheme.onSurface,
+                                  fontWeight: active
+                                      ? FontWeight.w600
+                                      : FontWeight.w400,
+                                ),
+                              ),
+                            ),
+                            if (active)
+                              Icon(Icons.check_rounded,
+                                  color: servio.accent, size: 20),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  List<BackendService> _sorted(List<BackendService> list) {
+    final copy = List<BackendService>.from(list);
+    switch (_sortOrder) {
+      case _SortOrder.priceLow:
+        copy.sort((a, b) => a.basePrice.compareTo(b.basePrice));
+      case _SortOrder.priceHigh:
+        copy.sort((a, b) => b.basePrice.compareTo(a.basePrice));
+      case _SortOrder.nameAZ:
+        copy.sort((a, b) => a.name.compareTo(b.name));
+      case _SortOrder.relevance:
+        break;
+    }
+    return copy;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -55,13 +163,15 @@ class _ServicesMarketplaceScreenState extends State<ServicesMarketplaceScreen> {
     final provider = context.watch<ServicesProvider>();
     final bottomInset = ServioTabShell.bottomOverlayInsetOf(context);
     final allServices = provider.services;
-    final services = _selectedCategory == 0
+    final filtered = _selectedCategory == 0
         ? allServices
         : allServices
             .where((s) =>
                 s.category.toLowerCase() ==
                 _categories[_selectedCategory].toLowerCase())
             .toList();
+    final services = _sorted(filtered);
+    final hasActiveFilter = _sortOrder != _SortOrder.relevance;
 
     return Scaffold(
       body: SafeArea(
@@ -103,15 +213,48 @@ class _ServicesMarketplaceScreenState extends State<ServicesMarketplaceScreen> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.surface,
-                        borderRadius: BorderRadius.circular(ServioRadius.full),
-                        boxShadow: ServioShadows.rest,
+                    GestureDetector(
+                      onTap: _showFilterSheet,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: <Widget>[
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: hasActiveFilter
+                                  ? ServioColors.tint(servio.accent)
+                                  : theme.colorScheme.surface,
+                              borderRadius:
+                                  BorderRadius.circular(ServioRadius.full),
+                              boxShadow: ServioShadows.rest,
+                              border: hasActiveFilter
+                                  ? Border.all(
+                                      color: servio.accent, width: 1.5)
+                                  : null,
+                            ),
+                            child:
+                                Icon(Icons.tune_rounded, color: servio.accent),
+                          ),
+                          if (hasActiveFilter)
+                            Positioned(
+                              top: -2,
+                              right: -2,
+                              child: Container(
+                                width: 10,
+                                height: 10,
+                                decoration: BoxDecoration(
+                                  color: servio.accent,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: theme.colorScheme.surface,
+                                    width: 1.5,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
-                      child: Icon(Icons.tune_rounded, color: servio.accent),
                     ),
                   ],
                 ),
@@ -159,9 +302,15 @@ class _ServicesMarketplaceScreenState extends State<ServicesMarketplaceScreen> {
                   children: <Widget>[
                     const Spacer(),
                     Text(
-                      'Sort: Rating',
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: servio.textSecondary),
+                      'Sort: ${_sortLabels[_sortOrder]}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: hasActiveFilter
+                            ? servio.accent
+                            : servio.textSecondary,
+                        fontWeight: hasActiveFilter
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     _ToggleIcon(

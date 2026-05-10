@@ -1024,7 +1024,7 @@ class _AvailabilityPanel extends StatelessWidget {
           decoration: BoxDecoration(
             color: ServioColors.tint(servio.success),
             borderRadius: BorderRadius.circular(ServioRadius.md),
-            border: Border.all(color: servio.success.withValues(alpha: 0.22)),
+            border: Border.all(color: servio.success.withValues(alpha: 0.14)),
           ),
           child: Row(
             children: <Widget>[
