@@ -23,6 +23,7 @@ class CustomerProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final account = context.watch<SessionProvider>().account;
+    final bookingsCount = context.watch<BookingsProvider?>()?.all.length ?? 0;
     final bottomInset = ServioTabShell.bottomOverlayInsetOf(context);
 
     return Scaffold(
@@ -56,10 +57,10 @@ class CustomerProfileScreen extends StatelessWidget {
                 delegate: SliverChildListDelegate(
                   <Widget>[
                     // Stats
-                    _StatsRow(stats: const <_Stat>[
-                      _Stat(value: '12', label: 'Bookings'),
-                      _Stat(value: '8', label: 'Reviews'),
-                      _Stat(value: '2025', label: 'Since'),
+                    _StatsRow(stats: <_Stat>[
+                      _Stat(value: '$bookingsCount', label: 'Bookings'),
+                      const _Stat(value: '0', label: 'Reviews'),
+                      const _Stat(value: '2025', label: 'Since'),
                     ]),
                     const SizedBox(height: ServioSpacing.sectionGap),
 

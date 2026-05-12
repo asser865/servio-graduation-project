@@ -33,7 +33,7 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
   late final AnimationController _pulseController;
   late final Animation<double> _checkScale;
 
-  // The 4-digit PIN generated once per booking.
+  // Server-generated 4-digit arrival PIN returned by booking creation.
   late final String _pin;
 
   bool _refCopied = false;
@@ -42,7 +42,7 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
   void initState() {
     super.initState();
 
-    _pin = (1000 + DateTime.now().millisecondsSinceEpoch % 9000).toString();
+    _pin = widget.data.pin.trim().isNotEmpty ? widget.data.pin.trim() : '----';
 
     _checkController = AnimationController(
       vsync: this,
@@ -60,7 +60,11 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
 
     // Refresh provider after first frame so home screen shows real backend data.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<BookingsProvider>().refresh();
+      try {
+        context.read<BookingsProvider>().refresh();
+      } catch (_) {
+        // Standalone preview/tests may mount this screen without app providers.
+      }
     });
   }
 
@@ -132,9 +136,8 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
                 ),
                 onPressed: () {
                   Navigator.of(ctx).pop();
-                  context
-                      .read<BookingsProvider>()
-                      .updateStatus(widget.data.backendId, BookingStatus.cancelled);
+                  context.read<BookingsProvider>().updateStatus(
+                      widget.data.backendId, BookingStatus.cancelled);
                   Navigator.of(context).pushAndRemoveUntil(
                     MaterialPageRoute<void>(
                         builder: (_) => const CustomerShell()),
@@ -272,7 +275,11 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
               const SizedBox(height: 24),
 
               // ── 6-step status tracker ────────────────────────────────────────
-              _StatusTracker(pulse: _pulseController),
+              _StatusTracker(
+                pulse: _pulseController,
+                statusCode: widget.data.statusCode,
+                statusLabel: widget.data.statusLabel,
+              ),
               const SizedBox(height: 20),
 
               // ── Arrival PIN card ─────────────────────────────────────────────
@@ -303,7 +310,7 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
                         border: Border.all(color: servio.accent),
                       ),
                       child: Text(
-                        _pin.split('').join('  '),
+                        _pin == '----' ? _pin : _pin.split('').join('  '),
                         style: theme.textTheme.displaySmall?.copyWith(
                           color: theme.colorScheme.onSurface,
                           fontWeight: FontWeight.w800,
@@ -339,6 +346,12 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
                       label: 'Method',
                       value: widget.data.paymentMethod,
                     ),
+                    if (widget.data.paymentMethodCode == 'card' &&
+                        widget.data.savedCardLabel.isNotEmpty)
+                      _ConfirmDetailRow(
+                        label: 'Card',
+                        value: widget.data.savedCardLabel,
+                      ),
                     _ConfirmDetailRow(
                         label: 'Base Rate', value: '$baseRate EGP'),
                     _ConfirmDetailRow(
@@ -477,6 +490,13 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
                       value: widget.data.paymentMethod,
                       icon: Icons.payments_outlined,
                     ),
+                    if (widget.data.paymentMethodCode == 'card' &&
+                        widget.data.savedCardLabel.isNotEmpty)
+                      _ConfirmDetailRow(
+                        label: 'Card',
+                        value: widget.data.savedCardLabel,
+                        icon: Icons.credit_card_rounded,
+                      ),
                     _ConfirmDetailRow(
                       label: 'Base Rate',
                       value: '$baseRate EGP',
@@ -517,8 +537,11 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
                 ),
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) =>
-                        ChatScreen(contactName: widget.data.technicianName),
+                    builder: (_) => ChatScreen(
+                      contactName: widget.data.technicianName,
+                      bookingId: widget.data.backendId,
+                      workerId: widget.data.technicianId,
+                    ),
                   ),
                 ),
               ),
@@ -625,9 +648,15 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
 // ── Status Tracker ─────────────────────────────────────────────────────────────
 
 class _StatusTracker extends StatelessWidget {
-  const _StatusTracker({required this.pulse});
+  const _StatusTracker({
+    required this.pulse,
+    required this.statusCode,
+    required this.statusLabel,
+  });
 
   final Animation<double> pulse;
+  final String statusCode;
+  final String statusLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -642,9 +671,11 @@ class _StatusTracker extends StatelessWidget {
       'In Progress',
       'Complete',
     ];
-    // Step 0 (Booked) is completed; step 1 is current.
-    const completedUpTo = 0;
-    const currentStep = 1;
+    final currentStep = _trackerIndex(statusCode);
+    final isCompleted = statusCode.toLowerCase() == 'completed' ||
+        statusCode.toLowerCase() == 'done';
+    final completedUpTo =
+        isCompleted ? currentStep : (currentStep > 0 ? currentStep - 1 : 0);
 
     return ServioCard(
       radius: ServioRadius.lg,
@@ -662,11 +693,15 @@ class _StatusTracker extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Text(
-                'Awaiting Technician Confirmation',
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: ServioColors.warning,
-                  fontWeight: FontWeight.w600,
+              AnimatedSwitcher(
+                duration: ServioMotion.normal,
+                child: Text(
+                  statusLabel,
+                  key: ValueKey<String>(statusLabel),
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: ServioColors.warning,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
@@ -688,7 +723,7 @@ class _StatusTracker extends StatelessWidget {
 
               final stepIndex = index ~/ 2;
               final isDone = stepIndex <= completedUpTo;
-              final isCurrent = stepIndex == currentStep;
+              final isCurrent = !isCompleted && stepIndex == currentStep;
 
               return _TrackerDot(
                 done: isDone,
@@ -724,6 +759,17 @@ class _StatusTracker extends StatelessWidget {
       ),
     );
   }
+}
+
+int _trackerIndex(String statusCode) {
+  return switch (statusCode.toLowerCase()) {
+    'confirmed' || 'accepted' || 'scheduled' => 1,
+    'en_route' || 'enroute' => 2,
+    'arrived' => 3,
+    'in_progress' || 'inprogress' => 4,
+    'completed' || 'done' => 5,
+    _ => 0,
+  };
 }
 
 class _TrackerDot extends StatelessWidget {

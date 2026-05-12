@@ -8,6 +8,7 @@ const { StatusCodes } = require('http-status-codes');
 const Booking        = require('./booking.model');
 const Service        = require('../services/service.model');
 const User           = require('../users/user.model');
+const SavedCard      = require('../savedCards/savedCard.model');
 const ApiError       = require('../../utils/ApiError');
 
 // Role → allowed status transitions
@@ -23,7 +24,8 @@ const TRANSITION_RULES = {
  * HOW:  Checks if worker and service are valid/active before creating.
  */
 const createBooking = async (userId, data) => {
-  const { workerId, serviceId, serviceCategory, serviceName, scheduledDate, scheduledTime, address, description, images } = data;
+  const { workerId, serviceId, serviceCategory, serviceName, scheduledDate, scheduledTime, address, description, images, savedCardId } = data;
+  const paymentMethod = normalizePaymentMethod(data.paymentMethod);
 
   // Fetch worker
   const worker = await User.findOne({ _id: workerId, role: 'worker', isActive: true, isVerified: true });
@@ -138,6 +140,8 @@ const createBooking = async (userId, data) => {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'A service or service category is required.');
   }
 
+  const paymentData = await resolvePaymentData(userId, paymentMethod, savedCardId);
+
   // Create booking — catch duplicate-key as race-condition safeguard
   let booking;
   try {
@@ -153,6 +157,9 @@ const createBooking = async (userId, data) => {
       description,
       images,
       totalPrice:      bookingPrice,
+      paymentMethod:    paymentData.paymentMethod,
+      savedCard:        paymentData.savedCard,
+      paymentMeta:      paymentData.paymentMeta,
     });
   } catch (err) {
     if (err.code === 11000) {
@@ -161,8 +168,44 @@ const createBooking = async (userId, data) => {
     throw err;
   }
 
-  return booking.populate(['user', 'worker', 'service']);
+  return booking.populate(['user', 'worker', 'service', 'savedCard']);
 };
+
+function normalizePaymentMethod(value) {
+  const method = String(value || '').trim().toLowerCase();
+  if (method === 'cash') return 'cash';
+  if (method === 'card' || method === 'online') return 'card';
+  throw new ApiError(StatusCodes.BAD_REQUEST, 'Payment method must be cash or card.');
+}
+
+async function resolvePaymentData(userId, paymentMethod, savedCardId) {
+  if (paymentMethod === 'cash') {
+    return {
+      paymentMethod: 'cash',
+      savedCard:    undefined,
+      paymentMeta:  undefined,
+    };
+  }
+
+  if (!savedCardId) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'A saved card is required for card payments.');
+  }
+
+  const card = await SavedCard.findOne({ _id: savedCardId, userId });
+  if (!card) {
+    throw new ApiError(StatusCodes.FORBIDDEN, 'Saved card not found for this customer.');
+  }
+
+  return {
+    paymentMethod: 'card',
+    savedCard:    card._id,
+    paymentMeta:  {
+      last4:    card.last4,
+      cardType: card.cardType,
+      label:    card.label,
+    },
+  };
+}
 
 /**
  * GET USER BOOKINGS
@@ -181,6 +224,7 @@ const getUserBookings = async (userId, { status, page = 1, limit = 10 }) => {
     Booking.find(filter)
       .populate('worker', 'name profileImage averageRating')
       .populate('service', 'title category basePrice priceUnit')
+      .populate('savedCard', 'last4 expiry cardType label isDefault')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(Number(limit)),
@@ -207,6 +251,7 @@ const getWorkerBookings = async (workerId, { status, page = 1, limit = 10 }) => 
     Booking.find(filter)
       .populate('user',    'name phone profileImage')
       .populate('service', 'title category basePrice priceUnit')
+      .populate('savedCard', 'last4 expiry cardType label isDefault')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(Number(limit)),
@@ -231,6 +276,7 @@ const getAllBookings = async ({ status, page = 1, limit = 10 }) => {
       .populate('user',    'name email')
       .populate('worker',  'name email')
       .populate('service', 'title category')
+      .populate('savedCard', 'last4 expiry cardType label isDefault')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(Number(limit)),
@@ -286,7 +332,8 @@ const getBookingById = async (bookingId, requestingUser) => {
   const booking = await Booking.findById(bookingId)
     .populate('user',    'name email phone profileImage')
     .populate('worker',  'name email phone profileImage')
-    .populate('service', 'title basePrice category');
+    .populate('service', 'title basePrice category')
+    .populate('savedCard', 'last4 expiry cardType label isDefault');
 
   if (!booking) throw new ApiError(StatusCodes.NOT_FOUND, 'Booking not found');
 

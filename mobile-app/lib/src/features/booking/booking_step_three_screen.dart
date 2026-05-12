@@ -5,7 +5,9 @@ import 'package:provider/provider.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/api/bookings_api.dart';
+import '../../core/api/saved_cards_api.dart';
 import '../../core/models/backend_booking_model.dart';
+import '../../core/models/saved_card_model.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
@@ -29,13 +31,48 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
   bool _termsAccepted = false;
   bool _loading = false;
   String? _error;
+  late String _paymentMethodCode;
+  String? _selectedCardId;
+  List<SavedCardModel> _savedCards = <SavedCardModel>[];
+  bool _cardsLoading = false;
+  bool _savingCard = false;
+  String? _cardsError;
+  bool _showAddCardForm = false;
+  late ApiClient _apiClient;
+  late final TextEditingController _cardNumberController;
+  late final TextEditingController _cardExpiryController;
+  late final TextEditingController _cardLabelController;
+
+  @override
+  void initState() {
+    super.initState();
+    _paymentMethodCode =
+        widget.data.paymentMethodCode == 'card' ? 'card' : 'cash';
+    _selectedCardId =
+        widget.data.savedCardId.isNotEmpty ? widget.data.savedCardId : null;
+    _cardNumberController = TextEditingController();
+    _cardExpiryController = TextEditingController();
+    _cardLabelController = TextEditingController();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _loadSavedCards();
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _apiClient = context.read<ApiClient>();
+  }
+
+  @override
+  void dispose() {
+    _cardNumberController.dispose();
+    _cardExpiryController.dispose();
+    _cardLabelController.dispose();
+    super.dispose();
+  }
 
   // ── helpers ──────────────────────────────────────────────────────────────────
-
-  /// Navigate back to step 2 (date / payment).
-  void _editPayment() {
-    Navigator.of(context).pop();
-  }
 
   void _editServiceDetails() {
     Navigator.of(context)
@@ -49,6 +86,84 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
     );
   }
 
+  Future<void> _loadSavedCards() async {
+    setState(() {
+      _cardsLoading = true;
+      _cardsError = null;
+    });
+    try {
+      final cards = await SavedCardsApi(_apiClient).getSavedCards();
+      if (!mounted) return;
+      setState(() {
+        _savedCards = cards;
+        if (_selectedCardId == null && cards.isNotEmpty) {
+          SavedCardModel? defaultCard;
+          for (final card in cards) {
+            if (card.isDefault) {
+              defaultCard = card;
+              break;
+            }
+          }
+          _selectedCardId = (defaultCard ?? cards.first).id;
+        }
+        _showAddCardForm = _paymentMethodCode == 'card' && cards.isEmpty;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _cardsError = e.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _cardsError = 'Could not load saved cards.');
+    } finally {
+      if (mounted) setState(() => _cardsLoading = false);
+    }
+  }
+
+  Future<void> _saveCard() async {
+    final digits = _cardNumberController.text.replaceAll(RegExp(r'\D'), '');
+    final expiry = _cardExpiryController.text.replaceAll(' ', '');
+    if (digits.length < 12 || !RegExp(r'^\d+$').hasMatch(digits)) {
+      setState(() => _cardsError = 'Enter a valid card number.');
+      return;
+    }
+    if (!RegExp(r'^\d{2}/\d{2}$').hasMatch(expiry)) {
+      setState(() => _cardsError = 'Enter expiry as MM/YY.');
+      return;
+    }
+
+    setState(() {
+      _savingCard = true;
+      _cardsError = null;
+    });
+    try {
+      final card = await SavedCardsApi(_apiClient).addCard(
+        last4: digits.substring(digits.length - 4),
+        expiry: expiry,
+        cardType: _detectCardType(digits),
+        label: _cardLabelController.text.trim(),
+      );
+      if (!mounted) return;
+      final cards = await SavedCardsApi(_apiClient).getSavedCards();
+      if (!mounted) return;
+      setState(() {
+        _savedCards = cards;
+        _selectedCardId = card.id;
+        _showAddCardForm = false;
+        _cardNumberController.clear();
+        _cardExpiryController.clear();
+        _cardLabelController.clear();
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _cardsError = e.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _cardsError = 'Could not save card.');
+    } finally {
+      if (mounted) setState(() => _savingCard = false);
+    }
+  }
+
   Future<void> _confirmBooking() async {
     if (!_termsAccepted) return;
 
@@ -59,10 +174,26 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
       });
       return;
     }
+    if (_paymentMethodCode == 'card' && (_selectedCardId ?? '').isEmpty) {
+      setState(() {
+        _error = 'Select or add a saved card to continue.';
+        _showAddCardForm = _savedCards.isEmpty;
+      });
+      return;
+    }
 
     final canCreateBackendBooking = data.technicianId.isNotEmpty &&
         (data.serviceId.isNotEmpty || data.category.isNotEmpty);
-    var confirmationData = data;
+    final selectedCard = _selectedCard;
+    var confirmationData = data.copyWith(
+      paymentMethodCode: _paymentMethodCode,
+      paymentMethod: _paymentMethodCode == 'card' ? 'Credit Card' : 'Cash',
+      savedCardId: _paymentMethodCode == 'card' ? _selectedCardId ?? '' : '',
+      savedCardLabel:
+          _paymentMethodCode == 'card' ? selectedCard?.displayLabel ?? '' : '',
+      savedCardLast4:
+          _paymentMethodCode == 'card' ? selectedCard?.last4 ?? '' : '',
+    );
 
     if (canCreateBackendBooking) {
       setState(() {
@@ -70,8 +201,7 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
         _error = null;
       });
       try {
-        final client = context.read<ApiClient>();
-        final booking = await BookingsApi(client).createBooking(
+        final booking = await BookingsApi(_apiClient).createBooking(
           workerId: data.technicianId,
           serviceId: data.serviceId,
           serviceCategory: data.category,
@@ -84,8 +214,13 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
           addressStreet:
               data.addressStreet.isNotEmpty ? data.addressStreet : '',
           notes: data.notes,
+          paymentMethod: _paymentMethodCode,
+          savedCardId: _paymentMethodCode == 'card' ? _selectedCardId : null,
         );
-        confirmationData = _confirmationDataFromBackend(data, booking);
+        confirmationData = _confirmationDataFromBackend(
+          confirmationData,
+          booking,
+        );
         if (!mounted) return;
       } on ApiException catch (e) {
         if (!mounted) return;
@@ -115,6 +250,238 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
 
   // ── build ────────────────────────────────────────────────────────────────────
 
+  SavedCardModel? get _selectedCard {
+    final id = _selectedCardId;
+    if (id == null) return null;
+    for (final card in _savedCards) {
+      if (card.id == id) return card;
+    }
+    return null;
+  }
+
+  String get _paymentLabel =>
+      _paymentMethodCode == 'card' ? 'Credit Card' : 'Cash';
+
+  String _detectCardType(String digits) {
+    if (digits.startsWith('4')) return 'visa';
+    if (digits.startsWith('5')) return 'mastercard';
+    if (digits.startsWith('3')) return 'amex';
+    return 'other';
+  }
+
+  Widget _buildPaymentSelector(ThemeData theme, ServioThemeExtension servio) {
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+
+    return ServioCard(
+      radius: ServioRadius.lg,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Text(
+            'Payment Method',
+            style: theme.textTheme.titleSmall
+                ?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: _PaymentChoice(
+                  icon: Icons.payments_outlined,
+                  label: 'Cash',
+                  selected: _paymentMethodCode == 'cash',
+                  onTap: () => setState(() {
+                    _paymentMethodCode = 'cash';
+                    _error = null;
+                  }),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _PaymentChoice(
+                  icon: Icons.credit_card_rounded,
+                  label: 'Credit Card',
+                  selected: _paymentMethodCode == 'card',
+                  onTap: () => setState(() {
+                    _paymentMethodCode = 'card';
+                    _showAddCardForm = _savedCards.isEmpty;
+                    _error = null;
+                  }),
+                ),
+              ),
+            ],
+          ),
+          AnimatedSwitcher(
+            duration: reduceMotion ? Duration.zero : ServioMotion.normal,
+            switchInCurve: ServioMotion.spring,
+            switchOutCurve: ServioMotion.standard,
+            child: _paymentMethodCode == 'card'
+                ? Padding(
+                    key: const ValueKey<String>('card-payment-panel'),
+                    padding: const EdgeInsets.only(top: 16),
+                    child: _buildCardPicker(theme, servio),
+                  )
+                : const SizedBox.shrink(key: ValueKey<String>('cash-panel')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCardPicker(ThemeData theme, ServioThemeExtension servio) {
+    if (_cardsLoading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 16),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    final error = _cardsError;
+    final showForm = _savedCards.isEmpty || _showAddCardForm;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        if (error != null) ...<Widget>[
+          Text(
+            error,
+            style: theme.textTheme.bodySmall?.copyWith(color: servio.danger),
+          ),
+          const SizedBox(height: 10),
+        ],
+        if (showForm)
+          _buildAddCardForm(theme, servio)
+        else ...<Widget>[
+          ...List<Widget>.generate(_savedCards.length, (int index) {
+            final card = _savedCards[index];
+            return TweenAnimationBuilder<double>(
+              tween: Tween<double>(begin: 0, end: 1),
+              duration: MediaQuery.disableAnimationsOf(context)
+                  ? Duration.zero
+                  : Duration(milliseconds: 320 + (index * 70)),
+              curve: ServioMotion.curve,
+              builder: (context, value, child) {
+                return Opacity(
+                  opacity: value,
+                  child: Transform.translate(
+                    offset: Offset(0, (1 - value) * 12),
+                    child: child,
+                  ),
+                );
+              },
+              child: Padding(
+                padding: EdgeInsets.only(
+                  bottom: index == _savedCards.length - 1 ? 0 : 10,
+                ),
+                child: _SavedCardChoice(
+                  card: card,
+                  selected: card.id == _selectedCardId,
+                  onTap: () => setState(() {
+                    _selectedCardId = card.id;
+                    _error = null;
+                  }),
+                ),
+              ),
+            );
+          }),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            key: const ValueKey<String>('booking-add-card-button'),
+            onPressed: () => setState(() => _showAddCardForm = true),
+            icon: const Icon(Icons.add_card_rounded),
+            label: const Text('Add New Card'),
+          ),
+        ],
+        if (!showForm && error != null)
+          TextButton(
+            onPressed: _loadSavedCards,
+            child: const Text('Retry'),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildAddCardForm(ThemeData theme, ServioThemeExtension servio) {
+    return AnimatedContainer(
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : ServioMotion.normal,
+      curve: ServioMotion.curve,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: servio.surfaceAlt,
+        borderRadius: BorderRadius.circular(ServioRadius.md),
+        border: Border.all(color: servio.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Text(
+            'Add Card',
+            style: theme.textTheme.labelLarge
+                ?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            key: const ValueKey<String>('booking-card-number-field'),
+            controller: _cardNumberController,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Card number',
+              hintText: '4242 4242 4242 4242',
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            key: const ValueKey<String>('booking-card-expiry-field'),
+            controller: _cardExpiryController,
+            keyboardType: TextInputType.datetime,
+            decoration: const InputDecoration(
+              labelText: 'Expiry',
+              hintText: 'MM/YY',
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            key: const ValueKey<String>('booking-card-label-field'),
+            controller: _cardLabelController,
+            decoration: const InputDecoration(
+              labelText: 'Label',
+              hintText: 'Personal',
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: <Widget>[
+              if (_savedCards.isNotEmpty) ...<Widget>[
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _savingCard
+                        ? null
+                        : () => setState(() => _showAddCardForm = false),
+                    child: const Text('Back'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+              ],
+              Expanded(
+                flex: 2,
+                child: ServioPrimaryButton(
+                  key: const ValueKey<String>('booking-save-card-button'),
+                  label: _savingCard ? 'Saving...' : 'Save Card',
+                  isLoading: _savingCard,
+                  onPressed: _savingCard ? null : _saveCard,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -127,7 +494,10 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
         ? null
         : 'Technician is not available on this day';
     final visibleError = availabilityError ?? _error;
-    final canConfirm = _termsAccepted && !_loading && availabilityError == null;
+    final cardReady =
+        _paymentMethodCode != 'card' || (_selectedCardId ?? '').isNotEmpty;
+    final canConfirm =
+        _termsAccepted && !_loading && availabilityError == null && cardReady;
 
     final bgColor = Theme.of(context).scaffoldBackgroundColor;
 
@@ -172,11 +542,19 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
               const SizedBox(height: 16),
 
               // ── Payment review ───────────────────────────────────────────────
+              _buildPaymentSelector(theme, servio),
+              const SizedBox(height: 16),
+
               _SectionCard(
                 title: 'Payment',
-                onEdit: _editPayment,
                 children: <Widget>[
-                  _ReviewRow(label: 'Method', value: widget.data.paymentMethod),
+                  _ReviewRow(label: 'Method', value: _paymentLabel),
+                  if (_paymentMethodCode == 'card' &&
+                      (_selectedCard?.displayLabel ?? '').isNotEmpty)
+                    _ReviewRow(
+                      label: 'Card',
+                      value: _selectedCard!.displayLabel,
+                    ),
                   _ReviewRow(label: 'Base Rate', value: '$baseRate EGP'),
                   _ReviewRow(
                       label: 'Platform Fee', value: '$platformFee EGP (5%)'),
@@ -541,6 +919,145 @@ class _StepIndicator extends StatelessWidget {
   }
 }
 
+class _PaymentChoice extends StatelessWidget {
+  const _PaymentChoice({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(ServioRadius.md),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : ServioMotion.normal,
+        curve: ServioMotion.curve,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        decoration: BoxDecoration(
+          color:
+              selected ? ServioColors.tint(servio.accent) : servio.surfaceAlt,
+          borderRadius: BorderRadius.circular(ServioRadius.md),
+          border: Border.all(
+            color: selected ? servio.accent : servio.border,
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: <Widget>[
+            Icon(icon, color: selected ? servio.accent : servio.textSecondary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: selected ? servio.accent : theme.colorScheme.onSurface,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SavedCardChoice extends StatelessWidget {
+  const _SavedCardChoice({
+    required this.card,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final SavedCardModel card;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(ServioRadius.md),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : ServioMotion.normal,
+        curve: ServioMotion.curve,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: selected ? Colors.white : servio.surfaceAlt,
+          borderRadius: BorderRadius.circular(ServioRadius.md),
+          border: Border.all(
+            color: selected ? servio.accent : servio.border,
+            width: selected ? 1.5 : 1,
+          ),
+          boxShadow: selected ? ServioShadows.rest : const <BoxShadow>[],
+        ),
+        child: Row(
+          children: <Widget>[
+            Icon(Icons.credit_card_rounded, color: servio.accent),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    card.displayLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  if (card.expiry.isNotEmpty)
+                    Text(
+                      'Expires ${card.expiry}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: servio.textSecondary,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            AnimatedSwitcher(
+              duration: ServioMotion.fast,
+              child: selected
+                  ? Icon(
+                      Icons.check_circle_rounded,
+                      key: const ValueKey<String>('selected'),
+                      color: servio.success,
+                    )
+                  : Icon(
+                      Icons.radio_button_unchecked_rounded,
+                      key: const ValueKey<String>('unselected'),
+                      color: servio.textSecondary,
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _SectionCard extends StatelessWidget {
   const _SectionCard({
     required this.title,
@@ -698,7 +1215,35 @@ BookingFlowData _confirmationDataFromBackend(
     amount: booking.totalAmount > 0
         ? '${booking.totalAmount.toStringAsFixed(0)} EGP'
         : original.amount,
+    pin: booking.pin,
+    paymentMethod:
+        booking.paymentMethod.toLowerCase() == 'card' ? 'Credit Card' : 'Cash',
+    paymentMethodCode:
+        booking.paymentMethod.toLowerCase() == 'card' ? 'card' : 'cash',
+    savedCardLabel: booking.paymentCardLabel.isNotEmpty
+        ? booking.paymentCardLabel
+        : booking.paymentCardLast4.isNotEmpty
+            ? 'Card ending ${booking.paymentCardLast4}'
+            : '',
+    savedCardLast4: booking.paymentCardLast4,
+    statusCode: booking.status,
+    statusLabel: _statusLabelFromBackend(booking.status),
   );
+}
+
+String _statusLabelFromBackend(String status) {
+  return switch (status.toLowerCase()) {
+    'pending' => 'Pending',
+    'confirmed' || 'accepted' || 'scheduled' => 'Confirmed',
+    'en_route' || 'enroute' => 'En Route',
+    'arrived' => 'Arrived',
+    'in_progress' || 'inprogress' => 'In Progress',
+    'completed' || 'done' => 'Completed',
+    'cancelled' || 'canceled' => 'Cancelled',
+    'rejected' => 'Rejected',
+    'disputed' => 'Disputed',
+    _ => 'Pending',
+  };
 }
 
 String _backendSlotFromLabel(String label) {

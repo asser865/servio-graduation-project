@@ -74,18 +74,21 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   group('SessionProvider.login — admin role restriction', () {
-    test('returns error and does NOT persist session when role is admin', () async {
+    test('returns error and does NOT persist session when role is admin',
+        () async {
       final (:provider, :storage) = await _makeProvider(
         _loginResponse(_userJson(role: 'admin')),
       );
 
       final error = await provider.login('admin@example.com', 'Password1');
 
-      expect(error, equals('Admin accounts can only log in through the website.'));
+      expect(
+          error, equals('Admin accounts can only log in through the website.'));
       expect(provider.isLoggedIn, isFalse);
       expect(provider.account, isNull);
 
-      final storedToken = await storage.getSecureString(StorageService.keyAuthToken);
+      final storedToken =
+          await storage.getSecureString(StorageService.keyAuthToken);
       expect(storedToken, isNull);
     });
 
@@ -100,7 +103,8 @@ void main() {
       expect(provider.isLoggedIn, isTrue);
       expect(provider.account, isNotNull);
 
-      final storedToken = await storage.getSecureString(StorageService.keyAuthToken);
+      final storedToken =
+          await storage.getSecureString(StorageService.keyAuthToken);
       expect(storedToken, equals('user-token'));
     });
 
@@ -114,7 +118,8 @@ void main() {
       expect(error, isNull);
       expect(provider.isLoggedIn, isTrue);
 
-      final storedToken = await storage.getSecureString(StorageService.keyAuthToken);
+      final storedToken =
+          await storage.getSecureString(StorageService.keyAuthToken);
       expect(storedToken, equals('worker-token'));
     });
 
@@ -131,7 +136,8 @@ void main() {
   });
 
   group('SessionProvider._loadFromStorage — defensive admin session clear', () {
-    test('clears stored session if saved role is admin and stays logged out', () async {
+    test('clears stored session if saved role is admin and stays logged out',
+        () async {
       // Simulate an old session stored with role: 'admin'
       SharedPreferences.setMockInitialValues({
         'servio_session': jsonEncode({

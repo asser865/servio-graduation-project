@@ -17,6 +17,7 @@ import '../booking/booking_flow_data.dart';
 import '../booking/booking_step_one_screen.dart';
 import '../messages/chat_screen.dart';
 import '../shared/notifications_screen.dart';
+import 'ai_finishing_estimator_screen.dart';
 import 'customer_profile_screen.dart';
 import 'my_bookings_screen.dart';
 
@@ -359,14 +360,12 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
   }
 
   void _openChat(BookingModel booking) {
-    final conversation = context
-        .read<MessagesProvider>()
-        .findOrCreate(booking.technicianId, booking.technicianName);
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => ChatScreen(
           contactName: booking.technicianName,
-          conversationId: conversation?.id,
+          bookingId: booking.id,
+          workerId: booking.technicianId,
         ),
       ),
     );
@@ -446,11 +445,7 @@ class _OverviewSection extends StatelessWidget {
     final userName =
         context.watch<SessionProvider>().account?.name.split(' ').first ??
             'Mostafa';
-    final active = bookings
-        .where((b) =>
-            b.status == BookingStatus.upcoming ||
-            b.status == BookingStatus.inProgress)
-        .toList();
+    final active = bookings.where((b) => b.status.isActive).toList();
     final completed =
         bookings.where((b) => b.status == BookingStatus.completed).toList();
     final totalSpent = completed.fold<int>(
@@ -462,6 +457,8 @@ class _OverviewSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         _WelcomeCard(userName: userName, onBookService: onBookService),
+        const SizedBox(height: 18),
+        const _EstimatorPromptCard(),
         const SizedBox(height: 18),
         _StatsGrid(
           totalBookings: bookings.length,
@@ -519,8 +516,8 @@ class _BookingsSection extends StatelessWidget {
 
   List<BookingModel> get _filtered => bookings.where((booking) {
         return switch (filter) {
-          'Active' => booking.status == BookingStatus.inProgress,
-          'Pending' => booking.status == BookingStatus.upcoming,
+          'Active' => booking.status.isActive,
+          'Pending' => booking.status == BookingStatus.pending,
           'Completed' => booking.status == BookingStatus.completed,
           _ => true,
         };
@@ -581,15 +578,14 @@ class _HistorySection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final completed = bookings
-        .where((b) =>
-            b.status == BookingStatus.completed ||
-            b.status == BookingStatus.cancelled)
-        .toList();
+    final history = _filteredHistory(bookings, filter);
+    final completed =
+        bookings.where((b) => b.status == BookingStatus.completed).toList();
     final spent = completed.fold<int>(
       0,
       (sum, booking) => sum + _amountValue(booking.amount),
     );
+    final topService = _topService(bookings);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -598,9 +594,9 @@ class _HistorySection extends StatelessWidget {
           children: <Widget>[
             Expanded(
               child: _MiniSummaryCard(
-                label: 'Completed',
-                value: '${completed.length}',
-                icon: Icons.check_circle_outline_rounded,
+                label: 'All Bookings',
+                value: '${bookings.length}',
+                icon: Icons.history_rounded,
               ),
             ),
             const SizedBox(width: 10),
@@ -612,10 +608,10 @@ class _HistorySection extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 10),
-            const Expanded(
+            Expanded(
               child: _MiniSummaryCard(
                 label: 'Top Service',
-                value: 'Plumbing',
+                value: topService,
                 icon: Icons.plumbing_rounded,
               ),
             ),
@@ -630,15 +626,32 @@ class _HistorySection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 24),
-        if (completed.isEmpty)
-          const _EmptyDashboardState(message: 'No completed bookings yet.')
+        if (history.isEmpty)
+          const _EmptyDashboardState(message: 'No bookings yet.')
         else
-          ...completed.map(
-            (booking) => Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: _HistoryBookingTile(booking: booking),
-            ),
-          ),
+          ...List<Widget>.generate(history.length, (int index) {
+            final booking = history[index];
+            return TweenAnimationBuilder<double>(
+              tween: Tween<double>(begin: 0, end: 1),
+              duration: MediaQuery.disableAnimationsOf(context)
+                  ? Duration.zero
+                  : Duration(milliseconds: 360 + index * 70),
+              curve: ServioMotion.curve,
+              builder: (context, value, child) {
+                return Opacity(
+                  opacity: value,
+                  child: Transform.translate(
+                    offset: Offset(0, (1 - value) * 14),
+                    child: child,
+                  ),
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: _HistoryBookingTile(booking: booking),
+              ),
+            );
+          }),
       ],
     );
   }
@@ -805,6 +818,66 @@ class _WelcomeCard extends StatelessWidget {
           const SizedBox(height: 18),
           ServioPrimaryButton(
               label: 'Book a Service', onPressed: onBookService),
+        ],
+      ),
+    );
+  }
+}
+
+class _EstimatorPromptCard extends StatelessWidget {
+  const _EstimatorPromptCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+
+    return ServioCard(
+      radius: ServioRadius.lg,
+      child: Row(
+        children: <Widget>[
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: ServioColors.tint(servio.accent),
+              borderRadius: BorderRadius.circular(ServioRadius.md),
+            ),
+            child: Icon(
+              Icons.calculate_rounded,
+              color: servio.accent,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text('AI Cost Estimator', style: theme.textTheme.titleMedium),
+                const SizedBox(height: 4),
+                Text(
+                  'Get a room finishing budget before you book.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: servio.textSecondary,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          IconButton(
+            tooltip: 'Open estimator',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const AiFinishingEstimatorScreen(),
+              ),
+            ),
+            icon: Icon(
+              Icons.arrow_forward_rounded,
+              color: servio.accent,
+            ),
+          ),
         ],
       ),
     );
@@ -1212,6 +1285,7 @@ class _DashboardBookingCardState extends State<_DashboardBookingCard>
                       platformFee: 75,
                       parts: 0,
                       total: amount,
+                      paymentMethod: _paymentLabelFor(booking),
                     ),
                   )
                 : const SizedBox.shrink(),
@@ -1274,7 +1348,20 @@ class _HistoryBookingTileState extends State<_HistoryBookingTile>
                           ),
                         ),
                         const SizedBox(height: 8),
-                        const ServioStatusChip(label: 'Cash on Completion'),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          children: <Widget>[
+                            ServioStatusChip(
+                              label: _statusLabel(booking.status),
+                              type: _chipType(booking.status),
+                            ),
+                            ServioStatusChip(
+                              label: _paymentLabelFor(booking),
+                              type: ServioStatusChipType.neutral,
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -1315,6 +1402,7 @@ class _HistoryBookingTileState extends State<_HistoryBookingTile>
                           platformFee: 75,
                           parts: 0,
                           total: amount,
+                          paymentMethod: _paymentLabelFor(booking),
                         ),
                         const SizedBox(height: 12),
                         _VerificationBox(reference: booking.reference),
@@ -1379,13 +1467,20 @@ class _BookingProgressTracker extends StatelessWidget {
       'Booked',
       'Confirmed',
       'En Route',
+      'Arrived',
+      'In Progress',
       'Completed'
     ];
     final currentIndex = switch (status) {
-      BookingStatus.upcoming => 1,
-      BookingStatus.inProgress => 2,
-      BookingStatus.completed => 3,
+      BookingStatus.pending => 0,
+      BookingStatus.confirmed => 1,
+      BookingStatus.enRoute => 2,
+      BookingStatus.arrived => 3,
+      BookingStatus.inProgress => 4,
+      BookingStatus.completed => 5,
       BookingStatus.cancelled => 0,
+      BookingStatus.rejected => 0,
+      BookingStatus.disputed => 0,
     };
 
     return Column(
@@ -1394,9 +1489,7 @@ class _BookingProgressTracker extends StatelessWidget {
           children: List<Widget>.generate(steps.length, (int index) {
             final isDone = index < currentIndex ||
                 (status == BookingStatus.completed && index == currentIndex);
-            final isCurrent = index == currentIndex &&
-                status != BookingStatus.completed &&
-                status != BookingStatus.cancelled;
+            final isCurrent = index == currentIndex && status.isActive;
 
             return Expanded(
               child: Row(
@@ -1478,12 +1571,14 @@ class _InvoicePanel extends StatelessWidget {
     required this.platformFee,
     required this.parts,
     required this.total,
+    required this.paymentMethod,
   });
 
   final int baseRate;
   final int platformFee;
   final int parts;
   final int total;
+  final String paymentMethod;
 
   @override
   Widget build(BuildContext context) {
@@ -1510,7 +1605,7 @@ class _InvoicePanel extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Payment method: Cash on Completion',
+                  'Payment method: $paymentMethod',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: servio.textSecondary,
                       ),
@@ -2013,32 +2108,104 @@ class _EmptyDashboardState extends StatelessWidget {
 
 BookingFlowData _flowDataFor(BookingModel booking) {
   return BookingFlowData(
+    backendId: booking.id,
     serviceName: booking.serviceName,
     technicianName: booking.technicianName,
+    technicianId: booking.technicianId,
     date: booking.date,
     time: booking.time,
     location: booking.location,
     amount: booking.amount,
     reference: booking.reference,
+    pin: booking.pin,
+    paymentMethod: booking.paymentMethod,
+    paymentMethodCode:
+        booking.paymentMethod.toLowerCase().contains('card') ? 'card' : 'cash',
+    savedCardLabel: _cardLabelFor(booking),
+    savedCardLast4: booking.paymentCardLast4,
+    statusLabel: _statusLabel(booking.status),
+    statusCode: _statusCodeFromStatus(booking.status),
   );
 }
 
 String _statusLabel(BookingStatus status) {
   return switch (status) {
-    BookingStatus.upcoming => 'Pending',
-    BookingStatus.inProgress => 'En Route',
+    BookingStatus.pending => 'Pending',
+    BookingStatus.confirmed => 'Confirmed',
+    BookingStatus.enRoute => 'En Route',
+    BookingStatus.arrived => 'Arrived',
+    BookingStatus.inProgress => 'In Progress',
     BookingStatus.completed => 'Completed',
     BookingStatus.cancelled => 'Cancelled',
+    BookingStatus.rejected => 'Rejected',
+    BookingStatus.disputed => 'Disputed',
   };
 }
 
 ServioStatusChipType _chipType(BookingStatus status) {
   return switch (status) {
-    BookingStatus.upcoming => ServioStatusChipType.warning,
+    BookingStatus.pending => ServioStatusChipType.warning,
+    BookingStatus.confirmed => ServioStatusChipType.success,
+    BookingStatus.enRoute => ServioStatusChipType.info,
+    BookingStatus.arrived => ServioStatusChipType.info,
     BookingStatus.inProgress => ServioStatusChipType.info,
     BookingStatus.completed => ServioStatusChipType.success,
     BookingStatus.cancelled => ServioStatusChipType.danger,
+    BookingStatus.rejected => ServioStatusChipType.danger,
+    BookingStatus.disputed => ServioStatusChipType.warning,
   };
+}
+
+String _statusCodeFromStatus(BookingStatus status) => switch (status) {
+      BookingStatus.pending => 'pending',
+      BookingStatus.confirmed => 'confirmed',
+      BookingStatus.enRoute => 'en_route',
+      BookingStatus.arrived => 'arrived',
+      BookingStatus.inProgress => 'in_progress',
+      BookingStatus.completed => 'completed',
+      BookingStatus.cancelled => 'cancelled',
+      BookingStatus.rejected => 'rejected',
+      BookingStatus.disputed => 'disputed',
+    };
+
+String _paymentLabelFor(BookingModel booking) {
+  if (booking.paymentMethod.toLowerCase().contains('card')) {
+    final card = _cardLabelFor(booking);
+    return card.isEmpty ? 'Credit Card' : 'Credit Card - $card';
+  }
+  return booking.paymentMethod.trim().isEmpty ? 'Cash' : booking.paymentMethod;
+}
+
+String _cardLabelFor(BookingModel booking) {
+  if (booking.paymentCardLabel.isNotEmpty) return booking.paymentCardLabel;
+  if (booking.paymentCardLast4.isNotEmpty) {
+    return 'Card ending ${booking.paymentCardLast4}';
+  }
+  return '';
+}
+
+List<BookingModel> _filteredHistory(
+    List<BookingModel> bookings, String filter) {
+  return bookings.where((booking) {
+    return switch (filter) {
+      'Plumbing' => booking.serviceName.toLowerCase().contains('plumb'),
+      'This Month' => true,
+      'Cash' => booking.paymentMethod.toLowerCase().contains('cash'),
+      '5 Star' => true,
+      _ => true,
+    };
+  }).toList();
+}
+
+String _topService(List<BookingModel> bookings) {
+  if (bookings.isEmpty) return 'None';
+  final counts = <String, int>{};
+  for (final booking in bookings) {
+    counts.update(booking.serviceName, (value) => value + 1, ifAbsent: () => 1);
+  }
+  final entries = counts.entries.toList()
+    ..sort((a, b) => b.value.compareTo(a.value));
+  return entries.first.key;
 }
 
 IconData _iconForService(String serviceName) {
@@ -2097,7 +2264,10 @@ BookingModel _toBookingModel(BackendBooking b) {
     location: location.isNotEmpty ? location : 'N/A',
     amount: '${b.totalAmount.toStringAsFixed(0)} EGP',
     status: _parseBookingStatus(b.status),
-    pin: b.id.length >= 4 ? b.id.substring(b.id.length - 4) : b.id,
+    pin: b.pin,
+    paymentMethod: _paymentMethodLabel(b.paymentMethod),
+    paymentCardLabel: b.paymentCardLabel,
+    paymentCardLast4: b.paymentCardLast4,
     notes: b.notes,
   );
 }
@@ -2112,9 +2282,23 @@ String _displayScheduledTime(String value) {
 
 BookingStatus _parseBookingStatus(String status) {
   return switch (status.toLowerCase()) {
+    'pending' => BookingStatus.pending,
+    'confirmed' || 'accepted' || 'scheduled' => BookingStatus.confirmed,
+    'en_route' || 'enroute' => BookingStatus.enRoute,
+    'arrived' => BookingStatus.arrived,
     'in_progress' || 'inprogress' || 'active' => BookingStatus.inProgress,
     'completed' || 'done' => BookingStatus.completed,
     'cancelled' || 'canceled' => BookingStatus.cancelled,
-    _ => BookingStatus.upcoming,
+    'rejected' => BookingStatus.rejected,
+    'disputed' => BookingStatus.disputed,
+    _ => BookingStatus.pending,
+  };
+}
+
+String _paymentMethodLabel(String value) {
+  return switch (value.toLowerCase()) {
+    'card' || 'online' => 'Credit Card',
+    'cash' => 'Cash',
+    _ => value.trim().isEmpty ? 'Cash' : value,
   };
 }

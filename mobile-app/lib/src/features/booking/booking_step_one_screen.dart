@@ -8,13 +8,32 @@ import '../../design_system/widgets/servio_status_chip.dart';
 import 'booking_flow_data.dart';
 import 'booking_step_two_screen.dart';
 
-class BookingStepOneScreen extends StatelessWidget {
+class BookingStepOneScreen extends StatefulWidget {
   const BookingStepOneScreen({
     super.key,
     this.data = const BookingFlowData(),
   });
 
   final BookingFlowData data;
+
+  @override
+  State<BookingStepOneScreen> createState() => _BookingStepOneScreenState();
+}
+
+class _BookingStepOneScreenState extends State<BookingStepOneScreen> {
+  late final TextEditingController _notesController;
+
+  @override
+  void initState() {
+    super.initState();
+    _notesController = TextEditingController(text: widget.data.notes);
+  }
+
+  @override
+  void dispose() {
+    _notesController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -63,17 +82,17 @@ class BookingStepOneScreen extends StatelessWidget {
                                   BorderRadius.circular(ServioRadius.sm),
                             ),
                             child: Text(
-                              data.category,
+                              widget.data.category,
                               style: theme.textTheme.labelSmall
                                   ?.copyWith(color: servio.accent),
                             ),
                           ),
                           const SizedBox(height: 10),
-                          Text(data.serviceName,
+                          Text(widget.data.serviceName,
                               style: theme.textTheme.titleMedium),
                           const SizedBox(height: 6),
                           Text(
-                            data.priceLabel,
+                            widget.data.priceLabel,
                             style: theme.textTheme.bodyMedium
                                 ?.copyWith(color: servio.accent),
                           ),
@@ -104,17 +123,17 @@ class BookingStepOneScreen extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
-                          Text(data.technicianName,
+                          Text(widget.data.technicianName,
                               style: theme.textTheme.titleMedium),
                           const SizedBox(height: 4),
                           Text(
-                            data.specialty,
+                            widget.data.specialty,
                             style: theme.textTheme.bodyMedium
                                 ?.copyWith(color: servio.textSecondary),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            '4.9 rating • ${data.hourlyRate}',
+                            '4.9 rating - ${widget.data.hourlyRate}',
                             style: theme.textTheme.bodySmall
                                 ?.copyWith(color: servio.textSecondary),
                           ),
@@ -134,7 +153,8 @@ class BookingStepOneScreen extends StatelessWidget {
                     ?.copyWith(color: servio.textSecondary),
               ),
               const SizedBox(height: 10),
-              const TextField(
+              TextField(
+                controller: _notesController,
                 maxLines: 5,
                 decoration: InputDecoration(
                   hintText: 'e.g., Repaint living room walls, 3 coats...',
@@ -147,7 +167,11 @@ class BookingStepOneScreen extends StatelessWidget {
                 onPressed: () {
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
-                      builder: (_) => BookingStepTwoScreen(data: data),
+                      builder: (_) => BookingStepTwoScreen(
+                        data: widget.data.copyWith(
+                          notes: _notesController.text.trim(),
+                        ),
+                      ),
                     ),
                   );
                 },

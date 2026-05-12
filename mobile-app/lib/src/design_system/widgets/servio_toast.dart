@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../servio_theme_extension.dart';
@@ -46,6 +48,8 @@ class _ServioToastOverlayState extends State<_ServioToastOverlay>
   late final AnimationController _controller;
   late final Animation<Offset> _slideAnimation;
   late final Animation<double> _fadeAnimation;
+  Timer? _dismissTimer;
+  bool _dismissed = false;
 
   @override
   void initState() {
@@ -66,17 +70,20 @@ class _ServioToastOverlayState extends State<_ServioToastOverlay>
     );
 
     _controller.forward();
-    Future<void>.delayed(const Duration(seconds: 3), _dismiss);
+    _dismissTimer = Timer(const Duration(seconds: 3), _dismiss);
   }
 
   Future<void> _dismiss() async {
-    if (!mounted) return;
+    if (_dismissed || !mounted) return;
+    _dismissed = true;
     await _controller.reverse();
+    if (!mounted) return;
     widget.onDismissed();
   }
 
   @override
   void dispose() {
+    _dismissTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }
@@ -103,35 +110,41 @@ class _ServioToastOverlayState extends State<_ServioToastOverlay>
                     decoration: BoxDecoration(
                       color: servio.surfaceRaised,
                       borderRadius: BorderRadius.circular(ServioRadius.md),
-                      // 4px left-border accent strip — matches web toast design
-                      border: Border(
-                        left: BorderSide(color: accentColor, width: 4),
-                        top: BorderSide(color: servio.border),
-                        right: BorderSide(color: servio.border),
-                        bottom: BorderSide(color: servio.border),
-                      ),
+                      border: Border.all(color: servio.border),
                       boxShadow: ServioShadows.elevated,
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
-                      ),
-                      child: Row(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(ServioRadius.md),
+                      child: Stack(
                         children: <Widget>[
-                          Icon(icon, color: accentColor, size: 20),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              widget.message,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodyMedium
-                                  ?.copyWith(
-                                    color:
-                                        Theme.of(context).colorScheme.onSurface,
-                                    height: 1.4,
+                          Positioned(
+                            left: 0,
+                            top: 0,
+                            bottom: 0,
+                            width: 4,
+                            child: ColoredBox(color: accentColor),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 14, 16, 14),
+                            child: Row(
+                              children: <Widget>[
+                                Icon(icon, color: accentColor, size: 20),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    widget.message,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface,
+                                          height: 1.4,
+                                        ),
                                   ),
+                                ),
+                              ],
                             ),
                           ),
                         ],

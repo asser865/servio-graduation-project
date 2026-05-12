@@ -35,6 +35,22 @@ const walletSchema = new mongoose.Schema(
       default: 'egp',
       lowercase: true,
     },
+    payoutMethod: {
+      type: String,
+      enum: ['bank', 'instapay', 'vodafone', 'orange'],
+      default: 'bank',
+    },
+    payoutSchedule: {
+      type: String,
+      enum: ['weekly', 'monthly', 'instant'],
+      default: 'weekly',
+    },
+    payoutDetails: {
+      bankName: { type: String, default: '' },
+      accountHolder: { type: String, default: '' },
+      accountNumber: { type: String, default: '' },
+      walletNumber: { type: String, default: '' },
+    },
   },
   {
     timestamps: true,

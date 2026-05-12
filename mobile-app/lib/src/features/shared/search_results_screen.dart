@@ -1,111 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/data/demo_technicians.dart';
-import '../../core/models/technician_model.dart';
-import '../../core/state/app_state.dart';
+import '../../core/models/backend_service_model.dart';
+import '../../core/models/backend_worker_model.dart';
+import '../../core/models/service_category.dart';
+import '../../core/state/services_state.dart';
+import '../../core/state/workers_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
 import '../customer/ai_smart_match_screen.dart';
+import '../customer/service_detail_screen.dart';
 import '../customer/technician_profile_screen.dart';
-
-// ---------------------------------------------------------------------------
-// Demo service catalogue
-// ---------------------------------------------------------------------------
-
-class _ServiceResult {
-  const _ServiceResult({
-    required this.id,
-    required this.name,
-    required this.category,
-    required this.description,
-    required this.icon,
-    required this.priceFrom,
-    required this.rating,
-    required this.reviewCount,
-  });
-
-  final String id;
-  final String name;
-  final String category;
-  final String description;
-  final IconData icon;
-  final int priceFrom;
-  final double rating;
-  final int reviewCount;
-}
-
-const List<_ServiceResult> _kServices = <_ServiceResult>[
-  _ServiceResult(
-    id: 'plumbing',
-    name: 'Plumbing Repair',
-    category: 'Plumbing',
-    description: 'Leak fixes, pipe replacement, bathroom installation & more.',
-    icon: Icons.water_drop_outlined,
-    priceFrom: 200,
-    rating: 4.8,
-    reviewCount: 2341,
-  ),
-  _ServiceResult(
-    id: 'electrical',
-    name: 'Electrical Work',
-    category: 'Electrical',
-    description:
-        'Wiring, lighting installation, panel upgrades & fault diagnosis.',
-    icon: Icons.bolt_outlined,
-    priceFrom: 250,
-    rating: 4.7,
-    reviewCount: 1876,
-  ),
-  _ServiceResult(
-    id: 'ac-maintenance',
-    name: 'AC Maintenance',
-    category: 'HVAC',
-    description: 'AC service, cleaning, installation & compressor repair.',
-    icon: Icons.ac_unit_outlined,
-    priceFrom: 220,
-    rating: 4.9,
-    reviewCount: 3102,
-  ),
-  _ServiceResult(
-    id: 'painting',
-    name: 'Painting & Finishing',
-    category: 'Painting',
-    description:
-        'Interior & exterior painting, Venetian plaster, decorative finishes.',
-    icon: Icons.format_paint_outlined,
-    priceFrom: 180,
-    rating: 4.6,
-    reviewCount: 987,
-  ),
-  _ServiceResult(
-    id: 'carpentry',
-    name: 'Carpentry & Woodwork',
-    category: 'Carpentry',
-    description:
-        'Custom furniture, built-in wardrobes, kitchen cabinets & repairs.',
-    icon: Icons.handyman_outlined,
-    priceFrom: 210,
-    rating: 4.5,
-    reviewCount: 654,
-  ),
-  _ServiceResult(
-    id: 'cleaning',
-    name: 'Deep Cleaning',
-    category: 'Cleaning',
-    description: 'Full apartment deep clean, post-construction clean-up.',
-    icon: Icons.cleaning_services_outlined,
-    priceFrom: 150,
-    rating: 4.7,
-    reviewCount: 1423,
-  ),
-];
-
-// ---------------------------------------------------------------------------
-// Screen
-// ---------------------------------------------------------------------------
 
 class SearchResultsScreen extends StatefulWidget {
   const SearchResultsScreen({super.key, this.query = ''});
@@ -132,6 +39,10 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   void initState() {
     super.initState();
     _searchCtrl = TextEditingController(text: widget.query);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<ServicesProvider>().fetchAll();
+      context.read<WorkersProvider>().fetchAll();
+    });
   }
 
   @override
@@ -142,46 +53,55 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
 
   String get _q => _searchCtrl.text.trim().toLowerCase();
 
-  List<_ServiceResult> get _filteredServices {
-    return _kServices.where((_ServiceResult s) {
+  List<BackendService> _filteredServices(List<BackendService> services) {
+    return services.where((service) {
+      final category = serviceCategoryLabel(service.category).toLowerCase();
       if (_q.isNotEmpty &&
-          !s.name.toLowerCase().contains(_q) &&
-          !s.category.toLowerCase().contains(_q)) {
+          !service.name.toLowerCase().contains(_q) &&
+          !service.description.toLowerCase().contains(_q) &&
+          !category.contains(_q)) {
         return false;
       }
-      if (_activeFilters.contains('Rating 4+') && s.rating < 4.0) return false;
       return true;
     }).toList();
   }
 
-  List<TechnicianModel> get _filteredTechnicians {
-    return kDemoTechnicians.where((TechnicianModel t) {
-      if (_q.isNotEmpty &&
-          !t.name.en.toLowerCase().contains(_q) &&
-          !t.specialty.toLowerCase().contains(_q) &&
-          !t.title.en.toLowerCase().contains(_q)) {
+  List<BackendWorker> _filteredTechnicians(List<BackendWorker> workers) {
+    return workers.where((worker) {
+      final searchable = <String>[
+        worker.displayName,
+        worker.bio,
+        worker.locationLabel,
+        ...worker.skills,
+        ...worker.categories,
+        ...worker.serviceLabels,
+      ].join(' ').toLowerCase();
+
+      if (_q.isNotEmpty && !searchable.contains(_q)) return false;
+      if (_activeFilters.contains('Verified Only') && !worker.isVerified) {
         return false;
       }
-      if (_activeFilters.contains('Verified Only') && !t.verified) return false;
-      if (_activeFilters.contains('Rating 4+') && t.rating < 4.0) return false;
+      if (_activeFilters.contains('Rating 4+') && worker.rating < 4.0) {
+        return false;
+      }
       if (_activeFilters.contains('Available Today') &&
-          !t.availability.en.toLowerCase().contains('today')) {
+          worker.availability.isEmpty) {
         return false;
       }
       if (_activeFilters.contains('Under 250 EGP/hr') &&
-          t.pricePerHour >= 250) {
+          worker.hourlyRate >= 250) {
         return false;
       }
       return true;
     }).toList();
   }
 
-  void _toggleFilter(String f) {
+  void _toggleFilter(String filter) {
     setState(() {
-      if (_activeFilters.contains(f)) {
-        _activeFilters.remove(f);
+      if (_activeFilters.contains(filter)) {
+        _activeFilters.remove(filter);
       } else {
-        _activeFilters.add(f);
+        _activeFilters.add(filter);
       }
     });
   }
@@ -190,8 +110,14 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   Widget build(BuildContext context) {
     final servio = context.servio;
     final theme = Theme.of(context);
-    final services = _filteredServices;
-    final technicians = _filteredTechnicians;
+    final servicesProvider = context.watch<ServicesProvider>();
+    final workersProvider = context.watch<WorkersProvider>();
+    final services = _filteredServices(servicesProvider.services);
+    final technicians = _filteredTechnicians(workersProvider.workers);
+    final activeLoading =
+        _tabIndex == 0 ? servicesProvider.loading : workersProvider.loading;
+    final activeError =
+        _tabIndex == 0 ? servicesProvider.error : workersProvider.error;
     final count = _tabIndex == 0 ? services.length : technicians.length;
 
     return Scaffold(
@@ -229,10 +155,13 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          // Tab bar
           Padding(
-            padding: const EdgeInsets.fromLTRB(ServioSpacing.screenPadding, 12,
-                ServioSpacing.screenPadding, 0),
+            padding: const EdgeInsets.fromLTRB(
+              ServioSpacing.screenPadding,
+              12,
+              ServioSpacing.screenPadding,
+              0,
+            ),
             child: Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
@@ -283,24 +212,27 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
               ),
             ),
           ),
-          // Filter chips
           SizedBox(
             height: 52,
             child: ListView(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(
-                  horizontal: ServioSpacing.screenPadding, vertical: 8),
-              children: _filterOptions.map((String f) {
-                final active = _activeFilters.contains(f);
+                horizontal: ServioSpacing.screenPadding,
+                vertical: 8,
+              ),
+              children: _filterOptions.map((String filter) {
+                final active = _activeFilters.contains(filter);
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: GestureDetector(
-                    onTap: () => _toggleFilter(f),
+                    onTap: () => _toggleFilter(filter),
                     child: AnimatedContainer(
                       duration: ServioMotion.micro,
                       curve: ServioMotion.curve,
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 6),
+                        horizontal: 14,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: active ? servio.accent : servio.backgroundSoft,
                         borderRadius: BorderRadius.circular(ServioRadius.full),
@@ -312,12 +244,15 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: <Widget>[
                           if (active) ...<Widget>[
-                            Icon(Icons.check_rounded,
-                                size: 14, color: Colors.white),
+                            const Icon(
+                              Icons.check_rounded,
+                              size: 14,
+                              color: Colors.white,
+                            ),
                             const SizedBox(width: 4),
                           ],
                           Text(
-                            f,
+                            filter,
                             style: theme.textTheme.labelLarge?.copyWith(
                               color:
                                   active ? Colors.white : servio.textSecondary,
@@ -333,21 +268,31 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
               }).toList(),
             ),
           ),
-          // Result count
           Padding(
             padding: const EdgeInsets.fromLTRB(
-                ServioSpacing.screenPadding, 4, ServioSpacing.screenPadding, 4),
+              ServioSpacing.screenPadding,
+              4,
+              ServioSpacing.screenPadding,
+              4,
+            ),
             child: Text(
               '$count result${count == 1 ? '' : 's'}',
               style: theme.textTheme.bodySmall
                   ?.copyWith(color: servio.textSecondary),
             ),
           ),
-          // Results
           Expanded(
             child: _tabIndex == 0
-                ? _ServicesResults(results: services)
-                : _TechniciansResults(technicians: technicians),
+                ? _ServicesResults(
+                    results: services,
+                    loading: activeLoading,
+                    error: activeError,
+                  )
+                : _TechniciansResults(
+                    technicians: technicians,
+                    loading: activeLoading,
+                    error: activeError,
+                  ),
           ),
         ],
       ),
@@ -355,17 +300,21 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Services results
-// ---------------------------------------------------------------------------
-
 class _ServicesResults extends StatelessWidget {
-  const _ServicesResults({required this.results});
+  const _ServicesResults({
+    required this.results,
+    required this.loading,
+    required this.error,
+  });
 
-  final List<_ServiceResult> results;
+  final List<BackendService> results;
+  final bool loading;
+  final String? error;
 
   @override
   Widget build(BuildContext context) {
+    if (loading) return const Center(child: CircularProgressIndicator());
+    if (error != null) return _ErrorState(message: error!);
     if (results.isEmpty) return const _EmptyState();
     return ListView.separated(
       padding: const EdgeInsets.all(ServioSpacing.screenPadding),
@@ -379,14 +328,22 @@ class _ServicesResults extends StatelessWidget {
 class _ServiceCard extends StatelessWidget {
   const _ServiceCard({required this.result});
 
-  final _ServiceResult result;
+  final BackendService result;
 
   @override
   Widget build(BuildContext context) {
     final servio = context.servio;
     final theme = Theme.of(context);
+    final category = normalizeServiceCategory(result.category);
 
     return ServioCard(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => ServiceDetailScreen(serviceId: result.id),
+          ),
+        );
+      },
       child: Row(
         children: <Widget>[
           Container(
@@ -396,7 +353,11 @@ class _ServiceCard extends StatelessWidget {
               gradient: ServioGradients.brand,
               borderRadius: BorderRadius.circular(ServioRadius.md),
             ),
-            child: Icon(result.icon, color: Colors.white, size: 26),
+            child: Icon(
+              _iconForCategory(category),
+              color: Colors.white,
+              size: 26,
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -411,13 +372,15 @@ class _ServiceCard extends StatelessWidget {
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: ServioColors.tint(servio.accent),
                         borderRadius: BorderRadius.circular(ServioRadius.full),
                       ),
                       child: Text(
-                        result.category,
+                        serviceCategoryLabel(category),
                         style: theme.textTheme.labelSmall?.copyWith(
                           color: servio.accent,
                           fontWeight: FontWeight.w700,
@@ -435,30 +398,15 @@ class _ServiceCard extends StatelessWidget {
                       ?.copyWith(color: servio.textSecondary, height: 1.4),
                 ),
                 const SizedBox(height: 8),
-                Row(
-                  children: <Widget>[
-                    Icon(Icons.star_rounded, color: servio.accent, size: 14),
-                    const SizedBox(width: 3),
-                    Text(
-                      result.rating.toStringAsFixed(1),
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    'From ${result.basePrice.toStringAsFixed(0)} EGP',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: servio.accent,
+                      fontWeight: FontWeight.w700,
                     ),
-                    Text(
-                      ' (${result.reviewCount})',
-                      style: theme.textTheme.labelSmall
-                          ?.copyWith(color: servio.textSecondary),
-                    ),
-                    const Spacer(),
-                    Text(
-                      'From ${result.priceFrom} EGP',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: servio.accent,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ],
             ),
@@ -469,37 +417,43 @@ class _ServiceCard extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Technician results
-// ---------------------------------------------------------------------------
-
 class _TechniciansResults extends StatelessWidget {
-  const _TechniciansResults({required this.technicians});
+  const _TechniciansResults({
+    required this.technicians,
+    required this.loading,
+    required this.error,
+  });
 
-  final List<TechnicianModel> technicians;
+  final List<BackendWorker> technicians;
+  final bool loading;
+  final String? error;
 
   @override
   Widget build(BuildContext context) {
+    if (loading) return const Center(child: CircularProgressIndicator());
+    if (error != null) return _ErrorState(message: error!);
     if (technicians.isEmpty) return const _EmptyState();
     return ListView.separated(
       padding: const EdgeInsets.all(ServioSpacing.screenPadding),
       itemCount: technicians.length,
       separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (_, int i) => _TechnicianCard(tech: technicians[i]),
+      itemBuilder: (_, int i) => _TechnicianCard(worker: technicians[i]),
     );
   }
 }
 
 class _TechnicianCard extends StatelessWidget {
-  const _TechnicianCard({required this.tech});
+  const _TechnicianCard({required this.worker});
 
-  final TechnicianModel tech;
+  final BackendWorker worker;
 
   @override
   Widget build(BuildContext context) {
     final servio = context.servio;
     final theme = Theme.of(context);
-    final locale = context.watch<LocaleProvider>().languageCode;
+    final subtitle = worker.serviceLabels.isNotEmpty
+        ? worker.serviceLabels.take(2).join(', ')
+        : worker.skills.take(2).join(', ');
 
     return ServioCard(
       child: Column(
@@ -515,13 +469,15 @@ class _TechnicianCard extends StatelessWidget {
                   shape: BoxShape.circle,
                   border: Border.all(color: servio.accent, width: 1.5),
                 ),
-                child: Center(
-                  child: Text(
-                    tech.avatarInitials,
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(color: ServioColors.deepBrown),
-                  ),
-                ),
+                clipBehavior: Clip.antiAlias,
+                child: worker.profileImage.isEmpty
+                    ? _WorkerInitials(initials: worker.initials)
+                    : Image.network(
+                        worker.profileImage,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) =>
+                            _WorkerInitials(initials: worker.initials),
+                      ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -532,18 +488,21 @@ class _TechnicianCard extends StatelessWidget {
                       children: <Widget>[
                         Expanded(
                           child: Text(
-                            locale == 'ar' ? tech.name.ar : tech.name.en,
+                            worker.displayName,
                             style: theme.textTheme.titleSmall,
                           ),
                         ),
-                        if (tech.verified)
-                          Icon(Icons.verified_rounded,
-                              color: servio.accent, size: 16),
+                        if (worker.isVerified)
+                          Icon(
+                            Icons.verified_rounded,
+                            color: servio.accent,
+                            size: 16,
+                          ),
                       ],
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      locale == 'ar' ? tech.title.ar : tech.title.en,
+                      subtitle.isEmpty ? 'Technician' : subtitle,
                       style: theme.textTheme.bodySmall
                           ?.copyWith(color: servio.textSecondary),
                     ),
@@ -558,52 +517,22 @@ class _TechnicianCard extends StatelessWidget {
               Icon(Icons.star_rounded, color: servio.accent, size: 14),
               const SizedBox(width: 3),
               Text(
-                tech.rating.toStringAsFixed(1),
+                worker.rating.toStringAsFixed(1),
                 style: theme.textTheme.labelSmall
                     ?.copyWith(fontWeight: FontWeight.w700),
               ),
               Text(
-                ' (${tech.reviewCount})',
-                style: theme.textTheme.labelSmall
-                    ?.copyWith(color: servio.textSecondary),
-              ),
-              const SizedBox(width: 12),
-              Icon(Icons.location_on_outlined,
-                  size: 13, color: servio.textSecondary),
-              const SizedBox(width: 2),
-              Text(
-                tech.distance,
+                ' (${worker.reviewCount})',
                 style: theme.textTheme.labelSmall
                     ?.copyWith(color: servio.textSecondary),
               ),
               const Spacer(),
               Text(
-                '${tech.pricePerHour} EGP/hr',
+                '${worker.hourlyRate} EGP/hr',
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: servio.accent,
                   fontWeight: FontWeight.w700,
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Row(
-            children: <Widget>[
-              Container(
-                width: 7,
-                height: 7,
-                decoration: BoxDecoration(
-                  color: tech.availability.en.toLowerCase().contains('today')
-                      ? servio.success
-                      : servio.warning,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 5),
-              Text(
-                locale == 'ar' ? tech.availability.ar : tech.availability.en,
-                style: theme.textTheme.labelSmall
-                    ?.copyWith(color: servio.textSecondary),
               ),
             ],
           ),
@@ -616,7 +545,7 @@ class _TechnicianCard extends StatelessWidget {
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) =>
-                        TechnicianProfileScreen(technicianId: tech.id),
+                        TechnicianProfileScreen(technicianId: worker.id),
                   ),
                 );
               },
@@ -628,9 +557,49 @@ class _TechnicianCard extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Empty state
-// ---------------------------------------------------------------------------
+class _WorkerInitials extends StatelessWidget {
+  const _WorkerInitials({required this.initials});
+
+  final String initials;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Text(
+        initials,
+        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: ServioColors.deepBrown,
+              fontWeight: FontWeight.w700,
+            ),
+      ),
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final servio = context.servio;
+    final theme = Theme.of(context);
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(ServioSpacing.screenPadding),
+        child: Text(
+          message,
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: servio.textSecondary,
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _EmptyState extends StatelessWidget {
   const _EmptyState();
@@ -653,8 +622,11 @@ class _EmptyState extends StatelessWidget {
                 gradient: ServioGradients.warm,
                 borderRadius: BorderRadius.circular(30),
               ),
-              child: Icon(Icons.travel_explore_rounded,
-                  size: 52, color: servio.accent),
+              child: Icon(
+                Icons.travel_explore_rounded,
+                size: 52,
+                color: servio.accent,
+              ),
             ),
             const SizedBox(height: 20),
             Text('No results found', style: theme.textTheme.headlineMedium),
@@ -681,4 +653,17 @@ class _EmptyState extends StatelessWidget {
       ),
     );
   }
+}
+
+IconData _iconForCategory(String category) {
+  return switch (normalizeServiceCategory(category)) {
+    'plumbing' => Icons.water_drop_outlined,
+    'electrical' => Icons.electrical_services_rounded,
+    'hvac' => Icons.ac_unit_rounded,
+    'carpentry' => Icons.handyman_rounded,
+    'painting' => Icons.format_paint_rounded,
+    'flooring' => Icons.grid_on_rounded,
+    'cleaning' => Icons.cleaning_services_rounded,
+    _ => Icons.home_repair_service_rounded,
+  };
 }

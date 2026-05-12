@@ -85,6 +85,21 @@ const getDisputes = async (req, res) => {
   return ApiResponse.success(res, StatusCodes.OK, 'Disputes retrieved.', result);
 };
 
+const updatePayoutSettings = async (req, res) => {
+  const payload = req.body;
+
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload) || !Object.keys(payload).length) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'At least one payout setting is required.');
+  }
+
+  if (payload.payoutDetails && (typeof payload.payoutDetails !== 'object' || Array.isArray(payload.payoutDetails))) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'payoutDetails must be an object.');
+  }
+
+  const result = await paymentService.updateWorkerPayoutSettings(req.user.id, payload);
+  return ApiResponse.success(res, StatusCodes.OK, 'Payout settings updated.', result);
+};
+
 module.exports = {
   confirmCompletion,
   getMyPayment,
@@ -93,4 +108,5 @@ module.exports = {
   openDispute,
   resolveDispute,
   getDisputes,
+  updatePayoutSettings,
 };

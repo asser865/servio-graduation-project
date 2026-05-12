@@ -142,6 +142,8 @@ class PaymentService {
 
   async getWorkerEarnings(workerId, filters = {}) {
     const wallet = await getOrCreateWallet(workerId);
+    const User = require('../users/user.model');
+    const worker = await User.findById(workerId).select('completedJobs');
 
     const query = {
       worker: workerId,
@@ -168,7 +170,29 @@ class PaymentService {
       { totalHeld: 0, totalReleased: 0 }
     );
 
-    return { wallet, payments, summary };
+    return { 
+      wallet, 
+      payments, 
+      summary,
+      completedJobs: worker ? worker.completedJobs : 0 
+    };
+  }
+
+  async updateWorkerPayoutSettings(workerId, payload = {}) {
+    const wallet = await getOrCreateWallet(workerId);
+
+    if (payload.payoutMethod) wallet.payoutMethod = payload.payoutMethod;
+    if (payload.payoutSchedule) wallet.payoutSchedule = payload.payoutSchedule;
+    
+    if (payload.payoutDetails) {
+      wallet.payoutDetails = {
+        ...wallet.payoutDetails,
+        ...payload.payoutDetails,
+      };
+    }
+
+    await wallet.save();
+    return wallet;
   }
 }
 

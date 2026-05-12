@@ -162,8 +162,7 @@ class _TechnicianEditProfileScreenState
                     icon: Icon(obscure
                         ? Icons.visibility_off_outlined
                         : Icons.visibility_outlined),
-                    onPressed: () =>
-                        setDialogState(() => obscure = !obscure),
+                    onPressed: () => setDialogState(() => obscure = !obscure),
                   ),
                 ),
               ),
@@ -202,8 +201,8 @@ class _TechnicianEditProfileScreenState
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-              'Email updated. Please log in again with your new email.'),
+          content:
+              Text('Email updated. Please log in again with your new email.'),
         ),
       );
     }

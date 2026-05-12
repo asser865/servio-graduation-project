@@ -56,7 +56,12 @@ const getTechnicians = async (req, res) => {
     role: 'worker',
     isActive: true,
     isVerified: true,
-    services: serviceId,
+    isAvailable: true,
+    'availability.0': { $exists: true },
+    $or: [
+      { services: serviceId },
+      { categories: { $in: [service.category] } },
+    ],
   };
   const skip = (Number(page) - 1) * Number(limit);
 

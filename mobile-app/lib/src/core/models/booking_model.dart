@@ -2,7 +2,35 @@ import 'package:intl/intl.dart';
 
 import 'backend_booking_model.dart';
 
-enum BookingStatus { upcoming, inProgress, completed, cancelled }
+enum BookingStatus {
+  pending,
+  confirmed,
+  enRoute,
+  arrived,
+  inProgress,
+  completed,
+  cancelled,
+  rejected,
+  disputed,
+}
+
+extension BookingStatusX on BookingStatus {
+  bool get isActive => switch (this) {
+        BookingStatus.pending ||
+        BookingStatus.confirmed ||
+        BookingStatus.enRoute ||
+        BookingStatus.arrived ||
+        BookingStatus.inProgress =>
+          true,
+        BookingStatus.completed ||
+        BookingStatus.cancelled ||
+        BookingStatus.rejected ||
+        BookingStatus.disputed =>
+          false,
+      };
+
+  bool get isPast => !isActive;
+}
 
 class BookingModel {
   BookingModel({
@@ -17,6 +45,9 @@ class BookingModel {
     required this.amount,
     required this.status,
     required this.pin,
+    required this.paymentMethod,
+    required this.paymentCardLabel,
+    required this.paymentCardLast4,
     this.notes = '',
   });
 
@@ -31,6 +62,9 @@ class BookingModel {
   final String amount;
   final BookingStatus status;
   final String pin;
+  final String paymentMethod;
+  final String paymentCardLabel;
+  final String paymentCardLast4;
   final String notes;
 
   BookingModel copyWith({BookingStatus? status}) {
@@ -46,6 +80,9 @@ class BookingModel {
       amount: amount,
       status: status ?? this.status,
       pin: pin,
+      paymentMethod: paymentMethod,
+      paymentCardLabel: paymentCardLabel,
+      paymentCardLast4: paymentCardLast4,
       notes: notes,
     );
   }
@@ -62,6 +99,9 @@ class BookingModel {
         'amount': amount,
         'status': status.name,
         'pin': pin,
+        'paymentMethod': paymentMethod,
+        'paymentCardLabel': paymentCardLabel,
+        'paymentCardLast4': paymentCardLast4,
         'notes': notes,
       };
 
@@ -76,10 +116,13 @@ class BookingModel {
         time: b.scheduledTime.isNotEmpty
             ? _displayScheduledTime(b.scheduledTime)
             : DateFormat('h:mm a').format(b.scheduledDate),
-        location: b.addressCity.isNotEmpty ? b.addressCity : 'Cairo',
+        location: _displayAddress(b.addressStreet, b.addressCity),
         amount: 'EGP ${b.totalAmount.toStringAsFixed(0)}',
         status: _parseBookingStatus(b.status),
-        pin: '0000',
+        pin: b.pin,
+        paymentMethod: _paymentMethodLabel(b.paymentMethod),
+        paymentCardLabel: b.paymentCardLabel,
+        paymentCardLast4: b.paymentCardLast4,
         notes: b.notes,
       );
 
@@ -95,19 +138,42 @@ class BookingModel {
         amount: json['amount'] as String,
         status: BookingStatus.values.firstWhere(
           (e) => e.name == json['status'],
-          orElse: () => BookingStatus.upcoming,
+          orElse: () => BookingStatus.pending,
         ),
-        pin: json['pin'] as String,
+        pin: (json['pin'] as String?) ?? '',
+        paymentMethod: (json['paymentMethod'] as String?) ?? 'Cash',
+        paymentCardLabel: (json['paymentCardLabel'] as String?) ?? '',
+        paymentCardLast4: (json['paymentCardLast4'] as String?) ?? '',
         notes: (json['notes'] as String?) ?? '',
       );
 }
 
-BookingStatus _parseBookingStatus(String s) => switch (s) {
-      'confirmed' || 'pending' || 'accepted' => BookingStatus.upcoming,
-      'in_progress' || 'inProgress' => BookingStatus.inProgress,
-      'completed' => BookingStatus.completed,
-      _ => BookingStatus.cancelled,
+BookingStatus _parseBookingStatus(String s) => switch (s.toLowerCase()) {
+      'pending' => BookingStatus.pending,
+      'confirmed' || 'accepted' || 'scheduled' => BookingStatus.confirmed,
+      'en_route' || 'enroute' => BookingStatus.enRoute,
+      'arrived' => BookingStatus.arrived,
+      'in_progress' || 'inprogress' => BookingStatus.inProgress,
+      'completed' || 'done' => BookingStatus.completed,
+      'cancelled' || 'canceled' => BookingStatus.cancelled,
+      'rejected' => BookingStatus.rejected,
+      'disputed' => BookingStatus.disputed,
+      _ => BookingStatus.pending,
     };
+
+String _paymentMethodLabel(String value) {
+  return switch (value.toLowerCase()) {
+    'card' || 'online' => 'Credit Card',
+    'cash' => 'Cash',
+    _ => value.trim().isEmpty ? 'Cash' : value,
+  };
+}
+
+String _displayAddress(String street, String city) {
+  final value =
+      <String>[street, city].where((part) => part.trim().isNotEmpty).join(', ');
+  return value.isNotEmpty ? value : 'Cairo';
+}
 
 String _displayScheduledTime(String value) {
   final parts = value.split(':');

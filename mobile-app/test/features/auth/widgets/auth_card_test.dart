@@ -17,7 +17,8 @@ void main() {
             .first,
       );
       final deco = box.decoration as BoxDecoration;
-      expect((deco.color!.a * 255).round(), lessThan(40)); // ≈ 0.07–0.15 opacity
+      expect(
+          (deco.color!.a * 255).round(), lessThan(40)); // ≈ 0.07–0.15 opacity
       expect(deco.boxShadow, anyOf(isNull, isEmpty));
     });
 

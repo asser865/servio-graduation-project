@@ -4,7 +4,8 @@ import 'package:servio_mobile_app/src/features/auth/widgets/auth_background.dart
 
 void main() {
   group('AuthBackground', () {
-    testWidgets('full dark gradient covers screen in dark mode', (tester) async {
+    testWidgets('full dark gradient covers screen in dark mode',
+        (tester) async {
       await tester.pumpWidget(MaterialApp(
         theme: ThemeData(brightness: Brightness.dark),
         home: Scaffold(

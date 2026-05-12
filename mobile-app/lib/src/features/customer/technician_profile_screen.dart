@@ -446,8 +446,10 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
                             onPressed: () {
                               Navigator.of(context).push(
                                 MaterialPageRoute<void>(
-                                  builder: (_) =>
-                                      ChatScreen(contactName: workerName),
+                                  builder: (_) => ChatScreen(
+                                    contactName: workerName,
+                                    workerId: worker.id,
+                                  ),
                                 ),
                               );
                             },

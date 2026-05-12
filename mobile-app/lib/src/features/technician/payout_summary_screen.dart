@@ -9,13 +9,7 @@ import '../../design_system/widgets/servio_card.dart';
 
 /// Worker-only Payout Summary screen.
 ///
-/// Mirrors the website's technician-dashboard payout/earnings sections:
-///   • Wallet balance header (total earned, pending, available)
-///   • Metric cards (completed jobs, this-month placeholder)
-///   • Payout method card (bank / wallet — settings placeholder)
-///   • Payout schedule card (weekly / monthly / instant)
-///   • Security hint
-///
+/// Mirrors the website's technician-dashboard payout/earnings sections.
 /// Data is fetched from `GET /payments/earnings` via [PaymentsApi].
 class PayoutSummaryScreen extends StatefulWidget {
   const PayoutSummaryScreen({super.key});
@@ -92,11 +86,14 @@ class _PayoutSummaryScreenState extends State<PayoutSummaryScreen>
           opacity: _fade,
           child: SlideTransition(
             position: _slide,
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : _error != null
-                    ? _ErrorBody(message: _error!, onRetry: _load)
-                    : _SuccessBody(summary: _summary!),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              child: _loading
+                  ? const _ShimmerBody()
+                  : _error != null
+                      ? _ErrorBody(message: _error!, onRetry: _load)
+                      : _SuccessBody(summary: _summary!),
+            ),
           ),
         ),
       ),
@@ -104,7 +101,88 @@ class _PayoutSummaryScreenState extends State<PayoutSummaryScreen>
   }
 }
 
-// ── Error state ──────────────────────────────────────────────────────────────
+// â”€â”€ Shimmer loading state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+class _ShimmerBody extends StatelessWidget {
+  const _ShimmerBody();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(ServioSpacing.screenPadding),
+      children: [
+        _ShimmerBox(height: 140, radius: ServioRadius.xl),
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            Expanded(child: _ShimmerBox(height: 110, radius: ServioRadius.lg)),
+            const SizedBox(width: 12),
+            Expanded(child: _ShimmerBox(height: 110, radius: ServioRadius.lg)),
+          ],
+        ),
+        const SizedBox(height: 24),
+        _ShimmerBox(height: 24, width: 120, radius: ServioRadius.sm),
+        const SizedBox(height: 8),
+        _ShimmerBox(height: 220, radius: ServioRadius.lg),
+        const SizedBox(height: 24),
+        _ShimmerBox(height: 24, width: 120, radius: ServioRadius.sm),
+        const SizedBox(height: 8),
+        _ShimmerBox(height: 260, radius: ServioRadius.lg),
+      ],
+    );
+  }
+}
+
+class _ShimmerBox extends StatefulWidget {
+  final double height;
+  final double width;
+  final double radius;
+  const _ShimmerBox(
+      {required this.height,
+      this.width = double.infinity,
+      required this.radius});
+
+  @override
+  State<_ShimmerBox> createState() => _ShimmerBoxState();
+}
+
+class _ShimmerBoxState extends State<_ShimmerBox>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 1200))
+      ..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (context, child) {
+        return Container(
+          width: widget.width,
+          height: widget.height,
+          decoration: BoxDecoration(
+            color: context.servio.border
+                .withValues(alpha: 0.3 + (_ctrl.value * 0.3)),
+            borderRadius: BorderRadius.circular(widget.radius),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// â”€â”€ Error state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _ErrorBody extends StatelessWidget {
   const _ErrorBody({required this.message, required this.onRetry});
@@ -130,10 +208,13 @@ class _ErrorBody extends StatelessWidget {
         ),
         const SizedBox(height: 24),
         Center(
-          child: OutlinedButton.icon(
-            onPressed: onRetry,
-            icon: const Icon(Icons.refresh_rounded, size: 18),
-            label: const Text('Try again'),
+          child: _ScaleButton(
+            onTap: onRetry,
+            child: OutlinedButton.icon(
+              onPressed: null, // Tap handled by _ScaleButton
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Try again'),
+            ),
           ),
         ),
       ],
@@ -141,146 +222,506 @@ class _ErrorBody extends StatelessWidget {
   }
 }
 
-// ── Success body ─────────────────────────────────────────────────────────────
+// â”€â”€ Success body (Stateful for forms) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-class _SuccessBody extends StatelessWidget {
+class _SuccessBody extends StatefulWidget {
   const _SuccessBody({required this.summary});
   final EarningsSummary summary;
+
+  @override
+  State<_SuccessBody> createState() => _SuccessBodyState();
+}
+
+class _SuccessBodyState extends State<_SuccessBody> {
+  late String _payoutMethod;
+  late String _payoutSchedule;
+  late TextEditingController _bankNameCtrl;
+  late TextEditingController _accountHolderCtrl;
+  late TextEditingController _accountNumberCtrl;
+  late TextEditingController _walletNumberCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _payoutMethod = widget.summary.payoutMethod;
+    if (!['bank', 'instapay', 'vodafone', 'orange'].contains(_payoutMethod)) {
+      _payoutMethod = 'bank';
+    }
+    _payoutSchedule = widget.summary.payoutSchedule;
+    if (!['weekly', 'monthly', 'instant'].contains(_payoutSchedule)) {
+      _payoutSchedule = 'weekly';
+    }
+
+    _bankNameCtrl = TextEditingController(text: widget.summary.bankName);
+    _accountHolderCtrl =
+        TextEditingController(text: widget.summary.accountHolder);
+    _accountNumberCtrl =
+        TextEditingController(text: widget.summary.accountNumber);
+    _walletNumberCtrl =
+        TextEditingController(text: widget.summary.walletNumber);
+  }
+
+  @override
+  void dispose() {
+    _bankNameCtrl.dispose();
+    _accountHolderCtrl.dispose();
+    _accountNumberCtrl.dispose();
+    _walletNumberCtrl.dispose();
+    super.dispose();
+  }
+
+  bool _isSaving = false;
+
+  Future<void> _handleSave() async {
+    FocusScope.of(context).unfocus();
+
+    setState(() => _isSaving = true);
+    try {
+      final client = context.read<ApiClient>();
+      await PaymentsApi(client).updateSettings(
+        payoutMethod: _payoutMethod,
+        payoutSchedule: _payoutSchedule,
+        payoutDetails: {
+          'bankName': _bankNameCtrl.text.trim(),
+          'accountHolder': _accountHolderCtrl.text.trim(),
+          'accountNumber': _accountNumberCtrl.text.trim(),
+          'walletNumber': _walletNumberCtrl.text.trim(),
+        },
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Changes saved successfully!'),
+          backgroundColor: context.servio.success,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Failed to save settings. Please try again.'),
+          backgroundColor: context.servio.danger,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  Widget _buildTextField({
+    required String label,
+    required String hint,
+    required TextEditingController controller,
+    bool isNumeric = false,
+  }) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
+          TextField(
+            controller: controller,
+            keyboardType: isNumeric ? TextInputType.number : TextInputType.text,
+            style: theme.textTheme.bodyMedium,
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: theme.textTheme.bodyMedium
+                  ?.copyWith(color: servio.textSecondary),
+              filled: true,
+              fillColor: servio.backgroundSoft,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(ServioRadius.sm),
+                borderSide: BorderSide(color: servio.border),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(ServioRadius.sm),
+                borderSide: BorderSide(color: servio.border),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(ServioRadius.sm),
+                borderSide: BorderSide(color: servio.accent, width: 1.5),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDropdown({
+    required String label,
+    required String hint,
+    required TextEditingController controller,
+    required List<String> items,
+  }) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
+          DropdownButtonFormField<String>(
+            value: items.contains(controller.text) ? controller.text : null,
+            hint: Text(hint,
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(color: servio.textSecondary)),
+            style: theme.textTheme.bodyMedium
+                ?.copyWith(color: theme.colorScheme.onSurface),
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: servio.backgroundSoft,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(ServioRadius.sm),
+                borderSide: BorderSide(color: servio.border),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(ServioRadius.sm),
+                borderSide: BorderSide(color: servio.border),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(ServioRadius.sm),
+                borderSide: BorderSide(color: servio.accent, width: 1.5),
+              ),
+            ),
+            items: items
+                .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                .toList(),
+            onChanged: (val) {
+              if (val != null) controller.text = val;
+            },
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final servio = context.servio;
     final theme = Theme.of(context);
 
-    return ListView(
-      padding: const EdgeInsets.all(ServioSpacing.screenPadding),
+    return Column(
       children: [
-        // ── Wallet header card ───────────────────────────────────────────
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            gradient: ServioGradients.brand,
-            borderRadius: BorderRadius.circular(ServioRadius.xl),
-            boxShadow: ServioShadows.rest,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.all(ServioSpacing.screenPadding),
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(ServioRadius.sm),
-                    ),
-                    child: const Icon(
-                      Icons.account_balance_wallet_rounded,
-                      size: 22,
-                      color: Colors.white,
-                    ),
+              // â”€â”€ Wallet header card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+              _StaggeredItem(
+                index: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: ServioGradients.brand,
+                    borderRadius: BorderRadius.circular(ServioRadius.xl),
+                    boxShadow: ServioShadows.rest,
                   ),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Total Earned',
-                    style: theme.textTheme.labelLarge
-                        ?.copyWith(color: Colors.white.withValues(alpha: 0.85)),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Text(
-                '${summary.totalEarnings.toStringAsFixed(0)} EGP',
-                style: theme.textTheme.displaySmall?.copyWith(
-                    color: Colors.white, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Pending: ${summary.pendingPayout.toStringAsFixed(0)} EGP',
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(color: ServioColors.accentLight),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
-
-        // ── Metric cards ─────────────────────────────────────────────────
-        Row(
-          children: [
-            Expanded(
-              child: _MetricCard(
-                icon: Icons.check_circle_outline_rounded,
-                label: 'Completed Jobs',
-                value: '${summary.completedJobs}',
-                color: servio.success,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _MetricCard(
-                icon: Icons.schedule_rounded,
-                label: 'Pending Payout',
-                value: '${summary.pendingPayout.toStringAsFixed(0)} EGP',
-                color: servio.warning,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-
-        // ── Payout Method card ───────────────────────────────────────────
-        // Matches website: tech_payout_method_title / tech_payout_method_desc
-        _SectionTitle(label: 'Payout Method'),
-        const SizedBox(height: 8),
-        ServioCard(
-          radius: ServioRadius.lg,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Choose how you receive your earnings from completed jobs.',
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: servio.textSecondary, height: 1.5),
-              ),
-              const SizedBox(height: 16),
-              _PayoutMethodOption(
-                icon: Icons.account_balance_rounded,
-                label: 'Bank Transfer',
-                selected: true,
-                servio: servio,
-              ),
-              const SizedBox(height: 10),
-              _PayoutMethodOption(
-                icon: Icons.phone_android_rounded,
-                label: 'Mobile Wallet',
-                selected: false,
-                servio: servio,
-              ),
-              const SizedBox(height: 16),
-              // Account details placeholder
-              // Matches website: tech_payout_details_title
-              Container(
-                width: double.infinity,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                decoration: BoxDecoration(
-                  color: servio.backgroundSoft,
-                  borderRadius: BorderRadius.circular(ServioRadius.sm),
-                  border: Border.all(
-                    color: servio.border,
-                    width: 0.5,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.18),
+                              borderRadius:
+                                  BorderRadius.circular(ServioRadius.sm),
+                            ),
+                            child: const Icon(
+                              Icons.account_balance_wallet_rounded,
+                              size: 22,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Total Earned',
+                            style: theme.textTheme.labelLarge?.copyWith(
+                                color: Colors.white.withValues(alpha: 0.85)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      _CountUpText(
+                        value: widget.summary.totalEarnings,
+                        suffix: ' EGP',
+                        style: theme.textTheme.displaySmall?.copyWith(
+                            color: Colors.white, fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 8),
+                      _CountUpText(
+                        value: widget.summary.pendingPayout,
+                        prefix: 'Pending: ',
+                        suffix: ' EGP',
+                        style: theme.textTheme.bodyMedium
+                            ?.copyWith(color: ServioColors.accentLight),
+                      ),
+                    ],
                   ),
                 ),
+              ),
+              const SizedBox(height: 20),
+
+              // â”€â”€ Metric cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+              _StaggeredItem(
+                index: 1,
                 child: Row(
                   children: [
-                    Icon(Icons.info_outline_rounded,
+                    Expanded(
+                      child: _MetricCard(
+                        icon: Icons.check_circle_outline_rounded,
+                        label: 'Completed Jobs',
+                        value: widget.summary.completedJobs.toDouble(),
+                        isCurrency: false,
+                        color: servio.success,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _MetricCard(
+                        icon: Icons.schedule_rounded,
+                        label: 'Pending Payout',
+                        value: widget.summary.pendingPayout,
+                        isCurrency: true,
+                        color: servio.warning,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // â”€â”€ Payout Method form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+              _StaggeredItem(
+                index: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const _SectionTitle(label: 'Payout Method'),
+                    const SizedBox(height: 8),
+                    ServioCard(
+                      radius: ServioRadius.lg,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Choose how you receive your earnings from completed jobs.',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                                color: servio.textSecondary, height: 1.5),
+                          ),
+                          const SizedBox(height: 16),
+                          _ScaleButton(
+                            onTap: () => setState(() => _payoutMethod = 'bank'),
+                            child: _PayoutMethodOption(
+                              icon: Icons.account_balance_rounded,
+                              label: 'Bank Transfer',
+                              selected: _payoutMethod == 'bank',
+                              servio: servio,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          _ScaleButton(
+                            onTap: () =>
+                                setState(() => _payoutMethod = 'instapay'),
+                            child: _PayoutMethodOption(
+                              icon: Icons.flash_on_rounded,
+                              label: 'Instapay',
+                              selected: _payoutMethod == 'instapay',
+                              servio: servio,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          _ScaleButton(
+                            onTap: () =>
+                                setState(() => _payoutMethod = 'vodafone'),
+                            child: _PayoutMethodOption(
+                              icon: Icons.phone_android_rounded,
+                              label: 'Vodafone Cash',
+                              selected: _payoutMethod == 'vodafone',
+                              servio: servio,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          _ScaleButton(
+                            onTap: () =>
+                                setState(() => _payoutMethod = 'orange'),
+                            child: _PayoutMethodOption(
+                              icon: Icons.phone_android_rounded,
+                              label: 'Orange Cash',
+                              selected: _payoutMethod == 'orange',
+                              servio: servio,
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          const _SectionTitle(label: 'Account Details'),
+                          const SizedBox(height: 16),
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 300),
+                            transitionBuilder: (child, animation) {
+                              return SizeTransition(
+                                sizeFactor: animation,
+                                axisAlignment: -1,
+                                child: FadeTransition(
+                                    opacity: animation, child: child),
+                              );
+                            },
+                            child: _payoutMethod == 'bank'
+                                ? Column(
+                                    key: const ValueKey('bank_form'),
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      _buildDropdown(
+                                          label: 'Bank Name',
+                                          hint: 'Select bank...',
+                                          controller: _bankNameCtrl,
+                                          items: [
+                                            'CIB',
+                                            'NBE â€” National Bank of Egypt',
+                                            'Banque Misr',
+                                            'QNB',
+                                            'HSBC Egypt',
+                                            'Alex Bank',
+                                            'Abu Dhabi Islamic Bank',
+                                            'Faisal Islamic Bank'
+                                          ]),
+                                      _buildTextField(
+                                        label: 'Account Holder Name',
+                                        hint: 'Exactly as on your bank card',
+                                        controller: _accountHolderCtrl,
+                                      ),
+                                      _buildTextField(
+                                        label: 'Account Number / IBAN',
+                                        hint:
+                                            'EG00 0000 0000 0000 0000 0000 0000',
+                                        controller: _accountNumberCtrl,
+                                      ),
+                                    ],
+                                  )
+                                : Column(
+                                    key: const ValueKey('wallet_form'),
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      _buildTextField(
+                                        label: 'Registered Mobile Number',
+                                        hint: '+20 100 000 0000',
+                                        controller: _walletNumberCtrl,
+                                        isNumeric: true,
+                                      ),
+                                      Text(
+                                        'Must match the number registered with your wallet provider.',
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                                color: servio.textSecondary),
+                                      ),
+                                      const SizedBox(height: 16),
+                                    ],
+                                  ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // â”€â”€ Payout Schedule card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+              _StaggeredItem(
+                index: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const _SectionTitle(label: 'Payout Schedule'),
+                    const SizedBox(height: 8),
+                    ServioCard(
+                      radius: ServioRadius.lg,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Choose how often you want your earnings transferred.',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                                color: servio.textSecondary, height: 1.5),
+                          ),
+                          const SizedBox(height: 16),
+                          _ScaleButton(
+                            onTap: () =>
+                                setState(() => _payoutSchedule = 'weekly'),
+                            child: _ScheduleOption(
+                              label: 'Weekly',
+                              subtitle:
+                                  'Every Sunday â€” earnings from the past 7 days.',
+                              selected: _payoutSchedule == 'weekly',
+                              servio: servio,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          _ScaleButton(
+                            onTap: () =>
+                                setState(() => _payoutSchedule = 'monthly'),
+                            child: _ScheduleOption(
+                              label: 'Monthly',
+                              subtitle:
+                                  '1st of each month â€” previous month\'s earnings.',
+                              selected: _payoutSchedule == 'monthly',
+                              servio: servio,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          _ScaleButton(
+                            onTap: () =>
+                                setState(() => _payoutSchedule = 'instant'),
+                            child: _ScheduleOption(
+                              label: 'Instant',
+                              subtitle:
+                                  'Request a payout at any time (small processing fee applies).',
+                              selected: _payoutSchedule == 'instant',
+                              servio: servio,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          // Form button moved to bottom
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // â”€â”€ Security hint â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+              _StaggeredItem(
+                index: 4,
+                child: Row(
+                  children: [
+                    Icon(Icons.lock_outline_rounded,
                         size: 16, color: servio.textSecondary),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Account details are encrypted and never shared publicly.',
+                        'Your payout information is encrypted and secure.',
                         style: theme.textTheme.bodySmall
                             ?.copyWith(color: servio.textSecondary),
                       ),
@@ -288,74 +729,181 @@ class _SuccessBody extends StatelessWidget {
                   ],
                 ),
               ),
+              const SizedBox(height: 32),
             ],
           ),
         ),
-        const SizedBox(height: 24),
-
-        // ── Payout Schedule card ─────────────────────────────────────────
-        // Matches website: tech_payout_schedule_title
-        _SectionTitle(label: 'Payout Schedule'),
-        const SizedBox(height: 8),
-        ServioCard(
-          radius: ServioRadius.lg,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Choose how often you want your earnings transferred.',
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: servio.textSecondary, height: 1.5),
-              ),
-              const SizedBox(height: 16),
-              _ScheduleOption(
-                label: 'Weekly',
-                subtitle: 'Every Sunday — earnings from the past 7 days.',
-                selected: true,
-                servio: servio,
-              ),
-              const SizedBox(height: 10),
-              _ScheduleOption(
-                label: 'Monthly',
-                subtitle: '1st of each month — previous month\'s earnings.',
-                selected: false,
-                servio: servio,
-              ),
-              const SizedBox(height: 10),
-              _ScheduleOption(
-                label: 'Instant',
-                subtitle:
-                    'Request a payout at any time (small processing fee applies).',
-                selected: false,
-                servio: servio,
+        Container(
+          padding: EdgeInsets.fromLTRB(
+            ServioSpacing.screenPadding,
+            16,
+            ServioSpacing.screenPadding,
+            MediaQuery.paddingOf(context).bottom + 16,
+          ),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            boxShadow: [
+              BoxShadow(
+                color: theme.shadowColor.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, -5),
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 24),
-
-        // ── Security hint ────────────────────────────────────────────────
-        Row(
-          children: [
-            Icon(Icons.lock_outline_rounded,
-                size: 16, color: servio.textSecondary),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Your payout information is encrypted and secure.',
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: servio.textSecondary),
+          child: SizedBox(
+            width: double.infinity,
+            height: 54,
+            child: ElevatedButton(
+              onPressed: _isSaving ? null : _handleSave,
+              style: ElevatedButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(ServioRadius.md),
+                ),
               ),
+              child: _isSaving
+                  ? const SizedBox(
+                      height: 24,
+                      width: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2.5),
+                    )
+                  : const Text('Save Changes',
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             ),
-          ],
+          ),
         ),
-        const SizedBox(height: 32),
       ],
     );
   }
 }
 
-// ── Reusable helpers ─────────────────────────────────────────────────────────
+// â”€â”€ Reusable helpers & animations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+class _StaggeredItem extends StatefulWidget {
+  final int index;
+  final Widget child;
+  const _StaggeredItem({required this.index, required this.child});
+  @override
+  State<_StaggeredItem> createState() => _StaggeredItemState();
+}
+
+class _StaggeredItemState extends State<_StaggeredItem>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _fade;
+  late final Animation<Offset> _slide;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 500));
+    _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
+    _slide = Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero)
+        .animate(CurvedAnimation(parent: _ctrl, curve: ServioMotion.spring));
+    Future.delayed(Duration(milliseconds: widget.index * 80), () {
+      if (mounted) _ctrl.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.disableAnimationsOf(context)) return widget.child;
+    return FadeTransition(
+      opacity: _fade,
+      child: SlideTransition(position: _slide, child: widget.child),
+    );
+  }
+}
+
+class _CountUpText extends StatelessWidget {
+  const _CountUpText({
+    required this.value,
+    required this.style,
+    this.prefix = '',
+    this.suffix = '',
+  });
+  final double value;
+  final TextStyle? style;
+  final String prefix;
+  final String suffix;
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.disableAnimationsOf(context)) {
+      return Text('$prefix${value.toStringAsFixed(0)}$suffix', style: style);
+    }
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: value),
+      duration: const Duration(milliseconds: 900),
+      curve: ServioMotion.spring,
+      builder: (context, val, child) {
+        return Text('$prefix${val.toStringAsFixed(0)}$suffix', style: style);
+      },
+    );
+  }
+}
+
+class _ScaleButton extends StatefulWidget {
+  const _ScaleButton({required this.onTap, required this.child});
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  State<_ScaleButton> createState() => _ScaleButtonState();
+}
+
+class _ScaleButtonState extends State<_ScaleButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 150));
+    _scale = Tween<double>(begin: 1.0, end: 0.98)
+        .animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onTapDown(TapDownDetails details) => _controller.forward();
+  void _onTapUp(TapUpDetails details) {
+    _controller.reverse();
+    widget.onTap();
+  }
+
+  void _onTapCancel() => _controller.reverse();
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.disableAnimationsOf(context)) {
+      return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: widget.onTap,
+          child: widget.child);
+    }
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: _onTapDown,
+      onTapUp: _onTapUp,
+      onTapCancel: _onTapCancel,
+      child: ScaleTransition(scale: _scale, child: widget.child),
+    );
+  }
+}
 
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle({required this.label});
@@ -371,11 +919,13 @@ class _MetricCard extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.value,
+    required this.isCurrency,
     required this.color,
   });
   final IconData icon;
   final String label;
-  final String value;
+  final double value;
+  final bool isCurrency;
   final Color color;
 
   @override
@@ -397,8 +947,9 @@ class _MetricCard extends StatelessWidget {
             child: Icon(icon, size: 18, color: color),
           ),
           const SizedBox(height: 12),
-          Text(
-            value,
+          _CountUpText(
+            value: value,
+            suffix: isCurrency ? ' EGP' : '',
             style: Theme.of(context)
                 .textTheme
                 .titleLarge
@@ -432,7 +983,9 @@ class _PayoutMethodOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOut,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(ServioRadius.sm),
@@ -480,7 +1033,9 @@ class _ScheduleOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOut,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(ServioRadius.sm),

@@ -5,8 +5,10 @@ import 'package:provider/provider.dart';
 import 'core/api/api_client.dart';
 import 'core/api/bookings_api.dart';
 import 'core/api/token_storage.dart';
+import 'core/api/users_api.dart';
 import 'core/services/storage_service.dart';
 import 'core/state/app_state.dart';
+import 'core/state/customer_addresses_state.dart';
 import 'core/state/services_state.dart';
 import 'core/state/workers_state.dart';
 import 'design_system/servio_theme.dart';
@@ -45,6 +47,11 @@ class ServioApp extends StatelessWidget {
           create: (ctx) => BookingsProvider(
             storage,
             BookingsApi(ctx.read<ApiClient>()),
+          ),
+        ),
+        ChangeNotifierProvider<CustomerAddressesProvider>(
+          create: (ctx) => CustomerAddressesProvider(
+            UsersApi(ctx.read<ApiClient>()),
           ),
         ),
         ChangeNotifierProvider<MessagesProvider>(

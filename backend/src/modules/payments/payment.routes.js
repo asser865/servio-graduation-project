@@ -26,6 +26,13 @@ router.get(
   controller.getWorkerEarnings
 );
 
+router.patch(
+  '/settings',
+  protect,
+  authorize('worker'),
+  controller.updatePayoutSettings
+);
+
 router.post(
   '/refund/:paymentId',
   protect,

@@ -117,11 +117,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
 
     switch (_tabIndex) {
       case 0:
-        final active = _bookings
-            .where((b) =>
-                b.status == BookingStatus.upcoming ||
-                b.status == BookingStatus.inProgress)
-            .toList();
+        final active = _bookings.where((b) => b.status.isActive).toList();
         if (active.isEmpty) {
           return const _EmptyState(message: 'No active bookings yet.');
         }
@@ -136,15 +132,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => BookingDetailsScreen(
-                      data: BookingFlowData(
-                        serviceName: booking.serviceName,
-                        technicianName: booking.technicianName,
-                        date: booking.date,
-                        time: booking.time,
-                        location: booking.location,
-                        amount: booking.amount,
-                        reference: booking.reference,
-                      ),
+                      data: _flowDataFromBooking(booking),
                     ),
                   ),
                 );
@@ -153,34 +141,22 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
           },
         );
       case 1:
-        final past = _bookings
-            .where((b) =>
-                b.status == BookingStatus.completed ||
-                b.status == BookingStatus.cancelled)
-            .toList();
-        if (past.isEmpty) {
-          return const _EmptyState(message: 'No booking history yet.');
+        final history = _bookings;
+        if (history.isEmpty) {
+          return const _EmptyState(message: 'No bookings yet.');
         }
         return ListView.separated(
-          itemCount: past.length,
+          itemCount: history.length,
           separatorBuilder: (_, __) => const SizedBox(height: 16),
           itemBuilder: (BuildContext context, int index) {
-            final booking = past[index];
+            final booking = history[index];
             return _LiveBookingCard(
               booking: booking,
               onViewDetails: () {
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => BookingDetailsScreen(
-                      data: BookingFlowData(
-                        serviceName: booking.serviceName,
-                        technicianName: booking.technicianName,
-                        date: booking.date,
-                        time: booking.time,
-                        location: booking.location,
-                        amount: booking.amount,
-                        reference: booking.reference,
-                      ),
+                      data: _flowDataFromBooking(booking),
                     ),
                   ),
                 );
@@ -233,25 +209,34 @@ class _LiveBookingCard extends StatelessWidget {
 
   static ServioStatusChipType _chipType(BookingStatus status) =>
       switch (status) {
-        BookingStatus.upcoming => ServioStatusChipType.warning,
+        BookingStatus.pending => ServioStatusChipType.warning,
+        BookingStatus.confirmed => ServioStatusChipType.success,
+        BookingStatus.enRoute => ServioStatusChipType.info,
+        BookingStatus.arrived => ServioStatusChipType.info,
         BookingStatus.inProgress => ServioStatusChipType.info,
         BookingStatus.completed => ServioStatusChipType.success,
         BookingStatus.cancelled => ServioStatusChipType.danger,
+        BookingStatus.rejected => ServioStatusChipType.danger,
+        BookingStatus.disputed => ServioStatusChipType.warning,
       };
 
   static String _chipLabel(BookingStatus status) => switch (status) {
-        BookingStatus.upcoming => 'Upcoming',
+        BookingStatus.pending => 'Pending',
+        BookingStatus.confirmed => 'Confirmed',
+        BookingStatus.enRoute => 'En Route',
+        BookingStatus.arrived => 'Arrived',
         BookingStatus.inProgress => 'In Progress',
         BookingStatus.completed => 'Completed',
         BookingStatus.cancelled => 'Cancelled',
+        BookingStatus.rejected => 'Rejected',
+        BookingStatus.disputed => 'Disputed',
       };
 
   @override
   Widget build(BuildContext context) {
     final servio = context.servio;
     final theme = Theme.of(context);
-    final isActive = booking.status == BookingStatus.upcoming ||
-        booking.status == BookingStatus.inProgress;
+    final isActive = booking.status.isActive;
 
     return ServioCard(
       child: Row(
@@ -346,11 +331,11 @@ class BookingDetailsScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              const Align(
+              Align(
                 alignment: Alignment.centerLeft,
                 child: ServioStatusChip(
-                  label: 'In Progress',
-                  type: ServioStatusChipType.info,
+                  label: data.statusLabel,
+                  type: _chipTypeForStatusCode(data.statusCode),
                 ),
               ),
               const SizedBox(height: 20),
@@ -393,7 +378,8 @@ class BookingDetailsScreen extends StatelessWidget {
                             shape: BoxShape.circle,
                             border: Border.all(color: servio.accent, width: 2),
                           ),
-                          child: const Center(child: Text('AN')),
+                          child: Center(
+                              child: Text(_initials(data.technicianName))),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -422,7 +408,10 @@ class BookingDetailsScreen extends StatelessWidget {
                               Navigator.of(context).push(
                                 MaterialPageRoute<void>(
                                   builder: (_) => ChatScreen(
-                                      contactName: data.technicianName),
+                                    contactName: data.technicianName,
+                                    bookingId: data.backendId,
+                                    workerId: data.technicianId,
+                                  ),
                                 ),
                               );
                             },
@@ -445,6 +434,11 @@ class BookingDetailsScreen extends StatelessWidget {
                     _DetailsPair(label: 'Date', value: data.date),
                     _DetailsPair(label: 'Time', value: data.time),
                     _DetailsPair(label: 'Location', value: data.location),
+                    _DetailsPair(label: 'Payment', value: data.paymentMethod),
+                    if (data.savedCardLabel.isNotEmpty)
+                      _DetailsPair(label: 'Card', value: data.savedCardLabel),
+                    if (data.pin.isNotEmpty)
+                      _DetailsPair(label: 'Arrival PIN', value: data.pin),
                     _DetailsPair(
                         label: 'Total', value: data.amount, highlight: true),
                   ],
@@ -602,6 +596,73 @@ class _DetailsPair extends StatelessWidget {
   }
 }
 
+BookingFlowData _flowDataFromBooking(BookingModel booking) {
+  return BookingFlowData(
+    backendId: booking.id,
+    serviceName: booking.serviceName,
+    technicianName: booking.technicianName,
+    technicianId: booking.technicianId,
+    date: booking.date,
+    time: booking.time,
+    location: booking.location,
+    amount: booking.amount,
+    reference: booking.reference,
+    pin: booking.pin,
+    paymentMethod: booking.paymentMethod,
+    paymentMethodCode:
+        booking.paymentMethod.toLowerCase().contains('card') ? 'card' : 'cash',
+    savedCardLabel: _cardLabelFor(booking),
+    savedCardLast4: booking.paymentCardLast4,
+    statusLabel: _LiveBookingCard._chipLabel(booking.status),
+    statusCode: _statusCodeFromStatus(booking.status),
+  );
+}
+
+String _cardLabelFor(BookingModel booking) {
+  if (booking.paymentCardLabel.isNotEmpty) return booking.paymentCardLabel;
+  if (booking.paymentCardLast4.isNotEmpty) {
+    return 'Card ending ${booking.paymentCardLast4}';
+  }
+  return '';
+}
+
+String _statusCodeFromStatus(BookingStatus status) => switch (status) {
+      BookingStatus.pending => 'pending',
+      BookingStatus.confirmed => 'confirmed',
+      BookingStatus.enRoute => 'en_route',
+      BookingStatus.arrived => 'arrived',
+      BookingStatus.inProgress => 'in_progress',
+      BookingStatus.completed => 'completed',
+      BookingStatus.cancelled => 'cancelled',
+      BookingStatus.rejected => 'rejected',
+      BookingStatus.disputed => 'disputed',
+    };
+
+ServioStatusChipType _chipTypeForStatusCode(String statusCode) {
+  return switch (statusCode.toLowerCase()) {
+    'confirmed' || 'completed' || 'done' => ServioStatusChipType.success,
+    'en_route' ||
+    'enroute' ||
+    'arrived' ||
+    'in_progress' ||
+    'inprogress' =>
+      ServioStatusChipType.info,
+    'cancelled' || 'canceled' || 'rejected' => ServioStatusChipType.danger,
+    'disputed' => ServioStatusChipType.warning,
+    _ => ServioStatusChipType.warning,
+  };
+}
+
+String _initials(String name) {
+  return name
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((part) => part.isNotEmpty)
+      .take(2)
+      .map((part) => part[0])
+      .join()
+      .toUpperCase();
+}
 
 class _FavouriteTechnicianCard extends StatelessWidget {
   const _FavouriteTechnicianCard({

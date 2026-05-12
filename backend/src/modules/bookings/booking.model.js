@@ -7,6 +7,7 @@
 const mongoose = require('mongoose');
 
 const BOOKING_STATUSES = ['pending', 'accepted', 'rejected', 'in_progress', 'completed', 'cancelled', 'disputed'];
+const PAYMENT_METHODS = ['cash', 'card'];
 
 const bookingSchema = new mongoose.Schema(
   {
@@ -97,6 +98,17 @@ const bookingSchema = new mongoose.Schema(
     cancellationReason: {
       type:  String,
       trim:  true,
+    },
+
+    paymentMethod: {
+      type:     String,
+      enum:     PAYMENT_METHODS,
+      required: [true, 'Payment method is required'],
+    },
+
+    savedCard: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref:  'SavedCard',
     },
 
     paymentMeta: {

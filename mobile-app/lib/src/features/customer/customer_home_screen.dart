@@ -13,6 +13,7 @@ import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_section_heading.dart';
 import '../../design_system/widgets/servio_status_chip.dart';
 import '../../design_system/widgets/servio_tab_shell.dart';
+import 'ai_finishing_estimator_screen.dart';
 import 'ai_smart_match_screen.dart';
 import 'customer_profile_screen.dart';
 import 'my_addresses_screen.dart';
@@ -69,8 +70,8 @@ class _HomeBodyState extends State<_HomeBody>
     _entranceSlide = Tween<Offset>(
       begin: const Offset(0, 0.055),
       end: Offset.zero,
-    ).animate(
-        CurvedAnimation(parent: _entranceController, curve: ServioMotion.spring));
+    ).animate(CurvedAnimation(
+        parent: _entranceController, curve: ServioMotion.spring));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _entranceController.forward();
     });
@@ -136,8 +137,7 @@ class _HomeBodyState extends State<_HomeBody>
         // ── Layer 2: Scrollable dashboard content ────────────────────
         RefreshIndicator(
           color: servio.accent,
-          onRefresh: () async =>
-              Future<void>.delayed(const Duration(seconds: 1)),
+          onRefresh: () => context.read<BookingsProvider>().refresh(),
           child: SingleChildScrollView(
             controller: _scrollController,
             physics: const AlwaysScrollableScrollPhysics(),
@@ -227,8 +227,8 @@ class _HomeBodyState extends State<_HomeBody>
                                   const SizedBox(height: 3),
                                   Text(
                                     firstName,
-                                    style: theme.textTheme.headlineLarge
-                                        ?.copyWith(
+                                    style:
+                                        theme.textTheme.headlineLarge?.copyWith(
                                       color: isDark
                                           ? ServioColors.navyDark
                                           : Colors.white,
@@ -351,19 +351,40 @@ class _HomeBodyState extends State<_HomeBody>
                                   horizontal: ServioSpacing.screenPadding,
                                   vertical: 28,
                                 ),
-                                child: _HeroBannerCard(
-                                  badgeLabel: 'NEW FEATURE',
-                                  title: 'AI Smart Match',
-                                  body:
-                                      'Snap a photo and let AI find the perfect pro.',
-                                  ctaLabel: 'Try AI Assistant',
-                                  icon: Icons.auto_awesome_rounded,
-                                  onTap: () => Navigator.of(context).push(
-                                    MaterialPageRoute<void>(
-                                      builder: (_) =>
-                                          const AiSmartMatchScreen(),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: <Widget>[
+                                    _HeroBannerCard(
+                                      badgeLabel: 'NEW FEATURE',
+                                      title: 'AI Smart Match',
+                                      body:
+                                          'Snap a photo and let AI find the perfect pro.',
+                                      ctaLabel: 'Try AI Assistant',
+                                      icon: Icons.auto_awesome_rounded,
+                                      onTap: () => Navigator.of(context).push(
+                                        MaterialPageRoute<void>(
+                                          builder: (_) =>
+                                              const AiSmartMatchScreen(),
+                                        ),
+                                      ),
                                     ),
-                                  ),
+                                    const SizedBox(height: 16),
+                                    _HeroBannerCard(
+                                      badgeLabel: 'AI ESTIMATE',
+                                      title: 'AI Cost Estimator',
+                                      body:
+                                          'Get a room finishing budget before you book.',
+                                      ctaLabel: 'Estimate Cost',
+                                      icon: Icons.calculate_rounded,
+                                      onTap: () => Navigator.of(context).push(
+                                        MaterialPageRoute<void>(
+                                          builder: (_) =>
+                                              const AiFinishingEstimatorScreen(),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
@@ -499,83 +520,158 @@ class _BackgroundLayerState extends State<_BackgroundLayer>
     // ── Near layer — large, fast, full opacity ───────────────────────────────
     _FloatingIconDef(
         icon: Icons.cleaning_services_rounded,
-        xFrac: 0.82, yFrac: 0.04,
-        size: 34, phase: 0.00, periodMs: 4800,
-        hAmplitude: 9, hPhase: 0.80, opacity: 1.0),
+        xFrac: 0.82,
+        yFrac: 0.04,
+        size: 34,
+        phase: 0.00,
+        periodMs: 4800,
+        hAmplitude: 9,
+        hPhase: 0.80,
+        opacity: 1.0),
     _FloatingIconDef(
         icon: Icons.plumbing_rounded,
-        xFrac: 0.06, yFrac: 0.11,
-        size: 32, phase: 0.44, periodMs: 5200,
-        hAmplitude: 8, hPhase: 2.10, opacity: 1.0),
+        xFrac: 0.06,
+        yFrac: 0.11,
+        size: 32,
+        phase: 0.44,
+        periodMs: 5200,
+        hAmplitude: 8,
+        hPhase: 2.10,
+        opacity: 1.0),
     _FloatingIconDef(
         icon: Icons.handyman_rounded,
-        xFrac: 0.90, yFrac: 0.23,
-        size: 30, phase: 0.71, periodMs: 4600,
-        hAmplitude: 10, hPhase: 3.60, opacity: 1.0),
+        xFrac: 0.90,
+        yFrac: 0.23,
+        size: 30,
+        phase: 0.71,
+        periodMs: 4600,
+        hAmplitude: 10,
+        hPhase: 3.60,
+        opacity: 1.0),
     _FloatingIconDef(
         icon: Icons.home_repair_service_rounded,
-        xFrac: 0.44, yFrac: 0.16,
-        size: 32, phase: 0.28, periodMs: 5400,
-        hAmplitude: 7, hPhase: 1.40, opacity: 1.0),
+        xFrac: 0.44,
+        yFrac: 0.16,
+        size: 32,
+        phase: 0.28,
+        periodMs: 5400,
+        hAmplitude: 7,
+        hPhase: 1.40,
+        opacity: 1.0),
     _FloatingIconDef(
         icon: Icons.construction_rounded,
-        xFrac: 0.20, yFrac: 0.05,
-        size: 28, phase: 0.55, periodMs: 4200,
-        hAmplitude: 11, hPhase: 4.20, opacity: 1.0),
+        xFrac: 0.20,
+        yFrac: 0.05,
+        size: 28,
+        phase: 0.55,
+        periodMs: 4200,
+        hAmplitude: 11,
+        hPhase: 4.20,
+        opacity: 1.0),
 
     // ── Mid layer — medium, moderate, 80 % opacity ───────────────────────────
     _FloatingIconDef(
         icon: Icons.electrical_services_rounded,
-        xFrac: 0.18, yFrac: 0.21,
-        size: 26, phase: 0.62, periodMs: 6400,
-        hAmplitude: 10, hPhase: 0.30, opacity: 0.80),
+        xFrac: 0.18,
+        yFrac: 0.21,
+        size: 26,
+        phase: 0.62,
+        periodMs: 6400,
+        hAmplitude: 10,
+        hPhase: 0.30,
+        opacity: 0.80),
     _FloatingIconDef(
         icon: Icons.format_paint_rounded,
-        xFrac: 0.63, yFrac: 0.07,
-        size: 27, phase: 0.18, periodMs: 5800,
-        hAmplitude: 9, hPhase: 4.20, opacity: 0.80),
+        xFrac: 0.63,
+        yFrac: 0.07,
+        size: 27,
+        phase: 0.18,
+        periodMs: 5800,
+        hAmplitude: 9,
+        hPhase: 4.20,
+        opacity: 0.80),
     _FloatingIconDef(
         icon: Icons.ac_unit_rounded,
-        xFrac: 0.34, yFrac: 0.26,
-        size: 25, phase: 0.85, periodMs: 6800,
-        hAmplitude: 8, hPhase: 1.80, opacity: 0.80),
+        xFrac: 0.34,
+        yFrac: 0.26,
+        size: 25,
+        phase: 0.85,
+        periodMs: 6800,
+        hAmplitude: 8,
+        hPhase: 1.80,
+        opacity: 0.80),
     _FloatingIconDef(
         icon: Icons.local_laundry_service_rounded,
-        xFrac: 0.72, yFrac: 0.19,
-        size: 24, phase: 0.36, periodMs: 6200,
-        hAmplitude: 12, hPhase: 3.00, opacity: 0.80),
+        xFrac: 0.72,
+        yFrac: 0.19,
+        size: 24,
+        phase: 0.36,
+        periodMs: 6200,
+        hAmplitude: 12,
+        hPhase: 3.00,
+        opacity: 0.80),
     _FloatingIconDef(
         icon: Icons.carpenter,
-        xFrac: 0.52, yFrac: 0.27,
-        size: 26, phase: 0.57, periodMs: 5600,
-        hAmplitude: 7, hPhase: 5.00, opacity: 0.80),
+        xFrac: 0.52,
+        yFrac: 0.27,
+        size: 26,
+        phase: 0.57,
+        periodMs: 5600,
+        hAmplitude: 7,
+        hPhase: 5.00,
+        opacity: 0.80),
 
     // ── Far layer — small, slow, 55 % opacity ────────────────────────────────
     _FloatingIconDef(
         icon: Icons.auto_awesome_rounded,
-        xFrac: 0.55, yFrac: 0.02,
-        size: 20, phase: 0.90, periodMs: 7800,
-        hAmplitude: 13, hPhase: 2.50, opacity: 0.55),
+        xFrac: 0.55,
+        yFrac: 0.02,
+        size: 20,
+        phase: 0.90,
+        periodMs: 7800,
+        hAmplitude: 13,
+        hPhase: 2.50,
+        opacity: 0.55),
     _FloatingIconDef(
         icon: Icons.security_rounded,
-        xFrac: 0.27, yFrac: 0.13,
-        size: 19, phase: 0.13, periodMs: 8200,
-        hAmplitude: 14, hPhase: 0.60, opacity: 0.55),
+        xFrac: 0.27,
+        yFrac: 0.13,
+        size: 19,
+        phase: 0.13,
+        periodMs: 8200,
+        hAmplitude: 14,
+        hPhase: 0.60,
+        opacity: 0.55),
     _FloatingIconDef(
         icon: Icons.grass_rounded,
-        xFrac: 0.78, yFrac: 0.27,
-        size: 21, phase: 0.48, periodMs: 7400,
-        hAmplitude: 11, hPhase: 4.80, opacity: 0.55),
+        xFrac: 0.78,
+        yFrac: 0.27,
+        size: 21,
+        phase: 0.48,
+        periodMs: 7400,
+        hAmplitude: 11,
+        hPhase: 4.80,
+        opacity: 0.55),
     _FloatingIconDef(
         icon: Icons.wifi_rounded,
-        xFrac: 0.09, yFrac: 0.27,
-        size: 18, phase: 0.76, periodMs: 8600,
-        hAmplitude: 10, hPhase: 2.20, opacity: 0.55),
+        xFrac: 0.09,
+        yFrac: 0.27,
+        size: 18,
+        phase: 0.76,
+        periodMs: 8600,
+        hAmplitude: 10,
+        hPhase: 2.20,
+        opacity: 0.55),
     _FloatingIconDef(
         icon: Icons.pest_control_rounded,
-        xFrac: 0.38, yFrac: 0.08,
-        size: 17, phase: 0.33, periodMs: 9000,
-        hAmplitude: 12, hPhase: 1.10, opacity: 0.55),
+        xFrac: 0.38,
+        yFrac: 0.08,
+        size: 17,
+        phase: 0.33,
+        periodMs: 9000,
+        hAmplitude: 12,
+        hPhase: 1.10,
+        opacity: 0.55),
   ];
 
   late final List<AnimationController> _controllers;
@@ -585,7 +681,21 @@ class _BackgroundLayerState extends State<_BackgroundLayer>
 
   // Alternate rotation direction per icon for organic feel.
   static const List<double> _rotDir = <double>[
-    1, -1, 1, -1, 1, -1, 1, -1, 1, -1, 1, -1, 1, -1, 1,
+    1,
+    -1,
+    1,
+    -1,
+    1,
+    -1,
+    1,
+    -1,
+    1,
+    -1,
+    1,
+    -1,
+    1,
+    -1,
+    1,
   ];
 
   @override
@@ -725,8 +835,8 @@ class _BackgroundLayerState extends State<_BackgroundLayer>
                       // the vertical easeInOutSine, giving each icon a unique
                       // Lissajous-like path through the background.
                       final dx = def.hAmplitude *
-                          math.sin(_controllers[i].value * math.pi * 2 +
-                              def.hPhase);
+                          math.sin(
+                              _controllers[i].value * math.pi * 2 + def.hPhase);
                       return Transform.translate(
                         offset: Offset(dx, _offsets[i].value),
                         child: Transform.rotate(
@@ -741,8 +851,8 @@ class _BackgroundLayerState extends State<_BackgroundLayer>
                     child: Icon(
                       def.icon,
                       size: def.size,
-                      color: iconColor
-                          .withValues(alpha: baseOpacity * def.opacity),
+                      color: iconColor.withValues(
+                          alpha: baseOpacity * def.opacity),
                     ),
                   ),
                 );
@@ -1163,11 +1273,14 @@ class _FloatingBookingCard extends StatelessWidget {
     final servio = context.servio;
 
     final isInProgress = booking.status == BookingStatus.inProgress;
-    final statusType =
-        isInProgress ? ServioStatusChipType.info : ServioStatusChipType.warning;
+    final statusType = _homeChipType(booking.status);
     final statusLabel = isInProgress
         ? (locale == 'ar' ? 'قيد التنفيذ' : 'En Route')
         : (locale == 'ar' ? 'قادم' : 'Upcoming');
+
+    final displayStatusLabel = _homeStatusLabel(booking.status).isNotEmpty
+        ? _homeStatusLabel(booking.status)
+        : statusLabel;
 
     return ServioCard(
       radius: ServioRadius.xl,
@@ -1211,10 +1324,22 @@ class _FloatingBookingCard extends StatelessWidget {
                       style: theme.textTheme.bodySmall
                           ?.copyWith(color: servio.textSecondary),
                     ),
+                    const SizedBox(height: 3),
+                    Text(
+                      booking.technicianName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: servio.textSecondary),
+                    ),
                   ],
                 ),
               ),
-              ServioStatusChip(label: statusLabel, type: statusType),
+              _AnimatedBookingStatusChip(
+                status: booking.status,
+                label: displayStatusLabel,
+                type: statusType,
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -1248,8 +1373,7 @@ class _FloatingBookingCard extends StatelessWidget {
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(ServioRadius.full)),
                   ),
-                  child:
-                      Text(locale == 'ar' ? 'تتبع الطلب' : 'Track Status'),
+                  child: Text(locale == 'ar' ? 'تتبع الطلب' : 'Track Status'),
                 ),
               ),
             ],
@@ -1258,6 +1382,115 @@ class _FloatingBookingCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _AnimatedBookingStatusChip extends StatefulWidget {
+  const _AnimatedBookingStatusChip({
+    required this.status,
+    required this.label,
+    required this.type,
+  });
+
+  final BookingStatus status;
+  final String label;
+  final ServioStatusChipType type;
+
+  @override
+  State<_AnimatedBookingStatusChip> createState() =>
+      _AnimatedBookingStatusChipState();
+}
+
+class _AnimatedBookingStatusChipState extends State<_AnimatedBookingStatusChip>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+      lowerBound: 0,
+      upperBound: 1,
+    );
+    if (_shouldPulse) _pulse.repeat(reverse: true);
+  }
+
+  @override
+  void didUpdateWidget(covariant _AnimatedBookingStatusChip oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_shouldPulse && !_pulse.isAnimating) {
+      _pulse.repeat(reverse: true);
+    } else if (!_shouldPulse && _pulse.isAnimating) {
+      _pulse.stop();
+      _pulse.value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  bool get _shouldPulse =>
+      widget.status == BookingStatus.enRoute ||
+      widget.status == BookingStatus.arrived ||
+      widget.status == BookingStatus.inProgress;
+
+  @override
+  Widget build(BuildContext context) {
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    Widget chip = AnimatedSwitcher(
+      duration: reduceMotion ? Duration.zero : ServioMotion.normal,
+      child: ServioStatusChip(
+        key: ValueKey<String>(widget.label),
+        label: widget.label,
+        type: widget.type,
+      ),
+    );
+
+    if (_shouldPulse && !reduceMotion) {
+      chip = AnimatedBuilder(
+        animation: _pulse,
+        builder: (context, child) => Transform.scale(
+          scale: 1 + (_pulse.value * 0.035),
+          child: child,
+        ),
+        child: chip,
+      );
+    }
+
+    return chip;
+  }
+}
+
+String _homeStatusLabel(BookingStatus status) {
+  return switch (status) {
+    BookingStatus.pending => 'Pending',
+    BookingStatus.confirmed => 'Confirmed',
+    BookingStatus.enRoute => 'En Route',
+    BookingStatus.arrived => 'Arrived',
+    BookingStatus.inProgress => 'In Progress',
+    BookingStatus.completed => 'Completed',
+    BookingStatus.cancelled => 'Cancelled',
+    BookingStatus.rejected => 'Rejected',
+    BookingStatus.disputed => 'Disputed',
+  };
+}
+
+ServioStatusChipType _homeChipType(BookingStatus status) {
+  return switch (status) {
+    BookingStatus.pending => ServioStatusChipType.warning,
+    BookingStatus.confirmed => ServioStatusChipType.success,
+    BookingStatus.enRoute => ServioStatusChipType.info,
+    BookingStatus.arrived => ServioStatusChipType.info,
+    BookingStatus.inProgress => ServioStatusChipType.info,
+    BookingStatus.completed => ServioStatusChipType.success,
+    BookingStatus.cancelled => ServioStatusChipType.danger,
+    BookingStatus.rejected => ServioStatusChipType.danger,
+    BookingStatus.disputed => ServioStatusChipType.warning,
+  };
 }
 
 class _FloatingEmptyBookingCard extends StatelessWidget {
@@ -1295,9 +1528,7 @@ class _FloatingEmptyBookingCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text(
-                  locale == 'ar'
-                      ? 'لا توجد حجوزات نشطة'
-                      : 'No active bookings',
+                  locale == 'ar' ? 'لا توجد حجوزات نشطة' : 'No active bookings',
                   style: theme.textTheme.titleMedium,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -1323,12 +1554,10 @@ class _FloatingEmptyBookingCard extends StatelessWidget {
               ),
             ),
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
-                gradient: isDark
-                    ? ServioGradients.brandDark
-                    : ServioGradients.brand,
+                gradient:
+                    isDark ? ServioGradients.brandDark : ServioGradients.brand,
                 borderRadius: BorderRadius.circular(ServioRadius.full),
                 boxShadow: <BoxShadow>[
                   BoxShadow(
@@ -1644,7 +1873,11 @@ class _ProfessionalCardState extends State<_ProfessionalCard>
                       ),
                       child: Center(
                         child: Text(
-                          name.split(' ').take(2).map((String e) => e[0]).join(),
+                          name
+                              .split(' ')
+                              .take(2)
+                              .map((String e) => e[0])
+                              .join(),
                           style: theme.textTheme.titleMedium
                               ?.copyWith(color: ServioColors.deepBrown),
                         ),
