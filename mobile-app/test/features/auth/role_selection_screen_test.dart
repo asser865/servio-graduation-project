@@ -28,8 +28,8 @@ void main() {
       await tester.pumpWidget(_build());
       await tester.pumpAndSettle();
       // Find the ServioPrimaryButton and check its onPressed is null
-      final servioPrimaryButton = tester.widget<ServioPrimaryButton>(
-          find.byType(ServioPrimaryButton));
+      final servioPrimaryButton =
+          tester.widget<ServioPrimaryButton>(find.byType(ServioPrimaryButton));
       expect(servioPrimaryButton.onPressed, isNull);
     });
 
@@ -39,8 +39,8 @@ void main() {
       await tester.tap(find.text('I need a service'));
       await tester.pump();
       // After selecting a role, onPressed should not be null
-      final servioPrimaryButton = tester.widget<ServioPrimaryButton>(
-          find.byType(ServioPrimaryButton));
+      final servioPrimaryButton =
+          tester.widget<ServioPrimaryButton>(find.byType(ServioPrimaryButton));
       expect(servioPrimaryButton.onPressed, isNotNull);
     });
 

@@ -1,4 +1,5 @@
 import 'user_account.dart';
+import 'service_category.dart';
 
 class BackendWorkerService {
   const BackendWorkerService({
@@ -92,6 +93,23 @@ class BackendWorker {
   String get primaryServiceLabel {
     final labels = serviceLabels;
     return labels.isNotEmpty ? labels.first : '';
+  }
+
+  bool offersService(String serviceId) {
+    final normalized = serviceId.trim();
+    if (normalized.isEmpty) return false;
+    return services.any((service) => service.id == normalized);
+  }
+
+  bool offersCategory(String category) {
+    final normalized = normalizeServiceCategory(category);
+    if (normalized.isEmpty) return false;
+    final workerCategories =
+        categories.map(normalizeServiceCategory).where((c) => c.isNotEmpty);
+    if (workerCategories.contains(normalized)) return true;
+    return services.any(
+      (service) => normalizeServiceCategory(service.category) == normalized,
+    );
   }
 
   String get initials {

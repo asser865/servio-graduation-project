@@ -58,15 +58,15 @@ if (process.env.NODE_ENV !== 'test') {
   app.use(morgan('dev'));
 }
 
-app.use('/api/v1/payments', paymentRoutes);
-
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 app.use('/uploads', (req, res, next) => {
   res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
   next();
-}, express.static(uploadRoot));
+}, express.static(uploadRoot), (req, res) => {
+  res.status(StatusCodes.NOT_FOUND).send('Upload not found');
+});
 
 app.get(['/health', '/api/v1/health'], (req, res) => {
   res.status(StatusCodes.OK).json({
@@ -86,11 +86,11 @@ app.use(`${API_PREFIX}/bookings`, bookingRoutes);
 app.use(`${API_PREFIX}/reviews`, reviewRoutes);
 app.use(`${API_PREFIX}/ai`, aiRoutes);
 app.use(`${API_PREFIX}/messages`, messageRoutes);
+app.use(`${API_PREFIX}/payments`, paymentRoutes);
 app.use(`${API_PREFIX}/admin`,       adminRoutes);
 app.use(`${API_PREFIX}/uploads`,     uploadRoutes);
 app.use(`${API_PREFIX}/notify`,      notifyRoutes);
 app.use(`${API_PREFIX}/saved-cards`, savedCardRoutes);
-// Note: payment routes are already mounted above express.json() for webhook support
 
 app.use(notFound);
 app.use(errorHandler);

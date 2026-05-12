@@ -1,4 +1,5 @@
 import '../models/backend_worker_model.dart';
+import '../models/customer_address.dart';
 import '../models/user_account.dart';
 import 'api_client.dart';
 import 'api_endpoints.dart';
@@ -42,6 +43,61 @@ class UsersApi {
   Future<UserAccount> getMe() async {
     final response = await _client.get(ApiEndpoints.usersMe);
     return UserAccount.fromBackend(_client.unwrapData(response));
+  }
+
+  Future<List<CustomerAddress>> getSavedAddresses() async {
+    final response = await _client.get(ApiEndpoints.usersMe);
+    final data = _client.unwrapData(response);
+    final list = (data['addresses'] as List<dynamic>?) ?? <dynamic>[];
+    return list
+        .whereType<Map<String, dynamic>>()
+        .map(CustomerAddress.fromBackend)
+        .toList();
+  }
+
+  Future<CustomerAddress> addAddress({
+    String label = '',
+    required String street,
+    String city = '',
+    String state = '',
+    String zipCode = '',
+  }) async {
+    final response = await _client.post(
+      ApiEndpoints.usersMeAddresses,
+      <String, dynamic>{
+        'label': label.trim(),
+        'street': street.trim(),
+        'city': city.trim(),
+        'state': state.trim(),
+        'zipCode': zipCode.trim(),
+      },
+    );
+    return CustomerAddress.fromBackend(_client.unwrapData(response));
+  }
+
+  Future<CustomerAddress> updateAddress(
+    String id, {
+    String label = '',
+    required String street,
+    String city = '',
+    String state = '',
+    String zipCode = '',
+  }) async {
+    final response = await _client.patch(
+      ApiEndpoints.usersMeAddress(id),
+      <String, dynamic>{
+        'label': label.trim(),
+        'street': street.trim(),
+        'city': city.trim(),
+        'state': state.trim(),
+        'zipCode': zipCode.trim(),
+      },
+    );
+    return CustomerAddress.fromBackend(_client.unwrapData(response));
+  }
+
+  Future<void> deleteAddress(String id) async {
+    await _client.delete(ApiEndpoints.usersMeAddress(id));
   }
 
   Future<UserAccount> updateAvailability(
@@ -95,4 +151,3 @@ class UsersApi {
     await _client.delete(ApiEndpoints.usersMe);
   }
 }
-

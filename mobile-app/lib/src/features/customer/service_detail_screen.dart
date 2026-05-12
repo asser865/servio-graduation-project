@@ -5,6 +5,7 @@ import '../../core/api/api_client.dart';
 import '../../core/api/services_api.dart';
 import '../../core/data/demo_services.dart';
 import '../../core/models/backend_service_model.dart';
+import '../../core/models/service_category.dart';
 import '../../core/models/service_model.dart';
 import '../../core/state/app_state.dart';
 import '../../core/state/services_state.dart';
@@ -56,19 +57,27 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
   Future<void> _loadBackendService() async {
     final serviceId = widget.serviceId?.trim();
     if (serviceId == null || serviceId.isEmpty) return;
-    final isDemoServiceId =
-        kDemoServices.any((service) => service.id == serviceId);
-    if (isDemoServiceId) return;
 
-    final cached = context.read<ServicesProvider>().findById(serviceId);
+    final servicesProvider = context.read<ServicesProvider>();
+    final cached = servicesProvider.findById(serviceId) ??
+        servicesProvider.findFirstByCategory(serviceId);
     if (cached != null) {
       if (mounted) setState(() => _backendService = cached);
       return;
     }
 
     try {
-      final service = await ServicesApi(context.read<ApiClient>())
-          .getServiceById(serviceId);
+      final api = ServicesApi(context.read<ApiClient>());
+      BackendService? service;
+      if (_looksLikeMongoId(serviceId)) {
+        service = await api.getServiceById(serviceId);
+      } else {
+        final category = normalizeServiceCategory(serviceId);
+        if (category.isEmpty) return;
+        final services = await api.getServices(category: category);
+        if (services.isNotEmpty) service = services.first;
+      }
+      if (service == null) return;
       if (mounted) setState(() => _backendService = service);
     } catch (_) {
       // Keep the existing demo fallback if the backend record cannot load.
@@ -83,18 +92,20 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
     final service = _service;
     final backendService = _backendService;
     final rawServiceCategory = backendService?.category;
+    final canonicalCategory =
+        normalizeServiceCategory(rawServiceCategory ?? widget.serviceId);
     final serviceTitle = backendService?.name ?? service.title.of(locale);
-    final serviceCategory =
-        (rawServiceCategory == null || rawServiceCategory.trim().isEmpty
-                ? 'HOME MAINTENANCE'
-                : rawServiceCategory)
-            .toUpperCase();
+    final serviceCategory = (canonicalCategory.isEmpty
+            ? 'HOME MAINTENANCE'
+            : serviceCategoryLabel(canonicalCategory))
+        .toUpperCase();
     final serviceDescription =
         backendService?.description ?? service.lead.of(locale);
     final servicePriceLabel = backendService == null
         ? service.priceBadge.of(locale)
         : 'EGP ${backendService.basePrice.toStringAsFixed(0)}';
-    final canonicalServiceId = backendService?.id;
+    final canonicalServiceId = backendService?.id ??
+        (_looksLikeMongoId(widget.serviceId) ? widget.serviceId!.trim() : null);
 
     return Scaffold(
       body: Stack(
@@ -281,7 +292,10 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                     Navigator.of(context).push(
                       MaterialPageRoute<void>(
                         builder: (_) => TechnicianListingScreen(
-                            serviceId: canonicalServiceId),
+                          serviceId: canonicalServiceId,
+                          category: canonicalCategory,
+                          title: serviceTitle,
+                        ),
                       ),
                     );
                   },
@@ -392,6 +406,9 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
     }
   }
 }
+
+bool _looksLikeMongoId(String? value) =>
+    value != null && RegExp(r'^[a-fA-F0-9]{24}$').hasMatch(value);
 
 class _FloatingActionIcon extends StatelessWidget {
   const _FloatingActionIcon({

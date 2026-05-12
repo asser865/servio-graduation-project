@@ -3,16 +3,19 @@
 jest.mock('../src/modules/users/user.model.js');
 jest.mock('../src/modules/services/service.model.js');
 jest.mock('../src/modules/bookings/booking.model.js');
+jest.mock('../src/modules/savedCards/savedCard.model.js');
 
 const User    = require('../src/modules/users/user.model.js');
 const Service = require('../src/modules/services/service.model.js');
 const Booking = require('../src/modules/bookings/booking.model.js');
+const SavedCard = require('../src/modules/savedCards/savedCard.model.js');
 const { createBooking } = require('../src/modules/bookings/booking.service.js');
 
 const PLUMBING_SERVICE_ID = '664000000000000000000001';
 const HVAC_SERVICE_ID     = '664000000000000000000002';
 const WORKER_ID           = '664000000000000000000010';
 const USER_ID             = '664000000000000000000020';
+const CARD_ID             = '664000000000000000000030';
 
 // Compute next occurrence of a given weekday (0=Sun, 1=Mon, ...) using UTC to
 // match the service layer which uses getUTCDay() for schedule validation.
@@ -57,6 +60,7 @@ const baseBookingData = {
   scheduledDate: NEXT_MONDAY,
   scheduledTime: '10:00',
   address:       '12 Tahrir St, Cairo',
+  paymentMethod: 'cash',
 };
 
 beforeEach(() => {
@@ -68,6 +72,14 @@ beforeEach(() => {
     ...baseBookingData,
     _id: 'booking123',
     populate: jest.fn().mockResolvedValue({ _id: 'booking123', status: 'pending' }),
+  });
+  SavedCard.findOne = jest.fn().mockResolvedValue({
+    _id: CARD_ID,
+    userId: USER_ID,
+    last4: '4242',
+    expiry: '12/30',
+    cardType: 'visa',
+    label: 'Personal',
   });
 });
 
@@ -118,8 +130,74 @@ describe('createBooking — worker-service validation', () => {
   test('booking is created with correct user, worker, service fields', async () => {
     await createBooking(USER_ID, baseBookingData);
     expect(Booking.create).toHaveBeenCalledWith(
-      expect.objectContaining({ user: USER_ID, worker: WORKER_ID, service: PLUMBING_SERVICE_ID })
+      expect.objectContaining({
+        user: USER_ID,
+        worker: WORKER_ID,
+        service: PLUMBING_SERVICE_ID,
+        paymentMethod: 'cash',
+      })
     );
+  });
+});
+
+describe('createBooking â€” payment validation', () => {
+  test('creates booking with cash without a saved card', async () => {
+    await createBooking(USER_ID, baseBookingData);
+    expect(SavedCard.findOne).not.toHaveBeenCalled();
+    expect(Booking.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        paymentMethod: 'cash',
+        savedCard: undefined,
+      })
+    );
+  });
+
+  test('creates booking with a saved card owned by the customer', async () => {
+    await createBooking(USER_ID, {
+      ...baseBookingData,
+      paymentMethod: 'card',
+      savedCardId: CARD_ID,
+    });
+
+    expect(SavedCard.findOne).toHaveBeenCalledWith({
+      _id: CARD_ID,
+      userId: USER_ID,
+    });
+    expect(Booking.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        paymentMethod: 'card',
+        savedCard: CARD_ID,
+        paymentMeta: {
+          last4: '4242',
+          cardType: 'visa',
+          label: 'Personal',
+        },
+      })
+    );
+  });
+
+  test('fails card booking when no saved card ID is supplied', async () => {
+    await expect(createBooking(USER_ID, {
+      ...baseBookingData,
+      paymentMethod: 'card',
+    })).rejects.toMatchObject({
+      statusCode: 400,
+      message: expect.stringContaining('saved card is required'),
+    });
+    expect(Booking.create).not.toHaveBeenCalled();
+  });
+
+  test('fails card booking when saved card is not owned by customer', async () => {
+    SavedCard.findOne = jest.fn().mockResolvedValue(null);
+    await expect(createBooking(USER_ID, {
+      ...baseBookingData,
+      paymentMethod: 'card',
+      savedCardId: CARD_ID,
+    })).rejects.toMatchObject({
+      statusCode: 403,
+      message: expect.stringContaining('Saved card not found'),
+    });
+    expect(Booking.create).not.toHaveBeenCalled();
   });
 });
 
@@ -233,7 +311,7 @@ describe('createBooking — success', () => {
   test('creates booking when all validation passes', async () => {
     await createBooking(USER_ID, baseBookingData);
     expect(Booking.create).toHaveBeenCalledWith(
-      expect.objectContaining({ worker: WORKER_ID, scheduledTime: '10:00', address: '12 Tahrir St, Cairo' })
+      expect.objectContaining({ worker: WORKER_ID, scheduledTime: '10:00', address: '12 Tahrir St, Cairo', paymentMethod: 'cash' })
     );
   });
 });

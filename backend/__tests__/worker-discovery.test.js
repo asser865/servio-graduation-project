@@ -19,12 +19,14 @@ jest.mock('../src/modules/services/service.model');
 jest.mock('../src/modules/admin/audit.service', () => ({ logEvent: jest.fn() }));
 
 const User        = require('../src/modules/users/user.model');
+const Service     = require('../src/modules/services/service.model');
 const { getWorkers } = require('../src/modules/users/user.controller');
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 const PLUMBING_ID = '664000000000000000000001';
 const HVAC_ID     = '664000000000000000000002';
+const ELECTRICAL_ID = '664000000000000000000003';
 
 const mockRes = () => {
   const res = {};
@@ -44,7 +46,16 @@ const buildQuery = (users) => {
   return chain;
 };
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+  Service.findOne = jest.fn().mockResolvedValue({
+    _id: PLUMBING_ID,
+    category: 'plumbing',
+  });
+  Service.find = jest.fn().mockResolvedValue([
+    { _id: PLUMBING_ID },
+  ]);
+});
 
 describe('getWorkers — serviceId filter (canonical)', () => {
   test('passes services: serviceId to the query when ?serviceId is provided', async () => {
@@ -56,11 +67,19 @@ describe('getWorkers — serviceId filter (canonical)', () => {
 
     await getWorkers(req, res);
 
-    expect(User.find).toHaveBeenCalledWith(
-      expect.objectContaining({ services: PLUMBING_ID, isAvailable: true, 'availability.0': { $exists: true } })
+    expect(Service.findOne).toHaveBeenCalledWith(
+      { _id: PLUMBING_ID, isActive: true },
+      'category'
     );
     expect(User.find).toHaveBeenCalledWith(
-      expect.not.objectContaining({ categories: expect.anything() })
+      expect.objectContaining({
+        $or: [
+          { services: PLUMBING_ID },
+          { categories: { $in: ['plumbing'] } },
+        ],
+        isAvailable: true,
+        'availability.0': { $exists: true },
+      })
     );
   });
 
@@ -75,6 +94,30 @@ describe('getWorkers — serviceId filter (canonical)', () => {
       expect.objectContaining({ isActive: true, isVerified: true, role: 'worker', isAvailable: true, 'availability.0': { $exists: true } })
     );
   });
+
+  test('invalid serviceId does not fall back to all workers', async () => {
+    User.find = jest.fn().mockReturnValue(buildQuery([]));
+    User.countDocuments = jest.fn().mockResolvedValue(0);
+
+    const req = { query: { serviceId: 'not-a-valid-id' } };
+    const res = mockRes();
+
+    await getWorkers(req, res);
+
+    expect(Service.findOne).not.toHaveBeenCalled();
+    expect(User.find).not.toHaveBeenCalled();
+    expect(User.countDocuments).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: true,
+        data: expect.objectContaining({
+          workers: [],
+          pagination: expect.objectContaining({ total: 0 }),
+        }),
+      })
+    );
+  });
 });
 
 describe('getWorkers — category filter (legacy backward compat)', () => {
@@ -85,11 +128,44 @@ describe('getWorkers — category filter (legacy backward compat)', () => {
     const req = { query: { category: 'plumbing' } };
     await getWorkers(req, mockRes());
 
-    expect(User.find).toHaveBeenCalledWith(
-      expect.objectContaining({ categories: { $in: ['plumbing'] }, isAvailable: true, 'availability.0': { $exists: true } })
+    expect(Service.find).toHaveBeenCalledWith(
+      { category: 'plumbing', isActive: true },
+      '_id'
     );
     expect(User.find).toHaveBeenCalledWith(
-      expect.not.objectContaining({ services: expect.anything() })
+      expect.objectContaining({
+        $or: [
+          { categories: { $in: ['plumbing'] } },
+          { services: { $in: [PLUMBING_ID] } },
+        ],
+        isAvailable: true,
+        'availability.0': { $exists: true },
+      })
+    );
+  });
+
+  test('passes electrical-only filters for ?category=electrical', async () => {
+    Service.find = jest.fn().mockResolvedValue([{ _id: ELECTRICAL_ID }]);
+    User.find = jest.fn().mockReturnValue(buildQuery([]));
+    User.countDocuments = jest.fn().mockResolvedValue(0);
+
+    const req = { query: { category: 'electrical' } };
+    await getWorkers(req, mockRes());
+
+    expect(User.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        $or: [
+          { categories: { $in: ['electrical'] } },
+          { services: { $in: [ELECTRICAL_ID] } },
+        ],
+      })
+    );
+    expect(User.find).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        $or: expect.arrayContaining([
+          { categories: { $in: ['plumbing'] } },
+        ]),
+      })
     );
   });
 });
@@ -103,10 +179,39 @@ describe('getWorkers — serviceId takes priority over category', () => {
     await getWorkers(req, mockRes());
 
     expect(User.find).toHaveBeenCalledWith(
-      expect.objectContaining({ services: PLUMBING_ID, isAvailable: true, 'availability.0': { $exists: true } })
+      expect.objectContaining({
+        $or: [
+          { services: PLUMBING_ID },
+          { categories: { $in: ['plumbing'] } },
+        ],
+        isAvailable: true,
+        'availability.0': { $exists: true },
+      })
     );
-    expect(User.find).toHaveBeenCalledWith(
-      expect.not.objectContaining({ categories: expect.anything() })
+  });
+});
+
+describe('getWorkers — invalid category', () => {
+  test('does not fall back to all workers', async () => {
+    User.find = jest.fn().mockReturnValue(buildQuery([]));
+    User.countDocuments = jest.fn().mockResolvedValue(0);
+
+    const req = { query: { category: 'not-a-real-category' } };
+    const res = mockRes();
+
+    await getWorkers(req, res);
+
+    expect(User.find).not.toHaveBeenCalled();
+    expect(User.countDocuments).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: true,
+        data: expect.objectContaining({
+          workers: [],
+          pagination: expect.objectContaining({ total: 0 }),
+        }),
+      })
     );
   });
 });

@@ -235,7 +235,12 @@ document.getElementById('cpConfirmBtn')?.addEventListener('click', () => {
   setTimeout(async () => {
     try {
       if (typeof _onConfirm === 'function') {
-        await _onConfirm({ last4: card.last4, cardType: card.cardType, label: card.label || '' });
+        await _onConfirm({
+          savedCardId: card._id,
+          last4: card.last4,
+          cardType: card.cardType,
+          label: card.label || '',
+        });
       }
       showView('cpSuccess');
       if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {

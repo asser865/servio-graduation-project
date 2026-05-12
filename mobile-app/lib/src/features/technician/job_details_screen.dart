@@ -163,8 +163,13 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                     onPressed: () {
                       Navigator.of(context).push(
                         MaterialPageRoute<void>(
-                          builder: (_) =>
-                              ChatScreen(contactName: job.serviceName),
+                          builder: (_) => ChatScreen(
+                            contactName: job.customerName.isNotEmpty
+                                ? job.customerName
+                                : 'Customer',
+                            bookingId: job.id,
+                            customerId: job.customerId,
+                          ),
                         ),
                       );
                     },

@@ -71,7 +71,8 @@ void main() {
     expect(inputFinder, findsNothing);
   });
 
-  testWidgets('delete account dialog fits compact mobile width', (tester) async {
+  testWidgets('delete account dialog fits compact mobile width',
+      (tester) async {
     await tester.binding.setSurfaceSize(const Size(320, 640));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -92,7 +93,8 @@ void main() {
     await tester.pumpWidget(_wrap(const AccountScreen()));
     await _openDeleteDialog(tester);
 
-    expect(_dialogDecoration(tester).color, ServioTheme.light().colorScheme.surface);
+    expect(_dialogDecoration(tester).color,
+        ServioTheme.light().colorScheme.surface);
 
     await tester.tap(
       find.byKey(const ValueKey<String>('delete-account-cancel-button')),
@@ -104,9 +106,7 @@ void main() {
 
     expect(
       _dialogDecoration(tester).color,
-      ServioTheme.dark()
-          .extension<ServioThemeExtension>()!
-          .surfaceRaised,
+      ServioTheme.dark().extension<ServioThemeExtension>()!.surfaceRaised,
     );
   });
 }
@@ -133,9 +133,8 @@ BoxDecoration _dialogDecoration(WidgetTester tester) {
     of: dialogFinder,
     matching: find.byType(DecoratedBox),
   );
-  return tester
-      .widget<DecoratedBox>(decoratedBoxFinder.first)
-      .decoration as BoxDecoration;
+  return tester.widget<DecoratedBox>(decoratedBoxFinder.first).decoration
+      as BoxDecoration;
 }
 
 String _confirmationText(WidgetTester tester) {

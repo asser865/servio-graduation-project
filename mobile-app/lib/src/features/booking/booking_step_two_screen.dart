@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/models/customer_address.dart';
 import '../../core/models/user_account.dart';
+import '../../core/state/customer_addresses_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
+import '../customer/create_address_screen.dart';
 import 'booking_flow_data.dart';
 import 'booking_step_three_screen.dart';
 
@@ -23,8 +27,9 @@ class BookingStepTwoScreen extends StatefulWidget {
 class _BookingStepTwoScreenState extends State<BookingStepTwoScreen> {
   late final List<DateTime> _days;
   late DateTime _selectedDate;
-  final TextEditingController _addressController = TextEditingController();
   String _selectedSlot = '';
+  String? _selectedAddressId;
+  String? _addressError;
 
   static const List<String> _fallbackSlots = <String>[
     '08:00',
@@ -52,13 +57,9 @@ class _BookingStepTwoScreenState extends State<BookingStepTwoScreen> {
     );
     _selectedDate = _firstAvailableDate() ?? _days.first;
     _selectedSlot = _firstSlotFor(_selectedDate);
-    _addressController.text = widget.data.addressStreet;
-  }
-
-  @override
-  void dispose() {
-    _addressController.dispose();
-    super.dispose();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<CustomerAddressesProvider>().load();
+    });
   }
 
   DateTime? _firstAvailableDate() {
@@ -98,6 +99,13 @@ class _BookingStepTwoScreenState extends State<BookingStepTwoScreen> {
 
   void _continue() {
     if (!_isAvailableDate(_selectedDate) || _selectedSlot.isEmpty) return;
+    final address = _selectedAddress(
+      context.read<CustomerAddressesProvider>().addresses,
+    );
+    if (address == null) {
+      setState(() => _addressError = 'Select a saved address to continue.');
+      return;
+    }
 
     final selectedHour = int.tryParse(_selectedSlot.split(':').first) ?? 10;
     final scheduledDateTime = DateTime(
@@ -106,7 +114,6 @@ class _BookingStepTwoScreenState extends State<BookingStepTwoScreen> {
       _selectedDate.day,
       selectedHour,
     );
-    final address = _addressController.text.trim();
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => BookingStepThreeScreen(
@@ -114,15 +121,43 @@ class _BookingStepTwoScreenState extends State<BookingStepTwoScreen> {
             date: DateFormat('dd/MM/yyyy').format(_selectedDate),
             time: _slotLabel(_selectedSlot),
             scheduledDateTime: scheduledDateTime,
-            location: address.isNotEmpty ? address : widget.data.location,
-            addressCity: widget.data.addressCity.isNotEmpty
-                ? widget.data.addressCity
-                : 'Cairo',
-            addressStreet: address,
+            location: address.formattedSingleLine,
+            addressCity: address.city.isNotEmpty
+                ? address.city
+                : widget.data.addressCity,
+            addressStreet: address.street,
           ),
         ),
       ),
     );
+  }
+
+  Future<void> _addAddress() async {
+    final saved = await Navigator.of(context).push<CustomerAddress>(
+      MaterialPageRoute<CustomerAddress>(
+        builder: (_) => const CreateAddressScreen(),
+      ),
+    );
+    if (!mounted || saved == null) return;
+    setState(() {
+      _selectedAddressId = saved.id;
+      _addressError = null;
+    });
+  }
+
+  CustomerAddress? _selectedAddress(List<CustomerAddress> addresses) {
+    if (addresses.isEmpty) return null;
+    if (_selectedAddressId != null) {
+      for (final address in addresses) {
+        if (address.id == _selectedAddressId) return address;
+      }
+    }
+    if (widget.data.addressStreet.isNotEmpty) {
+      for (final address in addresses) {
+        if (address.street == widget.data.addressStreet) return address;
+      }
+    }
+    return addresses.first;
   }
 
   @override
@@ -132,7 +167,12 @@ class _BookingStepTwoScreenState extends State<BookingStepTwoScreen> {
     final selectedDateAvailable = _isAvailableDate(_selectedDate);
     final slots =
         selectedDateAvailable ? _slotsForDate(_selectedDate) : const <String>[];
-    final canContinue = selectedDateAvailable && _selectedSlot.isNotEmpty;
+    final addressProvider = context.watch<CustomerAddressesProvider>();
+    final selectedAddress = _selectedAddress(addressProvider.addresses);
+    final canContinue = selectedDateAvailable &&
+        _selectedSlot.isNotEmpty &&
+        selectedAddress != null &&
+        !addressProvider.loading;
 
     return Scaffold(
       appBar: AppBar(
@@ -277,19 +317,20 @@ class _BookingStepTwoScreenState extends State<BookingStepTwoScreen> {
                   }).toList(),
                 ),
               const SizedBox(height: 24),
-              TextField(
-                controller: _addressController,
-                decoration: const InputDecoration(
-                  labelText: 'Service address',
-                  prefixIcon: Icon(Icons.location_on_outlined),
-                ),
-              ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () {},
-                  child: const Text('Use current location'),
-                ),
+              Text('Service Address', style: theme.textTheme.titleMedium),
+              const SizedBox(height: 12),
+              _AddressSelector(
+                addresses: addressProvider.addresses,
+                selectedAddress: selectedAddress,
+                loading: addressProvider.loading,
+                error: addressProvider.error,
+                addressError: _addressError,
+                onRetry: () => context.read<CustomerAddressesProvider>().load(),
+                onAdd: _addAddress,
+                onSelect: (address) => setState(() {
+                  _selectedAddressId = address.id;
+                  _addressError = null;
+                }),
               ),
               const SizedBox(height: 12),
               ServioPrimaryButton(
@@ -298,6 +339,219 @@ class _BookingStepTwoScreenState extends State<BookingStepTwoScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AddressSelector extends StatelessWidget {
+  const _AddressSelector({
+    required this.addresses,
+    required this.selectedAddress,
+    required this.loading,
+    required this.onRetry,
+    required this.onAdd,
+    required this.onSelect,
+    this.error,
+    this.addressError,
+  });
+
+  final List<CustomerAddress> addresses;
+  final CustomerAddress? selectedAddress;
+  final bool loading;
+  final String? error;
+  final String? addressError;
+  final VoidCallback onRetry;
+  final VoidCallback onAdd;
+  final ValueChanged<CustomerAddress> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+
+    if (loading && addresses.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(18),
+        decoration: _boxDecoration(context),
+        child: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (error != null && addresses.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: _boxDecoration(context),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Text(
+              error!,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: servio.danger,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Retry'),
+            ),
+            TextButton.icon(
+              onPressed: onAdd,
+              icon: const Icon(Icons.add_location_alt_outlined),
+              label: const Text('Add New Address'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (addresses.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: _boxDecoration(context),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Text(
+              'No saved addresses yet.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.titleSmall,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Add an address to continue with this booking.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: servio.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              key: const ValueKey<String>('booking-add-address-button'),
+              onPressed: onAdd,
+              icon: const Icon(Icons.add_location_alt_outlined),
+              label: const Text('Add New Address'),
+            ),
+            if (addressError != null) ...<Widget>[
+              const SizedBox(height: 8),
+              Text(
+                addressError!,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: servio.danger),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        for (final address in addresses) ...<Widget>[
+          _SelectableAddressCard(
+            address: address,
+            selected: selectedAddress?.id == address.id,
+            onTap: () => onSelect(address),
+          ),
+          const SizedBox(height: 10),
+        ],
+        OutlinedButton.icon(
+          key: const ValueKey<String>('booking-add-address-button'),
+          onPressed: onAdd,
+          icon: const Icon(Icons.add_location_alt_outlined),
+          label: const Text('Add New Address'),
+        ),
+        if (addressError != null) ...<Widget>[
+          const SizedBox(height: 8),
+          Text(
+            addressError!,
+            style: TextStyle(color: servio.danger),
+          ),
+        ],
+      ],
+    );
+  }
+
+  BoxDecoration _boxDecoration(BuildContext context) {
+    final servio = context.servio;
+    return BoxDecoration(
+      color: Theme.of(context).colorScheme.surface,
+      borderRadius: BorderRadius.circular(ServioRadius.md),
+      border: Border.all(color: servio.border),
+    );
+  }
+}
+
+class _SelectableAddressCard extends StatelessWidget {
+  const _SelectableAddressCard({
+    required this.address,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final CustomerAddress address;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+
+    return InkWell(
+      key: ValueKey<String>('booking-address-${address.id}'),
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(ServioRadius.md),
+      child: AnimatedContainer(
+        duration: ServioMotion.fast,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: selected
+              ? ServioColors.tint(servio.accent)
+              : Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(ServioRadius.md),
+          border: Border.all(
+            color: selected ? servio.accent : servio.border,
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: <Widget>[
+            Icon(
+              selected
+                  ? Icons.radio_button_checked_rounded
+                  : Icons.radio_button_unchecked_rounded,
+              color: selected ? servio.accent : servio.textSecondary,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    address.displayLabel,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    address.formattedSingleLine,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: servio.textSecondary,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

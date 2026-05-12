@@ -85,7 +85,24 @@ const registerUser = async (data) => {
   let categories = data.categories || [];
   if (categories.length === 0 && skills && Array.from(skills).length > 0) {
     const skillList = Array.isArray(skills) ? skills : Array.from(skills);
-    const categoryEnum = ['plumbing', 'electrical', 'painting', 'flooring', 'carpentry', 'cleaning', 'hvac', 'other'];
+    const categoryEnum = [
+      'plumbing',
+      'electrical',
+      'hvac',
+      'carpentry',
+      'appliance',
+      'handyman',
+      'renovation',
+      'painting',
+      'flooring',
+      'drywall',
+      'roofing',
+      'cleaning',
+      'pest-control',
+      'landscaping',
+      'installation',
+      'other',
+    ];
     const mapping = {
       'plumbing': 'plumbing',
       'electrical': 'electrical',
@@ -94,15 +111,15 @@ const registerUser = async (data) => {
       'carpentry': 'carpentry',
       'cleaning': 'cleaning',
       'flooring': 'flooring',
-      'roofing': 'other',
-      'appliance repair': 'other',
-      'landscaping': 'other',
-      'general maintenance': 'other'
+      'roofing': 'roofing',
+      'appliance-repair': 'appliance',
+      'landscaping': 'landscaping',
+      'general-maintenance': 'handyman',
     };
 
     const derived = new Set();
     skillList.forEach(s => {
-      const lowerS = s.toLowerCase().trim();
+      const lowerS = s.toLowerCase().trim().replace(/[\s_]+/g, '-');
       if (mapping[lowerS]) {
         derived.add(mapping[lowerS]);
       } else if (categoryEnum.includes(lowerS)) {

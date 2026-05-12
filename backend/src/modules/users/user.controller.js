@@ -16,6 +16,59 @@ const ApiResponse     = require('../../utils/ApiResponse');
 const { logEvent }    = require('../admin/audit.service');
 const { dispatchAvailabilityMatches } = require('../notifications/notify.service');
 
+const WORKER_CATEGORY_VALUES = new Set([
+  'plumbing',
+  'electrical',
+  'hvac',
+  'carpentry',
+  'appliance',
+  'handyman',
+  'renovation',
+  'painting',
+  'flooring',
+  'drywall',
+  'roofing',
+  'cleaning',
+  'pest-control',
+  'landscaping',
+  'installation',
+  'other',
+]);
+
+const CATEGORY_ALIASES = {
+  ac: 'hvac',
+  'ac-maintenance': 'hvac',
+  'air-conditioning': 'hvac',
+  appliance_repair: 'appliance',
+  'appliance-repair': 'appliance',
+  pest_control: 'pest-control',
+};
+
+function normalizeWorkerCategory(value) {
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_]+/g, '-');
+  const aliased = CATEGORY_ALIASES[normalized] || normalized;
+  return WORKER_CATEGORY_VALUES.has(aliased) ? aliased : '';
+}
+
+function looksLikeObjectId(value) {
+  return /^[a-fA-F0-9]{24}$/.test(String(value || '').trim());
+}
+
+function emptyWorkerDiscovery(res, page, limit) {
+  return ApiResponse.success(res, StatusCodes.OK, 'Workers retrieved successfully.', {
+    workers: [],
+    pagination: {
+      total: 0,
+      page: Number(page),
+      limit: Number(limit),
+      totalPages: 0,
+    },
+  });
+}
+
 function normalizeWorkerDecision(body) {
   if (body?.decision === 'approved' || body?.isVerified === true) return 'approved';
   if (body?.decision === 'rejected' || body?.isVerified === false) return 'rejected';
@@ -34,6 +87,7 @@ const getMe = async (req, res) => {
 //       serviceId takes priority when both are provided.
 const getWorkers = async (req, res) => {
   const { serviceId, category, page = 1, limit = 10 } = req.query;
+  const normalizedCategory = normalizeWorkerCategory(category);
 
   const filter = {
     role:     'worker',
@@ -44,11 +98,32 @@ const getWorkers = async (req, res) => {
   };
 
   if (serviceId) {
-    // Canonical filter: match workers whose services array contains this ObjectId
-    filter.services = serviceId;
+    if (!looksLikeObjectId(serviceId)) {
+      return emptyWorkerDiscovery(res, page, limit);
+    }
+
+    const service = await Service.findOne({ _id: serviceId, isActive: true }, 'category');
+    if (!service) return emptyWorkerDiscovery(res, page, limit);
+    const serviceCategory = normalizeWorkerCategory(service.category);
+    if (!serviceCategory) return emptyWorkerDiscovery(res, page, limit);
+
+    filter.$or = [
+      { services: serviceId },
+      { categories: { $in: [serviceCategory] } },
+    ];
   } else if (category) {
-    // Legacy filter: keep backward compatibility with category string filter
-    filter.categories = { $in: [category] };
+    if (!normalizedCategory) return emptyWorkerDiscovery(res, page, limit);
+
+    const servicesInCategory = await Service.find(
+      { category: normalizedCategory, isActive: true },
+      '_id'
+    );
+    const serviceIds = servicesInCategory.map((service) => service._id);
+
+    filter.$or = [
+      { categories: { $in: [normalizedCategory] } },
+      ...(serviceIds.length ? [{ services: { $in: serviceIds } }] : []),
+    ];
   }
 
   const skip = (Number(page) - 1) * Number(limit);
@@ -135,11 +210,6 @@ const updateProfile = async (req, res) => {
   if (updates.services !== undefined && req.user?.role !== 'worker') {
     delete updates.services;
   }
-  // Workers cannot self-update categories — handled via pendingCategories approval flow
-  if (updates.categories !== undefined && req.user?.role === 'worker') {
-    delete updates.categories;
-  }
-
   const user = await User.findById(req.user.id);
   if (!user) throw new ApiError(StatusCodes.NOT_FOUND, 'User not found.');
 

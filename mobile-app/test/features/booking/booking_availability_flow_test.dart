@@ -1,6 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:provider/provider.dart';
+import 'package:provider/single_child_widget.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:servio_mobile_app/src/core/api/api_client.dart';
+import 'package:servio_mobile_app/src/core/api/users_api.dart';
+import 'package:servio_mobile_app/src/core/services/storage_service.dart';
+import 'package:servio_mobile_app/src/core/state/customer_addresses_state.dart';
 import 'package:servio_mobile_app/src/core/models/user_account.dart';
 import 'package:servio_mobile_app/src/design_system/servio_theme.dart';
 import 'package:servio_mobile_app/src/features/booking/booking_flow_data.dart';
@@ -8,6 +17,12 @@ import 'package:servio_mobile_app/src/features/booking/booking_step_three_screen
 import 'package:servio_mobile_app/src/features/booking/booking_step_two_screen.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUp(() {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+  });
+
   testWidgets('date picker disables weekly day-off dates', (tester) async {
     final data = BookingFlowData(
       technicianId: 'worker1',
@@ -17,7 +32,7 @@ void main() {
       ],
     );
 
-    await tester.pumpWidget(_wrap(BookingStepTwoScreen(data: data)));
+    await tester.pumpWidget(await _wrap(BookingStepTwoScreen(data: data)));
     await tester.pumpAndSettle();
 
     final days = _visibleBookingDays();
@@ -54,7 +69,7 @@ void main() {
 
   testWidgets('date picker blocks booking when no weekdays are available',
       (tester) async {
-    await tester.pumpWidget(_wrap(const BookingStepTwoScreen(
+    await tester.pumpWidget(await _wrap(const BookingStepTwoScreen(
       data: BookingFlowData(technicianId: 'worker1'),
     )));
     await tester.pumpAndSettle();
@@ -75,7 +90,7 @@ void main() {
     final unavailableDate =
         days.firstWhere((day) => day.weekday == DateTime.saturday);
 
-    await tester.pumpWidget(_wrap(BookingStepThreeScreen(
+    await tester.pumpWidget(await _wrap(BookingStepThreeScreen(
       data: BookingFlowData(
         technicianId: 'worker1',
         serviceId: 'service1',
@@ -110,10 +125,30 @@ void main() {
   });
 }
 
-Widget _wrap(Widget child) {
-  return MaterialApp(
-    theme: ServioTheme.light(),
-    home: child,
+Future<Widget> _wrap(Widget child) async {
+  final storage = await StorageService.init();
+  final apiClient = ApiClient(
+    storage: storage,
+    httpClient: MockClient((request) async {
+      return http.Response(
+        '{"success":true,"data":{"addresses":[{"_id":"addr1","label":"Home","street":"12 Nile St","city":"Cairo","state":"Maadi"}]}}',
+        200,
+        headers: <String, String>{'content-type': 'application/json'},
+      );
+    }),
+    baseUrl: 'http://localhost',
+  );
+  return MultiProvider(
+    providers: <SingleChildWidget>[
+      Provider<ApiClient>.value(value: apiClient),
+      ChangeNotifierProvider<CustomerAddressesProvider>(
+        create: (_) => CustomerAddressesProvider(UsersApi(apiClient)),
+      ),
+    ],
+    child: MaterialApp(
+      theme: ServioTheme.light(),
+      home: child,
+    ),
   );
 }
 

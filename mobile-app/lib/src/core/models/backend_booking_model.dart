@@ -14,6 +14,11 @@ class BackendBooking {
     required this.addressStreet,
     required this.customerName,
     required this.customerId,
+    required this.pin,
+    required this.paymentMethod,
+    required this.paymentCardLast4,
+    required this.paymentCardType,
+    required this.paymentCardLabel,
   });
 
   final String id;
@@ -30,6 +35,11 @@ class BackendBooking {
   final String addressStreet;
   final String customerName;
   final String customerId;
+  final String pin;
+  final String paymentMethod;
+  final String paymentCardLast4;
+  final String paymentCardType;
+  final String paymentCardLabel;
 
   factory BackendBooking.fromJson(Map<String, dynamic> json) {
     // worker is a raw ObjectId string (not populated by getWorkerBookings)
@@ -90,6 +100,13 @@ class BackendBooking {
       addressStreet = (addressRaw['street'] as String?) ?? '';
     }
 
+    final paymentMeta = json['paymentMeta'] is Map<String, dynamic>
+        ? json['paymentMeta'] as Map<String, dynamic>
+        : <String, dynamic>{};
+    final savedCard = json['savedCard'] is Map<String, dynamic>
+        ? json['savedCard'] as Map<String, dynamic>
+        : <String, dynamic>{};
+
     return BackendBooking(
       id: (json['_id'] as String?) ?? (json['id'] as String?) ?? '',
       status: (json['status'] as String?) ?? 'pending',
@@ -111,6 +128,17 @@ class BackendBooking {
       addressStreet: addressStreet,
       customerName: customerName,
       customerId: customerId,
+      pin: (json['pin'] as String?) ?? '',
+      paymentMethod: (json['paymentMethod'] as String?) ?? '',
+      paymentCardLast4: (paymentMeta['last4'] as String?) ??
+          (savedCard['last4'] as String?) ??
+          '',
+      paymentCardType: (paymentMeta['cardType'] as String?) ??
+          (savedCard['cardType'] as String?) ??
+          '',
+      paymentCardLabel: (paymentMeta['label'] as String?) ??
+          (savedCard['label'] as String?) ??
+          '',
     );
   }
 }

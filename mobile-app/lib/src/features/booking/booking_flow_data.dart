@@ -19,9 +19,16 @@ class BookingFlowData {
     this.addressCity = '',
     this.addressStreet = '',
     this.notes = '',
-    this.paymentMethod = 'Cash on Completion',
+    this.paymentMethod = 'Cash',
+    this.paymentMethodCode = 'cash',
+    this.savedCardId = '',
+    this.savedCardLabel = '',
+    this.savedCardLast4 = '',
+    this.statusLabel = 'Pending',
+    this.statusCode = 'pending',
     this.reference = '#SRV-2026-8823',
     this.amount = '1,050 EGP',
+    this.pin = '',
   });
 
   final String serviceName;
@@ -42,8 +49,15 @@ class BookingFlowData {
   final String addressStreet;
   final String notes;
   final String paymentMethod;
+  final String paymentMethodCode;
+  final String savedCardId;
+  final String savedCardLabel;
+  final String savedCardLast4;
+  final String statusLabel;
+  final String statusCode;
   final String reference;
   final String amount;
+  final String pin;
 
   BookingFlowData copyWith({
     String? serviceName,
@@ -64,8 +78,15 @@ class BookingFlowData {
     String? addressStreet,
     String? notes,
     String? paymentMethod,
+    String? paymentMethodCode,
+    String? savedCardId,
+    String? savedCardLabel,
+    String? savedCardLast4,
+    String? statusLabel,
+    String? statusCode,
     String? reference,
     String? amount,
+    String? pin,
   }) {
     return BookingFlowData(
       serviceName: serviceName ?? this.serviceName,
@@ -87,8 +108,15 @@ class BookingFlowData {
       addressStreet: addressStreet ?? this.addressStreet,
       notes: notes ?? this.notes,
       paymentMethod: paymentMethod ?? this.paymentMethod,
+      paymentMethodCode: paymentMethodCode ?? this.paymentMethodCode,
+      savedCardId: savedCardId ?? this.savedCardId,
+      savedCardLabel: savedCardLabel ?? this.savedCardLabel,
+      savedCardLast4: savedCardLast4 ?? this.savedCardLast4,
+      statusLabel: statusLabel ?? this.statusLabel,
+      statusCode: statusCode ?? this.statusCode,
       reference: reference ?? this.reference,
       amount: amount ?? this.amount,
+      pin: pin ?? this.pin,
     );
   }
 

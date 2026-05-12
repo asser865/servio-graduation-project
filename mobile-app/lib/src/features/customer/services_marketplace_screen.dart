@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/models/backend_service_model.dart';
+import '../../core/models/service_category.dart';
 import '../../core/state/services_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
@@ -25,15 +26,6 @@ class _ServicesMarketplaceScreenState extends State<ServicesMarketplaceScreen> {
   int _selectedCategory = 0;
   bool _gridMode = false;
   _SortOrder _sortOrder = _SortOrder.relevance;
-
-  static const List<String> _categories = <String>[
-    'All',
-    'Plumbing',
-    'Electrical',
-    'Painting',
-    'HVAC',
-    'Carpentry',
-  ];
 
   static const Map<_SortOrder, String> _sortLabels = <_SortOrder, String>{
     _SortOrder.relevance: 'Relevance',
@@ -78,7 +70,9 @@ class _ServicesMarketplaceScreenState extends State<ServicesMarketplaceScreen> {
                 ),
               ),
               padding: EdgeInsets.fromLTRB(
-                24, 12, 24,
+                24,
+                12,
+                24,
                 MediaQuery.of(ctx).viewInsets.bottom + 32,
               ),
               child: Column(
@@ -163,12 +157,21 @@ class _ServicesMarketplaceScreenState extends State<ServicesMarketplaceScreen> {
     final provider = context.watch<ServicesProvider>();
     final bottomInset = ServioTabShell.bottomOverlayInsetOf(context);
     final allServices = provider.services;
+    final categoryKeys = <String>[
+      'all',
+      ...{
+        for (final service in allServices)
+          if (normalizeServiceCategory(service.category).isNotEmpty)
+            normalizeServiceCategory(service.category),
+      },
+    ];
+    if (_selectedCategory >= categoryKeys.length) _selectedCategory = 0;
+    final selectedCategory = categoryKeys[_selectedCategory];
     final filtered = _selectedCategory == 0
         ? allServices
         : allServices
-            .where((s) =>
-                s.category.toLowerCase() ==
-                _categories[_selectedCategory].toLowerCase())
+            .where(
+                (s) => normalizeServiceCategory(s.category) == selectedCategory)
             .toList();
     final services = _sorted(filtered);
     final hasActiveFilter = _sortOrder != _SortOrder.relevance;
@@ -229,8 +232,7 @@ class _ServicesMarketplaceScreenState extends State<ServicesMarketplaceScreen> {
                                   BorderRadius.circular(ServioRadius.full),
                               boxShadow: ServioShadows.rest,
                               border: hasActiveFilter
-                                  ? Border.all(
-                                      color: servio.accent, width: 1.5)
+                                  ? Border.all(color: servio.accent, width: 1.5)
                                   : null,
                             ),
                             child:
@@ -267,7 +269,7 @@ class _ServicesMarketplaceScreenState extends State<ServicesMarketplaceScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                   scrollDirection: Axis.horizontal,
-                  itemCount: _categories.length,
+                  itemCount: categoryKeys.length,
                   separatorBuilder: (BuildContext context, int index) =>
                       const SizedBox(width: 10),
                   itemBuilder: (BuildContext context, int index) {
@@ -284,7 +286,9 @@ class _ServicesMarketplaceScreenState extends State<ServicesMarketplaceScreen> {
                               BorderRadius.circular(ServioRadius.full),
                         ),
                         child: Text(
-                          _categories[index],
+                          index == 0
+                              ? 'All'
+                              : serviceCategoryLabel(categoryKeys[index]),
                           style: theme.textTheme.labelLarge?.copyWith(
                             color: active ? Colors.white : servio.textSecondary,
                           ),
@@ -307,9 +311,8 @@ class _ServicesMarketplaceScreenState extends State<ServicesMarketplaceScreen> {
                         color: hasActiveFilter
                             ? servio.accent
                             : servio.textSecondary,
-                        fontWeight: hasActiveFilter
-                            ? FontWeight.w600
-                            : FontWeight.w400,
+                        fontWeight:
+                            hasActiveFilter ? FontWeight.w600 : FontWeight.w400,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -448,7 +451,7 @@ const Map<String, IconData> _serviceCategoryIcons = <String, IconData>{
 };
 
 IconData _iconForService(BackendService service) {
-  return _serviceCategoryIcons[service.category.toLowerCase()] ??
+  return _serviceCategoryIcons[normalizeServiceCategory(service.category)] ??
       Icons.home_repair_service_rounded;
 }
 
@@ -742,7 +745,10 @@ class _CategoryBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
-    final label = category.trim().isEmpty ? 'SERVICE' : category.toUpperCase();
+    final normalized = normalizeServiceCategory(category);
+    final label = normalized.isEmpty
+        ? 'SERVICE'
+        : serviceCategoryLabel(normalized).toUpperCase();
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

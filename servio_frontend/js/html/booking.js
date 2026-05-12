@@ -1020,7 +1020,6 @@ async function finalizeBooking() {
   collectStep1();
   collectStep2();
 
-  const pin = Math.floor(1000 + Math.random() * 9000);
   const paymentMethod = PAYMENT_LABELS[state.data.payment] || state.data.payment;
   const readableDate  = formatDate(state.data.date);
 
@@ -1037,10 +1036,13 @@ async function finalizeBooking() {
         scheduledTime:   state.selectedTime || '',
         address:         state.data.address,
         description:     document.getElementById('bookNotes')?.value.trim() || '',
+        paymentMethod:   state.data.payment === 'cash' ? 'cash' : 'card',
+        savedCardId:     state.data.payment === 'online' ? state.data.paymentMeta?.savedCardId : undefined,
         ...(state.data.paymentMeta ? { paymentMeta: state.data.paymentMeta } : {}),
       };
       const res = await createBooking(payload);
       bookingId = res.data?._id || res._id || res.data?.booking?._id || null;
+      state.data.backendBooking = res.data?.booking || res.data || res;
     } catch (e) {
       const msg = e?.message || '';
       let userMsg = 'Booking failed. Please try again.';
@@ -1060,8 +1062,8 @@ async function finalizeBooking() {
   }
 
   const bookingData = {
-    _id:      bookingId || null,
-    id:       bookingId || ('S-' + Math.floor(2900 + Math.random() * 100)),
+    _id:      bookingId || state.data.backendBooking?._id || null,
+    id:       bookingId || state.data.backendBooking?._id || ('S-' + Math.floor(2900 + Math.random() * 100)),
     bookingId,
     workerId,
     workerName: state.worker?.name || '',
@@ -1074,7 +1076,7 @@ async function finalizeBooking() {
     time:          state.data.time,
     scheduledTime: state.selectedTime || state.data.time,
     address:       state.data.address,
-    pin,
+    pin: state.data.backendBooking?.pin || null,
     status:    'Booked',
     timestamp: Date.now(),
     technician: {

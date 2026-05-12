@@ -12,7 +12,7 @@ class BookingsApi {
   Future<List<BackendBooking>> getMyBookings({String? status}) async {
     final qs = Uri(
       queryParameters: <String, String>{
-        'limit': '50',
+        'limit': '200',
         if (status != null && status.isNotEmpty) 'status': status,
       },
     ).query;
@@ -68,6 +68,8 @@ class BookingsApi {
     String addressCity = '',
     String addressStreet = '',
     String notes = '',
+    String paymentMethod = 'cash',
+    String? savedCardId,
   }) async {
     final resolvedAddress = address.trim().isNotEmpty
         ? address.trim()
@@ -85,6 +87,9 @@ class BookingsApi {
         'scheduledDate': _dateOnly(scheduledDate),
         'scheduledTime': _normalizeScheduledTime(scheduledTime),
         'address': resolvedAddress,
+        'paymentMethod': paymentMethod,
+        if (savedCardId != null && savedCardId.trim().isNotEmpty)
+          'savedCardId': savedCardId.trim(),
         if (notes.trim().isNotEmpty) 'description': notes.trim(),
       }),
     );

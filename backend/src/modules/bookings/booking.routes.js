@@ -17,6 +17,8 @@ const createValidation = [
   body('serviceCategory').if(body('serviceId').isEmpty()).notEmpty().withMessage('Service category is required if no specific service is selected'),
   body('scheduledDate').notEmpty().isISO8601().withMessage('Scheduled date must be a valid date'),
   body('address').trim().notEmpty().withMessage('Address is required'),
+  body('paymentMethod').notEmpty().isIn(['cash', 'card', 'online']).withMessage('Payment method must be cash or card'),
+  body('savedCardId').optional({ checkFalsy: true }).isMongoId().withMessage('Valid saved card ID is required'),
 ];
 
 const statusValidation = [

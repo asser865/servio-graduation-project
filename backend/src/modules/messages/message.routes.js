@@ -10,14 +10,30 @@ router.use(protect);
 
 router.post('/',
   validate([
-    body('bookingId').notEmpty().isMongoId().withMessage('Valid booking ID required'),
-    body('content').trim().notEmpty().withMessage('Message content required'),
+    body('bookingId').optional().isMongoId().withMessage('Valid booking ID required'),
+    body('conversationId').optional().isMongoId().withMessage('Valid conversation ID required'),
+    body('receiverId').optional().isMongoId().withMessage('Valid receiver ID required'),
+    body('workerId').optional().isMongoId().withMessage('Valid worker ID required'),
+    body('customerId').optional().isMongoId().withMessage('Valid customer ID required'),
+    body('content').optional().trim().isLength({ max: 2000 }).withMessage('Message content cannot exceed 2000 characters'),
+    body('body').optional().trim().isLength({ max: 2000 }).withMessage('Message content cannot exceed 2000 characters'),
+    body('text').optional().trim().isLength({ max: 2000 }).withMessage('Message content cannot exceed 2000 characters'),
   ]),
   ctrl.send
 );
 
+router.post('/conversations/start',
+  validate([
+    body('bookingId').optional().isMongoId().withMessage('Valid booking ID required'),
+    body('receiverId').optional().isMongoId().withMessage('Valid receiver ID required'),
+    body('workerId').optional().isMongoId().withMessage('Valid worker ID required'),
+    body('customerId').optional().isMongoId().withMessage('Valid customer ID required'),
+  ]),
+  ctrl.startConversation
+);
 router.get('/conversations', ctrl.conversations);
+router.get('/conversations/:id', ctrl.list);
 router.get('/unread',        ctrl.unread);
-router.get('/:bookingId',    ctrl.list);
+router.get('/:id',           ctrl.list);
 
 module.exports = router;

@@ -1,13 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/models/customer_address.dart';
+import '../../core/state/customer_addresses_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
 
 class CreateAddressScreen extends StatefulWidget {
-  const CreateAddressScreen({super.key});
+  const CreateAddressScreen({
+    super.key,
+    this.address,
+  });
+
+  final CustomerAddress? address;
 
   @override
   State<CreateAddressScreen> createState() => _CreateAddressScreenState();
@@ -15,42 +22,80 @@ class CreateAddressScreen extends StatefulWidget {
 
 class _CreateAddressScreenState extends State<CreateAddressScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _labelCtrl = TextEditingController();
-  final _fullAddressCtrl = TextEditingController();
-  final _cityAreaCtrl = TextEditingController();
-  final _landmarkCtrl = TextEditingController();
+  late final TextEditingController _labelCtrl;
+  late final TextEditingController _streetCtrl;
+  late final TextEditingController _cityCtrl;
+  late final TextEditingController _stateCtrl;
+  late final TextEditingController _zipCtrl;
 
-  bool _isDefault = false;
+  String? _submitError;
+
+  bool get _isEditing => widget.address != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final address = widget.address;
+    _labelCtrl = TextEditingController(text: address?.label ?? '');
+    _streetCtrl = TextEditingController(text: address?.street ?? '');
+    _cityCtrl = TextEditingController(text: address?.city ?? '');
+    _stateCtrl = TextEditingController(text: address?.state ?? '');
+    _zipCtrl = TextEditingController(text: address?.zipCode ?? '');
+  }
 
   @override
   void dispose() {
     _labelCtrl.dispose();
-    _fullAddressCtrl.dispose();
-    _cityAreaCtrl.dispose();
-    _landmarkCtrl.dispose();
+    _streetCtrl.dispose();
+    _cityCtrl.dispose();
+    _stateCtrl.dispose();
+    _zipCtrl.dispose();
     super.dispose();
   }
 
-  void _saveAddress() {
+  Future<void> _saveAddress() async {
+    setState(() => _submitError = null);
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    final landmark = _landmarkCtrl.text.trim();
-    final address = CustomerAddress(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
-      label: _labelCtrl.text.trim(),
-      fullAddress: _fullAddressCtrl.text.trim(),
-      cityArea: _cityAreaCtrl.text.trim(),
-      landmarkInstructions: landmark.isEmpty ? null : landmark,
-      isDefault: _isDefault,
-    );
+    final provider = context.read<CustomerAddressesProvider>();
+    final saved = _isEditing
+        ? await provider.updateAddress(
+            widget.address!.id,
+            label: _labelCtrl.text,
+            street: _streetCtrl.text,
+            city: _cityCtrl.text,
+            state: _stateCtrl.text,
+            zipCode: _zipCtrl.text,
+          )
+        : await provider.addAddress(
+            label: _labelCtrl.text,
+            street: _streetCtrl.text,
+            city: _cityCtrl.text,
+            state: _stateCtrl.text,
+            zipCode: _zipCtrl.text,
+          );
 
-    Navigator.of(context).pop<CustomerAddress>(address);
+    if (!mounted) return;
+    if (saved != null) {
+      Navigator.of(context).pop<CustomerAddress>(saved);
+      return;
+    }
+
+    setState(() {
+      _submitError = provider.error ?? 'Failed to save address';
+    });
   }
 
-  String? _required(String? value, String fieldName) {
-    if (value == null || value.trim().isEmpty) {
-      return '$fieldName is required';
-    }
+  String? _requiredStreet(String? value) {
+    final trimmed = value?.trim() ?? '';
+    if (trimmed.isEmpty) return 'Street address is required';
+    if (trimmed.length > 200) return 'Street cannot exceed 200 characters';
+    return null;
+  }
+
+  String? _maxLength(String? value, String fieldName, int max) {
+    final trimmed = value?.trim() ?? '';
+    if (trimmed.length > max) return '$fieldName cannot exceed $max characters';
     return null;
   }
 
@@ -58,10 +103,11 @@ class _CreateAddressScreenState extends State<CreateAddressScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
+    final saving = context.watch<CustomerAddressesProvider>().saving;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Create New Address'),
+        title: Text(_isEditing ? 'Edit Address' : 'Add Address'),
         backgroundColor: theme.scaffoldBackgroundColor,
       ),
       body: Form(
@@ -96,7 +142,7 @@ class _CreateAddressScreenState extends State<CreateAddressScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Save a location you can reuse during booking.',
+                          'Saved addresses sync with the website.',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: servio.textSecondary,
                             height: 1.35,
@@ -110,105 +156,94 @@ class _CreateAddressScreenState extends State<CreateAddressScreen> {
             ),
             const SizedBox(height: 20),
             TextFormField(
+              key: const ValueKey<String>('address-label-field'),
               controller: _labelCtrl,
               textInputAction: TextInputAction.next,
-              validator: (value) => _required(value, 'Label'),
+              validator: (value) => _maxLength(value, 'Label', 100),
               decoration: const InputDecoration(
-                labelText: 'Address label',
-                hintText: 'Home, Work, Studio',
+                labelText: 'Address label (optional)',
+                hintText: 'Home, Work, Office',
                 prefixIcon: Icon(Icons.label_outline_rounded),
               ),
             ),
             const SizedBox(height: 16),
             TextFormField(
-              controller: _fullAddressCtrl,
-              textInputAction: TextInputAction.newline,
+              key: const ValueKey<String>('address-street-field'),
+              controller: _streetCtrl,
+              textInputAction: TextInputAction.next,
               keyboardType: TextInputType.streetAddress,
-              maxLines: 3,
-              validator: (value) => _required(value, 'Full address'),
+              validator: _requiredStreet,
               decoration: const InputDecoration(
-                labelText: 'Full address',
-                hintText: 'Building, street, apartment, floor',
-                alignLabelWithHint: true,
+                labelText: 'Street address',
+                hintText: 'Street, building, apartment',
                 prefixIcon: Icon(Icons.home_outlined),
               ),
             ),
             const SizedBox(height: 16),
             TextFormField(
-              controller: _cityAreaCtrl,
+              key: const ValueKey<String>('address-city-field'),
+              controller: _cityCtrl,
               textInputAction: TextInputAction.next,
-              validator: (value) => _required(value, 'City / area'),
+              validator: (value) => _maxLength(value, 'City', 100),
               decoration: const InputDecoration(
-                labelText: 'City / area',
-                hintText: 'Cairo, Nasr City',
+                labelText: 'City',
+                hintText: 'Cairo',
                 prefixIcon: Icon(Icons.location_city_outlined),
               ),
             ),
             const SizedBox(height: 16),
             TextFormField(
-              controller: _landmarkCtrl,
-              textInputAction: TextInputAction.done,
-              maxLines: 3,
+              key: const ValueKey<String>('address-state-field'),
+              controller: _stateCtrl,
+              textInputAction: TextInputAction.next,
+              validator: (value) => _maxLength(value, 'District / Area', 100),
               decoration: const InputDecoration(
-                labelText: 'Landmark or instructions (optional)',
-                hintText: 'Near gate 2, call on arrival',
-                alignLabelWithHint: true,
-                prefixIcon: Icon(Icons.notes_rounded),
+                labelText: 'District / Area',
+                hintText: 'Maadi, Nasr City',
+                prefixIcon: Icon(Icons.map_outlined),
               ),
             ),
-            const SizedBox(height: 20),
-            ServioCard(
-              radius: ServioRadius.lg,
-              child: Row(
-                children: <Widget>[
-                  Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      color: ServioColors.tint(servio.success),
-                      borderRadius: BorderRadius.circular(ServioRadius.md),
-                    ),
-                    child: Icon(
-                      Icons.check_circle_outline_rounded,
-                      color: servio.success,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          'Set as default',
-                          style: theme.textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Use this address first during future bookings.',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: servio.textSecondary,
-                            height: 1.35,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Switch(
-                    value: _isDefault,
-                    activeColor: servio.accent,
-                    onChanged: (value) => setState(() => _isDefault = value),
-                  ),
-                ],
+            const SizedBox(height: 16),
+            TextFormField(
+              key: const ValueKey<String>('address-zip-field'),
+              controller: _zipCtrl,
+              textInputAction: TextInputAction.done,
+              validator: (value) => _maxLength(value, 'Zip code', 30),
+              decoration: const InputDecoration(
+                labelText: 'ZIP / Postal code (optional)',
+                hintText: '11765',
+                prefixIcon: Icon(Icons.markunread_mailbox_outlined),
               ),
+              onFieldSubmitted: (_) {
+                if (!saving) _saveAddress();
+              },
             ),
+            if (_submitError != null) ...<Widget>[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: ServioColors.tint(servio.danger),
+                  borderRadius: BorderRadius.circular(ServioRadius.md),
+                ),
+                child: Text(
+                  _submitError!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: servio.danger,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 28),
             ServioPrimaryButton(
-              label: 'Save Address',
-              onPressed: _saveAddress,
+              key: const ValueKey<String>('address-save-button'),
+              label: saving ? 'Saving...' : 'Save Address',
+              onPressed: saving ? null : _saveAddress,
             ),
             const SizedBox(height: 12),
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: saving ? null : () => Navigator.of(context).pop(),
               child: Text(
                 'Cancel',
                 style: TextStyle(color: servio.textSecondary),

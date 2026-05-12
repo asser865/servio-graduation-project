@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/api/api_exception.dart';
 import '../../core/api/messages_api.dart';
-import '../../core/models/message_model.dart';
 import '../../core/models/user_account.dart';
 import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
@@ -11,7 +12,6 @@ import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_tab_shell.dart';
 import '../customer/customer_shell.dart';
 import '../technician/technician_shell.dart';
-
 import 'chat_screen.dart';
 
 class MessagesScreen extends StatefulWidget {
@@ -24,7 +24,9 @@ class MessagesScreen extends StatefulWidget {
 class _MessagesScreenState extends State<MessagesScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
-  List<ApiConversation> _apiConversations = <ApiConversation>[];
+  List<ApiConversation> _conversations = <ApiConversation>[];
+  bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -33,12 +35,27 @@ class _MessagesScreenState extends State<MessagesScreen> {
   }
 
   Future<void> _fetchConversations() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
-      final client = context.read<ApiClient>();
-      final convs = await MessagesApi(client).getConversations();
+      final convs =
+          await MessagesApi(context.read<ApiClient>()).getConversations();
       if (!mounted) return;
-      setState(() => _apiConversations = convs);
-    } catch (_) {}
+      context.read<MessagesProvider>().setTotalUnread(
+            convs.fold<int>(0, (sum, conv) => sum + conv.unreadCount),
+          );
+      setState(() => _conversations = convs);
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      setState(() => _error = error.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _error = 'Unable to load messages.');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
@@ -61,28 +78,23 @@ class _MessagesScreenState extends State<MessagesScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
-
-    final allConversations = context.watch<MessagesProvider>().conversations;
     final session = context.watch<SessionProvider>();
     final isTechnician = session.account?.role == UserRole.technician;
     final bottomInset = ServioTabShell.bottomOverlayInsetOf(context);
-
-    // Filter by search query
-    final conversations = _query.isEmpty
-        ? allConversations
-        : allConversations
+    final filtered = _query.isEmpty
+        ? _conversations
+        : _conversations
             .where((c) =>
                 c.contactName.toLowerCase().contains(_query.toLowerCase()) ||
                 c.lastMessage.toLowerCase().contains(_query.toLowerCase()))
             .toList();
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            // ── Workspace header ─────────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(
                 ServioSpacing.screenPadding,
@@ -95,18 +107,16 @@ class _MessagesScreenState extends State<MessagesScreen> {
                 onDashboardTap: () => _openDashboard(isTechnician),
               ),
             ),
-
             const SizedBox(height: 20),
-
-            // ── Search field ─────────────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(
-                  horizontal: ServioSpacing.screenPadding),
+                horizontal: ServioSpacing.screenPadding,
+              ),
               child: TextField(
                 controller: _searchController,
-                onChanged: (v) => setState(() => _query = v),
+                onChanged: (value) => setState(() => _query = value),
                 decoration: InputDecoration(
-                  hintText: 'Search conversations…',
+                  hintText: 'Search conversations...',
                   prefixIcon: const Icon(Icons.search_rounded),
                   suffixIcon: _query.isNotEmpty
                       ? IconButton(
@@ -127,61 +137,30 @@ class _MessagesScreenState extends State<MessagesScreen> {
                     borderRadius: BorderRadius.circular(ServioRadius.full),
                     borderSide: BorderSide(color: servio.accent, width: 2),
                   ),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 14,
+                  ),
                 ),
               ),
             ),
             const SizedBox(height: 16),
-
-            // ── Conversation count row ───────────────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(
-                  horizontal: ServioSpacing.screenPadding),
+                horizontal: ServioSpacing.screenPadding,
+              ),
               child: Text(
-                '${conversations.length} conversation${conversations.length == 1 ? '' : 's'}',
+                '${filtered.length} conversation${filtered.length == 1 ? '' : 's'}',
                 style: theme.textTheme.bodySmall
                     ?.copyWith(color: servio.textSecondary),
               ),
             ),
             const SizedBox(height: 10),
-
-            // ── Conversation list ────────────────────────────────────────────
             Expanded(
-              child: conversations.isEmpty
-                  ? _EmptyState(query: _query)
-                  : ListView.separated(
-                      padding: EdgeInsets.fromLTRB(
-                        ServioSpacing.screenPadding,
-                        0,
-                        ServioSpacing.screenPadding,
-                        8 + bottomInset,
-                      ),
-                      itemCount: conversations.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
-                      itemBuilder: (BuildContext context, int index) {
-                        final conv = conversations[index];
-                        return _ConversationTile(
-                          conversation: conv,
-                          onTap: () {
-                            context.read<MessagesProvider>().markRead(conv.id);
-                            final apiConv = _apiConversations
-                                .where(
-                                    (a) => a.otherUserName == conv.contactName)
-                                .firstOrNull;
-                            Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => ChatScreen(
-                                  conversationId: conv.id,
-                                  contactName: conv.contactName,
-                                  bookingId: apiConv?.bookingId,
-                                ),
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    ),
+              child: AnimatedSwitcher(
+                duration: ServioMotion.normal,
+                child: _body(filtered, bottomInset),
+              ),
             ),
             const SizedBox(height: 8),
           ],
@@ -189,9 +168,60 @@ class _MessagesScreenState extends State<MessagesScreen> {
       ),
     );
   }
-}
 
-// ── _ConversationTile ─────────────────────────────────────────────────────────
+  Widget _body(List<ApiConversation> conversations, double bottomInset) {
+    if (_loading) {
+      return const Center(
+        key: ValueKey<String>('loading'),
+        child: CircularProgressIndicator(),
+      );
+    }
+    if (_error != null) {
+      return _ErrorState(
+        key: const ValueKey<String>('error'),
+        message: _error!,
+        onRetry: _fetchConversations,
+      );
+    }
+    if (conversations.isEmpty) {
+      return _EmptyState(key: const ValueKey<String>('empty'), query: _query);
+    }
+    return RefreshIndicator(
+      key: const ValueKey<String>('list'),
+      onRefresh: _fetchConversations,
+      child: ListView.separated(
+        padding: EdgeInsets.fromLTRB(
+          ServioSpacing.screenPadding,
+          0,
+          ServioSpacing.screenPadding,
+          8 + bottomInset,
+        ),
+        itemCount: conversations.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        itemBuilder: (BuildContext context, int index) {
+          final conversation = conversations[index];
+          return _StaggeredEntry(
+            index: index,
+            child: _ConversationTile(
+              conversation: conversation,
+              onTap: () async {
+                await Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => ChatScreen(
+                      conversationId: conversation.id,
+                      contactName: conversation.contactName,
+                    ),
+                  ),
+                );
+                if (mounted) _fetchConversations();
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
 
 class _WorkspaceHeader extends StatelessWidget {
   const _WorkspaceHeader({
@@ -286,7 +316,7 @@ class _SecureBadge extends StatelessWidget {
           const SizedBox(width: 5),
           Flexible(
             child: Text(
-              'End-to-end secured',
+              'Saved securely',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.labelSmall?.copyWith(
@@ -301,78 +331,61 @@ class _SecureBadge extends StatelessWidget {
   }
 }
 
-class _ConversationTile extends StatelessWidget {
+class _ConversationTile extends StatefulWidget {
   const _ConversationTile({
     required this.conversation,
     required this.onTap,
   });
 
-  final ConversationModel conversation;
+  final ApiConversation conversation;
   final VoidCallback onTap;
+
+  @override
+  State<_ConversationTile> createState() => _ConversationTileState();
+}
+
+class _ConversationTileState extends State<_ConversationTile> {
+  bool _pressed = false;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
+    final conversation = widget.conversation;
 
     return GestureDetector(
-      onTap: onTap,
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapCancel: () => setState(() => _pressed = false),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTap: widget.onTap,
       child: AnimatedContainer(
-        duration: ServioMotion.normal,
-        curve: ServioMotion.spring,
+        duration: ServioMotion.micro,
+        curve: ServioMotion.curve,
+        transform: Matrix4.identity()..scale(_pressed ? 0.985 : 1.0),
         padding: const EdgeInsets.all(ServioSpacing.cardPadding),
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(ServioRadius.card),
-          border: Border.all(
-            color: servio.border.withValues(
-                alpha: Theme.of(context).brightness == Brightness.dark
-                    ? 0.45
-                    : 1.0),
-          ),
-          boxShadow: Theme.of(context).brightness == Brightness.dark
-              ? ServioShadows.restDark
-              : ServioShadows.rest,
+          border: Border.all(color: servio.border),
+          boxShadow: _pressed ? ServioShadows.restDark : ServioShadows.rest,
         ),
         child: Row(
           children: <Widget>[
-            // Avatar with online indicator
-            Stack(
-              clipBehavior: Clip.none,
-              children: <Widget>[
-                Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    gradient: ServioGradients.warm,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: servio.accent, width: 2),
-                  ),
-                  child: Center(
-                    child: Text(
+            CircleAvatar(
+              radius: 25,
+              backgroundColor: servio.accent.withValues(alpha: 0.16),
+              backgroundImage: conversation.otherUser.avatar == null
+                  ? null
+                  : NetworkImage(conversation.otherUser.avatar!),
+              child: conversation.otherUser.avatar == null
+                  ? Text(
                       conversation.contactInitials,
                       style: theme.textTheme.titleSmall?.copyWith(
-                        color: ServioColors.deepBrown,
+                        color: servio.accent,
                         fontWeight: FontWeight.w700,
                       ),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  right: 0,
-                  bottom: 0,
-                  child: Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: ServioColors.success,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                          color: theme.colorScheme.surface, width: 2),
-                    ),
-                  ),
-                ),
-              ],
+                    )
+                  : null,
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -401,29 +414,40 @@ class _ConversationTile extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: <Widget>[
                 Text(
-                  conversation.time,
+                  _formatConversationTime(conversation.updatedAt),
                   style: theme.textTheme.labelSmall
                       ?.copyWith(color: servio.textSecondary),
                 ),
                 const SizedBox(height: 8),
-                if (conversation.unreadCount > 0)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: servio.accent,
-                      borderRadius: BorderRadius.circular(ServioRadius.full),
-                    ),
-                    child: Text(
-                      '${conversation.unreadCount}',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  )
-                else
-                  const SizedBox(width: 24), // Keeps consistent alignment
+                AnimatedSwitcher(
+                  duration: ServioMotion.normal,
+                  transitionBuilder: (child, animation) => ScaleTransition(
+                    scale: animation,
+                    child: FadeTransition(opacity: animation, child: child),
+                  ),
+                  child: conversation.unreadCount > 0
+                      ? Container(
+                          key: ValueKey<int>(conversation.unreadCount),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: servio.accent,
+                            borderRadius:
+                                BorderRadius.circular(ServioRadius.full),
+                          ),
+                          child: Text(
+                            '${conversation.unreadCount}',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        )
+                      : const SizedBox(
+                          key: ValueKey<String>('none'), width: 24),
+                ),
               ],
             ),
           ],
@@ -433,10 +457,48 @@ class _ConversationTile extends StatelessWidget {
   }
 }
 
-// ── _EmptyState ───────────────────────────────────────────────────────────────
+class _StaggeredEntry extends StatelessWidget {
+  const _StaggeredEntry({
+    required this.index,
+    required this.child,
+  });
+
+  final int index;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final disabled = MediaQuery.disableAnimationsOf(context);
+    if (disabled) return child;
+    final delayMs = (index * 60).clamp(0, 360).toInt();
+    final delay = Duration(milliseconds: delayMs);
+    return TweenAnimationBuilder<double>(
+      key: ValueKey<int>(index),
+      tween: Tween<double>(begin: 0, end: 1),
+      duration: ServioMotion.normal + delay,
+      curve: ServioMotion.curve,
+      builder: (context, value, child) {
+        final delayed = delay.inMilliseconds == 0
+            ? value
+            : ((value * (ServioMotion.normal + delay).inMilliseconds -
+                        delay.inMilliseconds) /
+                    ServioMotion.normal.inMilliseconds)
+                .clamp(0.0, 1.0);
+        return Opacity(
+          opacity: delayed,
+          child: Transform.translate(
+            offset: Offset(0, 16 * (1 - delayed)),
+            child: child,
+          ),
+        );
+      },
+      child: child,
+    );
+  }
+}
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.query});
+  const _EmptyState({required this.query, super.key});
 
   final String query;
 
@@ -444,32 +506,102 @@ class _EmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
+    final disabled = MediaQuery.disableAnimationsOf(context);
+    final icon = Icon(
+      query.isNotEmpty ? Icons.search_off_rounded : Icons.forum_outlined,
+      size: 56,
+      color: servio.border,
+    );
 
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(ServioSpacing.screenPadding),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Icon(
-              query.isNotEmpty
-                  ? Icons.search_off_rounded
-                  : Icons.chat_bubble_outline_rounded,
-              size: 56,
-              color: servio.border,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              query.isNotEmpty
-                  ? 'No conversations found for "$query"'
-                  : 'No messages yet',
-              style: theme.textTheme.titleMedium
-                  ?.copyWith(color: servio.textSecondary),
-              textAlign: TextAlign.center,
-            ),
-          ],
+        child: TweenAnimationBuilder<double>(
+          tween: Tween<double>(begin: disabled ? 1 : 0.92, end: 1),
+          duration: disabled ? Duration.zero : ServioMotion.normal,
+          curve: ServioMotion.spring,
+          builder: (context, value, child) => Opacity(
+            opacity: value.clamp(0.0, 1.0),
+            child: Transform.scale(scale: value, child: child),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              icon,
+              const SizedBox(height: 16),
+              Text(
+                query.isNotEmpty
+                    ? 'No conversations found for "$query"'
+                    : 'No messages yet',
+                style: theme.textTheme.titleMedium
+                    ?.copyWith(color: servio.textSecondary),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
+}
+
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({
+    required this.message,
+    required this.onRetry,
+    super.key,
+  });
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+
+    return Center(
+      child: FadeTransition(
+        opacity: const AlwaysStoppedAnimation<double>(1),
+        child: Padding(
+          padding: const EdgeInsets.all(ServioSpacing.screenPadding),
+          child: Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(ServioRadius.card),
+              border: Border.all(color: servio.border),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Icon(Icons.wifi_off_rounded, color: servio.accent),
+                const SizedBox(height: 10),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String _formatConversationTime(DateTime date) {
+  final now = DateTime.now();
+  final sameDay =
+      now.year == date.year && now.month == date.month && now.day == date.day;
+  if (sameDay) return DateFormat('HH:mm').format(date);
+  if (now.difference(date).inDays < 7) return DateFormat('EEE').format(date);
+  return DateFormat('MMM d').format(date);
 }
