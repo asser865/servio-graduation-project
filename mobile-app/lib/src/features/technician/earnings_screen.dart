@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/api/bookings_api.dart';
 import '../../core/api/payments_api.dart';
+import '../../core/models/backend_booking_model.dart';
+import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
@@ -24,18 +27,32 @@ class _EarningsScreenState extends State<EarningsScreen> {
   ];
 
   EarningsSummary? _summary;
+  List<BackendBooking> _recentJobs = [];
   bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _fetchEarnings());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _fetchData());
   }
 
-  Future<void> _fetchEarnings() async {
+  Future<void> _fetchData() async {
     try {
       final client = context.read<ApiClient>();
-      _summary = await PaymentsApi(client).getEarnings();
+      final session = context.read<SessionProvider>();
+      final workerId = session.account?.id.trim() ?? '';
+      
+      final summaryFuture = PaymentsApi(client).getEarnings();
+      final bookingsFuture = BookingsApi(client).getWorkerBookings(workerId: workerId);
+
+      final results = await Future.wait(<Future<dynamic>>[summaryFuture, bookingsFuture]);
+      _summary = results[0] as EarningsSummary;
+      
+      final jobs = results[1] as List<BackendBooking>;
+      _recentJobs = jobs
+          .where((job) => ['completed', 'done'].contains(job.status))
+          .toList();
+      _recentJobs.sort((a, b) => b.scheduledDate.compareTo(a.scheduledDate));
     } catch (_) {
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -156,21 +173,27 @@ class _EarningsScreenState extends State<EarningsScreen> {
             const SizedBox(height: 24),
             Text('Transactions', style: theme.textTheme.titleMedium),
             const SizedBox(height: 14),
-            const _TransactionCard(
-              date: '26/03/2026',
-              service: 'Kitchen faucet leak repair',
-              customer: 'Mostafa Abdelaal',
-              amount: '850 EGP',
-              released: false,
-            ),
-            const SizedBox(height: 12),
-            const _TransactionCard(
-              date: '25/03/2026',
-              service: 'Pipe inspection',
-              customer: 'Nour Hany',
-              amount: '420 EGP',
-              released: true,
-            ),
+            if (_recentJobs.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                child: Center(
+                  child: Text(
+                    'No recent transactions.',
+                    style: theme.textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
+                  ),
+                ),
+              )
+            else
+              ..._recentJobs.take(10).map((job) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _TransactionCard(
+                      date: '${job.scheduledDate.day.toString().padLeft(2, '0')}/${job.scheduledDate.month.toString().padLeft(2, '0')}/${job.scheduledDate.year}',
+                      service: job.serviceName,
+                      customer: job.customerName,
+                      amount: '${job.totalAmount.toStringAsFixed(0)} EGP',
+                      released: true, // simplified
+                    ),
+                  )),
             const SizedBox(height: 12),
             _PayoutSummaryCard(
               pendingAmount: pending,

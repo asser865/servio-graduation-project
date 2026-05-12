@@ -45,6 +45,8 @@ class UserAccount {
     this.availability = const <AvailabilitySlot>[],
     this.blockedDates = const <String>[],
     this.categories = const [],
+    this.averageRating = 0.0,
+    this.reviewCount = 0,
   });
 
   final String id;
@@ -65,6 +67,8 @@ class UserAccount {
   final List<AvailabilitySlot> availability;
   final List<String> blockedDates;
   final List<String> categories;
+  final double averageRating;
+  final int reviewCount;
 
   String get initials {
     if (avatarInitials.isNotEmpty) return avatarInitials;
@@ -92,6 +96,8 @@ class UserAccount {
     List<AvailabilitySlot>? availability,
     List<String>? blockedDates,
     List<String>? categories,
+    double? averageRating,
+    int? reviewCount,
   }) =>
       UserAccount(
         id: id ?? this.id,
@@ -112,6 +118,8 @@ class UserAccount {
         availability: availability ?? this.availability,
         blockedDates: blockedDates ?? this.blockedDates,
         categories: categories ?? this.categories,
+        averageRating: averageRating ?? this.averageRating,
+        reviewCount: reviewCount ?? this.reviewCount,
       );
 
   Map<String, dynamic> toJson() => {
@@ -133,6 +141,8 @@ class UserAccount {
         'availability': availability.map((slot) => slot.toJson()).toList(),
         'blockedDates': blockedDates,
         'categories': categories,
+        'averageRating': averageRating,
+        'reviewCount': reviewCount,
       };
 
   factory UserAccount.fromJson(Map<String, dynamic> json) => UserAccount(
@@ -159,6 +169,8 @@ class UserAccount {
             List<String>.from((json['blockedDates'] as List<dynamic>?) ?? []),
         categories:
             List<String>.from((json['categories'] as List<dynamic>?) ?? []),
+        averageRating: ((json['averageRating'] as num?) ?? 0.0).toDouble(),
+        reviewCount: ((json['reviewCount'] as num?) ?? 0).toInt(),
       );
 
   // Maps backend API response (uses _id, role: 'user'|'worker', nested address)
@@ -187,6 +199,8 @@ class UserAccount {
           List<String>.from((json['blockedDates'] as List<dynamic>?) ?? []),
       categories:
           List<String>.from((json['categories'] as List<dynamic>?) ?? []),
+      averageRating: ((json['averageRating'] as num?) ?? 0.0).toDouble(),
+      reviewCount: ((json['reviewCount'] as num?) ?? 0).toInt(),
     );
   }
 }

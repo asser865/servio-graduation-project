@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 
+import '../../core/api/api_client.dart';
+import '../../core/api/bookings_api.dart';
+import '../../core/api/payments_api.dart';
+import '../../core/models/backend_booking_model.dart';
+import '../../core/models/user_account.dart';
 import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
@@ -17,8 +23,80 @@ import '../shared/notifications_screen.dart';
 // Technician Dashboard – Overview (matches website technician-dashboard.html)
 // ─────────────────────────────────────────────────────────────────────────────
 
-class TechnicianDashboardScreen extends StatelessWidget {
+class TechnicianDashboardScreen extends StatefulWidget {
   const TechnicianDashboardScreen({super.key});
+
+  @override
+  State<TechnicianDashboardScreen> createState() => _TechnicianDashboardScreenState();
+}
+
+class _TechnicianDashboardScreenState extends State<TechnicianDashboardScreen> {
+  List<BackendBooking> _jobs = [];
+  EarningsSummary? _earnings;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _fetchData());
+  }
+
+  Future<void> _fetchData() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    final client = context.read<ApiClient>();
+    final session = context.read<SessionProvider>();
+    var workerId = session.account?.id.trim() ?? '';
+
+    if (workerId.isEmpty || session.account?.role != UserRole.technician) {
+      final profileError = await session.loadCurrentWorkerProfile();
+      if (!mounted) return;
+      if (profileError != null) {
+        setState(() {
+          _error = profileError;
+          _loading = false;
+        });
+        return;
+      }
+      workerId = session.account?.id.trim() ?? '';
+    }
+
+    if (workerId.isEmpty) {
+      setState(() {
+        _error = 'Log in as a technician to view dashboard.';
+        _loading = false;
+      });
+      return;
+    }
+
+    try {
+      final bookingsFuture = BookingsApi(client).getWorkerBookings(workerId: workerId);
+      final earningsFuture = PaymentsApi(client).getEarnings();
+      
+      final results = await Future.wait([bookingsFuture, earningsFuture]);
+      final jobs = (results[0] as List<BackendBooking>)
+          .where((job) => job.workerId.trim() == workerId)
+          .toList();
+      final earnings = results[1] as EarningsSummary;
+
+      if (!mounted) return;
+      setState(() {
+        _jobs = jobs;
+        _earnings = earnings;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,12 +104,37 @@ class TechnicianDashboardScreen extends StatelessWidget {
     final firstName = (account?.name ?? 'Ahmed').split(' ').first;
     final bottomInset = ServioTabShell.bottomOverlayInsetOf(context);
 
+    if (_loading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (_error != null) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(_error!),
+              const SizedBox(height: 16),
+              OutlinedButton(onPressed: _fetchData, child: const Text('Retry')),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final pendingJobs = _jobs.where((j) => j.status == 'pending').toList();
+    final upcomingJobs = _jobs.where((j) => ['accepted', 'confirmed', 'scheduled', 'in_progress', 'en_route'].contains(j.status)).toList();
+    final recentJobs = _jobs.where((j) => ['completed', 'done', 'cancelled', 'rejected'].contains(j.status)).toList();
+
+    // Sort appropriately
+    upcomingJobs.sort((a, b) => a.scheduledDate.compareTo(b.scheduledDate));
+    recentJobs.sort((a, b) => b.scheduledDate.compareTo(a.scheduledDate));
+
     return Scaffold(
       body: SafeArea(
         child: RefreshIndicator(
           color: ServioColors.accent,
-          onRefresh: () async =>
-              Future<void>.delayed(const Duration(seconds: 1)),
+          onRefresh: _fetchData,
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: EdgeInsets.fromLTRB(
@@ -44,96 +147,73 @@ class TechnicianDashboardScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 // ── Welcome Banner ────────────────────────────────
-                _WelcomeBanner(firstName: firstName),
+                _WelcomeBanner(
+                  firstName: firstName,
+                  pendingCount: pendingJobs.length,
+                ),
                 const SizedBox(height: 24),
 
                 // ── Stat Cards Grid ──────────────────────────────
-                const _StatCardGrid(),
+                _StatCardGrid(
+                  totalJobs: _jobs.length,
+                  totalEarnings: _earnings?.totalEarnings ?? 0,
+                  avgRating: account?.averageRating ?? 0.0,
+                  reviewCount: account?.reviewCount ?? 0,
+                  pendingJobs: pendingJobs.length,
+                  completedJobs: _earnings?.completedJobs ?? recentJobs.where((j) => j.status == 'completed' || j.status == 'done').length,
+                  pendingPayout: _earnings?.pendingPayout ?? 0,
+                ),
                 const SizedBox(height: 24),
 
                 // ── Incoming Requests ─────────────────────────────
-                ServioSectionHeading(
-                  title: 'Incoming Requests',
-                  actionLabel: 'View all →',
-                  onActionTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                          builder: (_) => const JobQueueScreen()),
-                    );
-                  },
-                ),
-                const SizedBox(height: 12),
-                const _IncomingRequestCard(
-                  service: 'Plumbing — Burst Pipe',
-                  customer: 'Ahmed Hassan',
-                  location: 'Cairo, Maadi',
-                  price: '~EGP 350',
-                  statusLabel: 'New',
-                  statusType: ServioStatusChipType.warning,
-                ),
-                const SizedBox(height: 12),
-                const _IncomingRequestCard(
-                  service: 'Electrical — Panel Upgrade',
-                  customer: 'Sara Mohamed',
-                  location: 'Heliopolis',
-                  price: '~EGP 600',
-                  statusLabel: 'New',
-                  statusType: ServioStatusChipType.warning,
-                ),
-                const SizedBox(height: 24),
+                if (pendingJobs.isNotEmpty) ...[
+                  ServioSectionHeading(
+                    title: 'Incoming Requests',
+                    actionLabel: 'View all →',
+                    onActionTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                            builder: (_) => const JobQueueScreen()),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  ...pendingJobs.take(3).map((job) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _IncomingRequestCard(job: job),
+                  )),
+                  const SizedBox(height: 12),
+                ],
 
                 // ── Upcoming Schedule ─────────────────────────────
-                const ServioSectionHeading(title: 'Upcoming Schedule'),
-                const SizedBox(height: 12),
-                const _ScheduleItem(
-                    day: '29',
-                    month: 'MAR',
-                    title: 'Plumbing — Burst Pipe',
-                    time: '10:00 AM',
-                    location: 'Maadi'),
-                const SizedBox(height: 10),
-                const _ScheduleItem(
-                    day: '30',
-                    month: 'MAR',
-                    title: 'Electrical — Panel Upgrade',
-                    time: '02:30 PM',
-                    location: 'Nasr City'),
-                const SizedBox(height: 10),
-                const _ScheduleItem(
-                    day: '02',
-                    month: 'APR',
-                    title: 'Air Conditioning',
-                    time: '09:00 AM',
-                    location: 'Heliopolis'),
-                const SizedBox(height: 24),
+                if (upcomingJobs.isNotEmpty) ...[
+                  const ServioSectionHeading(title: 'Upcoming Schedule'),
+                  const SizedBox(height: 12),
+                  ...upcomingJobs.take(3).map((job) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _ScheduleItem(job: job),
+                  )),
+                  const SizedBox(height: 14),
+                ],
 
                 // ── Recent Activity ───────────────────────────────
-                ServioSectionHeading(
-                  title: 'Recent Activity',
-                  actionLabel: 'View all →',
-                  onActionTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                          builder: (_) => const EarningsScreen()),
-                    );
-                  },
-                ),
-                const SizedBox(height: 12),
-                const _ActivityCard(
-                  service: 'Pipe inspection',
-                  customer: 'Nour Hany',
-                  amount: '420 EGP',
-                  statusLabel: 'Completed',
-                  statusType: ServioStatusChipType.success,
-                ),
-                const SizedBox(height: 12),
-                const _ActivityCard(
-                  service: 'Electrical outlet fix',
-                  customer: 'Karim Adel',
-                  amount: '300 EGP',
-                  statusLabel: 'Confirmed',
-                  statusType: ServioStatusChipType.info,
-                ),
+                if (recentJobs.isNotEmpty) ...[
+                  ServioSectionHeading(
+                    title: 'Recent Activity',
+                    actionLabel: 'View all →',
+                    onActionTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                            builder: (_) => const EarningsScreen()),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  ...recentJobs.take(4).map((job) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _ActivityCard(job: job),
+                  )),
+                ],
                 const SizedBox(height: 16),
               ],
             ),
@@ -149,9 +229,13 @@ class TechnicianDashboardScreen extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _WelcomeBanner extends StatelessWidget {
-  const _WelcomeBanner({required this.firstName});
+  const _WelcomeBanner({
+    required this.firstName,
+    required this.pendingCount,
+  });
 
   final String firstName;
+  final int pendingCount;
 
   String get _greeting {
     final hour = DateTime.now().hour;
@@ -198,7 +282,9 @@ class _WelcomeBanner extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'You have 2 new job requests waiting.',
+                      pendingCount > 0
+                          ? 'You have $pendingCount new job request${pendingCount == 1 ? '' : 's'} waiting.'
+                          : 'You have no new job requests at the moment.',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: isDark
                             ? ServioColors.navyDark.withValues(alpha: 0.7)
@@ -346,28 +432,44 @@ class _BannerActionButton extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _StatCardGrid extends StatelessWidget {
-  const _StatCardGrid();
+  const _StatCardGrid({
+    required this.totalJobs,
+    required this.totalEarnings,
+    required this.avgRating,
+    required this.reviewCount,
+    required this.pendingJobs,
+    required this.completedJobs,
+    required this.pendingPayout,
+  });
+
+  final int totalJobs;
+  final double totalEarnings;
+  final double avgRating;
+  final int reviewCount;
+  final int pendingJobs;
+  final int completedJobs;
+  final double pendingPayout;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: <Widget>[
         Row(
-          children: const <Widget>[
+          children: <Widget>[
             Expanded(
                 child: _StatCard(
               label: 'Total Jobs',
-              value: '47',
-              change: '+3 this month',
+              value: '$totalJobs',
+              change: '$completedJobs completed',
               icon: Icons.check_box_outlined,
               iconColor: ServioColors.accent,
             )),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Expanded(
                 child: _StatCard(
-              label: 'This Month',
-              value: 'EGP 3,200',
-              change: '+EGP 800 vs last',
+              label: 'Total Earnings',
+              value: 'EGP ${totalEarnings.toStringAsFixed(0)}',
+              change: 'Lifetime',
               icon: Icons.payments_outlined,
               iconColor: ServioColors.success,
             )),
@@ -375,47 +477,47 @@ class _StatCardGrid extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         Row(
-          children: const <Widget>[
+          children: <Widget>[
             Expanded(
                 child: _StatCard(
               label: 'Avg Rating',
-              value: '4.8',
-              change: 'Based on 24 reviews',
+              value: avgRating.toStringAsFixed(1),
+              change: 'Based on $reviewCount reviews',
               icon: Icons.star_border_rounded,
-              iconColor: Color(0xFFF59E0B),
+              iconColor: const Color(0xFFF59E0B),
             )),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Expanded(
                 child: _StatCard(
               label: 'Pending Requests',
-              value: '2',
-              change: 'Action needed',
+              value: '$pendingJobs',
+              change: pendingJobs > 0 ? 'Action needed' : 'All caught up',
               icon: Icons.pending_actions_rounded,
-              iconColor: Color(0xFF6E56CF),
-              changeColor: Color(0xFF6E56CF),
+              iconColor: const Color(0xFF6E56CF),
+              changeColor: pendingJobs > 0 ? const Color(0xFF6E56CF) : ServioColors.success,
             )),
           ],
         ),
         const SizedBox(height: 12),
         Row(
-          children: const <Widget>[
+          children: <Widget>[
             Expanded(
                 child: _StatCard(
-              label: 'Pending Proposals',
-              value: '2',
-              change: 'Awaiting review',
+              label: 'Completed Jobs',
+              value: '$completedJobs',
+              change: 'Successfully done',
               icon: Icons.assignment_outlined,
-              iconColor: Color(0xFFF59E0B),
+              iconColor: const Color(0xFFF59E0B),
             )),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Expanded(
                 child: _StatCard(
               label: 'Outstanding',
-              value: '1,350 EGP',
-              change: 'Due 31 Mar',
+              value: '${pendingPayout.toStringAsFixed(0)} EGP',
+              change: 'Pending payout',
               icon: Icons.credit_card_rounded,
-              iconColor: Color(0xFFD97706),
-              changeColor: Color(0xFFD97706),
+              iconColor: const Color(0xFFD97706),
+              changeColor: const Color(0xFFD97706),
               highlight: true,
             )),
           ],
@@ -494,21 +596,9 @@ class _StatCard extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _IncomingRequestCard extends StatelessWidget {
-  const _IncomingRequestCard({
-    required this.service,
-    required this.customer,
-    required this.location,
-    required this.price,
-    required this.statusLabel,
-    required this.statusType,
-  });
+  const _IncomingRequestCard({required this.job});
 
-  final String service;
-  final String customer;
-  final String location;
-  final String price;
-  final String statusLabel;
-  final ServioStatusChipType statusType;
+  final BackendBooking job;
 
   @override
   Widget build(BuildContext context) {
@@ -535,24 +625,26 @@ class _IncomingRequestCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(service, style: theme.textTheme.titleMedium),
+                Text(job.serviceName, style: theme.textTheme.titleMedium),
                 const SizedBox(height: 4),
                 Wrap(
                   spacing: 4,
                   children: <Widget>[
-                    Text(customer,
+                    if (job.customerName.isNotEmpty) ...[
+                      Text(job.customerName,
+                          style: theme.textTheme.bodySmall
+                              ?.copyWith(color: servio.textSecondary)),
+                      Text('·',
+                          style: theme.textTheme.bodySmall
+                              ?.copyWith(color: servio.textSecondary)),
+                    ],
+                    Text(job.addressCity,
                         style: theme.textTheme.bodySmall
                             ?.copyWith(color: servio.textSecondary)),
                     Text('·',
                         style: theme.textTheme.bodySmall
                             ?.copyWith(color: servio.textSecondary)),
-                    Text(location,
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(color: servio.textSecondary)),
-                    Text('·',
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(color: servio.textSecondary)),
-                    Text(price,
+                    Text('EGP ${job.totalAmount.toStringAsFixed(0)}',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: servio.accent,
                           fontWeight: FontWeight.w600,
@@ -563,7 +655,7 @@ class _IncomingRequestCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          ServioStatusChip(label: statusLabel, type: statusType),
+          const ServioStatusChip(label: 'New', type: ServioStatusChipType.warning),
         ],
       ),
     );
@@ -575,24 +667,17 @@ class _IncomingRequestCard extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _ScheduleItem extends StatelessWidget {
-  const _ScheduleItem({
-    required this.day,
-    required this.month,
-    required this.title,
-    required this.time,
-    required this.location,
-  });
+  const _ScheduleItem({required this.job});
 
-  final String day;
-  final String month;
-  final String title;
-  final String time;
-  final String location;
+  final BackendBooking job;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
+    
+    final day = DateFormat('dd').format(job.scheduledDate);
+    final month = DateFormat('MMM').format(job.scheduledDate).toUpperCase();
 
     return ServioCard(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -632,12 +717,12 @@ class _ScheduleItem extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(title, style: theme.textTheme.titleMedium),
+                Text(job.serviceName, style: theme.textTheme.titleMedium),
                 const SizedBox(height: 4),
                 Row(
                   children: <Widget>[
                     Text(
-                      time,
+                      job.scheduledTime,
                       style: theme.textTheme.bodySmall
                           ?.copyWith(color: servio.textSecondary),
                     ),
@@ -648,7 +733,7 @@ class _ScheduleItem extends StatelessWidget {
                               ?.copyWith(color: servio.textSecondary)),
                     ),
                     Text(
-                      location,
+                      job.addressCity,
                       style: theme.textTheme.bodySmall
                           ?.copyWith(color: servio.textSecondary),
                     ),
@@ -668,19 +753,36 @@ class _ScheduleItem extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _ActivityCard extends StatelessWidget {
-  const _ActivityCard({
-    required this.service,
-    required this.customer,
-    required this.amount,
-    required this.statusLabel,
-    required this.statusType,
-  });
+  const _ActivityCard({required this.job});
 
-  final String service;
-  final String customer;
-  final String amount;
-  final String statusLabel;
-  final ServioStatusChipType statusType;
+  final BackendBooking job;
+
+  ServioStatusChipType _chipType(String status) {
+    switch (status.toLowerCase()) {
+      case 'completed':
+      case 'done':
+        return ServioStatusChipType.success;
+      case 'cancelled':
+      case 'rejected':
+        return ServioStatusChipType.danger;
+      default:
+        return ServioStatusChipType.info;
+    }
+  }
+
+  String _chipLabel(String status) {
+    switch (status.toLowerCase()) {
+      case 'completed':
+      case 'done':
+        return 'Completed';
+      case 'cancelled':
+        return 'Cancelled';
+      case 'rejected':
+        return 'Rejected';
+      default:
+        return status.toUpperCase();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -693,23 +795,28 @@ class _ActivityCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(service, style: Theme.of(context).textTheme.titleMedium),
+                Text(job.serviceName, style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 4),
-                Text(
-                  customer,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: servio.textSecondary),
+                if (job.customerName.isNotEmpty) ...[
+                  Text(
+                    job.customerName,
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: servio.textSecondary),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                ServioStatusChip(
+                  label: _chipLabel(job.status),
+                  type: _chipType(job.status),
                 ),
-                const SizedBox(height: 8),
-                ServioStatusChip(label: statusLabel, type: statusType),
               ],
             ),
           ),
           const SizedBox(width: 12),
           Text(
-            amount,
+            '${job.totalAmount.toStringAsFixed(0)} EGP',
             style: Theme.of(context)
                 .textTheme
                 .titleMedium

@@ -131,7 +131,8 @@ const createBooking = async (userId, data) => {
   } else if (serviceCategory) {
     // General category path — no specific sub-service selected
     const workerCoversCategory = (worker.categories || []).includes(serviceCategory);
-    if (!workerCoversCategory) {
+    const workerCoversSkill = (worker.skills || []).includes(serviceCategory);
+    if (!workerCoversCategory && !workerCoversSkill) {
       throw new ApiError(StatusCodes.BAD_REQUEST, 'This technician does not offer this service category.');
     }
     bookingPrice  = worker.hourlyRate || 0;

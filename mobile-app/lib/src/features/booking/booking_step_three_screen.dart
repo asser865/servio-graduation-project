@@ -195,50 +195,55 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
           _paymentMethodCode == 'card' ? selectedCard?.last4 ?? '' : '',
     );
 
-    if (canCreateBackendBooking) {
+    if (!canCreateBackendBooking) {
       setState(() {
-        _loading = true;
-        _error = null;
+        _error = 'Cannot create booking without a valid technician and service.';
       });
-      try {
-        final booking = await BookingsApi(_apiClient).createBooking(
-          workerId: data.technicianId,
-          serviceId: data.serviceId,
-          serviceCategory: data.category,
-          serviceName: data.serviceName,
-          scheduledDate: data.scheduledDateTime ??
-              DateTime.now().add(const Duration(days: 1)),
-          scheduledTime: _backendSlotFromLabel(data.time),
-          address: data.location,
-          addressCity: data.addressCity.isNotEmpty ? data.addressCity : 'Cairo',
-          addressStreet:
-              data.addressStreet.isNotEmpty ? data.addressStreet : '',
-          notes: data.notes,
-          paymentMethod: _paymentMethodCode,
-          savedCardId: _paymentMethodCode == 'card' ? _selectedCardId : null,
-        );
-        confirmationData = _confirmationDataFromBackend(
-          confirmationData,
-          booking,
-        );
-        if (!mounted) return;
-      } on ApiException catch (e) {
-        if (!mounted) return;
-        setState(() {
-          _loading = false;
-          _error = e.message;
-        });
-        return;
-      } catch (e) {
-        if (!mounted) return;
-        setState(() {
-          _loading = false;
-          _error = 'Booking failed. Please try again.';
-        });
-        return;
-      }
-      setState(() => _loading = false);
+      return;
     }
+
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final booking = await BookingsApi(_apiClient).createBooking(
+        workerId: data.technicianId,
+        serviceId: data.serviceId,
+        serviceCategory: data.category,
+        serviceName: data.serviceName,
+        scheduledDate: data.scheduledDateTime ??
+            DateTime.now().add(const Duration(days: 1)),
+        scheduledTime: _backendSlotFromLabel(data.time),
+        address: data.location,
+        addressCity: data.addressCity.isNotEmpty ? data.addressCity : 'Cairo',
+        addressStreet:
+            data.addressStreet.isNotEmpty ? data.addressStreet : '',
+        notes: data.notes,
+        paymentMethod: _paymentMethodCode,
+        savedCardId: _paymentMethodCode == 'card' ? _selectedCardId : null,
+      );
+      confirmationData = _confirmationDataFromBackend(
+        confirmationData,
+        booking,
+      );
+      if (!mounted) return;
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e.message;
+      });
+      return;
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Booking failed. Please try again.';
+      });
+      return;
+    }
+    setState(() => _loading = false);
 
     if (!mounted) return;
     Navigator.of(context).push(

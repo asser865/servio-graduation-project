@@ -343,25 +343,7 @@ class BookingDetailsScreen extends StatelessWidget {
                 radius: ServioRadius.lg,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const <Widget>[
-                    _TimelineRow(
-                        label: 'Booking Placed',
-                        complete: true,
-                        meta: '25/03/2026 05:30 PM'),
-                    _TimelineRow(
-                        label: 'Payment Confirmed',
-                        complete: true,
-                        meta: 'Held in Escrow'),
-                    _TimelineRow(
-                        label: 'Technician En Route',
-                        complete: true,
-                        meta: 'Arriving soon'),
-                    _TimelineRow(
-                        label: 'In Progress',
-                        active: true,
-                        meta: 'Current stage'),
-                    _TimelineRow(label: 'Completed', meta: 'Upcoming'),
-                  ],
+                  children: _buildTimeline(data),
                 ),
               ),
               const SizedBox(height: 16),
@@ -487,6 +469,69 @@ class BookingDetailsScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  List<Widget> _buildTimeline(BookingFlowData data) {
+    final level = switch (data.statusCode) {
+      'pending' => 0,
+      'confirmed' || 'accepted' => 1,
+      'en_route' || 'arrived' => 2,
+      'in_progress' => 3,
+      'completed' => 4,
+      _ => -1,
+    };
+
+    if (level == -1) {
+      return <Widget>[
+        _TimelineRow(
+          label: 'Booking Placed',
+          complete: true,
+          meta: '${data.date} ${data.time.split('-').first.trim()}',
+        ),
+        _TimelineRow(
+          label: data.statusLabel,
+          complete: false,
+          active: true,
+          meta: 'This booking was ${data.statusCode}.',
+        ),
+      ];
+    }
+
+    final isCash = data.paymentMethodCode != 'card';
+    final paymentMeta = isCash ? 'Cash payment upon completion' : 'Held in Escrow';
+
+    return <Widget>[
+      _TimelineRow(
+        label: 'Booking Placed',
+        complete: true,
+        active: false,
+        meta: '${data.date} ${data.time.split('-').first.trim()}',
+      ),
+      _TimelineRow(
+        label: 'Technician Confirmed',
+        complete: level >= 1,
+        active: level == 0,
+        meta: level == 0 ? 'Waiting for technician to confirm' : 'Technician has accepted the booking',
+      ),
+      _TimelineRow(
+        label: isCash ? 'Payment Method (Cash)' : 'Payment Authorized',
+        complete: isCash ? level >= 4 : level >= 0,
+        active: isCash ? level < 4 : false,
+        meta: isCash ? 'Cash payment due upon completion' : 'Card payment confirmed via Escrow',
+      ),
+      _TimelineRow(
+        label: 'In Progress',
+        complete: level >= 4,
+        active: level == 3 || level == 2,
+        meta: level < 2 ? 'Upcoming' : (level < 4 ? 'Technician is working on your service' : 'Finished'),
+      ),
+      _TimelineRow(
+        label: 'Completed',
+        complete: level == 4,
+        active: false,
+        meta: level == 4 ? 'Job done' : 'Upcoming',
+      ),
+    ];
   }
 
   void _leaveDetails(BuildContext context) {
