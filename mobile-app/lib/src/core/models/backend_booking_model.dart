@@ -141,6 +141,33 @@ class BackendBooking {
           '',
     );
   }
+
+  /// Creates a copy of this booking with the given fields replaced.
+  /// Used by optimistic UI updates to immediately reflect a new status
+  /// in local state before the API call completes.
+  BackendBooking copyWith({String? status}) {
+    return BackendBooking(
+      id: id,
+      status: status ?? this.status,
+      scheduledDate: scheduledDate,
+      scheduledTime: scheduledTime,
+      totalAmount: totalAmount,
+      notes: notes,
+      workerName: workerName,
+      workerId: workerId,
+      serviceName: serviceName,
+      serviceId: serviceId,
+      addressCity: addressCity,
+      addressStreet: addressStreet,
+      customerName: customerName,
+      customerId: customerId,
+      pin: pin,
+      paymentMethod: paymentMethod,
+      paymentCardLast4: paymentCardLast4,
+      paymentCardType: paymentCardType,
+      paymentCardLabel: paymentCardLabel,
+    );
+  }
 }
 
 String _assignmentIdFrom(dynamic value) {

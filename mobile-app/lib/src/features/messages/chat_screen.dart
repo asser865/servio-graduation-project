@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -41,7 +43,11 @@ class _ChatScreenState extends State<ChatScreen> {
   List<ApiMessage> _messages = <ApiMessage>[];
   bool _loading = true;
   bool _sending = false;
+  bool _polling = false;   // true during a background poll tick
   String? _error;
+
+  Timer? _pollTimer;
+  static const Duration _kPollInterval = Duration(seconds: 5);
 
   @override
   void initState() {
@@ -57,9 +63,54 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    _stopPolling();
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  // ── Polling ──────────────────────────────────────────────────────────────────
+
+  void _startPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(_kPollInterval, (_) => _poll());
+  }
+
+  void _stopPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+  }
+
+  /// Background poll — silently fetches new messages and merges them.
+  /// Skipped while the user is actively sending to avoid race conditions.
+  Future<void> _poll() async {
+    if (!mounted || _conversationId == null || _sending) return;
+    setState(() => _polling = true);
+    try {
+      final detail = await MessagesApi(context.read<ApiClient>())
+          .getConversationMessages(_conversationId!);
+      if (!mounted) return;
+
+      // Only update when there are genuinely new messages to avoid
+      // unnecessary rebuilds and jarring scroll jumps.
+      final incoming = detail.messages;
+      final existingIds = _messages.map((m) => m.id).toSet();
+      final newMessages =
+          incoming.where((m) => !existingIds.contains(m.id)).toList();
+
+      if (newMessages.isNotEmpty) {
+        setState(() {
+          _messages = incoming;
+          _error = null;
+        });
+        _scrollToBottom();
+      }
+    } catch (_) {
+      // Silently swallow poll errors — the user still has their existing
+      // messages and the next tick will retry automatically.
+    } finally {
+      if (mounted) setState(() => _polling = false);
+    }
   }
 
   Future<void> _load() async {
@@ -92,6 +143,8 @@ class _ChatScreenState extends State<ChatScreen> {
         _messages = detail.messages;
       });
       _scrollToBottom();
+      // Start background polling once we have a valid conversation.
+      _startPolling();
     } on ApiException catch (error) {
       if (!mounted) return;
       setState(() => _error = error.message);
@@ -166,7 +219,10 @@ class _ChatScreenState extends State<ChatScreen> {
       body: SafeArea(
         child: Column(
           children: <Widget>[
-            _ChatHeader(contactName: _contactName),
+            _ChatHeader(
+              contactName: _contactName,
+              isLive: _polling,
+            ),
             Expanded(
               child: AnimatedSwitcher(
                 duration: ServioMotion.normal,
@@ -295,9 +351,13 @@ class _ChatScreenState extends State<ChatScreen> {
 }
 
 class _ChatHeader extends StatelessWidget {
-  const _ChatHeader({required this.contactName});
+  const _ChatHeader({
+    required this.contactName,
+    this.isLive = false,
+  });
 
   final String contactName;
+  final bool isLive;
 
   @override
   Widget build(BuildContext context) {
@@ -341,10 +401,34 @@ class _ChatHeader extends StatelessWidget {
                   style: theme.textTheme.labelLarge,
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  'Conversation history',
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: servio.textSecondary),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: isLive
+                      ? Row(
+                          key: const ValueKey<String>('live'),
+                          children: <Widget>[
+                            SizedBox(
+                              width: 8,
+                              height: 8,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 1.5,
+                                color: servio.accent,
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              'Updating...',
+                              style: theme.textTheme.bodySmall
+                                  ?.copyWith(color: servio.accent),
+                            ),
+                          ],
+                        )
+                      : Text(
+                          key: const ValueKey<String>('idle'),
+                          'Conversation history',
+                          style: theme.textTheme.bodySmall
+                              ?.copyWith(color: servio.textSecondary),
+                        ),
                 ),
               ],
             ),

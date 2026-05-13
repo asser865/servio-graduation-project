@@ -29,6 +29,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
   EarningsSummary? _summary;
   List<BackendBooking> _recentJobs = [];
   bool _loading = true;
+  String? _fetchError;
 
   @override
   void initState() {
@@ -37,26 +38,115 @@ class _EarningsScreenState extends State<EarningsScreen> {
   }
 
   Future<void> _fetchData() async {
+    if (!mounted) return;
+    setState(() {
+      _loading = true;
+      _fetchError = null;
+    });
     try {
       final client = context.read<ApiClient>();
       final session = context.read<SessionProvider>();
       final workerId = session.account?.id.trim() ?? '';
-      
+
       final summaryFuture = PaymentsApi(client).getEarnings();
       final bookingsFuture = BookingsApi(client).getWorkerBookings(workerId: workerId);
 
       final results = await Future.wait(<Future<dynamic>>[summaryFuture, bookingsFuture]);
+      if (!mounted) return;
       _summary = results[0] as EarningsSummary;
-      
+
       final jobs = results[1] as List<BackendBooking>;
       _recentJobs = jobs
           .where((job) => ['completed', 'done'].contains(job.status))
           .toList();
       _recentJobs.sort((a, b) => b.scheduledDate.compareTo(a.scheduledDate));
     } catch (_) {
+      if (mounted) setState(() => _fetchError = 'Could not load earnings data.');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  void _showWithdrawComingSoon() {
+    showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(ServioRadius.xl)),
+      ),
+      builder: (BuildContext ctx) {
+        final theme = Theme.of(ctx);
+        final servio = ctx.servio;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                // Handle bar
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 24),
+                  decoration: BoxDecoration(
+                    color: servio.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                // Icon
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: ServioColors.tint(servio.accent),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.account_balance_wallet_outlined,
+                    size: 30,
+                    color: servio.accent,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Withdrawals Coming Soon',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Instant payouts to your bank or wallet will be '
+                  'available in an upcoming release. '
+                  'Your earnings are safe and accumulating until then.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: servio.textSecondary,
+                    height: 1.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 28),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: servio.accent,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(ServioRadius.md),
+                      ),
+                    ),
+                    child: const Text('Got it'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -67,12 +157,95 @@ class _EarningsScreenState extends State<EarningsScreen> {
     final pending = _summary?.pendingPayout ?? 0.0;
     final bottomInset = ServioTabShell.bottomOverlayInsetOf(context);
 
+    // ── Full-screen loading state ────────────────────────────────────────────
+    if (_loading) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Earnings'),
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // ── Full-screen error state ──────────────────────────────────────────────
+    if (_fetchError != null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Earnings'),
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: ServioColors.tint(ServioColors.danger),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.wifi_off_rounded,
+                    color: ServioColors.danger,
+                    size: 32,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Data Unavailable',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Your earnings could not be loaded.\nCheck your connection and try again.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: servio.textSecondary,
+                    height: 1.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 28),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _fetchData,
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text('Try Again'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: servio.accent,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(ServioRadius.md),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // ── Normal content ───────────────────────────────────────────────────────
     return Scaffold(
       appBar: AppBar(
         title: const Text('Earnings'),
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       ),
-      body: SingleChildScrollView(
+      body: RefreshIndicator(
+        color: servio.accent,
+        onRefresh: _fetchData,
+        child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: EdgeInsets.fromLTRB(
           ServioSpacing.screenPadding,
           ServioSpacing.screenPadding,
@@ -138,7 +311,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
                   ),
                   const SizedBox(height: 16),
                   OutlinedButton(
-                    onPressed: () {},
+                    onPressed: _showWithdrawComingSoon,
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: Colors.white),
                       foregroundColor: Colors.white,
@@ -200,6 +373,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

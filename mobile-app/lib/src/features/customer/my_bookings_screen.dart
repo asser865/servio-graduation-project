@@ -456,14 +456,37 @@ class BookingDetailsScreen extends StatelessWidget {
                 child: const Text('Write a Review'),
               ),
               const SizedBox(height: 10),
-              OutlinedButton(
-                onPressed: () => Navigator.of(context).pop(),
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: servio.danger),
-                  foregroundColor: servio.danger,
+              // Cancel is only available for pending bookings.
+              if (data.statusCode == 'pending')
+                OutlinedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: servio.danger),
+                    foregroundColor: servio.danger,
+                  ),
+                  child: const Text('Cancel Booking'),
+                )
+              else
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: <Widget>[
+                      Icon(
+                        Icons.lock_outline_rounded,
+                        size: 14,
+                        color: servio.textSecondary,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Cancellation unavailable — booking is ${data.statusLabel.toLowerCase()}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: servio.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                child: const Text('Cancel Booking'),
-              ),
             ],
           ),
         ),

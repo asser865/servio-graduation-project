@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/state/app_state.dart';
 import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
 import '../../design_system/widgets/servio_tab_shell.dart';
-import 'availability_manager_screen.dart';
+import '../messages/messages_screen.dart';
 import 'earnings_screen.dart';
 import 'job_queue_screen.dart';
 import 'technician_dashboard_screen.dart';
@@ -24,20 +26,37 @@ class TechnicianShell extends StatelessWidget {
       icon: Icons.account_balance_wallet_outlined,
       label: 'Earnings',
     ),
-    ServioBottomNavItem(icon: Icons.schedule_rounded, label: 'Availability'),
+    ServioBottomNavItem(
+      icon: Icons.chat_bubble_outline_rounded,
+      label: 'Messages',
+    ),
     ServioBottomNavItem(icon: Icons.person_rounded, label: 'Profile'),
   ];
 
   @override
   Widget build(BuildContext context) {
+    final unreadMessages = context.watch<MessagesProvider>().totalUnread;
+
+    final navItems = <ServioBottomNavItem>[
+      _items[0],
+      _items[1],
+      _items[2],
+      ServioBottomNavItem(
+        icon: Icons.chat_bubble_outline_rounded,
+        label: 'Messages',
+        badgeCount: unreadMessages,
+      ),
+      _items[4],
+    ];
+
     return ServioTabShell(
-      items: _items,
+      items: navItems,
       initialIndex: initialIndex,
       pages: const <Widget>[
         TechnicianDashboardScreen(),
         JobQueueScreen(),
         EarningsScreen(),
-        AvailabilityManagerScreen(),
+        MessagesScreen(),
         TechnicianSettingsProfileScreen(),
       ],
     );

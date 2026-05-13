@@ -14,6 +14,7 @@ import '../marketing/faq_screen.dart';
 import '../marketing/privacy_policy_screen.dart';
 import '../marketing/terms_of_service_screen.dart';
 import '../shared/report_problem_screen.dart';
+import 'availability_manager_screen.dart';
 import 'technician_settings_screen.dart';
 import 'verification_upload_screen.dart';
 
@@ -77,6 +78,17 @@ class TechnicianSettingsProfileScreen extends StatelessWidget {
                     const _SectionHeader(label: 'App'),
                     _MenuGroup(
                       children: <Widget>[
+                        _NavTile(
+                          icon: Icons.schedule_rounded,
+                          iconColor: context.servio.success,
+                          label: 'Availability',
+                          subtitle: 'Manage your working hours',
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const AvailabilityManagerScreen(),
+                            ),
+                          ),
+                        ),
                         _NavTile(
                           icon: Icons.settings_outlined,
                           iconColor: context.servio.accent,

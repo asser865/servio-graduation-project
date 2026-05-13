@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -27,6 +29,9 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
   bool _loading = true;
   String? _error;
   bool _updating = false;
+  Timer? _timeoutTimer;
+
+  static const Duration _kTimeout = Duration(seconds: 12);
 
   @override
   void initState() {
@@ -34,37 +39,89 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
+  @override
+  void dispose() {
+    _timeoutTimer?.cancel();
+    super.dispose();
+  }
+
   Future<void> _load() async {
+    _timeoutTimer?.cancel();
+    // Start a 12-second timeout — if the API hasn't responded by then,
+    // the user sees the error card instead of an infinite spinner.
+    _timeoutTimer = Timer(_kTimeout, () {
+      if (mounted && _loading) {
+        setState(() {
+          _loading = false;
+          _error = 'Request timed out. Check your connection and try again.';
+        });
+      }
+    });
+
     final client = context.read<ApiClient>();
     try {
       final jobs = await BookingsApi(client).getWorkerBookings();
+      _timeoutTimer?.cancel();
       if (!mounted) return;
       final job = jobs.where((j) => j.id == widget.jobId).firstOrNull;
       setState(() {
         _job = job;
         _loading = false;
+        _error = null;
         _updating = false;
       });
     } catch (e) {
+      _timeoutTimer?.cancel();
       if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = 'Could not load job details. Please try again.';
         _loading = false;
         _updating = false;
       });
     }
   }
 
-  Future<void> _updateStatus(String status) async {
+  Future<void> _retry() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+      _job = null;
+    });
+    await _load();
+  }
+
+  Future<void> _updateStatus(String newStatus) async {
+    if (_job == null) return;
+
+    // ── Optimistic update ────────────────────────────────────────────────────
+    // Immediately show the new status so the action button updates at once.
+    final previousJob = _job!;
+    setState(() {
+      _job = previousJob.copyWith(status: newStatus);
+      _updating = true;
+    });
+
+    // ── API call ─────────────────────────────────────────────────────────────
     final client = context.read<ApiClient>();
-    setState(() => _updating = true);
     try {
-      await BookingsApi(client).updateStatus(widget.jobId, status);
-      if (!mounted) return;
-      await _load();
-    } catch (e) {
+      await BookingsApi(client).updateStatus(widget.jobId, newStatus);
       if (!mounted) return;
       setState(() => _updating = false);
+      // Refresh silently in the background to get server-populated fields.
+      await _load();
+    } catch (e) {
+      // ── Rollback on failure ───────────────────────────────────────────────
+      if (!mounted) return;
+      setState(() {
+        _job = previousJob;
+        _updating = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not update status. Please try again.'),
+          duration: Duration(seconds: 3),
+        ),
+      );
     }
   }
 
@@ -78,9 +135,78 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
     }
 
     if (_error != null) {
+      final theme = Theme.of(context);
+      final servio = context.servio;
       return Scaffold(
-        appBar: AppBar(title: const Text('Job Details')),
-        body: Center(child: Text(_error!)),
+        appBar: AppBar(
+          title: const Text('Job Details'),
+          backgroundColor: theme.scaffoldBackgroundColor,
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: ServioColors.tint(ServioColors.danger),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.cloud_off_rounded,
+                    color: ServioColors.danger,
+                    size: 32,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Could Not Load Job',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _error!,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: servio.textSecondary,
+                    height: 1.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 28),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _retry,
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text('Try Again'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: servio.accent,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(ServioRadius.md),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(
+                    'Go Back',
+                    style: TextStyle(color: servio.textSecondary),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       );
     }
 

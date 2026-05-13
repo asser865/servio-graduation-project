@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -15,9 +17,11 @@ import '../../design_system/widgets/servio_section_heading.dart';
 import '../../design_system/widgets/servio_status_chip.dart';
 import '../../design_system/widgets/servio_tab_shell.dart';
 import 'earnings_screen.dart';
+import 'job_details_screen.dart';
 import 'job_queue_screen.dart';
 import 'technician_profile_screen.dart';
 import '../shared/notifications_screen.dart';
+import '../../core/state/notifications_provider.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Technician Dashboard – Overview (matches website technician-dashboard.html)
@@ -89,6 +93,13 @@ class _TechnicianDashboardScreenState extends State<TechnicianDashboardScreen> {
         _earnings = earnings;
         _loading = false;
       });
+      // Refresh notification feed in background after jobs load.
+      unawaited(
+        context.read<NotificationsProvider>().refresh(
+          role: UserRole.technician,
+          workerId: workerId,
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -295,43 +306,59 @@ class _WelcomeBanner extends StatelessWidget {
                 ),
               ),
               // Notification bell
-              GestureDetector(
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                        builder: (_) => const NotificationsScreen()),
+              Consumer<NotificationsProvider>(
+                builder: (context, notifProvider, _) {
+                  final count = notifProvider.unreadCount;
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                            builder: (_) => const NotificationsScreen()),
+                      );
+                    },
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: (isDark ? ServioColors.navyDark : Colors.white)
+                            .withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(ServioRadius.full),
+                      ),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: <Widget>[
+                          Icon(
+                            Icons.notifications_none_rounded,
+                            color: isDark ? ServioColors.navyDark : Colors.white,
+                          ),
+                          if (count > 0)
+                            Positioned(
+                              top: 6,
+                              right: 6,
+                              child: Container(
+                                constraints: const BoxConstraints(minWidth: 16),
+                                height: 16,
+                                padding: const EdgeInsets.symmetric(horizontal: 3),
+                                decoration: const BoxDecoration(
+                                  color: ServioColors.danger,
+                                  shape: BoxShape.circle,
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  count > 9 ? '9+' : '$count',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
                   );
                 },
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: (isDark ? ServioColors.navyDark : Colors.white)
-                        .withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(ServioRadius.full),
-                  ),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: <Widget>[
-                      Icon(
-                        Icons.notifications_none_rounded,
-                        color: isDark ? ServioColors.navyDark : Colors.white,
-                      ),
-                      Positioned(
-                        top: 10,
-                        right: 10,
-                        child: Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: ServioColors.danger,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               ),
             ],
           ),
@@ -484,7 +511,7 @@ class _StatCardGrid extends StatelessWidget {
               value: avgRating.toStringAsFixed(1),
               change: 'Based on $reviewCount reviews',
               icon: Icons.star_border_rounded,
-              iconColor: const Color(0xFFF59E0B),
+              iconColor: ServioColors.warning,
             )),
             const SizedBox(width: 12),
             Expanded(
@@ -493,8 +520,8 @@ class _StatCardGrid extends StatelessWidget {
               value: '$pendingJobs',
               change: pendingJobs > 0 ? 'Action needed' : 'All caught up',
               icon: Icons.pending_actions_rounded,
-              iconColor: const Color(0xFF6E56CF),
-              changeColor: pendingJobs > 0 ? const Color(0xFF6E56CF) : ServioColors.success,
+              iconColor: ServioColors.info,
+              changeColor: pendingJobs > 0 ? ServioColors.info : ServioColors.success,
             )),
           ],
         ),
@@ -507,7 +534,7 @@ class _StatCardGrid extends StatelessWidget {
               value: '$completedJobs',
               change: 'Successfully done',
               icon: Icons.assignment_outlined,
-              iconColor: const Color(0xFFF59E0B),
+              iconColor: ServioColors.success,
             )),
             const SizedBox(width: 12),
             Expanded(
@@ -516,8 +543,8 @@ class _StatCardGrid extends StatelessWidget {
               value: '${pendingPayout.toStringAsFixed(0)} EGP',
               change: 'Pending payout',
               icon: Icons.credit_card_rounded,
-              iconColor: const Color(0xFFD97706),
-              changeColor: const Color(0xFFD97706),
+              iconColor: ServioColors.warning,
+              changeColor: ServioColors.warning,
               highlight: true,
             )),
           ],
@@ -605,12 +632,21 @@ class _IncomingRequestCard extends StatelessWidget {
     final theme = Theme.of(context);
     final servio = context.servio;
 
-    return ServioCard(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          // Icon
-          Container(
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => JobDetailsScreen(jobId: job.id),
+          ),
+        );
+      },
+      behavior: HitTestBehavior.opaque,
+      child: ServioCard(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            // Icon
+            Container(
             width: 40,
             height: 40,
             decoration: BoxDecoration(
@@ -658,8 +694,9 @@ class _IncomingRequestCard extends StatelessWidget {
           const ServioStatusChip(label: 'New', type: ServioStatusChipType.warning),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -679,11 +716,20 @@ class _ScheduleItem extends StatelessWidget {
     final day = DateFormat('dd').format(job.scheduledDate);
     final month = DateFormat('MMM').format(job.scheduledDate).toUpperCase();
 
-    return ServioCard(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: Row(
-        children: <Widget>[
-          // Date block
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => JobDetailsScreen(jobId: job.id),
+          ),
+        );
+      },
+      behavior: HitTestBehavior.opaque,
+      child: ServioCard(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: <Widget>[
+            // Date block
           Container(
             width: 48,
             padding: const EdgeInsets.symmetric(vertical: 8),
@@ -744,8 +790,9 @@ class _ScheduleItem extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -788,10 +835,19 @@ class _ActivityCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final servio = context.servio;
 
-    return ServioCard(
-      child: Row(
-        children: <Widget>[
-          Expanded(
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => JobDetailsScreen(jobId: job.id),
+          ),
+        );
+      },
+      behavior: HitTestBehavior.opaque,
+      child: ServioCard(
+        child: Row(
+          children: <Widget>[
+            Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
@@ -824,6 +880,7 @@ class _ActivityCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }

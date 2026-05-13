@@ -586,13 +586,37 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
                   style: TextStyle(color: servio.textSecondary),
                 ),
               ),
-              TextButton(
-                onPressed: _showCancelSheet,
-                child: const Text(
-                  'Cancel Booking',
-                  style: TextStyle(color: ServioColors.danger),
+              // Cancel is only available for pending bookings.
+              // Backend rejects cancellation of any other status.
+              if (widget.data.statusCode == 'pending')
+                TextButton(
+                  onPressed: _showCancelSheet,
+                  child: const Text(
+                    'Cancel Booking',
+                    style: TextStyle(color: ServioColors.danger),
+                  ),
+                )
+              else
+                Padding(
+                  padding: const EdgeInsets.only(top: 4, bottom: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: <Widget>[
+                      Icon(
+                        Icons.lock_outline_rounded,
+                        size: 14,
+                        color: servio.textSecondary,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Cancellation unavailable — booking is ${widget.data.statusLabel.toLowerCase()}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: servio.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
               const SizedBox(height: 16),
 
               // ── Help card ────────────────────────────────────────────────────

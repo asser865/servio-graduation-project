@@ -14,7 +14,6 @@ import '../../design_system/widgets/servio_primary_button.dart';
 import '../../design_system/widgets/servio_section_heading.dart';
 import '../../design_system/widgets/servio_status_chip.dart';
 import '../booking/booking_flow_data.dart';
-import '../booking/booking_step_one_screen.dart';
 import '../messages/chat_screen.dart';
 import '../shared/notifications_screen.dart';
 import 'ai_finishing_estimator_screen.dart';
@@ -38,6 +37,8 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
   String _bookingFilter = 'All';
   String _historyFilter = 'All';
   List<BookingModel> _bookings = <BookingModel>[];
+  bool _isLoading = false;
+  String? _fetchError;
   late ScrollController _scrollController;
 
   @override
@@ -54,13 +55,27 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
   }
 
   Future<void> _fetchBookings() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _fetchError = null;
+    });
     try {
       final client = context.read<ApiClient>();
       final raw = await BookingsApi(client).getMyBookings();
       if (mounted) {
-        setState(() => _bookings = raw.map(_toBookingModel).toList());
+        setState(() {
+          _bookings = raw.map(_toBookingModel).toList();
+          _fetchError = null;
+        });
       }
-    } catch (_) {}
+    } catch (_) {
+      if (mounted) {
+        setState(() => _fetchError = 'Could not load your bookings.');
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -141,7 +156,10 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
           ),
 
           // 2. Foreground Scrolling Content
-          CustomScrollView(
+          RefreshIndicator(
+            color: ServioColors.accentLight,
+            onRefresh: _fetchBookings,
+            child: CustomScrollView(
             controller: _scrollController,
             slivers: <Widget>[
               // Header Section
@@ -293,55 +311,155 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                     ],
                   ),
                   padding: const EdgeInsets.fromLTRB(20, 32, 20, 48),
-                  child: AnimatedSwitcher(
-                    duration: ServioMotion.tabSwitch,
-                    switchInCurve: ServioMotion.spring,
-                    switchOutCurve: ServioMotion.standard,
-                    layoutBuilder:
-                        (Widget? currentChild, List<Widget> previousChildren) {
-                      return Stack(
-                        alignment: Alignment.topCenter,
-                        children: <Widget>[
-                          ...previousChildren,
-                          if (currentChild != null) currentChild,
-                        ],
-                      );
-                    },
-                    child: switch (_section) {
-                      _DashboardSection.overview => _OverviewSection(
-                          key: const ValueKey<String>('overview'),
-                          bookings: bookings,
-                          onBookService: _openBooking,
-                          onViewBookings: () => setState(
-                            () => _section = _DashboardSection.bookings,
-                          ),
-                        ),
-                      _DashboardSection.bookings => _BookingsSection(
-                          key: const ValueKey<String>('bookings'),
-                          bookings: bookings,
-                          filter: _bookingFilter,
-                          onFilterChanged: (value) =>
-                              setState(() => _bookingFilter = value),
-                          onViewDetails: _openBookingDetails,
-                          onChat: _openChat,
-                          onCancel: _cancelBooking,
-                        ),
-                      _DashboardSection.history => _HistorySection(
-                          key: const ValueKey<String>('history'),
-                          bookings: bookings,
-                          filter: _historyFilter,
-                          onFilterChanged: (value) =>
-                              setState(() => _historyFilter = value),
-                        ),
-                      _DashboardSection.favourites => const _FavouritesSection(
-                          key: ValueKey<String>('favourites'),
-                        ),
-                    },
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      // ── Error Banner ──────────────────────────────────────
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 300),
+                        transitionBuilder: (Widget child, Animation<double> animation) {
+                          return SizeTransition(
+                            sizeFactor: CurvedAnimation(
+                              parent: animation,
+                              curve: ServioMotion.spring,
+                            ),
+                            axisAlignment: -1,
+                            child: FadeTransition(opacity: animation, child: child),
+                          );
+                        },
+                        child: _fetchError != null
+                            ? Padding(
+                                key: const ValueKey<String>('error-banner'),
+                                padding: const EdgeInsets.only(bottom: 16),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 12,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: ServioColors.tint(ServioColors.danger),
+                                    borderRadius:
+                                        BorderRadius.circular(ServioRadius.md),
+                                    border: Border.all(
+                                      color: ServioColors.danger
+                                          .withValues(alpha: 0.35),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: <Widget>[
+                                      Icon(
+                                        Icons.wifi_off_rounded,
+                                        color: ServioColors.danger,
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          _fetchError!,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall
+                                              ?.copyWith(
+                                                color: ServioColors.danger,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      GestureDetector(
+                                        onTap: _isLoading ? null : _fetchBookings,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 6,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: ServioColors.danger,
+                                            borderRadius: BorderRadius.circular(
+                                                ServioRadius.sm),
+                                          ),
+                                          child: _isLoading
+                                              ? const SizedBox(
+                                                  width: 12,
+                                                  height: 12,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                    color: Colors.white,
+                                                    strokeWidth: 2,
+                                                  ),
+                                                )
+                                              : const Text(
+                                                  'Retry',
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              )
+                            : const SizedBox.shrink(
+                                key: ValueKey<String>('no-error'),
+                              ),
+                      ),
+
+                      // ── Section Content ───────────────────────────────────
+                      AnimatedSwitcher(
+                        duration: ServioMotion.tabSwitch,
+                        switchInCurve: ServioMotion.spring,
+                        switchOutCurve: ServioMotion.standard,
+                        layoutBuilder:
+                            (Widget? currentChild, List<Widget> previousChildren) {
+                          return Stack(
+                            alignment: Alignment.topCenter,
+                            children: <Widget>[
+                              ...previousChildren,
+                              if (currentChild != null) currentChild,
+                            ],
+                          );
+                        },
+                        child: switch (_section) {
+                          _DashboardSection.overview => _OverviewSection(
+                              key: const ValueKey<String>('overview'),
+                              bookings: bookings,
+                              onBookService: _openBooking,
+                              onViewBookings: () => setState(
+                                () => _section = _DashboardSection.bookings,
+                              ),
+                            ),
+                          _DashboardSection.bookings => _BookingsSection(
+                              key: const ValueKey<String>('bookings'),
+                              bookings: bookings,
+                              filter: _bookingFilter,
+                              onFilterChanged: (value) =>
+                                  setState(() => _bookingFilter = value),
+                              onViewDetails: _openBookingDetails,
+                              onChat: _openChat,
+                              onCancel: _cancelBooking,
+                            ),
+                          _DashboardSection.history => _HistorySection(
+                              key: const ValueKey<String>('history'),
+                              bookings: bookings,
+                              filter: _historyFilter,
+                              onFilterChanged: (value) =>
+                                  setState(() => _historyFilter = value),
+                            ),
+                          _DashboardSection.favourites => const _FavouritesSection(
+                              key: ValueKey<String>('favourites'),
+                            ),
+                        },
+                      ),
+                    ],
                   ),
                 ),
               ),
             ],
           ),
+        ),
         ],
       ),
     );
@@ -376,6 +494,32 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
   }
 
   Future<void> _cancelBooking(BookingModel booking) async {
+    // Guard: backend only allows cancellation of pending bookings.
+    if (booking.status != BookingStatus.pending) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Only pending bookings can be cancelled. '
+              'This booking is already ${switch (booking.status) {
+                BookingStatus.confirmed => 'confirmed',
+                BookingStatus.enRoute => 'en route',
+                BookingStatus.arrived => 'arrived',
+                BookingStatus.inProgress => 'in progress',
+                BookingStatus.completed => 'completed',
+                BookingStatus.cancelled => 'cancelled',
+                BookingStatus.rejected => 'rejected',
+                BookingStatus.disputed => 'disputed',
+                BookingStatus.pending => 'pending',
+              }}.'
+            ),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+      return;
+    }
+
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
       builder: (BuildContext context) {
@@ -1270,12 +1414,15 @@ class _DashboardBookingCardState extends State<_DashboardBookingCard>
                 icon: Icons.chat_bubble_outline_rounded,
                 onTap: widget.onChat,
               ),
-              _SmallActionButton(
-                label: 'Cancel',
-                icon: Icons.cancel_outlined,
-                danger: true,
-                onTap: widget.onCancel,
-              ),
+              // Only show Cancel for pending bookings — backend rejects
+              // cancellation of accepted/in-progress/completed bookings.
+              if (booking.status == BookingStatus.pending)
+                _SmallActionButton(
+                  label: 'Cancel',
+                  icon: Icons.cancel_outlined,
+                  danger: true,
+                  onTap: widget.onCancel,
+                ),
             ],
           ),
           AnimatedSize(

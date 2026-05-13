@@ -1,110 +1,54 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/models/app_notification.dart';
+import '../../core/models/user_account.dart';
+import '../../core/state/app_state.dart';
+import '../../core/state/notifications_provider.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
 
-enum _NType { booking, payment, system, ai }
-
 enum _NCategory { all, bookings, payments, system }
 
+// Map AppNotificationType → _NType for the existing UI widgets.
+enum _NType { booking, payment, system, ai }
+
+// Thin wrapper so UI widgets don't need to change.
 class _Notif {
-  _Notif({
-    required this.id,
-    required this.title,
-    required this.body,
-    required this.time,
-    required this.type,
-    this.unread = false,
-  });
+  _Notif.fromReal(AppNotification n)
+      : id = n.id,
+        title = n.title,
+        body = n.body,
+        time = _formatTime(n.createdAt),
+        type = _mapType(n.type),
+        unread = !n.isRead;
 
   final String id;
   final String title;
   final String body;
   final String time;
   final _NType type;
-  bool unread;
+  final bool unread;
 
-  _Notif copy() {
-    return _Notif(
-      id: id,
-      title: title,
-      body: body,
-      time: time,
-      type: type,
-      unread: unread,
-    );
+  static _NType _mapType(AppNotificationType t) => switch (t) {
+        AppNotificationType.booking => _NType.booking,
+        AppNotificationType.payment => _NType.payment,
+        AppNotificationType.system  => _NType.system,
+      };
+
+  static String _formatTime(DateTime dt) {
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+    if (diff.inMinutes < 60)  return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24)   return '${diff.inHours}h ago';
+    if (diff.inDays == 1)    return 'Yesterday';
+    if (diff.inDays < 7)     return '${diff.inDays}d ago';
+    return DateFormat('d MMM').format(dt);
   }
 }
-
-final List<_Notif> _kNotifications = <_Notif>[
-  _Notif(
-    id: 'n1',
-    title: 'Booking Confirmed',
-    body: 'Ahmed Nabil confirmed your plumbing visit for 10:00 AM tomorrow.',
-    time: '5m ago',
-    type: _NType.booking,
-    unread: true,
-  ),
-  _Notif(
-    id: 'n2',
-    title: 'Technician En Route',
-    body: 'Ahmed Nabil is on his way. Estimated arrival in 15 minutes.',
-    time: '22m ago',
-    type: _NType.booking,
-    unread: true,
-  ),
-  _Notif(
-    id: 'n3',
-    title: 'Payment Released',
-    body:
-        'Your escrow payment of 850 EGP for the completed plumbing service has been released.',
-    time: '1h ago',
-    type: _NType.payment,
-  ),
-  _Notif(
-    id: 'n4',
-    title: 'AI Match Ready',
-    body:
-        'SERVIO AI found 3 high-confidence technician matches for your AC maintenance request.',
-    time: '3h ago',
-    type: _NType.ai,
-    unread: true,
-  ),
-  _Notif(
-    id: 'n5',
-    title: 'Invoice Available',
-    body:
-        'Your invoice #INV-20240326 for electrical repair is ready to download.',
-    time: '5h ago',
-    type: _NType.payment,
-  ),
-  _Notif(
-    id: 'n6',
-    title: 'Booking Cancelled',
-    body:
-        'Booking #BK-00291 has been cancelled. A full refund will be processed within 3 business days.',
-    time: 'Yesterday',
-    type: _NType.booking,
-  ),
-  _Notif(
-    id: 'n7',
-    title: 'Leave a Review',
-    body:
-        'How was your experience with Nour Hany? Share your feedback to help other customers.',
-    time: 'Yesterday',
-    type: _NType.system,
-  ),
-  _Notif(
-    id: 'n8',
-    title: 'Welcome to SERVIO',
-    body:
-        'Your account is set up and ready. Browse verified professionals or let AI match you with the right technician.',
-    time: '2d ago',
-    type: _NType.system,
-  ),
-];
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -114,185 +58,216 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
-  late final List<_Notif> _notifs;
   _NCategory _category = _NCategory.all;
 
   @override
   void initState() {
     super.initState();
-    _notifs = _kNotifications.map((_Notif n) => n.copy()).toList();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _refresh());
   }
 
-  List<_Notif> get _visible {
-    return _notifs.where((_Notif n) {
-      return switch (_category) {
-        _NCategory.all => true,
+  Future<void> _refresh() async {
+    if (!mounted) return;
+    final provider = context.read<NotificationsProvider>();
+    final session  = context.read<SessionProvider>();
+    final role     = session.account?.role ?? UserRole.customer;
+    final workerId = session.account?.id;
+    await provider.refresh(role: role, workerId: workerId);
+  }
+
+  List<_Notif> _notifs(NotificationsProvider p) =>
+      p.notifications.map(_Notif.fromReal).toList();
+
+  List<_Notif> _visible(List<_Notif> all) => all.where((n) => switch (_category) {
+        _NCategory.all      => true,
         _NCategory.bookings => n.type == _NType.booking,
         _NCategory.payments => n.type == _NType.payment,
-        _NCategory.system => n.type == _NType.system || n.type == _NType.ai,
-      };
-    }).toList();
-  }
+        _NCategory.system   => n.type == _NType.system || n.type == _NType.ai,
+      }).toList();
 
-  int get _totalUnread => _notifs.where((_Notif n) => n.unread).length;
+  int _countFor(List<_Notif> all, _NCategory category, {bool unreadOnly = false}) =>
+      all.where((n) {
+        final matches = switch (category) {
+          _NCategory.all      => true,
+          _NCategory.bookings => n.type == _NType.booking,
+          _NCategory.payments => n.type == _NType.payment,
+          _NCategory.system   => n.type == _NType.system || n.type == _NType.ai,
+        };
+        return matches && (!unreadOnly || n.unread);
+      }).length;
 
-  int _countFor(_NCategory category, {bool unreadOnly = false}) {
-    return _notifs.where((_Notif n) {
-      final matches = switch (category) {
-        _NCategory.all => true,
-        _NCategory.bookings => n.type == _NType.booking,
-        _NCategory.payments => n.type == _NType.payment,
-        _NCategory.system => n.type == _NType.system || n.type == _NType.ai,
-      };
+  void _markAll() => context.read<NotificationsProvider>().markAllRead();
 
-      return matches && (!unreadOnly || n.unread);
-    }).length;
-  }
-
-  void _markAll() {
-    setState(() {
-      for (final n in _notifs) {
-        n.unread = false;
-      }
-    });
-  }
-
-  void _markOne(String id) {
-    setState(() {
-      final n = _notifs.firstWhere((_Notif n) => n.id == id);
-      n.unread = false;
-    });
-  }
+  void _markOne(String id) => context.read<NotificationsProvider>().markRead(id);
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final visible = _visible;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      body: AnnotatedRegion<SystemUiOverlayStyle>(
-        value: isDark
-            ? SystemUiOverlayStyle.light.copyWith(
-                statusBarColor: Colors.transparent,
-              )
-            : SystemUiOverlayStyle.dark.copyWith(
-                statusBarColor: Colors.transparent,
-              ),
-        child: Stack(
-          children: <Widget>[
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final horizontalPadding =
-                    constraints.maxWidth >= 700 ? 28.0 : 20.0;
-                final maxContentWidth =
-                    constraints.maxWidth >= 700 ? 760.0 : double.infinity;
+      body: Consumer<NotificationsProvider>(
+        builder: (context, provider, _) {
+          final notifs  = _notifs(provider);
+          final visible = _visible(notifs);
+          final totalUnread = notifs.where((n) => n.unread).length;
 
-                return CustomScrollView(
-                  slivers: <Widget>[
-                    SliverToBoxAdapter(
-                      child: _NotificationsHero(
-                        totalCount: _notifs.length,
-                        unreadCount: _totalUnread,
-                        bookingCount: _countFor(_NCategory.bookings),
-                      ),
-                    ),
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 14),
-                        child: _CenteredContent(
-                          horizontalPadding: horizontalPadding,
-                          maxWidth: maxContentWidth,
-                          child: _CategoryBar(
-                            selected: _category,
-                            onChanged: (c) => setState(() => _category = c),
-                            unreadCounts: <_NCategory, int>{
-                              for (final category in _NCategory.values)
-                                category: _countFor(
-                                  category,
-                                  unreadOnly: true,
-                                ),
-                            },
-                            totalCounts: <_NCategory, int>{
-                              for (final category in _NCategory.values)
-                                category: _countFor(category),
-                            },
-                          ),
-                        ),
-                      ),
-                    ),
-                    SliverToBoxAdapter(
-                      child: _CenteredContent(
-                        horizontalPadding: horizontalPadding,
-                        maxWidth: maxContentWidth,
+          return AnnotatedRegion<SystemUiOverlayStyle>(
+            value: isDark
+                ? SystemUiOverlayStyle.light.copyWith(statusBarColor: Colors.transparent)
+                : SystemUiOverlayStyle.dark.copyWith(statusBarColor: Colors.transparent),
+            child: Stack(
+              children: <Widget>[
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final horizontalPadding = constraints.maxWidth >= 700 ? 28.0 : 20.0;
+                    final maxContentWidth   = constraints.maxWidth >= 700 ? 760.0 : double.infinity;
+
+                    // ── Loading state ─────────────────────────────────────────
+                    if (provider.loading && notifs.isEmpty) {
+                      return Center(
                         child: Padding(
-                          padding: const EdgeInsets.only(top: 16),
-                          child: _InboxPulseCard(
-                            unreadCount: _totalUnread,
-                            visibleCount: visible.length,
-                            selectedCategory: _category,
+                          padding: EdgeInsets.only(
+                            top: MediaQuery.paddingOf(context).top + 80,
+                          ),
+                          child: const CircularProgressIndicator(),
+                        ),
+                      );
+                    }
+
+                    // ── Error state ───────────────────────────────────────────
+                    if (provider.error != null && notifs.isEmpty) {
+                      return Center(
+                        child: Padding(
+                          padding: EdgeInsets.only(
+                            top: MediaQuery.paddingOf(context).top + 80,
+                            left: 28, right: 28,
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: <Widget>[
+                              Icon(Icons.wifi_off_rounded,
+                                  size: 48, color: context.servio.textSecondary),
+                              const SizedBox(height: 14),
+                              Text(provider.error!,
+                                  textAlign: TextAlign.center,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: context.servio.textSecondary,
+                                  )),
+                              const SizedBox(height: 20),
+                              OutlinedButton.icon(
+                                onPressed: _refresh,
+                                icon: const Icon(Icons.refresh_rounded),
+                                label: const Text('Try Again'),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                    ),
-                    if (visible.isEmpty)
-                      SliverFillRemaining(
-                        hasScrollBody: false,
-                        child: _CenteredContent(
-                          horizontalPadding: horizontalPadding,
-                          maxWidth: maxContentWidth,
-                          child: _EmptyState(category: _category),
-                        ),
-                      )
-                    else
-                      SliverPadding(
-                        padding: EdgeInsets.fromLTRB(
-                          horizontalPadding,
-                          16,
-                          horizontalPadding,
-                          34,
-                        ),
-                        sliver: SliverToBoxAdapter(
-                          child: Center(
-                            child: ConstrainedBox(
-                              constraints:
-                                  BoxConstraints(maxWidth: maxContentWidth),
-                              child: Column(
-                                children: List<Widget>.generate(
-                                  visible.length,
-                                  (i) {
-                                    return Padding(
-                                      padding: EdgeInsets.only(
-                                        bottom:
-                                            i == visible.length - 1 ? 0 : 12,
-                                      ),
-                                      child: _NotificationTile(
-                                        notif: visible[i],
-                                        onTap: () => _markOne(visible[i].id),
-                                      ),
-                                    );
+                      );
+                    }
+
+                    // ── Normal / pull-to-refresh content ──────────────────────
+                    return RefreshIndicator(
+                      onRefresh: _refresh,
+                      color: context.servio.accent,
+                      child: CustomScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        slivers: <Widget>[
+                          SliverToBoxAdapter(
+                            child: _NotificationsHero(
+                              totalCount:   notifs.length,
+                              unreadCount:  totalUnread,
+                              bookingCount: _countFor(notifs, _NCategory.bookings),
+                            ),
+                          ),
+                          SliverToBoxAdapter(
+                            child: Padding(
+                              padding: const EdgeInsets.only(top: 14),
+                              child: _CenteredContent(
+                                horizontalPadding: horizontalPadding,
+                                maxWidth: maxContentWidth,
+                                child: _CategoryBar(
+                                  selected: _category,
+                                  onChanged: (c) => setState(() => _category = c),
+                                  unreadCounts: <_NCategory, int>{
+                                    for (final cat in _NCategory.values)
+                                      cat: _countFor(notifs, cat, unreadOnly: true),
+                                  },
+                                  totalCounts: <_NCategory, int>{
+                                    for (final cat in _NCategory.values)
+                                      cat: _countFor(notifs, cat),
                                   },
                                 ),
                               ),
                             ),
                           ),
-                        ),
+                          SliverToBoxAdapter(
+                            child: _CenteredContent(
+                              horizontalPadding: horizontalPadding,
+                              maxWidth: maxContentWidth,
+                              child: Padding(
+                                padding: const EdgeInsets.only(top: 16),
+                                child: _InboxPulseCard(
+                                  unreadCount:      totalUnread,
+                                  visibleCount:     visible.length,
+                                  selectedCategory: _category,
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (visible.isEmpty)
+                            SliverFillRemaining(
+                              hasScrollBody: false,
+                              child: _CenteredContent(
+                                horizontalPadding: horizontalPadding,
+                                maxWidth: maxContentWidth,
+                                child: _EmptyState(category: _category),
+                              ),
+                            )
+                          else
+                            SliverPadding(
+                              padding: EdgeInsets.fromLTRB(
+                                  horizontalPadding, 16, horizontalPadding, 34),
+                              sliver: SliverToBoxAdapter(
+                                child: Center(
+                                  child: ConstrainedBox(
+                                    constraints: BoxConstraints(maxWidth: maxContentWidth),
+                                    child: Column(
+                                      children: List<Widget>.generate(visible.length, (i) {
+                                        return Padding(
+                                          padding: EdgeInsets.only(
+                                              bottom: i == visible.length - 1 ? 0 : 12),
+                                          child: _NotificationTile(
+                                            notif: visible[i],
+                                            onTap: () => _markOne(visible[i].id),
+                                          ),
+                                        );
+                                      }),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
-                  ],
-                );
-              },
+                    );
+                  },
+                ),
+                _PinnedNotificationActions(
+                  onBack:    () => Navigator.of(context).pop(),
+                  onMarkAll: totalUnread > 0 ? _markAll : null,
+                ),
+              ],
             ),
-            _PinnedNotificationActions(
-              onBack: () => Navigator.of(context).pop(),
-              onMarkAll: _totalUnread > 0 ? _markAll : null,
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 }
+
+
 
 class _PinnedNotificationActions extends StatelessWidget {
   const _PinnedNotificationActions({

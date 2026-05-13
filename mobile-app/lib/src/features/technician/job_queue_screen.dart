@@ -133,13 +133,42 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
     return null;
   }
 
-  Future<void> _updateJobStatus(String jobId, String status) async {
+  Future<void> _updateJobStatus(String jobId, String newStatus) async {
+    // ── Optimistic update ────────────────────────────────────────────────────
+    // Immediately reflect the new status in local state so the card moves
+    // tabs without waiting for the network round-trip.
+    final originalJobs = List<BackendBooking>.from(_jobs);
+    final idx = _jobs.indexWhere((j) => j.id == jobId);
+    if (idx != -1) {
+      setState(() {
+        _jobs = List<BackendBooking>.from(_jobs)
+          ..[idx] = _jobs[idx].copyWith(status: newStatus);
+        // Auto-advance to the tab that now contains the updated job.
+        _tabIndex = _firstTabWithJobs(_jobs) ?? _tabIndex;
+      });
+    }
+
+    // ── API call ─────────────────────────────────────────────────────────────
     final client = context.read<ApiClient>();
     try {
-      await BookingsApi(client).updateStatus(jobId, status);
+      await BookingsApi(client).updateStatus(jobId, newStatus);
+      // Silently refresh in the background to sync any server-side changes
+      // (e.g. timestamps, populated fields) without blocking the UI.
+      if (mounted) await _fetchJobs();
+    } catch (_) {
+      // ── Rollback on failure ───────────────────────────────────────────────
       if (!mounted) return;
-      await _fetchJobs();
-    } catch (_) {}
+      setState(() {
+        _jobs = originalJobs;
+        _tabIndex = _firstTabWithJobs(originalJobs) ?? _tabIndex;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not update job status. Please try again.'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
   }
 
   @override
@@ -371,14 +400,17 @@ class _JobCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final servio = context.servio;
 
-    return ServioCard(
-      radius: ServioRadius.lg,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              Container(
+    return GestureDetector(
+      onTap: onOpen,
+      behavior: HitTestBehavior.opaque,
+      child: ServioCard(
+        radius: ServioRadius.lg,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Container(
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
@@ -464,8 +496,9 @@ class _JobCard extends StatelessWidget {
             ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 bool _isAssignedToWorker(BackendBooking job, String workerId) {

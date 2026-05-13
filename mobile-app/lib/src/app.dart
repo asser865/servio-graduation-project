@@ -10,6 +10,7 @@ import 'core/services/storage_service.dart';
 import 'core/state/app_state.dart';
 import 'core/state/customer_addresses_state.dart';
 import 'core/state/services_state.dart';
+import 'core/state/notifications_provider.dart';
 import 'core/state/workers_state.dart';
 import 'design_system/servio_theme.dart';
 import 'design_system/servio_tokens.dart';
@@ -62,6 +63,12 @@ class ServioApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<WorkersProvider>(
           create: (ctx) => WorkersProvider(ctx.read<ApiClient>()),
+        ),
+        ChangeNotifierProvider<NotificationsProvider>(
+          create: (ctx) => NotificationsProvider(
+            storage,
+            ctx.read<ApiClient>(),
+          ),
         ),
       ],
       child: const _AppView(),
