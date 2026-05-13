@@ -10,7 +10,6 @@ const disputeSchema = new mongoose.Schema(
     payment: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Payment',
-      required: [true, 'Payment reference is required'],
     },
     raisedBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -19,7 +18,7 @@ const disputeSchema = new mongoose.Schema(
     },
     raisedByRole: {
       type: String,
-      enum: ['user', 'worker'],
+      enum: ['user', 'worker', 'admin'],
       required: true,
     },
     reason: {

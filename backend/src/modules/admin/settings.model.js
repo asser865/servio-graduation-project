@@ -3,6 +3,9 @@ const mongoose = require('mongoose');
 const settingsSchema = new mongoose.Schema({
   commissionRate:       { type: Number, default: 10 },
   maxCashLiability:     { type: Number, default: 5000 },
+  cashDebtWarningThreshold: { type: Number, default: 1000 },
+  cashDebtBlockThreshold:   { type: Number, default: 5000 },
+  cashDebtAutoBlockEnabled: { type: Boolean, default: true },
   autoReleaseWindow:    { type: Number, default: 48 },
   minDepositPct:        { type: Number, default: 20 },
   minBookingAmount:     { type: Number, default: 100 },
