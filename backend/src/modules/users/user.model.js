@@ -75,6 +75,13 @@ const userSchema = new mongoose.Schema(
       default: true,
     },
 
+    restrictions: {
+      cashBookingsBlocked: { type: Boolean, default: false },
+      blockReason:         { type: String },
+      blockedAt:           { type: Date },
+      blockedBy:           { type: String, enum: ['system', 'admin'] },
+    },
+
     authVersion: {
       type:    Number,
       default: 0,
@@ -216,6 +223,13 @@ const userSchema = new mongoose.Schema(
       type:    String,
       trim:    true,
       default: '',
+    },
+
+    // Structured districts/areas the worker accepts jobs in. This is the
+    // matching-friendly version of the display-oriented serviceArea string.
+    coverageAreas: {
+      type:    [String],
+      default: [],
     },
 
     // Specific skills (e.g. ['pipe repair', 'drain cleaning'])
