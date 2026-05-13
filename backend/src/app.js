@@ -19,8 +19,10 @@ const messageRoutes   = require('./modules/messages/message.routes');
 const paymentRoutes   = require('./modules/payments/payment.routes');
 const adminRoutes     = require('./modules/admin/audit.routes');
 const uploadRoutes    = require('./modules/uploads/upload.routes');
-const notifyRoutes    = require('./modules/notifications/notify.routes');
-const savedCardRoutes = require('./modules/savedCards/savedCard.routes');
+const notifyRoutes         = require('./modules/notifications/notify.routes');
+const notificationsRoutes  = require('./modules/notifications/notifications.routes');
+const savedCardRoutes      = require('./modules/savedCards/savedCard.routes');
+const platformRoutes  = require('./modules/platform/platform.routes');
 
 const { notFound, errorHandler } = require('./middleware/error.middleware');
 
@@ -58,8 +60,6 @@ if (process.env.NODE_ENV !== 'test') {
   app.use(morgan('dev'));
 }
 
-app.use('/api/v1/payments', paymentRoutes);
-
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -88,9 +88,11 @@ app.use(`${API_PREFIX}/ai`, aiRoutes);
 app.use(`${API_PREFIX}/messages`, messageRoutes);
 app.use(`${API_PREFIX}/admin`,       adminRoutes);
 app.use(`${API_PREFIX}/uploads`,     uploadRoutes);
-app.use(`${API_PREFIX}/notify`,      notifyRoutes);
+app.use(`${API_PREFIX}/notify`,         notifyRoutes);
+app.use(`${API_PREFIX}/notifications`,  notificationsRoutes);
 app.use(`${API_PREFIX}/saved-cards`, savedCardRoutes);
-// Note: payment routes are already mounted above express.json() for webhook support
+app.use(`${API_PREFIX}/platform-settings`, platformRoutes);
+app.use(`${API_PREFIX}/payments`, paymentRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
