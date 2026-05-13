@@ -45,8 +45,8 @@ const paymentSchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      enum: ['card', 'cash'],
-      default: 'card',
+      enum: ['online', 'cash', 'card'],
+      default: 'online',
     },
     gateway: {
       type: String,
@@ -77,6 +77,17 @@ const paymentSchema = new mongoose.Schema(
     metadata: {
       type: mongoose.Schema.Types.Mixed,
     },
+
+    skipFeeCalc: {
+      type: Boolean,
+      default: false,
+      select: false,
+    },
+
+    releaseRequestedAt:  { type: Date },
+    releaseRequestedBy:  { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    releaseApprovedAt:   { type: Date },
+    releaseApprovedBy:   { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
   {
     timestamps: true,
@@ -84,7 +95,7 @@ const paymentSchema = new mongoose.Schema(
 );
 
 paymentSchema.pre('save', async function () {
-  if (this.isModified('amount')) {
+  if (this.isModified('amount') && !this.skipFeeCalc) {
     this.platformFee = Math.round(this.amount * PLATFORM_FEE_PCT);
     this.workerEarning = this.amount - this.platformFee;
   }
@@ -96,6 +107,8 @@ paymentSchema.statics.findByBooking = function (bookingId) {
     .populate('worker', 'name email')
     .populate('booking', 'scheduledDate address status');
 };
+
+paymentSchema.index({ booking: 1, status: 1 });
 
 const Payment = mongoose.model('Payment', paymentSchema);
 
