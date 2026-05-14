@@ -51,5 +51,6 @@ graphify-out/
 .DS_Store
 CLAUDE.md
 docs/
+.graphifyignore
 skills-lock.json
 .gitattributes
