@@ -76,7 +76,8 @@ class NotificationsProvider extends ChangeNotifier {
   /// 5. Save the current states as the new snapshot.
   ///
   /// Pass [role] to use the correct API endpoint.
-  Future<void> refresh({UserRole role = UserRole.customer, String? workerId}) async {
+  Future<void> refresh(
+      {UserRole role = UserRole.customer, String? workerId}) async {
     _loading = true;
     _error = null;
     notifyListeners();
@@ -227,7 +228,8 @@ class NotificationsProvider extends ChangeNotifier {
         return AppNotification(
           id: id,
           title: 'Booking Confirmed',
-          body: '${booking.workerName.isNotEmpty ? booking.workerName : "Your technician"} '
+          body:
+              '${booking.workerName.isNotEmpty ? booking.workerName : "Your technician"} '
               'confirmed your ${booking.serviceName} visit.',
           type: AppNotificationType.booking,
           createdAt: date,
@@ -274,7 +276,8 @@ class NotificationsProvider extends ChangeNotifier {
         return AppNotification(
           id: id,
           title: 'Booking Rejected',
-          body: 'Your ${booking.serviceName} booking was not accepted by the technician.',
+          body:
+              'Your ${booking.serviceName} booking was not accepted by the technician.',
           type: AppNotificationType.booking,
           createdAt: date,
           isRead: isRead,
@@ -287,7 +290,8 @@ class NotificationsProvider extends ChangeNotifier {
 
   // ── Helpers ───────────────────────────────────────────────────────────────────
 
-  int _unreadIn(List<AppNotification> list) => list.where((n) => !n.isRead).length;
+  int _unreadIn(List<AppNotification> list) =>
+      list.where((n) => !n.isRead).length;
 
   void _log(String message) {
     assert(() {

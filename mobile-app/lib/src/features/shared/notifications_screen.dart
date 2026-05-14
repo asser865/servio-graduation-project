@@ -36,16 +36,16 @@ class _Notif {
   static _NType _mapType(AppNotificationType t) => switch (t) {
         AppNotificationType.booking => _NType.booking,
         AppNotificationType.payment => _NType.payment,
-        AppNotificationType.system  => _NType.system,
+        AppNotificationType.system => _NType.system,
       };
 
   static String _formatTime(DateTime dt) {
     final now = DateTime.now();
     final diff = now.difference(dt);
-    if (diff.inMinutes < 60)  return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24)   return '${diff.inHours}h ago';
-    if (diff.inDays == 1)    return 'Yesterday';
-    if (diff.inDays < 7)     return '${diff.inDays}d ago';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays == 1) return 'Yesterday';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
     return DateFormat('d MMM').format(dt);
   }
 }
@@ -69,8 +69,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Future<void> _refresh() async {
     if (!mounted) return;
     final provider = context.read<NotificationsProvider>();
-    final session  = context.read<SessionProvider>();
-    final role     = session.account?.role ?? UserRole.customer;
+    final session = context.read<SessionProvider>();
+    final role = session.account?.role ?? UserRole.customer;
     final workerId = session.account?.id;
     await provider.refresh(role: role, workerId: workerId);
   }
@@ -78,27 +78,31 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   List<_Notif> _notifs(NotificationsProvider p) =>
       p.notifications.map(_Notif.fromReal).toList();
 
-  List<_Notif> _visible(List<_Notif> all) => all.where((n) => switch (_category) {
-        _NCategory.all      => true,
-        _NCategory.bookings => n.type == _NType.booking,
-        _NCategory.payments => n.type == _NType.payment,
-        _NCategory.system   => n.type == _NType.system || n.type == _NType.ai,
-      }).toList();
+  List<_Notif> _visible(List<_Notif> all) => all
+      .where((n) => switch (_category) {
+            _NCategory.all => true,
+            _NCategory.bookings => n.type == _NType.booking,
+            _NCategory.payments => n.type == _NType.payment,
+            _NCategory.system => n.type == _NType.system || n.type == _NType.ai,
+          })
+      .toList();
 
-  int _countFor(List<_Notif> all, _NCategory category, {bool unreadOnly = false}) =>
+  int _countFor(List<_Notif> all, _NCategory category,
+          {bool unreadOnly = false}) =>
       all.where((n) {
         final matches = switch (category) {
-          _NCategory.all      => true,
+          _NCategory.all => true,
           _NCategory.bookings => n.type == _NType.booking,
           _NCategory.payments => n.type == _NType.payment,
-          _NCategory.system   => n.type == _NType.system || n.type == _NType.ai,
+          _NCategory.system => n.type == _NType.system || n.type == _NType.ai,
         };
         return matches && (!unreadOnly || n.unread);
       }).length;
 
   void _markAll() => context.read<NotificationsProvider>().markAllRead();
 
-  void _markOne(String id) => context.read<NotificationsProvider>().markRead(id);
+  void _markOne(String id) =>
+      context.read<NotificationsProvider>().markRead(id);
 
   @override
   Widget build(BuildContext context) {
@@ -109,20 +113,24 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       backgroundColor: theme.scaffoldBackgroundColor,
       body: Consumer<NotificationsProvider>(
         builder: (context, provider, _) {
-          final notifs  = _notifs(provider);
+          final notifs = _notifs(provider);
           final visible = _visible(notifs);
           final totalUnread = notifs.where((n) => n.unread).length;
 
           return AnnotatedRegion<SystemUiOverlayStyle>(
             value: isDark
-                ? SystemUiOverlayStyle.light.copyWith(statusBarColor: Colors.transparent)
-                : SystemUiOverlayStyle.dark.copyWith(statusBarColor: Colors.transparent),
+                ? SystemUiOverlayStyle.light
+                    .copyWith(statusBarColor: Colors.transparent)
+                : SystemUiOverlayStyle.dark
+                    .copyWith(statusBarColor: Colors.transparent),
             child: Stack(
               children: <Widget>[
                 LayoutBuilder(
                   builder: (context, constraints) {
-                    final horizontalPadding = constraints.maxWidth >= 700 ? 28.0 : 20.0;
-                    final maxContentWidth   = constraints.maxWidth >= 700 ? 760.0 : double.infinity;
+                    final horizontalPadding =
+                        constraints.maxWidth >= 700 ? 28.0 : 20.0;
+                    final maxContentWidth =
+                        constraints.maxWidth >= 700 ? 760.0 : double.infinity;
 
                     // ── Loading state ─────────────────────────────────────────
                     if (provider.loading && notifs.isEmpty) {
@@ -142,13 +150,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         child: Padding(
                           padding: EdgeInsets.only(
                             top: MediaQuery.paddingOf(context).top + 80,
-                            left: 28, right: 28,
+                            left: 28,
+                            right: 28,
                           ),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: <Widget>[
                               Icon(Icons.wifi_off_rounded,
-                                  size: 48, color: context.servio.textSecondary),
+                                  size: 48,
+                                  color: context.servio.textSecondary),
                               const SizedBox(height: 14),
                               Text(provider.error!,
                                   textAlign: TextAlign.center,
@@ -176,9 +186,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         slivers: <Widget>[
                           SliverToBoxAdapter(
                             child: _NotificationsHero(
-                              totalCount:   notifs.length,
-                              unreadCount:  totalUnread,
-                              bookingCount: _countFor(notifs, _NCategory.bookings),
+                              totalCount: notifs.length,
+                              unreadCount: totalUnread,
+                              bookingCount:
+                                  _countFor(notifs, _NCategory.bookings),
                             ),
                           ),
                           SliverToBoxAdapter(
@@ -189,10 +200,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                 maxWidth: maxContentWidth,
                                 child: _CategoryBar(
                                   selected: _category,
-                                  onChanged: (c) => setState(() => _category = c),
+                                  onChanged: (c) =>
+                                      setState(() => _category = c),
                                   unreadCounts: <_NCategory, int>{
                                     for (final cat in _NCategory.values)
-                                      cat: _countFor(notifs, cat, unreadOnly: true),
+                                      cat: _countFor(notifs, cat,
+                                          unreadOnly: true),
                                   },
                                   totalCounts: <_NCategory, int>{
                                     for (final cat in _NCategory.values)
@@ -209,8 +222,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                               child: Padding(
                                 padding: const EdgeInsets.only(top: 16),
                                 child: _InboxPulseCard(
-                                  unreadCount:      totalUnread,
-                                  visibleCount:     visible.length,
+                                  unreadCount: totalUnread,
+                                  visibleCount: visible.length,
                                   selectedCategory: _category,
                                 ),
                               ),
@@ -232,15 +245,20 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                               sliver: SliverToBoxAdapter(
                                 child: Center(
                                   child: ConstrainedBox(
-                                    constraints: BoxConstraints(maxWidth: maxContentWidth),
+                                    constraints: BoxConstraints(
+                                        maxWidth: maxContentWidth),
                                     child: Column(
-                                      children: List<Widget>.generate(visible.length, (i) {
+                                      children: List<Widget>.generate(
+                                          visible.length, (i) {
                                         return Padding(
                                           padding: EdgeInsets.only(
-                                              bottom: i == visible.length - 1 ? 0 : 12),
+                                              bottom: i == visible.length - 1
+                                                  ? 0
+                                                  : 12),
                                           child: _NotificationTile(
                                             notif: visible[i],
-                                            onTap: () => _markOne(visible[i].id),
+                                            onTap: () =>
+                                                _markOne(visible[i].id),
                                           ),
                                         );
                                       }),
@@ -255,7 +273,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   },
                 ),
                 _PinnedNotificationActions(
-                  onBack:    () => Navigator.of(context).pop(),
+                  onBack: () => Navigator.of(context).pop(),
                   onMarkAll: totalUnread > 0 ? _markAll : null,
                 ),
               ],
@@ -266,8 +284,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 }
-
-
 
 class _PinnedNotificationActions extends StatelessWidget {
   const _PinnedNotificationActions({

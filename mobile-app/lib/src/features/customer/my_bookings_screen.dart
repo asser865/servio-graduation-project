@@ -61,9 +61,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
 
   Future<void> _refreshNotifications() async {
     try {
-      await context
-          .read<NotificationsProvider>()
-          .refresh();
+      await context.read<NotificationsProvider>().refresh();
     } catch (_) {
       // Non-critical — booking refresh still succeeds.
     }
@@ -84,51 +82,51 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
         color: context.servio.accent,
         onRefresh: _pullRefresh,
         child: Padding(
-        padding: const EdgeInsets.all(ServioSpacing.screenPadding),
-        child: Column(
-          children: <Widget>[
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: servio.backgroundSoft,
-                borderRadius: BorderRadius.circular(ServioRadius.full),
-              ),
-              child: Row(
-                children: List<Widget>.generate(tabs.length, (int index) {
-                  final active = index == _tabIndex;
+          padding: const EdgeInsets.all(ServioSpacing.screenPadding),
+          child: Column(
+            children: <Widget>[
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: servio.backgroundSoft,
+                  borderRadius: BorderRadius.circular(ServioRadius.full),
+                ),
+                child: Row(
+                  children: List<Widget>.generate(tabs.length, (int index) {
+                    final active = index == _tabIndex;
 
-                  return Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _tabIndex = index),
-                      child: AnimatedContainer(
-                        duration: ServioMotion.micro,
-                        curve: ServioMotion.curve,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        decoration: BoxDecoration(
-                          color: active
-                              ? Theme.of(context).colorScheme.surface
-                              : Colors.transparent,
-                          borderRadius:
-                              BorderRadius.circular(ServioRadius.full),
-                        ),
-                        child: Text(
-                          tabs[index],
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            color:
-                                active ? servio.accent : servio.textSecondary,
+                    return Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _tabIndex = index),
+                        child: AnimatedContainer(
+                          duration: ServioMotion.micro,
+                          curve: ServioMotion.curve,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: active
+                                ? Theme.of(context).colorScheme.surface
+                                : Colors.transparent,
+                            borderRadius:
+                                BorderRadius.circular(ServioRadius.full),
+                          ),
+                          child: Text(
+                            tabs[index],
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              color:
+                                  active ? servio.accent : servio.textSecondary,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  );
-                }),
+                    );
+                  }),
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-            Expanded(child: _buildTabContent()),
-          ],
-        ),
+              const SizedBox(height: 20),
+              Expanded(child: _buildTabContent()),
+            ],
+          ),
         ),
       ),
     );
@@ -610,19 +608,27 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
         label: 'Technician Confirmed',
         complete: level >= 1,
         active: level == 0,
-        meta: level == 0 ? 'Waiting for technician to confirm' : 'Technician has accepted the booking',
+        meta: level == 0
+            ? 'Waiting for technician to confirm'
+            : 'Technician has accepted the booking',
       ),
       _TimelineRow(
         label: isCash ? 'Payment Method (Cash)' : 'Payment Authorized',
         complete: isCash ? level >= 4 : level >= 0,
         active: isCash ? level < 4 : false,
-        meta: isCash ? 'Cash payment due upon completion' : 'Card payment confirmed via Escrow',
+        meta: isCash
+            ? 'Cash payment due upon completion'
+            : 'Card payment confirmed via Escrow',
       ),
       _TimelineRow(
         label: 'In Progress',
         complete: level >= 4,
         active: level == 3 || level == 2,
-        meta: level < 2 ? 'Upcoming' : (level < 4 ? 'Technician is working on your service' : 'Finished'),
+        meta: level < 2
+            ? 'Upcoming'
+            : (level < 4
+                ? 'Technician is working on your service'
+                : 'Finished'),
       ),
       _TimelineRow(
         label: 'Completed',
@@ -807,4 +813,3 @@ String _initials(String name) {
       .join()
       .toUpperCase();
 }
-

@@ -43,7 +43,7 @@ class _ChatScreenState extends State<ChatScreen> {
   List<ApiMessage> _messages = <ApiMessage>[];
   bool _loading = true;
   bool _sending = false;
-  bool _polling = false;   // true during a background poll tick
+  bool _polling = false; // true during a background poll tick
   String? _error;
 
   Timer? _pollTimer;

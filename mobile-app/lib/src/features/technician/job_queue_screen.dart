@@ -411,94 +411,94 @@ class _JobCard extends StatelessWidget {
             Row(
               children: <Widget>[
                 Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  gradient: ServioGradients.warm,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: servio.accent, width: 2),
-                ),
-                child: Center(
-                  child: Text(
-                    job.serviceName.isNotEmpty
-                        ? job.serviceName[0].toUpperCase()
-                        : '?',
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    gradient: ServioGradients.warm,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: servio.accent, width: 2),
                   ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(job.serviceName,
-                        style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 2),
-                    if (job.customerName.isNotEmpty)
-                      Text(
-                        job.customerName,
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodySmall
-                            ?.copyWith(color: servio.textSecondary),
-                      ),
-                  ],
-                ),
-              ),
-              ServioStatusChip(
-                label: _chipLabel(job.status),
-                type: _chipType(job.status),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            '${job.addressCity} • EGP ${job.totalAmount.toStringAsFixed(0)}',
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.copyWith(color: servio.textSecondary),
-          ),
-          const SizedBox(height: 14),
-          if (onAccept != null || onDecline != null)
-            Row(
-              children: <Widget>[
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: onAccept,
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: servio.success),
-                      foregroundColor: servio.success,
+                  child: Center(
+                    child: Text(
+                      job.serviceName.isNotEmpty
+                          ? job.serviceName[0].toUpperCase()
+                          : '?',
                     ),
-                    child: const Text('Accept'),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: OutlinedButton(
-                    onPressed: onDecline,
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: servio.danger),
-                      foregroundColor: servio.danger,
-                    ),
-                    child: const Text('Decline'),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(job.serviceName,
+                          style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: 2),
+                      if (job.customerName.isNotEmpty)
+                        Text(
+                          job.customerName,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: servio.textSecondary),
+                        ),
+                    ],
                   ),
                 ),
+                ServioStatusChip(
+                  label: _chipLabel(job.status),
+                  type: _chipType(job.status),
+                ),
               ],
-            )
-          else
-            Align(
-              alignment: Alignment.centerRight,
-              child: OutlinedButton(
-                onPressed: onOpen,
-                child: const Text('View Details'),
-              ),
             ),
-        ],
+            const SizedBox(height: 12),
+            Text(
+              '${job.addressCity} • EGP ${job.totalAmount.toStringAsFixed(0)}',
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: servio.textSecondary),
+            ),
+            const SizedBox(height: 14),
+            if (onAccept != null || onDecline != null)
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: onAccept,
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: servio.success),
+                        foregroundColor: servio.success,
+                      ),
+                      child: const Text('Accept'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: onDecline,
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: servio.danger),
+                        foregroundColor: servio.danger,
+                      ),
+                      child: const Text('Decline'),
+                    ),
+                  ),
+                ],
+              )
+            else
+              Align(
+                alignment: Alignment.centerRight,
+                child: OutlinedButton(
+                  onPressed: onOpen,
+                  child: const Text('View Details'),
+                ),
+              ),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 }
 
 bool _isAssignedToWorker(BackendBooking job, String workerId) {

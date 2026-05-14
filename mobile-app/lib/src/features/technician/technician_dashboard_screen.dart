@@ -31,7 +31,8 @@ class TechnicianDashboardScreen extends StatefulWidget {
   const TechnicianDashboardScreen({super.key});
 
   @override
-  State<TechnicianDashboardScreen> createState() => _TechnicianDashboardScreenState();
+  State<TechnicianDashboardScreen> createState() =>
+      _TechnicianDashboardScreenState();
 }
 
 class _TechnicianDashboardScreenState extends State<TechnicianDashboardScreen> {
@@ -78,9 +79,10 @@ class _TechnicianDashboardScreenState extends State<TechnicianDashboardScreen> {
     }
 
     try {
-      final bookingsFuture = BookingsApi(client).getWorkerBookings(workerId: workerId);
+      final bookingsFuture =
+          BookingsApi(client).getWorkerBookings(workerId: workerId);
       final earningsFuture = PaymentsApi(client).getEarnings();
-      
+
       final results = await Future.wait([bookingsFuture, earningsFuture]);
       final jobs = (results[0] as List<BackendBooking>)
           .where((job) => job.workerId.trim() == workerId)
@@ -96,9 +98,9 @@ class _TechnicianDashboardScreenState extends State<TechnicianDashboardScreen> {
       // Refresh notification feed in background after jobs load.
       unawaited(
         context.read<NotificationsProvider>().refresh(
-          role: UserRole.technician,
-          workerId: workerId,
-        ),
+              role: UserRole.technician,
+              workerId: workerId,
+            ),
       );
     } catch (e) {
       if (!mounted) return;
@@ -134,8 +136,19 @@ class _TechnicianDashboardScreenState extends State<TechnicianDashboardScreen> {
     }
 
     final pendingJobs = _jobs.where((j) => j.status == 'pending').toList();
-    final upcomingJobs = _jobs.where((j) => ['accepted', 'confirmed', 'scheduled', 'in_progress', 'en_route'].contains(j.status)).toList();
-    final recentJobs = _jobs.where((j) => ['completed', 'done', 'cancelled', 'rejected'].contains(j.status)).toList();
+    final upcomingJobs = _jobs
+        .where((j) => [
+              'accepted',
+              'confirmed',
+              'scheduled',
+              'in_progress',
+              'en_route'
+            ].contains(j.status))
+        .toList();
+    final recentJobs = _jobs
+        .where((j) =>
+            ['completed', 'done', 'cancelled', 'rejected'].contains(j.status))
+        .toList();
 
     // Sort appropriately
     upcomingJobs.sort((a, b) => a.scheduledDate.compareTo(b.scheduledDate));
@@ -171,7 +184,11 @@ class _TechnicianDashboardScreenState extends State<TechnicianDashboardScreen> {
                   avgRating: account?.averageRating ?? 0.0,
                   reviewCount: account?.reviewCount ?? 0,
                   pendingJobs: pendingJobs.length,
-                  completedJobs: _earnings?.completedJobs ?? recentJobs.where((j) => j.status == 'completed' || j.status == 'done').length,
+                  completedJobs: _earnings?.completedJobs ??
+                      recentJobs
+                          .where((j) =>
+                              j.status == 'completed' || j.status == 'done')
+                          .length,
                   pendingPayout: _earnings?.pendingPayout ?? 0,
                 ),
                 const SizedBox(height: 24),
@@ -190,9 +207,9 @@ class _TechnicianDashboardScreenState extends State<TechnicianDashboardScreen> {
                   ),
                   const SizedBox(height: 12),
                   ...pendingJobs.take(3).map((job) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _IncomingRequestCard(job: job),
-                  )),
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _IncomingRequestCard(job: job),
+                      )),
                   const SizedBox(height: 12),
                 ],
 
@@ -201,9 +218,9 @@ class _TechnicianDashboardScreenState extends State<TechnicianDashboardScreen> {
                   const ServioSectionHeading(title: 'Upcoming Schedule'),
                   const SizedBox(height: 12),
                   ...upcomingJobs.take(3).map((job) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _ScheduleItem(job: job),
-                  )),
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _ScheduleItem(job: job),
+                      )),
                   const SizedBox(height: 14),
                 ],
 
@@ -221,9 +238,9 @@ class _TechnicianDashboardScreenState extends State<TechnicianDashboardScreen> {
                   ),
                   const SizedBox(height: 12),
                   ...recentJobs.take(4).map((job) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _ActivityCard(job: job),
-                  )),
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _ActivityCard(job: job),
+                      )),
                 ],
                 const SizedBox(height: 16),
               ],
@@ -329,7 +346,8 @@ class _WelcomeBanner extends StatelessWidget {
                         children: <Widget>[
                           Icon(
                             Icons.notifications_none_rounded,
-                            color: isDark ? ServioColors.navyDark : Colors.white,
+                            color:
+                                isDark ? ServioColors.navyDark : Colors.white,
                           ),
                           if (count > 0)
                             Positioned(
@@ -338,7 +356,8 @@ class _WelcomeBanner extends StatelessWidget {
                               child: Container(
                                 constraints: const BoxConstraints(minWidth: 16),
                                 height: 16,
-                                padding: const EdgeInsets.symmetric(horizontal: 3),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 3),
                                 decoration: const BoxDecoration(
                                   color: ServioColors.danger,
                                   shape: BoxShape.circle,
@@ -521,7 +540,8 @@ class _StatCardGrid extends StatelessWidget {
               change: pendingJobs > 0 ? 'Action needed' : 'All caught up',
               icon: Icons.pending_actions_rounded,
               iconColor: ServioColors.info,
-              changeColor: pendingJobs > 0 ? ServioColors.info : ServioColors.success,
+              changeColor:
+                  pendingJobs > 0 ? ServioColors.info : ServioColors.success,
             )),
           ],
         ),
@@ -647,56 +667,57 @@ class _IncomingRequestCard extends StatelessWidget {
           children: <Widget>[
             // Icon
             Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: ServioColors.tint(servio.accent),
-              borderRadius: BorderRadius.circular(ServioRadius.sm),
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: ServioColors.tint(servio.accent),
+                borderRadius: BorderRadius.circular(ServioRadius.sm),
+              ),
+              child: Icon(Icons.build_outlined, size: 20, color: servio.accent),
             ),
-            child: Icon(Icons.build_outlined, size: 20, color: servio.accent),
-          ),
-          const SizedBox(width: 12),
-          // Body
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(job.serviceName, style: theme.textTheme.titleMedium),
-                const SizedBox(height: 4),
-                Wrap(
-                  spacing: 4,
-                  children: <Widget>[
-                    if (job.customerName.isNotEmpty) ...[
-                      Text(job.customerName,
+            const SizedBox(width: 12),
+            // Body
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(job.serviceName, style: theme.textTheme.titleMedium),
+                  const SizedBox(height: 4),
+                  Wrap(
+                    spacing: 4,
+                    children: <Widget>[
+                      if (job.customerName.isNotEmpty) ...[
+                        Text(job.customerName,
+                            style: theme.textTheme.bodySmall
+                                ?.copyWith(color: servio.textSecondary)),
+                        Text('·',
+                            style: theme.textTheme.bodySmall
+                                ?.copyWith(color: servio.textSecondary)),
+                      ],
+                      Text(job.addressCity,
                           style: theme.textTheme.bodySmall
                               ?.copyWith(color: servio.textSecondary)),
                       Text('·',
                           style: theme.textTheme.bodySmall
                               ?.copyWith(color: servio.textSecondary)),
+                      Text('EGP ${job.totalAmount.toStringAsFixed(0)}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: servio.accent,
+                            fontWeight: FontWeight.w600,
+                          )),
                     ],
-                    Text(job.addressCity,
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(color: servio.textSecondary)),
-                    Text('·',
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(color: servio.textSecondary)),
-                    Text('EGP ${job.totalAmount.toStringAsFixed(0)}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: servio.accent,
-                          fontWeight: FontWeight.w600,
-                        )),
-                  ],
-                ),
-              ],
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
-          const ServioStatusChip(label: 'New', type: ServioStatusChipType.warning),
-        ],
+            const SizedBox(width: 8),
+            const ServioStatusChip(
+                label: 'New', type: ServioStatusChipType.warning),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -712,7 +733,7 @@ class _ScheduleItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
-    
+
     final day = DateFormat('dd').format(job.scheduledDate);
     final month = DateFormat('MMM').format(job.scheduledDate).toUpperCase();
 
@@ -730,69 +751,69 @@ class _ScheduleItem extends StatelessWidget {
         child: Row(
           children: <Widget>[
             // Date block
-          Container(
-            width: 48,
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            decoration: BoxDecoration(
-              color: ServioColors.tint(servio.accent),
-              borderRadius: BorderRadius.circular(ServioRadius.sm),
-            ),
-            child: Column(
-              children: <Widget>[
-                Text(
-                  day,
-                  style: theme.textTheme.headlineMedium?.copyWith(
-                    color: servio.accent,
-                    height: 1,
+            Container(
+              width: 48,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              decoration: BoxDecoration(
+                color: ServioColors.tint(servio.accent),
+                borderRadius: BorderRadius.circular(ServioRadius.sm),
+              ),
+              child: Column(
+                children: <Widget>[
+                  Text(
+                    day,
+                    style: theme.textTheme.headlineMedium?.copyWith(
+                      color: servio.accent,
+                      height: 1,
+                    ),
                   ),
-                ),
-                Text(
-                  month,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: servio.accent,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.5,
+                  Text(
+                    month,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: servio.accent,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 14),
-          // Content
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(job.serviceName, style: theme.textTheme.titleMedium),
-                const SizedBox(height: 4),
-                Row(
-                  children: <Widget>[
-                    Text(
-                      job.scheduledTime,
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: servio.textSecondary),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 6),
-                      child: Text('·',
-                          style: theme.textTheme.bodySmall
-                              ?.copyWith(color: servio.textSecondary)),
-                    ),
-                    Text(
-                      job.addressCity,
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: servio.textSecondary),
-                    ),
-                  ],
-                ),
-              ],
+            const SizedBox(width: 14),
+            // Content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(job.serviceName, style: theme.textTheme.titleMedium),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: <Widget>[
+                      Text(
+                        job.scheduledTime,
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(color: servio.textSecondary),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        child: Text('·',
+                            style: theme.textTheme.bodySmall
+                                ?.copyWith(color: servio.textSecondary)),
+                      ),
+                      Text(
+                        job.addressCity,
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(color: servio.textSecondary),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -848,39 +869,40 @@ class _ActivityCard extends StatelessWidget {
         child: Row(
           children: <Widget>[
             Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(job.serviceName, style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 4),
-                if (job.customerName.isNotEmpty) ...[
-                  Text(
-                    job.customerName,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(color: servio.textSecondary),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(job.serviceName,
+                      style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 4),
+                  if (job.customerName.isNotEmpty) ...[
+                    Text(
+                      job.customerName,
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(color: servio.textSecondary),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  ServioStatusChip(
+                    label: _chipLabel(job.status),
+                    type: _chipType(job.status),
                   ),
-                  const SizedBox(height: 8),
                 ],
-                ServioStatusChip(
-                  label: _chipLabel(job.status),
-                  type: _chipType(job.status),
-                ),
-              ],
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            '${job.totalAmount.toStringAsFixed(0)} EGP',
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(color: servio.accent),
-          ),
-        ],
+            const SizedBox(width: 12),
+            Text(
+              '${job.totalAmount.toStringAsFixed(0)} EGP',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(color: servio.accent),
+            ),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 }

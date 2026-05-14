@@ -28,6 +28,7 @@ class _AvailabilityManagerScreenState extends State<AvailabilityManagerScreen> {
   bool _loadingProfile = false;
   bool _savingSchedule = false;
   bool _savingAvailableNow = false;
+  _AvailabilityPreset? _selectedPreset;
   String? _error;
 
   @override
@@ -38,6 +39,7 @@ class _AvailabilityManagerScreenState extends State<AvailabilityManagerScreen> {
       text: account?.locationLabel ?? '',
     );
     _days = _initialDays(account?.availability ?? const <AvailabilitySlot>[]);
+    _selectedPreset = _matchingPreset(_days);
     _availableNow = account?.isAvailable ?? false;
     unawaited(_loadCurrentWorkerProfile());
   }
@@ -81,6 +83,7 @@ class _AvailabilityManagerScreenState extends State<AvailabilityManagerScreen> {
         ..start = freshDays[i].start
         ..end = freshDays[i].end;
     }
+    _selectedPreset = _matchingPreset(_days);
   }
 
   Future<void> _loadCurrentWorkerProfile() async {
@@ -145,6 +148,7 @@ class _AvailabilityManagerScreenState extends State<AvailabilityManagerScreen> {
   void _setDayEnabled(_AvailabilityDay day, bool value) {
     setState(() {
       day.enabled = value;
+      _selectedPreset = _matchingPreset(_days);
       _error = null;
     });
   }
@@ -168,6 +172,7 @@ class _AvailabilityManagerScreenState extends State<AvailabilityManagerScreen> {
       } else {
         day.end = picked;
       }
+      _selectedPreset = _matchingPreset(_days);
       _error = null;
     });
   }
@@ -196,8 +201,40 @@ class _AvailabilityManagerScreenState extends State<AvailabilityManagerScreen> {
             break;
         }
       }
+      _selectedPreset = preset;
       _error = null;
     });
+  }
+
+  _AvailabilityPreset? _matchingPreset(List<_AvailabilityDay> days) {
+    if (days.every((day) => !day.enabled)) {
+      return _AvailabilityPreset.clear;
+    }
+
+    final everyDay = days.every((day) {
+      return day.enabled &&
+          day.start == const TimeOfDay(hour: 9, minute: 0) &&
+          day.end == const TimeOfDay(hour: 17, minute: 0);
+    });
+    if (everyDay) return _AvailabilityPreset.everyDay;
+
+    final weekdays = days.every((day) {
+      if (day.enabled != day.definition.isWeekday) return false;
+      if (!day.enabled) return true;
+      return day.start == const TimeOfDay(hour: 9, minute: 0) &&
+          day.end == const TimeOfDay(hour: 17, minute: 0);
+    });
+    if (weekdays) return _AvailabilityPreset.weekdays;
+
+    final weekends = days.every((day) {
+      if (day.enabled != day.definition.isWeekend) return false;
+      if (!day.enabled) return true;
+      return day.start == const TimeOfDay(hour: 10, minute: 0) &&
+          day.end == const TimeOfDay(hour: 15, minute: 0);
+    });
+    if (weekends) return _AvailabilityPreset.weekends;
+
+    return null;
   }
 
   String? _validateSchedule(String locale) {
@@ -312,7 +349,7 @@ class _AvailabilityManagerScreenState extends State<AvailabilityManagerScreen> {
                     ServioSpacing.screenPadding,
                     MediaQuery.paddingOf(context).top + 12,
                     ServioSpacing.screenPadding,
-                    104 + bottomInset,
+                    112 + bottomInset,
                   ),
                   child: Center(
                     child: ConstrainedBox(
@@ -362,6 +399,7 @@ class _AvailabilityManagerScreenState extends State<AvailabilityManagerScreen> {
                             locale: locale,
                             days: _days,
                             busy: _isBusy,
+                            selectedPreset: _selectedPreset,
                             onPresetSelected: _applyPreset,
                             onDayChanged: _setDayEnabled,
                             onStartTap: (day) => _pickTime(day, isStart: true),
@@ -393,37 +431,37 @@ class _AvailabilityManagerScreenState extends State<AvailabilityManagerScreen> {
               },
             ),
             Positioned(
+              top: MediaQuery.paddingOf(context).top + 12,
+              left: ServioSpacing.screenPadding,
+              child: _FloatingBackButton(
+                onPressed: () => Navigator.of(context).maybePop(),
+              ),
+            ),
+            Positioned(
               left: 0,
               right: 0,
               bottom: 0,
               child: SafeArea(
                 top: false,
-                child: Container(
+                child: Padding(
                   padding: EdgeInsets.fromLTRB(
                     ServioSpacing.screenPadding,
-                    12,
+                    10,
                     ServioSpacing.screenPadding,
                     12 + bottomInset,
                   ),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    border: Border(
-                      top: BorderSide(
-                        color: servio.border.withValues(alpha: 0.72),
-                      ),
-                    ),
-                    boxShadow: theme.brightness == Brightness.dark
-                        ? ServioShadows.elevatedDark
-                        : ServioShadows.elevated,
-                  ),
                   child: Center(
                     child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 720),
+                      constraints: const BoxConstraints(maxWidth: 520),
                       child: SizedBox(
                         width: double.infinity,
                         child: ServioPrimaryButton(
                           label: _savingSchedule
-                              ? _copy(locale, en: 'Saving...', ar: 'Saving...')
+                              ? _copy(
+                                  locale,
+                                  en: 'Saving...',
+                                  ar: 'Saving...',
+                                )
                               : _copy(
                                   locale,
                                   en: 'Save Availability',
@@ -439,6 +477,76 @@ class _AvailabilityManagerScreenState extends State<AvailabilityManagerScreen> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FloatingBackButton extends StatefulWidget {
+  const _FloatingBackButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  State<_FloatingBackButton> createState() => _FloatingBackButtonState();
+}
+
+class _FloatingBackButtonState extends State<_FloatingBackButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: ServioMotion.fast,
+      reverseDuration: ServioMotion.normal,
+    );
+    _scale = Tween<double>(begin: 1.0, end: 0.94).animate(
+      CurvedAnimation(parent: _controller, curve: ServioMotion.spring),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onTapDown(TapDownDetails _) => _controller.forward();
+  void _onTapUp(TapUpDetails _) => _controller.reverse();
+  void _onTapCancel() => _controller.reverse();
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'Back',
+      child: GestureDetector(
+        onTapDown: _onTapDown,
+        onTapUp: _onTapUp,
+        onTapCancel: _onTapCancel,
+        onTap: widget.onPressed,
+        child: ScaleTransition(
+          scale: _scale,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: ServioGradients.brand,
+              shape: BoxShape.circle,
+              boxShadow: ServioShadows.rest,
+            ),
+            child: const SizedBox(
+              width: 46,
+              height: 46,
+              child: Icon(
+                Icons.arrow_back_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -655,6 +763,7 @@ class _WeeklySchedulePanel extends StatelessWidget {
     required this.locale,
     required this.days,
     required this.busy,
+    required this.selectedPreset,
     required this.onPresetSelected,
     required this.onDayChanged,
     required this.onStartTap,
@@ -664,6 +773,7 @@ class _WeeklySchedulePanel extends StatelessWidget {
   final String locale;
   final List<_AvailabilityDay> days;
   final bool busy;
+  final _AvailabilityPreset? selectedPreset;
   final ValueChanged<_AvailabilityPreset> onPresetSelected;
   final void Function(_AvailabilityDay day, bool value) onDayChanged;
   final ValueChanged<_AvailabilityDay> onStartTap;
@@ -730,6 +840,7 @@ class _WeeklySchedulePanel extends StatelessWidget {
           _PresetRail(
             locale: locale,
             busy: busy,
+            selectedPreset: selectedPreset,
             onSelected: onPresetSelected,
           ),
           const SizedBox(height: 14),
@@ -756,11 +867,13 @@ class _PresetRail extends StatelessWidget {
   const _PresetRail({
     required this.locale,
     required this.busy,
+    required this.selectedPreset,
     required this.onSelected,
   });
 
   final String locale;
   final bool busy;
+  final _AvailabilityPreset? selectedPreset;
   final ValueChanged<_AvailabilityPreset> onSelected;
 
   @override
@@ -768,45 +881,63 @@ class _PresetRail extends StatelessWidget {
     final presets = <_PresetButtonData>[
       _PresetButtonData(
         preset: _AvailabilityPreset.weekdays,
-        icon: Icons.work_outline_rounded,
         label: _copy(locale, en: 'Weekdays', ar: 'Weekdays'),
-        detail: '09:00-17:00',
       ),
       _PresetButtonData(
         preset: _AvailabilityPreset.weekends,
-        icon: Icons.weekend_outlined,
         label: _copy(locale, en: 'Weekends', ar: 'Weekends'),
-        detail: '10:00-15:00',
       ),
       _PresetButtonData(
         preset: _AvailabilityPreset.everyDay,
-        icon: Icons.event_available_outlined,
         label: _copy(locale, en: 'Every day', ar: 'Every day'),
-        detail: '09:00-17:00',
       ),
       _PresetButtonData(
         preset: _AvailabilityPreset.clear,
-        icon: Icons.clear_all_rounded,
         label: _copy(locale, en: 'Clear', ar: 'Clear'),
-        detail: _copy(locale, en: 'Schedule', ar: 'Schedule'),
       ),
     ];
 
-    return SizedBox(
-      height: 74,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: presets.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final preset = presets[index];
-          return _PresetButton(
-            data: preset,
-            enabled: !busy,
-            onTap: () => onSelected(preset.preset),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const gap = 6.0;
+        final useTwoRows = constraints.maxWidth < 320;
+
+        if (useTwoRows) {
+          final chipWidth = (constraints.maxWidth - gap) / 2;
+          return Wrap(
+            spacing: gap,
+            runSpacing: gap,
+            children: presets.map((preset) {
+              return SizedBox(
+                width: chipWidth,
+                child: _PresetButton(
+                  data: preset,
+                  enabled: !busy,
+                  selected: selectedPreset == preset.preset,
+                  onTap: () => onSelected(preset.preset),
+                ),
+              );
+            }).toList(),
           );
-        },
-      ),
+        }
+
+        return Row(
+          children: presets.map((preset) {
+            final isLast = identical(preset, presets.last);
+            return Expanded(
+              child: Padding(
+                padding: EdgeInsetsDirectional.only(end: isLast ? 0 : gap),
+                child: _PresetButton(
+                  data: preset,
+                  enabled: !busy,
+                  selected: selectedPreset == preset.preset,
+                  onTap: () => onSelected(preset.preset),
+                ),
+              ),
+            );
+          }).toList(),
+        );
+      },
     );
   }
 }
@@ -815,11 +946,13 @@ class _PresetButton extends StatelessWidget {
   const _PresetButton({
     required this.data,
     required this.enabled,
+    required this.selected,
     required this.onTap,
   });
 
   final _PresetButtonData data;
   final bool enabled;
+  final bool selected;
   final VoidCallback onTap;
 
   @override
@@ -828,49 +961,56 @@ class _PresetButton extends StatelessWidget {
     final servio = context.servio;
     final radius = BorderRadius.circular(ServioRadius.md);
 
+    final foreground = selected
+        ? servio.accent
+        : enabled
+            ? theme.colorScheme.onSurface
+            : servio.textSecondary;
+
     return Material(
-      color: enabled ? servio.surfaceAlt : servio.backgroundSoft,
+      color: Colors.transparent,
       borderRadius: radius,
       child: InkWell(
         borderRadius: radius,
         onTap: enabled ? onTap : null,
-        child: Container(
-          width: 138,
-          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+        child: AnimatedContainer(
+          duration: _motion(context, ServioMotion.normal),
+          curve: ServioMotion.spring,
+          constraints: const BoxConstraints(minHeight: 36),
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           decoration: BoxDecoration(
+            color: selected
+                ? ServioColors.tint(servio.accent)
+                : enabled
+                    ? servio.surfaceAlt
+                    : servio.backgroundSoft,
             borderRadius: radius,
-            border: Border.all(color: servio.border.withValues(alpha: 0.72)),
+            border: Border.all(
+              color: selected
+                  ? servio.accent.withValues(alpha: 0.7)
+                  : servio.border.withValues(alpha: 0.72),
+            ),
+            boxShadow: selected
+                ? <BoxShadow>[
+                    BoxShadow(
+                      color: servio.accent.withValues(alpha: 0.12),
+                      blurRadius: 12,
+                      offset: const Offset(0, 5),
+                    ),
+                  ]
+                : null,
           ),
-          child: Row(
-            children: <Widget>[
-              Icon(data.icon, size: 18, color: servio.accent),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      data.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      data.detail,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: servio.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              data.label,
+              maxLines: 1,
+              style: theme.textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: foreground,
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -1392,15 +1532,11 @@ class _DayDefinition {
 class _PresetButtonData {
   const _PresetButtonData({
     required this.preset,
-    required this.icon,
     required this.label,
-    required this.detail,
   });
 
   final _AvailabilityPreset preset;
-  final IconData icon;
   final String label;
-  final String detail;
 }
 
 enum _AvailabilityPreset { weekdays, weekends, everyDay, clear }
