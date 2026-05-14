@@ -63,8 +63,9 @@ class _EarningsScreenState extends State<EarningsScreen> {
           .toList();
       _recentJobs.sort((a, b) => b.scheduledDate.compareTo(a.scheduledDate));
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(() => _fetchError = 'Could not load earnings data.');
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
