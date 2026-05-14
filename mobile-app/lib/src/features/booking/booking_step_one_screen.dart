@@ -133,7 +133,7 @@ class _BookingStepOneScreenState extends State<BookingStepOneScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            '4.9 rating - ${widget.data.hourlyRate}',
+                            widget.data.hourlyRate,
                             style: theme.textTheme.bodySmall
                                 ?.copyWith(color: servio.textSecondary),
                           ),

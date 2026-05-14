@@ -322,7 +322,7 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
                                       : null,
                                   onDecline: _tabIndex == 0
                                       ? () =>
-                                          _updateJobStatus(job.id, 'cancelled')
+                                          _updateJobStatus(job.id, 'rejected')
                                       : null,
                                 );
                               },

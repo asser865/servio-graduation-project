@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/bookings_api.dart';
 import '../../core/models/booking_model.dart';
+import '../../core/state/notifications_provider.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
@@ -50,6 +51,24 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     }
   }
 
+  Future<void> _pullRefresh() async {
+    setState(() => _loading = true);
+    await Future.wait(<Future<void>>[
+      _fetchBookings(),
+      _refreshNotifications(),
+    ]);
+  }
+
+  Future<void> _refreshNotifications() async {
+    try {
+      await context
+          .read<NotificationsProvider>()
+          .refresh();
+    } catch (_) {
+      // Non-critical — booking refresh still succeeds.
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final servio = context.servio;
@@ -61,7 +80,10 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
         title: const Text('My Bookings'),
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       ),
-      body: Padding(
+      body: RefreshIndicator(
+        color: context.servio.accent,
+        onRefresh: _pullRefresh,
+        child: Padding(
         padding: const EdgeInsets.all(ServioSpacing.screenPadding),
         child: Column(
           children: <Widget>[
@@ -107,6 +129,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
             Expanded(child: _buildTabContent()),
           ],
         ),
+        ),
       ),
     );
   }
@@ -141,9 +164,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
           },
         );
       case 1:
-        final history = _bookings;
+        final history = _bookings.where((b) => b.status.isPast).toList();
         if (history.isEmpty) {
-          return const _EmptyState(message: 'No bookings yet.');
+          return const _EmptyState(message: 'No completed bookings yet.');
         }
         return ListView.separated(
           itemCount: history.length,
@@ -165,34 +188,44 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
           },
         );
       default:
-        return ListView(
-          children: const <Widget>[
-            _FavouriteTechnicianCard(
-                name: 'Khaled Mohamed', specialty: 'Plumbing'),
-            SizedBox(height: 16),
-            _FavouriteTechnicianCard(
-                name: 'Mahmoud Ibrahim', specialty: 'Electrical'),
-          ],
+        return _EmptyState(
+          icon: Icons.favorite_border_rounded,
+          message: 'Your favourite technicians will appear here\n'
+              'after you complete a booking and write a review.',
         );
     }
   }
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.message});
+  const _EmptyState({required this.message, this.icon});
 
   final String message;
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
     final servio = context.servio;
     return Center(
-      child: Text(
-        message,
-        style: Theme.of(context)
-            .textTheme
-            .bodyMedium
-            ?.copyWith(color: servio.textSecondary),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            if (icon != null) ...<Widget>[
+              Icon(icon, size: 40, color: servio.textSecondary),
+              const SizedBox(height: 12),
+            ],
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: servio.textSecondary, height: 1.5),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -232,6 +265,15 @@ class _LiveBookingCard extends StatelessWidget {
         BookingStatus.disputed => 'Disputed',
       };
 
+  Color _accentColor(ServioThemeExtension servio) => switch (booking.status) {
+        BookingStatus.cancelled ||
+        BookingStatus.rejected ||
+        BookingStatus.disputed =>
+          servio.danger,
+        BookingStatus.completed => servio.success,
+        _ => servio.info,
+      };
+
   @override
   Widget build(BuildContext context) {
     final servio = context.servio;
@@ -244,9 +286,9 @@ class _LiveBookingCard extends StatelessWidget {
         children: <Widget>[
           Container(
             width: 4,
-            height: 120,
+            height: 110,
             decoration: BoxDecoration(
-              color: isActive ? servio.info : servio.success,
+              color: _accentColor(servio),
               borderRadius: BorderRadius.circular(ServioRadius.full),
             ),
           ),
@@ -271,22 +313,12 @@ class _LiveBookingCard extends StatelessWidget {
                 isActive
                     ? ServioPrimaryButton(
                         label: 'View Details', onPressed: onViewDetails)
-                    : Row(
-                        children: <Widget>[
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () {},
-                              child: const Text('Re-book'),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: onViewDetails,
-                              child: const Text('View Details'),
-                            ),
-                          ),
-                        ],
+                    : SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton(
+                          onPressed: onViewDetails,
+                          child: const Text('View Details'),
+                        ),
                       ),
               ],
             ),
@@ -297,7 +329,7 @@ class _LiveBookingCard extends StatelessWidget {
   }
 }
 
-class BookingDetailsScreen extends StatelessWidget {
+class BookingDetailsScreen extends StatefulWidget {
   const BookingDetailsScreen({
     super.key,
     this.data = const BookingFlowData(),
@@ -306,7 +338,63 @@ class BookingDetailsScreen extends StatelessWidget {
   final BookingFlowData data;
 
   @override
+  State<BookingDetailsScreen> createState() => _BookingDetailsScreenState();
+}
+
+class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
+  bool _cancelling = false;
+
+  Future<void> _cancelBooking() async {
+    if (_cancelling) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cancel Booking'),
+        content: const Text(
+          'Are you sure you want to cancel this booking? This action cannot be undone.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Keep Booking'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              'Yes, Cancel',
+              style: TextStyle(color: context.servio.danger),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _cancelling = true);
+    final client = context.read<ApiClient>();
+    try {
+      await BookingsApi(client)
+          .updateStatus(widget.data.backendId, 'cancelled');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Booking cancelled successfully.')),
+      );
+      _leaveDetails(context);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not cancel booking. Please try again.'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _cancelling = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final data = widget.data;
     final theme = Theme.of(context);
     final servio = context.servio;
 
@@ -365,45 +453,30 @@ class BookingDetailsScreen extends StatelessWidget {
                         ),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: <Widget>[
-                              Text(data.technicianName,
-                                  style: theme.textTheme.titleMedium),
-                              const SizedBox(height: 4),
-                              Text(
-                                '4.9 rating',
-                                style: theme.textTheme.bodySmall
-                                    ?.copyWith(color: servio.textSecondary),
-                              ),
-                            ],
-                          ),
+                          child: Text(data.technicianName,
+                              style: theme.textTheme.titleMedium),
                         ),
                       ],
                     ),
                     const SizedBox(height: 12),
-                    Row(
-                      children: <Widget>[
-                        Expanded(
-                          child: TextButton(
-                            onPressed: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                  builder: (_) => ChatScreen(
-                                    contactName: data.technicianName,
-                                    bookingId: data.backendId,
-                                    workerId: data.technicianId,
-                                  ),
-                                ),
-                              );
-                            },
-                            child: const Text('Message'),
-                          ),
-                        ),
-                        Expanded(
-                            child: TextButton(
-                                onPressed: () {}, child: const Text('Call'))),
-                      ],
+                    SizedBox(
+                      width: double.infinity,
+                      child: TextButton.icon(
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => ChatScreen(
+                                contactName: data.technicianName,
+                                bookingId: data.backendId,
+                                workerId: data.technicianId,
+                              ),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.chat_bubble_outline_rounded,
+                            size: 16),
+                        label: const Text('Message Technician'),
+                      ),
                     ),
                   ],
                 ),
@@ -458,14 +531,16 @@ class BookingDetailsScreen extends StatelessWidget {
               const SizedBox(height: 10),
               // Cancel is only available for pending bookings.
               if (data.statusCode == 'pending')
-                OutlinedButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: servio.danger),
-                    foregroundColor: servio.danger,
-                  ),
-                  child: const Text('Cancel Booking'),
-                )
+                _cancelling
+                    ? const Center(child: CircularProgressIndicator())
+                    : OutlinedButton(
+                        onPressed: _cancelBooking,
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: servio.danger),
+                          foregroundColor: servio.danger,
+                        ),
+                        child: const Text('Cancel Booking'),
+                      )
               else
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
@@ -478,10 +553,12 @@ class BookingDetailsScreen extends StatelessWidget {
                         color: servio.textSecondary,
                       ),
                       const SizedBox(width: 6),
-                      Text(
-                        'Cancellation unavailable — booking is ${data.statusLabel.toLowerCase()}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: servio.textSecondary,
+                      Flexible(
+                        child: Text(
+                          'Cancellation unavailable — booking is ${data.statusLabel.toLowerCase()}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: servio.textSecondary,
+                          ),
                         ),
                       ),
                     ],
@@ -521,7 +598,6 @@ class BookingDetailsScreen extends StatelessWidget {
     }
 
     final isCash = data.paymentMethodCode != 'card';
-    final paymentMeta = isCash ? 'Cash payment upon completion' : 'Held in Escrow';
 
     return <Widget>[
       _TimelineRow(
@@ -732,53 +808,3 @@ String _initials(String name) {
       .toUpperCase();
 }
 
-class _FavouriteTechnicianCard extends StatelessWidget {
-  const _FavouriteTechnicianCard({
-    required this.name,
-    required this.specialty,
-  });
-
-  final String name;
-  final String specialty;
-
-  @override
-  Widget build(BuildContext context) {
-    final servio = context.servio;
-
-    return ServioCard(
-      radius: ServioRadius.lg,
-      child: Row(
-        children: <Widget>[
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              gradient: ServioGradients.warm,
-              shape: BoxShape.circle,
-              border: Border.all(color: servio.accent, width: 2),
-            ),
-            child: Center(child: Text(name[0])),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(name, style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 4),
-                Text(
-                  specialty,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: servio.textSecondary),
-                ),
-              ],
-            ),
-          ),
-          Icon(Icons.favorite_rounded, color: servio.accent),
-        ],
-      ),
-    );
-  }
-}

@@ -9,8 +9,12 @@ import '../models/backend_booking_model.dart';
 import '../models/user_account.dart';
 import '../services/storage_service.dart';
 
-// ── Storage key ───────────────────────────────────────────────────────────────
+// ── Storage keys ─────────────────────────────────────────────────────────────
 const String _kReadIdsKey = 'servio_notif_read_ids';
+
+/// Snapshot of `{bookingId: lastKnownStatus}` used for change-detection.
+/// Matches the website's `servio_booking_snapshot` localStorage pattern.
+const String _kSnapshotKey = 'servio_booking_snapshot';
 
 /// Derives a real notification feed from the user's booking history.
 ///
@@ -61,6 +65,16 @@ class NotificationsProvider extends ChangeNotifier {
   // ── Fetch ─────────────────────────────────────────────────────────────────────
 
   /// Fetches real bookings and rebuilds the notification feed.
+  ///
+  /// Uses a snapshot-diff strategy that matches the website behaviour:
+  /// 1. Load the previous snapshot `{bookingId: lastKnownStatus}`.
+  /// 2. Fetch current bookings from the API.
+  /// 3. A notification is **unread** only if its status differs from the
+  ///    snapshot (i.e. it represents a genuine status change).
+  /// 4. On first load (empty snapshot) all notifications are marked read so
+  ///    a fresh install doesn't flood the inbox with historical entries.
+  /// 5. Save the current states as the new snapshot.
+  ///
   /// Pass [role] to use the correct API endpoint.
   Future<void> refresh({UserRole role = UserRole.customer, String? workerId}) async {
     _loading = true;
@@ -78,10 +92,12 @@ class NotificationsProvider extends ChangeNotifier {
       }
 
       final readIds = _loadReadIds();
-      final feed = <AppNotification>[];
+      final snapshot = _loadSnapshot();
+      final isFirstLoad = snapshot.isEmpty;
 
+      final feed = <AppNotification>[];
       for (final booking in bookings) {
-        final entry = _toNotification(booking, readIds);
+        final entry = _toNotification(booking, readIds, snapshot, isFirstLoad);
         if (entry != null) feed.add(entry);
       }
 
@@ -89,9 +105,13 @@ class NotificationsProvider extends ChangeNotifier {
       // does not return a notification timestamp).
       feed.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
+      // Persist the new snapshot so the next refresh can detect changes.
+      _saveSnapshot({for (final b in bookings) b.id: b.status});
+
       _notifications = feed;
       _error = null;
-      _log('Loaded ${feed.length} notifications, ${_unreadIn(feed)} unread.');
+      _log('Loaded ${feed.length} notifications, ${_unreadIn(feed)} unread '
+          '(first-load: $isFirstLoad).');
     } catch (e) {
       _error = 'Could not load notifications. Pull down to retry.';
       _log('Error fetching notifications: $e');
@@ -145,14 +165,48 @@ class NotificationsProvider extends ChangeNotifier {
     _storage.setString(_kReadIdsKey, existing.join(','));
   }
 
+  // ── Snapshot helpers ──────────────────────────────────────────────────────────
+
+  Map<String, String> _loadSnapshot() {
+    final raw = _storage.getString(_kSnapshotKey);
+    if (raw == null || raw.isEmpty) return <String, String>{};
+    // Stored as CSV: "bookingId1:status1,bookingId2:status2,..."
+    final result = <String, String>{};
+    for (final pair in raw.split(',')) {
+      final sep = pair.indexOf(':');
+      if (sep > 0) result[pair.substring(0, sep)] = pair.substring(sep + 1);
+    }
+    return result;
+  }
+
+  void _saveSnapshot(Map<String, String> snapshot) {
+    final encoded =
+        snapshot.entries.map((e) => '${e.key}:${e.value}').join(',');
+    _storage.setString(_kSnapshotKey, encoded);
+  }
+
   // ── Conversion: BackendBooking → AppNotification ──────────────────────────────
 
-  AppNotification? _toNotification(BackendBooking booking, Set<String> readIds) {
+  AppNotification? _toNotification(
+    BackendBooking booking,
+    Set<String> readIds,
+    Map<String, String> snapshot,
+    bool isFirstLoad,
+  ) {
     final status = booking.status.trim().toLowerCase();
 
     // Stable ID: bookingId_status  (prevents duplicate on re-fetch)
     final id = '${booking.id}_$status';
-    final isRead = readIds.contains(id);
+
+    // A notification is read if:
+    //   • The user manually marked it read (readIds), OR
+    //   • This is the first load (empty snapshot) — avoids flooding inbox with
+    //     historical entries on fresh install, matching website behaviour, OR
+    //   • The status has not changed since the last snapshot — the user was
+    //     already aware of this state.
+    final statusUnchanged = snapshot[booking.id] == status;
+    final isRead = readIds.contains(id) || isFirstLoad || statusUnchanged;
+
     final date = booking.scheduledDate;
 
     switch (status) {

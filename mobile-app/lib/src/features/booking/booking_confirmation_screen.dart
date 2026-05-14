@@ -423,19 +423,6 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
                                 style: theme.textTheme.bodySmall
                                     ?.copyWith(color: servio.textSecondary),
                               ),
-                              const SizedBox(height: 3),
-                              Row(
-                                children: <Widget>[
-                                  Icon(Icons.star_rounded,
-                                      color: servio.warning, size: 15),
-                                  const SizedBox(width: 3),
-                                  Text(
-                                    '4.9 (128)',
-                                    style: theme.textTheme.labelSmall
-                                        ?.copyWith(color: servio.textSecondary),
-                                  ),
-                                ],
-                              ),
                             ],
                           ),
                         ),

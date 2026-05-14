@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/models/booking_model.dart';
 import '../../core/state/app_state.dart';
+import '../../core/state/notifications_provider.dart';
 import '../../core/state/workers_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
@@ -137,7 +138,12 @@ class _HomeBodyState extends State<_HomeBody>
         // ── Layer 2: Scrollable dashboard content ────────────────────
         RefreshIndicator(
           color: servio.accent,
-          onRefresh: () => context.read<BookingsProvider>().refresh(),
+          onRefresh: () async {
+            await Future.wait(<Future<void>>[
+              context.read<BookingsProvider>().refresh(),
+              context.read<NotificationsProvider>().refresh(),
+            ]);
+          },
           child: SingleChildScrollView(
             controller: _scrollController,
             physics: const AlwaysScrollableScrollPhysics(),

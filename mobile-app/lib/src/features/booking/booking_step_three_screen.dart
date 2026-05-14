@@ -631,24 +631,6 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
                             ],
                           ),
                         ),
-                        // Star rating
-                        Row(
-                          children: <Widget>[
-                            Icon(Icons.star_rounded,
-                                color: servio.accent, size: 16),
-                            const SizedBox(width: 4),
-                            Text(
-                              '4.9',
-                              style: theme.textTheme.labelLarge
-                                  ?.copyWith(fontWeight: FontWeight.w600),
-                            ),
-                            Text(
-                              ' (128)',
-                              style: theme.textTheme.labelSmall
-                                  ?.copyWith(color: servio.textSecondary),
-                            ),
-                          ],
-                        ),
                       ],
                     ),
                     const SizedBox(height: 16),

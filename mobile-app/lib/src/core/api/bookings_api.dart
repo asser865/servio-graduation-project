@@ -96,10 +96,17 @@ class BookingsApi {
     return BackendBooking.fromJson(data);
   }
 
-  Future<void> updateStatus(String bookingId, String status) async {
+  Future<void> updateStatus(
+    String bookingId,
+    String status, {
+    String? notes,
+    String? reason,
+  }) async {
     await _client
         .patch(ApiEndpoints.bookingStatus(bookingId), <String, dynamic>{
       'status': status,
+      if (notes != null && notes.isNotEmpty) 'workerNotes': notes,
+      if (reason != null && reason.isNotEmpty) 'reason': reason,
     });
   }
 
