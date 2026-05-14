@@ -197,7 +197,8 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
 
     if (!canCreateBackendBooking) {
       setState(() {
-        _error = 'Cannot create booking without a valid technician and service.';
+        _error =
+            'Cannot create booking without a valid technician and service.';
       });
       return;
     }
@@ -217,8 +218,7 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
         scheduledTime: _backendSlotFromLabel(data.time),
         address: data.location,
         addressCity: data.addressCity.isNotEmpty ? data.addressCity : 'Cairo',
-        addressStreet:
-            data.addressStreet.isNotEmpty ? data.addressStreet : '',
+        addressStreet: data.addressStreet.isNotEmpty ? data.addressStreet : '',
         notes: data.notes,
         paymentMethod: _paymentMethodCode,
         savedCardId: _paymentMethodCode == 'card' ? _selectedCardId : null,

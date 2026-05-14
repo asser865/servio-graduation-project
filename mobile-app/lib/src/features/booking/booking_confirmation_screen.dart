@@ -611,8 +611,8 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
                       Text(
                         'Cancellation unavailable — booking is ${widget.data.statusLabel.toLowerCase()}',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: servio.textSecondary,
-                        ),
+                              color: servio.textSecondary,
+                            ),
                       ),
                     ],
                   ),

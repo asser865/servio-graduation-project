@@ -521,7 +521,8 @@ class BookingDetailsScreen extends StatelessWidget {
     }
 
     final isCash = data.paymentMethodCode != 'card';
-    final paymentMeta = isCash ? 'Cash payment upon completion' : 'Held in Escrow';
+    final paymentMeta =
+        isCash ? 'Cash payment upon completion' : 'Held in Escrow';
 
     return <Widget>[
       _TimelineRow(
@@ -534,19 +535,27 @@ class BookingDetailsScreen extends StatelessWidget {
         label: 'Technician Confirmed',
         complete: level >= 1,
         active: level == 0,
-        meta: level == 0 ? 'Waiting for technician to confirm' : 'Technician has accepted the booking',
+        meta: level == 0
+            ? 'Waiting for technician to confirm'
+            : 'Technician has accepted the booking',
       ),
       _TimelineRow(
         label: isCash ? 'Payment Method (Cash)' : 'Payment Authorized',
         complete: isCash ? level >= 4 : level >= 0,
         active: isCash ? level < 4 : false,
-        meta: isCash ? 'Cash payment due upon completion' : 'Card payment confirmed via Escrow',
+        meta: isCash
+            ? 'Cash payment due upon completion'
+            : 'Card payment confirmed via Escrow',
       ),
       _TimelineRow(
         label: 'In Progress',
         complete: level >= 4,
         active: level == 3 || level == 2,
-        meta: level < 2 ? 'Upcoming' : (level < 4 ? 'Technician is working on your service' : 'Finished'),
+        meta: level < 2
+            ? 'Upcoming'
+            : (level < 4
+                ? 'Technician is working on your service'
+                : 'Finished'),
       ),
       _TimelineRow(
         label: 'Completed',

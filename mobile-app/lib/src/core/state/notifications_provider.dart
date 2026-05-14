@@ -62,7 +62,8 @@ class NotificationsProvider extends ChangeNotifier {
 
   /// Fetches real bookings and rebuilds the notification feed.
   /// Pass [role] to use the correct API endpoint.
-  Future<void> refresh({UserRole role = UserRole.customer, String? workerId}) async {
+  Future<void> refresh(
+      {UserRole role = UserRole.customer, String? workerId}) async {
     _loading = true;
     _error = null;
     notifyListeners();
@@ -147,7 +148,8 @@ class NotificationsProvider extends ChangeNotifier {
 
   // ── Conversion: BackendBooking → AppNotification ──────────────────────────────
 
-  AppNotification? _toNotification(BackendBooking booking, Set<String> readIds) {
+  AppNotification? _toNotification(
+      BackendBooking booking, Set<String> readIds) {
     final status = booking.status.trim().toLowerCase();
 
     // Stable ID: bookingId_status  (prevents duplicate on re-fetch)
@@ -173,7 +175,8 @@ class NotificationsProvider extends ChangeNotifier {
         return AppNotification(
           id: id,
           title: 'Booking Confirmed',
-          body: '${booking.workerName.isNotEmpty ? booking.workerName : "Your technician"} '
+          body:
+              '${booking.workerName.isNotEmpty ? booking.workerName : "Your technician"} '
               'confirmed your ${booking.serviceName} visit.',
           type: AppNotificationType.booking,
           createdAt: date,
@@ -220,7 +223,8 @@ class NotificationsProvider extends ChangeNotifier {
         return AppNotification(
           id: id,
           title: 'Booking Rejected',
-          body: 'Your ${booking.serviceName} booking was not accepted by the technician.',
+          body:
+              'Your ${booking.serviceName} booking was not accepted by the technician.',
           type: AppNotificationType.booking,
           createdAt: date,
           isRead: isRead,
@@ -233,7 +237,8 @@ class NotificationsProvider extends ChangeNotifier {
 
   // ── Helpers ───────────────────────────────────────────────────────────────────
 
-  int _unreadIn(List<AppNotification> list) => list.where((n) => !n.isRead).length;
+  int _unreadIn(List<AppNotification> list) =>
+      list.where((n) => !n.isRead).length;
 
   void _log(String message) {
     assert(() {

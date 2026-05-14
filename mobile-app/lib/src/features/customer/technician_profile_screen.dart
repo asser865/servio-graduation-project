@@ -421,11 +421,16 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
                                       technicianId: worker.id,
                                       serviceId:
                                           primaryBackendService?.id ?? '',
-                                      category: (primaryBackendService?.category ?? '').isNotEmpty
-                                          ? primaryBackendService!.category
-                                          : (worker.categories.isNotEmpty
-                                              ? worker.categories.first
-                                              : (worker.skills.isNotEmpty ? worker.skills.first : '')),
+                                      category:
+                                          (primaryBackendService?.category ??
+                                                      '')
+                                                  .isNotEmpty
+                                              ? primaryBackendService!.category
+                                              : (worker.categories.isNotEmpty
+                                                  ? worker.categories.first
+                                                  : (worker.skills.isNotEmpty
+                                                      ? worker.skills.first
+                                                      : '')),
                                       serviceName: primaryService.isNotEmpty
                                           ? primaryService
                                           : _copy(locale,

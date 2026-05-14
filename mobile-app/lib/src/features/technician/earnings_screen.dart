@@ -49,9 +49,11 @@ class _EarningsScreenState extends State<EarningsScreen> {
       final workerId = session.account?.id.trim() ?? '';
 
       final summaryFuture = PaymentsApi(client).getEarnings();
-      final bookingsFuture = BookingsApi(client).getWorkerBookings(workerId: workerId);
+      final bookingsFuture =
+          BookingsApi(client).getWorkerBookings(workerId: workerId);
 
-      final results = await Future.wait(<Future<dynamic>>[summaryFuture, bookingsFuture]);
+      final results =
+          await Future.wait(<Future<dynamic>>[summaryFuture, bookingsFuture]);
       if (!mounted) return;
       _summary = results[0] as EarningsSummary;
 
@@ -61,7 +63,8 @@ class _EarningsScreenState extends State<EarningsScreen> {
           .toList();
       _recentJobs.sort((a, b) => b.scheduledDate.compareTo(a.scheduledDate));
     } catch (_) {
-      if (mounted) setState(() => _fetchError = 'Could not load earnings data.');
+      if (mounted)
+        setState(() => _fetchError = 'Could not load earnings data.');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -71,7 +74,8 @@ class _EarningsScreenState extends State<EarningsScreen> {
     showModalBottomSheet<void>(
       context: context,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(ServioRadius.xl)),
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(ServioRadius.xl)),
       ),
       builder: (BuildContext ctx) {
         final theme = Theme.of(ctx);
@@ -245,135 +249,137 @@ class _EarningsScreenState extends State<EarningsScreen> {
         color: servio.accent,
         onRefresh: _fetchData,
         child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.fromLTRB(
-          ServioSpacing.screenPadding,
-          ServioSpacing.screenPadding,
-          ServioSpacing.screenPadding,
-          ServioSpacing.screenPadding + bottomInset,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: List<Widget>.generate(_periods.length, (int index) {
-                final active = index == _periodIndex;
-                return GestureDetector(
-                  onTap: () => setState(() => _periodIndex = index),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: active ? servio.accent : servio.backgroundSoft,
-                      borderRadius: BorderRadius.circular(ServioRadius.full),
-                    ),
-                    child: Text(
-                      _periods[index],
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: active ? Colors.white : servio.textSecondary,
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.fromLTRB(
+            ServioSpacing.screenPadding,
+            ServioSpacing.screenPadding,
+            ServioSpacing.screenPadding,
+            ServioSpacing.screenPadding + bottomInset,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: List<Widget>.generate(_periods.length, (int index) {
+                  final active = index == _periodIndex;
+                  return GestureDetector(
+                    onTap: () => setState(() => _periodIndex = index),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: active ? servio.accent : servio.backgroundSoft,
+                        borderRadius: BorderRadius.circular(ServioRadius.full),
+                      ),
+                      child: Text(
+                        _periods[index],
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: active ? Colors.white : servio.textSecondary,
+                        ),
                       ),
                     ),
-                  ),
-                );
-              }),
-            ),
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: ServioGradients.brand,
-                borderRadius: BorderRadius.circular(ServioRadius.xl),
-                boxShadow: ServioShadows.rest,
+                  );
+                }),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    'Total Earnings',
-                    style: theme.textTheme.labelLarge
-                        ?.copyWith(color: Colors.white.withValues(alpha: 0.8)),
-                  ),
-                  const SizedBox(height: 10),
-                  _loading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : Text(
-                          '${earnings.toStringAsFixed(0)} EGP',
-                          style: theme.textTheme.displayLarge
-                              ?.copyWith(color: Colors.white),
-                        ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Pending: ${pending.toStringAsFixed(0)} EGP',
-                    style: theme.textTheme.bodyMedium
-                        ?.copyWith(color: ServioColors.accentLight),
-                  ),
-                  const SizedBox(height: 16),
-                  OutlinedButton(
-                    onPressed: _showWithdrawComingSoon,
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Colors.white),
-                      foregroundColor: Colors.white,
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: ServioGradients.brand,
+                  borderRadius: BorderRadius.circular(ServioRadius.xl),
+                  boxShadow: ServioShadows.rest,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'Total Earnings',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.8)),
                     ),
-                    child: const Text('Withdraw'),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text('Overview', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 180,
-              child: ServioCard(
-                radius: ServioRadius.lg,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: const <Widget>[
-                    _BarColumn(label: 'Mon', height: 54, active: false),
-                    _BarColumn(label: 'Tue', height: 82, active: true),
-                    _BarColumn(label: 'Wed', height: 66, active: true),
-                    _BarColumn(label: 'Thu', height: 110, active: true),
-                    _BarColumn(label: 'Fri', height: 94, active: true),
-                    _BarColumn(label: 'Sat', height: 70, active: false),
-                    _BarColumn(label: 'Sun', height: 120, active: true),
+                    const SizedBox(height: 10),
+                    _loading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : Text(
+                            '${earnings.toStringAsFixed(0)} EGP',
+                            style: theme.textTheme.displayLarge
+                                ?.copyWith(color: Colors.white),
+                          ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Pending: ${pending.toStringAsFixed(0)} EGP',
+                      style: theme.textTheme.bodyMedium
+                          ?.copyWith(color: ServioColors.accentLight),
+                    ),
+                    const SizedBox(height: 16),
+                    OutlinedButton(
+                      onPressed: _showWithdrawComingSoon,
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Colors.white),
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Withdraw'),
+                    ),
                   ],
                 ),
               ),
-            ),
-            const SizedBox(height: 24),
-            Text('Transactions', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 14),
-            if (_recentJobs.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 20),
-                child: Center(
-                  child: Text(
-                    'No recent transactions.',
-                    style: theme.textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
+              const SizedBox(height: 24),
+              Text('Overview', style: theme.textTheme.titleMedium),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 180,
+                child: ServioCard(
+                  radius: ServioRadius.lg,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: const <Widget>[
+                      _BarColumn(label: 'Mon', height: 54, active: false),
+                      _BarColumn(label: 'Tue', height: 82, active: true),
+                      _BarColumn(label: 'Wed', height: 66, active: true),
+                      _BarColumn(label: 'Thu', height: 110, active: true),
+                      _BarColumn(label: 'Fri', height: 94, active: true),
+                      _BarColumn(label: 'Sat', height: 70, active: false),
+                      _BarColumn(label: 'Sun', height: 120, active: true),
+                    ],
                   ),
                 ),
-              )
-            else
-              ..._recentJobs.take(10).map((job) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _TransactionCard(
-                      date: '${job.scheduledDate.day.toString().padLeft(2, '0')}/${job.scheduledDate.month.toString().padLeft(2, '0')}/${job.scheduledDate.year}',
-                      service: job.serviceName,
-                      customer: job.customerName,
-                      amount: '${job.totalAmount.toStringAsFixed(0)} EGP',
-                      released: true, // simplified
+              ),
+              const SizedBox(height: 24),
+              Text('Transactions', style: theme.textTheme.titleMedium),
+              const SizedBox(height: 14),
+              if (_recentJobs.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  child: Center(
+                    child: Text(
+                      'No recent transactions.',
+                      style: theme.textTheme.bodyMedium
+                          ?.copyWith(color: servio.textSecondary),
                     ),
-                  )),
-            const SizedBox(height: 12),
-            _PayoutSummaryCard(
-              pendingAmount: pending,
-            ),
-          ],
+                  ),
+                )
+              else
+                ..._recentJobs.take(10).map((job) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _TransactionCard(
+                        date:
+                            '${job.scheduledDate.day.toString().padLeft(2, '0')}/${job.scheduledDate.month.toString().padLeft(2, '0')}/${job.scheduledDate.year}',
+                        service: job.serviceName,
+                        customer: job.customerName,
+                        amount: '${job.totalAmount.toStringAsFixed(0)} EGP',
+                        released: true, // simplified
+                      ),
+                    )),
+              const SizedBox(height: 12),
+              _PayoutSummaryCard(
+                pendingAmount: pending,
+              ),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }

@@ -160,306 +160,314 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
             color: ServioColors.accentLight,
             onRefresh: _fetchBookings,
             child: CustomScrollView(
-            controller: _scrollController,
-            slivers: <Widget>[
-              // Header Section
-              SliverToBoxAdapter(
-                child: SafeArea(
-                  bottom: false,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        // Logo & Brand Header
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: <Widget>[
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.15),
-                                borderRadius:
-                                    BorderRadius.circular(ServioRadius.sm),
-                              ),
-                              child: const Icon(
-                                  Icons.home_repair_service_rounded,
-                                  color: Colors.white,
-                                  size: 20),
-                            ),
-                            const SizedBox(width: 10),
-                            Text(
-                              'SERVIO',
-                              style: theme.textTheme.headlineMedium?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 1.5,
-                              ),
-                            ),
-                            const Spacer(),
-                            // Notification Icon
-                            GestureDetector(
-                              onTap: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute<void>(
-                                      builder: (_) =>
-                                          const NotificationsScreen()),
-                                );
-                              },
-                              child: Stack(
-                                alignment: Alignment.topRight,
-                                children: <Widget>[
-                                  Container(
-                                    width: 44,
-                                    height: 44,
-                                    decoration: BoxDecoration(
-                                      color:
-                                          Colors.white.withValues(alpha: 0.15),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                        Icons.notifications_none_rounded,
-                                        color: Colors.white,
-                                        size: 22),
-                                  ),
-                                  Positioned(
-                                    top: 10,
-                                    right: 12,
-                                    child: Container(
-                                      width: 8,
-                                      height: 8,
-                                      decoration: const BoxDecoration(
-                                        color: ServioColors.danger,
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            // Profile Avatar
-                            GestureDetector(
-                              onTap: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute<void>(
-                                      builder: (_) =>
-                                          const CustomerProfileScreen()),
-                                );
-                              },
-                              child: Container(
-                                width: 44,
-                                height: 44,
+              controller: _scrollController,
+              slivers: <Widget>[
+                // Header Section
+                SliverToBoxAdapter(
+                  child: SafeArea(
+                    bottom: false,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          // Logo & Brand Header
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: <Widget>[
+                              Container(
+                                padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
                                   color: Colors.white.withValues(alpha: 0.15),
-                                  shape: BoxShape.circle,
+                                  borderRadius:
+                                      BorderRadius.circular(ServioRadius.sm),
                                 ),
-                                child: Center(
-                                  child: Text(
-                                    userName.isNotEmpty
-                                        ? userName[0].toUpperCase()
-                                        : 'C',
-                                    style: theme.textTheme.titleMedium
-                                        ?.copyWith(color: Colors.white),
+                                child: const Icon(
+                                    Icons.home_repair_service_rounded,
+                                    color: Colors.white,
+                                    size: 20),
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                'SERVIO',
+                                style: theme.textTheme.headlineMedium?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 1.5,
+                                ),
+                              ),
+                              const Spacer(),
+                              // Notification Icon
+                              GestureDetector(
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute<void>(
+                                        builder: (_) =>
+                                            const NotificationsScreen()),
+                                  );
+                                },
+                                child: Stack(
+                                  alignment: Alignment.topRight,
+                                  children: <Widget>[
+                                    Container(
+                                      width: 44,
+                                      height: 44,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white
+                                            .withValues(alpha: 0.15),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                          Icons.notifications_none_rounded,
+                                          color: Colors.white,
+                                          size: 22),
+                                    ),
+                                    Positioned(
+                                      top: 10,
+                                      right: 12,
+                                      child: Container(
+                                        width: 8,
+                                        height: 8,
+                                        decoration: const BoxDecoration(
+                                          color: ServioColors.danger,
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              // Profile Avatar
+                              GestureDetector(
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute<void>(
+                                        builder: (_) =>
+                                            const CustomerProfileScreen()),
+                                  );
+                                },
+                                child: Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.15),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      userName.isNotEmpty
+                                          ? userName[0].toUpperCase()
+                                          : 'C',
+                                      style: theme.textTheme.titleMedium
+                                          ?.copyWith(color: Colors.white),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 32),
-                        // Dashboard Title
-                        Text(
-                          '$userName\'s Dashboard',
-                          style: theme.textTheme.headlineLarge?.copyWith(
-                            color: Colors.white,
+                            ],
                           ),
+                          const SizedBox(height: 32),
+                          // Dashboard Title
+                          Text(
+                            '$userName\'s Dashboard',
+                            style: theme.textTheme.headlineLarge?.copyWith(
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          // Segmented Control inside the hero
+                          _DashboardSegmentedControl(
+                            current: _section,
+                            onChanged: (value) =>
+                                setState(() => _section = value),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Bottom Layered Sheet Section
+                SliverToBoxAdapter(
+                  child: Container(
+                    width: double.infinity,
+                    constraints: BoxConstraints(
+                      minHeight: MediaQuery.of(context).size.height * 0.6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: theme.scaffoldBackgroundColor,
+                      borderRadius:
+                          const BorderRadius.vertical(top: Radius.circular(32)),
+                      boxShadow: <BoxShadow>[
+                        BoxShadow(
+                          color: isDark
+                              ? Colors.black.withValues(alpha: 0.4)
+                              : Colors.black.withValues(alpha: 0.05),
+                          blurRadius: 24,
+                          offset: const Offset(0, -8),
                         ),
-                        const SizedBox(height: 24),
-                        // Segmented Control inside the hero
-                        _DashboardSegmentedControl(
-                          current: _section,
-                          onChanged: (value) =>
-                              setState(() => _section = value),
+                      ],
+                    ),
+                    padding: const EdgeInsets.fromLTRB(20, 32, 20, 48),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        // ── Error Banner ──────────────────────────────────────
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 300),
+                          transitionBuilder:
+                              (Widget child, Animation<double> animation) {
+                            return SizeTransition(
+                              sizeFactor: CurvedAnimation(
+                                parent: animation,
+                                curve: ServioMotion.spring,
+                              ),
+                              axisAlignment: -1,
+                              child: FadeTransition(
+                                  opacity: animation, child: child),
+                            );
+                          },
+                          child: _fetchError != null
+                              ? Padding(
+                                  key: const ValueKey<String>('error-banner'),
+                                  padding: const EdgeInsets.only(bottom: 16),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 12,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: ServioColors.tint(
+                                          ServioColors.danger),
+                                      borderRadius: BorderRadius.circular(
+                                          ServioRadius.md),
+                                      border: Border.all(
+                                        color: ServioColors.danger
+                                            .withValues(alpha: 0.35),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: <Widget>[
+                                        Icon(
+                                          Icons.wifi_off_rounded,
+                                          color: ServioColors.danger,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Text(
+                                            _fetchError!,
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodySmall
+                                                ?.copyWith(
+                                                  color: ServioColors.danger,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        GestureDetector(
+                                          onTap: _isLoading
+                                              ? null
+                                              : _fetchBookings,
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                              vertical: 6,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: ServioColors.danger,
+                                              borderRadius:
+                                                  BorderRadius.circular(
+                                                      ServioRadius.sm),
+                                            ),
+                                            child: _isLoading
+                                                ? const SizedBox(
+                                                    width: 12,
+                                                    height: 12,
+                                                    child:
+                                                        CircularProgressIndicator(
+                                                      color: Colors.white,
+                                                      strokeWidth: 2,
+                                                    ),
+                                                  )
+                                                : const Text(
+                                                    'Retry',
+                                                    style: TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize: 12,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                    ),
+                                                  ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                )
+                              : const SizedBox.shrink(
+                                  key: ValueKey<String>('no-error'),
+                                ),
                         ),
-                        const SizedBox(height: 16),
+
+                        // ── Section Content ───────────────────────────────────
+                        AnimatedSwitcher(
+                          duration: ServioMotion.tabSwitch,
+                          switchInCurve: ServioMotion.spring,
+                          switchOutCurve: ServioMotion.standard,
+                          layoutBuilder: (Widget? currentChild,
+                              List<Widget> previousChildren) {
+                            return Stack(
+                              alignment: Alignment.topCenter,
+                              children: <Widget>[
+                                ...previousChildren,
+                                if (currentChild != null) currentChild,
+                              ],
+                            );
+                          },
+                          child: switch (_section) {
+                            _DashboardSection.overview => _OverviewSection(
+                                key: const ValueKey<String>('overview'),
+                                bookings: bookings,
+                                onBookService: _openBooking,
+                                onViewBookings: () => setState(
+                                  () => _section = _DashboardSection.bookings,
+                                ),
+                              ),
+                            _DashboardSection.bookings => _BookingsSection(
+                                key: const ValueKey<String>('bookings'),
+                                bookings: bookings,
+                                filter: _bookingFilter,
+                                onFilterChanged: (value) =>
+                                    setState(() => _bookingFilter = value),
+                                onViewDetails: _openBookingDetails,
+                                onChat: _openChat,
+                                onCancel: _cancelBooking,
+                              ),
+                            _DashboardSection.history => _HistorySection(
+                                key: const ValueKey<String>('history'),
+                                bookings: bookings,
+                                filter: _historyFilter,
+                                onFilterChanged: (value) =>
+                                    setState(() => _historyFilter = value),
+                              ),
+                            _DashboardSection.favourites =>
+                              const _FavouritesSection(
+                                key: ValueKey<String>('favourites'),
+                              ),
+                          },
+                        ),
                       ],
                     ),
                   ),
                 ),
-              ),
-
-              // Bottom Layered Sheet Section
-              SliverToBoxAdapter(
-                child: Container(
-                  width: double.infinity,
-                  constraints: BoxConstraints(
-                    minHeight: MediaQuery.of(context).size.height * 0.6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: theme.scaffoldBackgroundColor,
-                    borderRadius:
-                        const BorderRadius.vertical(top: Radius.circular(32)),
-                    boxShadow: <BoxShadow>[
-                      BoxShadow(
-                        color: isDark
-                            ? Colors.black.withValues(alpha: 0.4)
-                            : Colors.black.withValues(alpha: 0.05),
-                        blurRadius: 24,
-                        offset: const Offset(0, -8),
-                      ),
-                    ],
-                  ),
-                  padding: const EdgeInsets.fromLTRB(20, 32, 20, 48),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: <Widget>[
-                      // ── Error Banner ──────────────────────────────────────
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 300),
-                        transitionBuilder: (Widget child, Animation<double> animation) {
-                          return SizeTransition(
-                            sizeFactor: CurvedAnimation(
-                              parent: animation,
-                              curve: ServioMotion.spring,
-                            ),
-                            axisAlignment: -1,
-                            child: FadeTransition(opacity: animation, child: child),
-                          );
-                        },
-                        child: _fetchError != null
-                            ? Padding(
-                                key: const ValueKey<String>('error-banner'),
-                                padding: const EdgeInsets.only(bottom: 16),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 12,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: ServioColors.tint(ServioColors.danger),
-                                    borderRadius:
-                                        BorderRadius.circular(ServioRadius.md),
-                                    border: Border.all(
-                                      color: ServioColors.danger
-                                          .withValues(alpha: 0.35),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    children: <Widget>[
-                                      Icon(
-                                        Icons.wifi_off_rounded,
-                                        color: ServioColors.danger,
-                                        size: 20,
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Text(
-                                          _fetchError!,
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .bodySmall
-                                              ?.copyWith(
-                                                color: ServioColors.danger,
-                                                fontWeight: FontWeight.w500,
-                                              ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      GestureDetector(
-                                        onTap: _isLoading ? null : _fetchBookings,
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 12,
-                                            vertical: 6,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: ServioColors.danger,
-                                            borderRadius: BorderRadius.circular(
-                                                ServioRadius.sm),
-                                          ),
-                                          child: _isLoading
-                                              ? const SizedBox(
-                                                  width: 12,
-                                                  height: 12,
-                                                  child:
-                                                      CircularProgressIndicator(
-                                                    color: Colors.white,
-                                                    strokeWidth: 2,
-                                                  ),
-                                                )
-                                              : const Text(
-                                                  'Retry',
-                                                  style: TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              )
-                            : const SizedBox.shrink(
-                                key: ValueKey<String>('no-error'),
-                              ),
-                      ),
-
-                      // ── Section Content ───────────────────────────────────
-                      AnimatedSwitcher(
-                        duration: ServioMotion.tabSwitch,
-                        switchInCurve: ServioMotion.spring,
-                        switchOutCurve: ServioMotion.standard,
-                        layoutBuilder:
-                            (Widget? currentChild, List<Widget> previousChildren) {
-                          return Stack(
-                            alignment: Alignment.topCenter,
-                            children: <Widget>[
-                              ...previousChildren,
-                              if (currentChild != null) currentChild,
-                            ],
-                          );
-                        },
-                        child: switch (_section) {
-                          _DashboardSection.overview => _OverviewSection(
-                              key: const ValueKey<String>('overview'),
-                              bookings: bookings,
-                              onBookService: _openBooking,
-                              onViewBookings: () => setState(
-                                () => _section = _DashboardSection.bookings,
-                              ),
-                            ),
-                          _DashboardSection.bookings => _BookingsSection(
-                              key: const ValueKey<String>('bookings'),
-                              bookings: bookings,
-                              filter: _bookingFilter,
-                              onFilterChanged: (value) =>
-                                  setState(() => _bookingFilter = value),
-                              onViewDetails: _openBookingDetails,
-                              onChat: _openChat,
-                              onCancel: _cancelBooking,
-                            ),
-                          _DashboardSection.history => _HistorySection(
-                              key: const ValueKey<String>('history'),
-                              bookings: bookings,
-                              filter: _historyFilter,
-                              onFilterChanged: (value) =>
-                                  setState(() => _historyFilter = value),
-                            ),
-                          _DashboardSection.favourites => const _FavouritesSection(
-                              key: ValueKey<String>('favourites'),
-                            ),
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
         ],
       ),
     );
@@ -499,20 +507,18 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              'Only pending bookings can be cancelled. '
-              'This booking is already ${switch (booking.status) {
-                BookingStatus.confirmed => 'confirmed',
-                BookingStatus.enRoute => 'en route',
-                BookingStatus.arrived => 'arrived',
-                BookingStatus.inProgress => 'in progress',
-                BookingStatus.completed => 'completed',
-                BookingStatus.cancelled => 'cancelled',
-                BookingStatus.rejected => 'rejected',
-                BookingStatus.disputed => 'disputed',
-                BookingStatus.pending => 'pending',
-              }}.'
-            ),
+            content: Text('Only pending bookings can be cancelled. '
+                'This booking is already ${switch (booking.status) {
+              BookingStatus.confirmed => 'confirmed',
+              BookingStatus.enRoute => 'en route',
+              BookingStatus.arrived => 'arrived',
+              BookingStatus.inProgress => 'in progress',
+              BookingStatus.completed => 'completed',
+              BookingStatus.cancelled => 'cancelled',
+              BookingStatus.rejected => 'rejected',
+              BookingStatus.disputed => 'disputed',
+              BookingStatus.pending => 'pending',
+            }}.'),
             duration: const Duration(seconds: 3),
           ),
         );
