@@ -1,0 +1,1114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Room Finishing Planner — Servio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Variables (Servio design tokens) ───────────────────── */
+    :root {
+      --color-primary:    #222831;
+      --color-secondary:  #393E46;
+      --color-accent:     #9A8C73;
+      --color-accent-warm:#fec195;
+      --color-neutral:    #E3D5CA;
+      --color-bg:         #FAF8F5;
+      --color-bg-soft:    #F3EDE7;
+      --color-surface:    #ffffff;
+      --color-surface-alt:#F7F3EF;
+      --color-border:     #DDD5CC;
+      --color-text:       #222831;
+      --color-text-light: #6B6560;
+      --color-success:    #27ae60;
+      --color-warning:    #e67e22;
+      --color-danger:     #c0392b;
+      --gradient-brand:   linear-gradient(135deg, #3C2415, #222831);
+      --gradient-accent:  linear-gradient(135deg, #9A8C73, #BFB09A);
+      --gradient-warm:    linear-gradient(135deg, #fec195, #e6a070);
+      --shadow-sm:        0 8px 20px rgba(34,40,49,.06);
+      --shadow-md:        0 14px 36px rgba(34,40,49,.10);
+      --shadow-lg:        0 24px 56px rgba(34,40,49,.14);
+      --radius-sm:        10px;
+      --radius-md:        14px;
+      --radius-lg:        18px;
+      --radius-xl:        22px;
+      --font-primary:     'Inter', sans-serif;
+      --font-heading:     'Poppins', sans-serif;
+    }
+
+    /* ── Reset ──────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--font-primary);
+      background: var(--color-bg);
+      color: var(--color-text);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    /* ── Header (matches site header exactly) ───────────────── */
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      padding: 12px 24px;
+    }
+    .header__inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 10px 20px;
+      background: rgba(250,248,245,0.72);
+      backdrop-filter: blur(22px) saturate(170%);
+      -webkit-backdrop-filter: blur(22px) saturate(170%);
+      border-radius: 999px;
+      border: 1px solid rgba(34,40,49,.09);
+      box-shadow: 0 2px 20px rgba(34,40,49,.07);
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+    .brand__mark {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: var(--gradient-brand);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-family: var(--font-heading);
+      font-weight: 800;
+      font-size: 15px;
+      letter-spacing: -1px;
+    }
+    .brand__name {
+      font-family: var(--font-heading);
+      font-size: 1.08rem;
+      font-weight: 800;
+      background: var(--gradient-brand);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .header__badge {
+      background: var(--gradient-warm);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 12px;
+      border-radius: 999px;
+      letter-spacing: .4px;
+      font-family: var(--font-heading);
+    }
+
+    /* ── Page hero ──────────────────────────────────────────── */
+    .page-hero {
+      background: var(--gradient-brand);
+      padding: 56px 24px 64px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .page-hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 60% 80% at 70% 50%, rgba(254,193,149,.12), transparent),
+                  radial-gradient(ellipse 40% 60% at 20% 30%, rgba(154,140,115,.15), transparent);
+      pointer-events: none;
+    }
+    .page-hero__eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 999px;
+      padding: 5px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--color-accent-warm);
+      letter-spacing: .6px;
+      text-transform: uppercase;
+      margin-bottom: 18px;
+    }
+    .page-hero h1 {
+      font-family: var(--font-heading);
+      font-size: clamp(28px, 5vw, 48px);
+      font-weight: 800;
+      color: #fff;
+      line-height: 1.15;
+      margin-bottom: 14px;
+    }
+    .page-hero h1 span { color: var(--color-accent-warm); }
+    .page-hero p {
+      color: rgba(255,255,255,.65);
+      font-size: 15px;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    /* ── Main layout ────────────────────────────────────────── */
+    .page-body {
+      max-width: 1160px;
+      margin: -28px auto 60px;
+      padding: 0 24px;
+      display: grid;
+      grid-template-columns: 400px 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+    @media (max-width: 880px) {
+      .page-body { grid-template-columns: 1fr; margin-top: -20px; }
+    }
+
+    /* ── Cards ──────────────────────────────────────────────── */
+    .card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-xl);
+      padding: 28px;
+      box-shadow: var(--shadow-sm);
+    }
+    .card + .card { margin-top: 20px; }
+    .card__title {
+      font-family: var(--font-heading);
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--color-primary);
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card__title .icon {
+      width: 30px; height: 30px;
+      background: var(--color-bg-soft);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px;
+    }
+
+    /* ── Auth strip ─────────────────────────────────────────── */
+    .auth-strip {
+      background: var(--color-bg-soft);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: 18px 20px;
+      margin-bottom: 20px;
+    }
+    .auth-strip__fields {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 10px;
+      align-items: flex-end;
+    }
+    .auth-status {
+      margin-top: 10px;
+      font-size: 12.5px;
+      color: var(--color-text-light);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .auth-status.ok  { color: var(--color-success); }
+    .auth-status.err { color: var(--color-danger); }
+
+    /* ── Form fields ────────────────────────────────────────── */
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field label {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--color-text-light);
+      text-transform: uppercase;
+      letter-spacing: .6px;
+    }
+    .field input, .field select {
+      background: var(--color-bg);
+      border: 1.5px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      color: var(--color-text);
+      padding: 11px 14px;
+      font-size: 14px;
+      font-family: var(--font-primary);
+      outline: none;
+      transition: border-color .18s, box-shadow .18s;
+      width: 100%;
+    }
+    .field input:focus, .field select:focus {
+      border-color: var(--color-accent);
+      box-shadow: 0 0 0 3px rgba(154,140,115,.12);
+    }
+    .field input::placeholder { color: #b8b0aa; }
+
+    .dims { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+
+    /* ── Drop zone ──────────────────────────────────────────── */
+    .dropzone {
+      border: 2px dashed var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: 36px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+      position: relative;
+      margin-bottom: 20px;
+      background: var(--color-bg);
+    }
+    .dropzone:hover, .dropzone.drag {
+      border-color: var(--color-accent);
+      background: rgba(154,140,115,.05);
+    }
+    .dropzone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+    .dropzone__icon {
+      width: 52px; height: 52px;
+      background: var(--color-bg-soft);
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px;
+      margin: 0 auto 14px;
+      border: 1px solid var(--color-border);
+    }
+    .dropzone p { font-size: 13px; color: var(--color-text-light); }
+    .dropzone strong { color: var(--color-accent); font-weight: 600; }
+
+    .preview-wrap { display: none; margin-bottom: 20px; position: relative; }
+    .preview-wrap img {
+      width: 100%;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--color-border);
+      max-height: 200px;
+      object-fit: cover;
+      display: block;
+    }
+    .preview-wrap__label {
+      position: absolute;
+      bottom: 10px; left: 10px;
+      background: rgba(34,40,49,.7);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 999px;
+      backdrop-filter: blur(4px);
+    }
+    .remove-img {
+      position: absolute;
+      top: 8px; right: 8px;
+      background: rgba(34,40,49,.75);
+      border: none;
+      color: #fff;
+      border-radius: 50%;
+      width: 28px; height: 28px;
+      cursor: pointer;
+      font-size: 13px;
+      display: flex; align-items: center; justify-content: center;
+      transition: background .15s;
+    }
+    .remove-img:hover { background: var(--color-danger); }
+
+    /* ── Buttons (Servio 3D style) ──────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 11px 22px;
+      border-radius: 999px;
+      font-family: var(--font-primary);
+      font-size: 14px;
+      font-weight: 600;
+      border: 1.5px solid transparent;
+      cursor: pointer;
+      transition: transform .15s cubic-bezier(.22,1,.36,1), box-shadow .15s;
+      white-space: nowrap;
+      text-decoration: none;
+    }
+    .btn:hover:not(:disabled) {
+      transform: translateY(-3px) translateX(-1px);
+      box-shadow: 3px 5px 0 rgba(34,40,49,.18);
+    }
+    .btn:active:not(:disabled) {
+      transform: translateY(1px) translateX(0);
+      box-shadow: none;
+    }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+
+    .btn--primary {
+      background: var(--gradient-brand);
+      color: #fff;
+      border-color: var(--color-primary);
+      width: 100%;
+      padding: 14px 22px;
+      font-size: 15px;
+    }
+    .btn--accent {
+      background: var(--gradient-warm);
+      color: #fff;
+      border-color: #e6a070;
+    }
+    .btn--ghost {
+      background: transparent;
+      color: var(--color-primary);
+      border-color: var(--color-primary);
+    }
+    .btn--sm {
+      padding: 9px 18px;
+      font-size: 13px;
+    }
+
+    /* ── Divider ────────────────────────────────────────────── */
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 18px 0;
+      color: var(--color-text-light);
+      font-size: 11.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+    }
+    .divider::before, .divider::after {
+      content: ''; flex: 1;
+      height: 1px;
+      background: var(--color-border);
+    }
+
+    /* ── Loader ─────────────────────────────────────────────── */
+    .loader {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      padding: 60px 20px;
+    }
+    .loader__ring {
+      width: 52px; height: 52px;
+      border: 3px solid var(--color-border);
+      border-top-color: var(--color-accent);
+      border-radius: 50%;
+      animation: spin .9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loader__text {
+      text-align: center;
+      color: var(--color-text-light);
+      font-size: 14px;
+      line-height: 1.7;
+    }
+    .loader__steps {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      width: 100%;
+      max-width: 260px;
+    }
+    .loader__step {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12.5px;
+      color: var(--color-text-light);
+      opacity: 0;
+      animation: fadeIn .4s forwards;
+    }
+    .loader__step .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--color-border);
+      flex-shrink: 0;
+    }
+    .loader__step.done { color: var(--color-success); }
+    .loader__step.done .dot { background: var(--color-success); }
+    .loader__step.active { color: var(--color-accent); }
+    .loader__step.active .dot { background: var(--color-accent); animation: pulse 1s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+    @keyframes fadeIn { to{opacity:1} }
+
+    /* ── Placeholder ────────────────────────────────────────── */
+    .placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 70px 30px;
+      text-align: center;
+    }
+    .placeholder__icon {
+      width: 80px; height: 80px;
+      background: var(--color-bg-soft);
+      border-radius: 22px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 36px;
+      border: 1px solid var(--color-border);
+    }
+    .placeholder h3 {
+      font-family: var(--font-heading);
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--color-primary);
+    }
+    .placeholder p {
+      font-size: 14px;
+      color: var(--color-text-light);
+      max-width: 260px;
+      line-height: 1.6;
+    }
+
+    /* ── Error box ──────────────────────────────────────────── */
+    .error-box {
+      display: none;
+      align-items: flex-start;
+      gap: 10px;
+      background: rgba(192,57,43,.06);
+      border: 1px solid rgba(192,57,43,.2);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      margin-top: 14px;
+      font-size: 13px;
+      color: var(--color-danger);
+    }
+
+    /* ── Results ────────────────────────────────────────────── */
+    #results { display: none; }
+
+    .room-meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .meta-pill {
+      background: var(--color-bg-soft);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+    }
+    .meta-pill__label {
+      font-size: 10.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+      color: var(--color-text-light);
+      margin-bottom: 4px;
+    }
+    .meta-pill__value {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--color-primary);
+      text-transform: capitalize;
+    }
+
+    .features-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+    .feature-tag {
+      background: var(--color-surface-alt, #F7F3EF);
+      border: 1px solid var(--color-border);
+      border-radius: 999px;
+      padding: 4px 12px;
+      font-size: 12px;
+      color: var(--color-text-light);
+      font-weight: 500;
+    }
+
+    .recommendation-banner {
+      background: linear-gradient(135deg, rgba(60,36,21,.04), rgba(154,140,115,.08));
+      border: 1px solid rgba(154,140,115,.25);
+      border-left: 3px solid var(--color-accent);
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+      font-size: 13.5px;
+      line-height: 1.6;
+      color: var(--color-text);
+    }
+    .recommendation-banner strong { color: var(--color-accent); font-weight: 700; }
+
+    /* ── Plan tabs ──────────────────────────────────────────── */
+    .plan-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      background: var(--color-bg-soft);
+      padding: 5px;
+      border-radius: var(--radius-md);
+    }
+    .plan-tab {
+      flex: 1;
+      padding: 10px 8px;
+      border-radius: var(--radius-sm);
+      border: none;
+      background: transparent;
+      color: var(--color-text-light);
+      font-family: var(--font-primary);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .2s;
+      text-align: center;
+    }
+    .plan-tab:hover { background: rgba(34,40,49,.06); color: var(--color-primary); }
+    .plan-tab.active {
+      background: var(--color-surface);
+      color: var(--color-primary);
+      box-shadow: var(--shadow-sm);
+    }
+    .plan-tab__name { display: block; }
+    .plan-tab__price {
+      display: block;
+      font-size: 11px;
+      font-weight: 500;
+      margin-top: 2px;
+      opacity: .7;
+    }
+    .plan-tab.active .plan-tab__price { opacity: 1; }
+
+    /* Economy = green accent, Standard = taupe, Premium = warm gold */
+    .plan-tab.economy.active  { border-bottom: 2px solid var(--color-success); }
+    .plan-tab.standard.active { border-bottom: 2px solid var(--color-accent);  }
+    .plan-tab.premium.active  { border-bottom: 2px solid var(--color-accent-warm); }
+
+    .plan-panel { display: none; }
+    .plan-panel.active { display: block; }
+
+    /* ── Cost summary ───────────────────────────────────────── */
+    .cost-summary {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .cost-box {
+      background: var(--color-bg-soft);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      text-align: center;
+    }
+    .cost-box__amount {
+      font-family: var(--font-heading);
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--color-primary);
+    }
+    .cost-box__label {
+      font-size: 11px;
+      color: var(--color-text-light);
+      margin-top: 3px;
+      font-weight: 500;
+    }
+    .cost-box--highlight .cost-box__amount { color: var(--color-accent); }
+
+    /* ── Section label ──────────────────────────────────────── */
+    .section-label {
+      font-size: 11.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      color: var(--color-text-light);
+      margin: 20px 0 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .section-label::after {
+      content: ''; flex: 1;
+      height: 1px;
+      background: var(--color-border);
+    }
+
+    /* ── Tables ─────────────────────────────────────────────── */
+    .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .data-table th {
+      text-align: left;
+      padding: 8px 12px;
+      color: var(--color-text-light);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      border-bottom: 1px solid var(--color-border);
+    }
+    .data-table td {
+      padding: 11px 12px;
+      border-bottom: 1px solid rgba(221,213,204,.4);
+      vertical-align: top;
+    }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr:hover td { background: var(--color-bg-soft); }
+    .data-table .notes { color: var(--color-text-light); font-size: 11.5px; margin-top: 2px; }
+    .data-table .amount { font-weight: 700; }
+
+    /* ── Timeline banner ────────────────────────────────────── */
+    .timeline-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--color-bg-soft);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: 16px 20px;
+      margin-top: 20px;
+    }
+    .timeline-banner__label { font-size: 13px; color: var(--color-text-light); }
+    .timeline-banner__days {
+      font-family: var(--font-heading);
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--color-primary);
+    }
+    .timeline-banner__unit { font-size: 13px; color: var(--color-text-light); }
+
+    /* ── Misc ───────────────────────────────────────────────── */
+    .rec-star {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--gradient-warm);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ────────────────────────────────────────────────── -->
+<header class="site-header">
+  <div class="header__inner">
+    <a class="brand" href="#">
+      <div class="brand__mark">Se</div>
+      <span class="brand__name">SERVIO</span>
+    </a>
+    <div class="header__badge">✦ AI Room Planner</div>
+  </div>
+</header>
+
+<!-- ── Hero ──────────────────────────────────────────────────── -->
+<section class="page-hero">
+  <div class="page-hero__eyebrow">✦ Powered by Groq AI</div>
+  <h1>Room Finishing<br/><span>Made Intelligent</span></h1>
+  <p>Upload a photo of your room, enter dimensions, and get a full finishing plan with 3 cost tiers — instantly.</p>
+</section>
+
+<!-- ── Body ──────────────────────────────────────────────────── -->
+<div class="page-body">
+
+  <!-- ── LEFT: Form ────────────────────────────────────────── -->
+  <div>
+
+    <!-- Auth -->
+    <div class="auth-strip">
+      <div style="font-family:'Poppins',sans-serif;font-size:13px;font-weight:700;color:var(--color-primary);margin-bottom:12px;">
+        🔐 Quick Login
+      </div>
+      <div class="auth-strip__fields">
+        <div class="field">
+          <label>Email</label>
+          <input type="email" id="email" placeholder="you@email.com" />
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input type="password" id="password" placeholder="••••••" />
+        </div>
+        <button class="btn btn--ghost btn--sm" onclick="login()">Login</button>
+      </div>
+      <div class="auth-status" id="auth-status">Not logged in — log in to generate plans</div>
+    </div>
+
+    <!-- Upload -->
+    <div class="card">
+      <div class="card__title"><div class="icon">📷</div> Room Photo</div>
+
+      <div class="dropzone" id="dropzone">
+        <input type="file" id="file-input" accept="image/*" onchange="handleFile(this.files[0])" />
+        <div class="dropzone__icon">🏠</div>
+        <p>Drag & drop your room photo<br/>or <strong>click to browse</strong></p>
+        <p style="margin-top:6px;font-size:11px;color:#b8b0aa;">JPEG · PNG · WEBP · max 10 MB</p>
+      </div>
+
+      <div class="preview-wrap" id="preview-wrap">
+        <img id="preview-img" src="" alt="Room preview" />
+        <span class="preview-wrap__label" id="preview-label">Room photo</span>
+        <button class="remove-img" onclick="removeImage()" title="Remove photo">✕</button>
+      </div>
+
+      <div class="divider">Dimensions</div>
+
+      <div class="dims">
+        <div class="field">
+          <label>Length (m)</label>
+          <input type="number" id="length" placeholder="5.0" step="0.1" min="1" max="50" />
+        </div>
+        <div class="field">
+          <label>Width (m)</label>
+          <input type="number" id="width" placeholder="4.0" step="0.1" min="1" max="50" />
+        </div>
+        <div class="field">
+          <label>Height (m)</label>
+          <input type="number" id="height" placeholder="2.8" step="0.1" min="2" max="6" />
+        </div>
+      </div>
+
+      <div class="divider">Preferences</div>
+
+      <div class="field" style="margin-bottom:14px;">
+        <label>Budget (EGP)</label>
+        <input type="number" id="budget" placeholder="50,000" step="1000" min="1000" />
+      </div>
+      <div class="field" style="margin-bottom:24px;">
+        <label>Style Preference</label>
+        <select id="style">
+          <option value="modern">Modern</option>
+          <option value="classic">Classic</option>
+          <option value="minimalist">Minimalist</option>
+          <option value="contemporary">Contemporary</option>
+          <option value="traditional">Traditional</option>
+          <option value="luxury">Luxury</option>
+        </select>
+      </div>
+
+      <button class="btn btn--primary" id="submit-btn" onclick="analyze()">
+        ✦ Generate Finishing Plan
+      </button>
+
+      <div class="error-box" id="error-box"></div>
+    </div>
+  </div>
+
+  <!-- ── RIGHT: Results ────────────────────────────────────── -->
+  <div>
+
+    <!-- Loader -->
+    <div class="card loader" id="loader">
+      <div class="loader__ring"></div>
+      <div class="loader__text">
+        <strong>Analyzing your room…</strong><br/>
+        This takes about 5–10 seconds
+      </div>
+      <div class="loader__steps" id="loader-steps">
+        <div class="loader__step done" style="animation-delay:.0s"><div class="dot"></div>Image uploaded & validated</div>
+        <div class="loader__step active" style="animation-delay:.4s"><div class="dot"></div>Detecting room features…</div>
+        <div class="loader__step" style="animation-delay:.8s"><div class="dot"></div>Calculating material quantities</div>
+        <div class="loader__step" style="animation-delay:1.2s"><div class="dot"></div>Pricing from Egyptian market rates</div>
+        <div class="loader__step" style="animation-delay:1.6s"><div class="dot"></div>Building 3-tier finishing plan</div>
+      </div>
+    </div>
+
+    <!-- Placeholder -->
+    <div class="card placeholder" id="placeholder">
+      <div class="placeholder__icon">🏗️</div>
+      <h3>Your Plan Appears Here</h3>
+      <p>Upload a room photo, fill in the dimensions and budget, then click Generate.</p>
+    </div>
+
+    <!-- Results -->
+    <div id="results">
+
+      <!-- Room Analysis Card -->
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card__title"><div class="icon">🔍</div> Room Analysis</div>
+        <div class="room-meta-grid" id="room-meta"></div>
+        <div class="features-row" id="features-row"></div>
+        <div class="recommendation-banner" id="rec-banner"></div>
+      </div>
+
+      <!-- Plans Card -->
+      <div class="card">
+        <div class="card__title"><div class="icon">📋</div> Finishing Plans</div>
+        <div class="plan-tabs" id="plan-tabs"></div>
+        <div id="plan-panels"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  let token = null;
+  let selectedFile = null;
+
+  /* ── Drag & drop ─────────────────────────────────────────── */
+  const dz = document.getElementById('dropzone');
+  dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('drag'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault(); dz.classList.remove('drag');
+    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+
+  function handleFile(file) {
+    if (!file) return;
+    selectedFile = file;
+    const reader = new FileReader();
+    reader.onload = e => {
+      document.getElementById('preview-img').src = e.target.result;
+      document.getElementById('preview-label').textContent = file.name;
+      document.getElementById('preview-wrap').style.display = 'block';
+      dz.style.display = 'none';
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function removeImage() {
+    selectedFile = null;
+    document.getElementById('file-input').value = '';
+    document.getElementById('preview-wrap').style.display = 'none';
+    dz.style.display = 'block';
+  }
+
+  /* ── Auth ────────────────────────────────────────────────── */
+  async function login() {
+    const email    = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const status   = document.getElementById('auth-status');
+    if (!email || !password) { setStatus('Enter email and password.', 'err'); return; }
+    setStatus('Logging in…', '');
+    try {
+      const res  = await fetch('http://localhost:5000/api/v1/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const json = await res.json();
+      if (json.success && json.data?.token) {
+        token = json.data.token;
+        setStatus('✓ Logged in as ' + (json.data.user?.name || email), 'ok');
+      } else {
+        setStatus(json.message || 'Login failed.', 'err');
+      }
+    } catch {
+      setStatus('Cannot reach backend — is it running on :5000?', 'err');
+    }
+  }
+
+  function setStatus(msg, cls) {
+    const el = document.getElementById('auth-status');
+    el.textContent = msg;
+    el.className = 'auth-status' + (cls ? ' ' + cls : '');
+  }
+
+  /* ── Analyze ─────────────────────────────────────────────── */
+  async function analyze() {
+    hideError();
+    if (!token)        return showError('Log in first.');
+    if (!selectedFile) return showError('Upload a room photo.');
+
+    const length = document.getElementById('length').value;
+    const width  = document.getElementById('width').value;
+    const height = document.getElementById('height').value;
+    const budget = document.getElementById('budget').value;
+    const style  = document.getElementById('style').value;
+
+    if (!length || !width || !height || !budget)
+      return showError('Fill in all dimensions and budget.');
+
+    setState('loading');
+    document.getElementById('submit-btn').disabled = true;
+
+    const form = new FormData();
+    form.append('image',      selectedFile);
+    form.append('length_m',   length);
+    form.append('width_m',    width);
+    form.append('height_m',   height);
+    form.append('budget_egp', budget);
+    form.append('style',      style);
+
+    try {
+      const res  = await fetch('http://localhost:5000/api/v1/ai/analyze-room', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      });
+      const json = await res.json();
+      document.getElementById('submit-btn').disabled = false;
+
+      if (!json.success) { setState('placeholder'); showError(json.message || 'Analysis failed.'); return; }
+      renderResults(json.data?.data || json.data);
+      setState('results');
+    } catch {
+      document.getElementById('submit-btn').disabled = false;
+      setState('placeholder');
+      showError('Network error — are both servers running on :5000 and :8001?');
+    }
+  }
+
+  function setState(s) {
+    document.getElementById('loader').style.display      = s === 'loading'     ? 'flex' : 'none';
+    document.getElementById('placeholder').style.display = s === 'placeholder' ? 'flex' : 'none';
+    document.getElementById('results').style.display     = s === 'results'     ? 'block': 'none';
+  }
+  function showError(msg) {
+    const el = document.getElementById('error-box');
+    el.textContent = '⚠ ' + msg;
+    el.style.display = 'flex';
+  }
+  function hideError() { document.getElementById('error-box').style.display = 'none'; }
+
+  /* ── Render results ──────────────────────────────────────── */
+  function renderResults(data) {
+    const a   = data.room_analysis;
+    const rec = data.recommended_plan;
+
+    /* Room meta */
+    document.getElementById('room-meta').innerHTML = `
+      <div class="meta-pill">
+        <div class="meta-pill__label">Room Type</div>
+        <div class="meta-pill__value">${a.room_type.replace(/_/g,' ')}</div>
+      </div>
+      <div class="meta-pill">
+        <div class="meta-pill__label">Wall Condition</div>
+        <div class="meta-pill__value">${a.wall_condition.replace(/_/g,' ')}</div>
+      </div>
+      <div class="meta-pill">
+        <div class="meta-pill__label">Ceiling Height</div>
+        <div class="meta-pill__value">${a.estimated_ceiling_height_m} m</div>
+      </div>
+      <div class="meta-pill">
+        <div class="meta-pill__label">Notes</div>
+        <div class="meta-pill__value" style="font-size:12px;font-weight:500">${a.special_notes || '—'}</div>
+      </div>
+    `;
+
+    /* Feature tags */
+    document.getElementById('features-row').innerHTML =
+      a.detected_features.map(f => `<span class="feature-tag">${f}</span>`).join('');
+
+    /* Recommendation */
+    document.getElementById('rec-banner').innerHTML =
+      `<strong>Recommended: ${rec}</strong> &mdash; ${data.recommendation_reason}`;
+
+    /* Plans */
+    const clsMap = { Economy: 'economy', Standard: 'standard', Premium: 'premium' };
+    const tabsEl   = document.getElementById('plan-tabs');
+    const panelsEl = document.getElementById('plan-panels');
+    tabsEl.innerHTML = '';
+    panelsEl.innerHTML = '';
+
+    data.finishing_plans.forEach((plan, i) => {
+      const cls   = clsMap[plan.plan_name] || 'standard';
+      const isRec = plan.plan_name === rec;
+      const isActive = isRec; // recommended plan active by default
+
+      const tab = document.createElement('button');
+      tab.className = `plan-tab ${cls}${isActive ? ' active' : ''}`;
+      tab.dataset.idx = i;
+      tab.innerHTML = `
+        <span class="plan-tab__name">${plan.plan_name}${isRec ? '<span class="rec-star">★ Best</span>' : ''}</span>
+        <span class="plan-tab__price">EGP ${plan.total_cost_egp.toLocaleString()}</span>
+      `;
+      tab.onclick = () => switchPlan(i, data.finishing_plans.length);
+      tabsEl.appendChild(tab);
+
+      const panel = document.createElement('div');
+      panel.id = `panel-${i}`;
+      panel.className = `plan-panel${isActive ? ' active' : ''}`;
+      panel.innerHTML = buildPanel(plan, cls);
+      panelsEl.appendChild(panel);
+    });
+  }
+
+  function switchPlan(idx) {
+    document.querySelectorAll('.plan-tab').forEach((t, i) => {
+      t.className = t.className.replace(' active', '') + (i === idx ? ' active' : '');
+    });
+    document.querySelectorAll('.plan-panel').forEach((p, i) => {
+      p.className = 'plan-panel' + (i === idx ? ' active' : '');
+    });
+  }
+
+  function buildPanel(plan, cls) {
+    const accentColor = cls === 'economy' ? 'var(--color-success)'
+                      : cls === 'premium' ? 'var(--color-accent-warm)'
+                      :                     'var(--color-accent)';
+
+    const matRows = (plan.materials || []).map(m => `
+      <tr>
+        <td>
+          <strong>${m.name}</strong>
+          <div class="notes">${m.notes || ''}</div>
+        </td>
+        <td>${m.quantity} ${m.unit}</td>
+        <td>EGP ${m.unit_price_egp.toLocaleString()}</td>
+        <td class="amount" style="color:${accentColor}">EGP ${m.total_egp.toLocaleString()}</td>
+      </tr>`).join('') || `<tr><td colspan="4" style="color:var(--color-text-light)">No materials listed</td></tr>`;
+
+    const labRows = (plan.labor || []).map(l => `
+      <tr>
+        <td>
+          <strong>${l.trade}</strong>
+          <div class="notes">${l.description}</div>
+        </td>
+        <td>${l.days} days</td>
+        <td>EGP ${l.daily_rate_egp.toLocaleString()}/day</td>
+        <td class="amount" style="color:${accentColor}">EGP ${l.total_egp.toLocaleString()}</td>
+      </tr>`).join('') || `<tr><td colspan="4" style="color:var(--color-text-light)">No labor listed</td></tr>`;
+
+    return `
+      <p style="font-size:13.5px;color:var(--color-text-light);margin-bottom:16px;">${plan.description}</p>
+
+      <div class="cost-summary">
+        <div class="cost-box cost-box--highlight">
+          <div class="cost-box__amount" style="color:${accentColor}">EGP ${plan.total_cost_egp.toLocaleString()}</div>
+          <div class="cost-box__label">Total</div>
+        </div>
+        <div class="cost-box">
+          <div class="cost-box__amount">EGP ${plan.materials_subtotal_egp.toLocaleString()}</div>
+          <div class="cost-box__label">Materials</div>
+        </div>
+        <div class="cost-box">
+          <div class="cost-box__amount">EGP ${plan.labor_subtotal_egp.toLocaleString()}</div>
+          <div class="cost-box__label">Labor</div>
+        </div>
+      </div>
+
+      <div class="section-label">Materials Breakdown</div>
+      <table class="data-table">
+        <thead><tr><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
+        <tbody>${matRows}</tbody>
+      </table>
+
+      <div class="section-label">Labor Breakdown</div>
+      <table class="data-table">
+        <thead><tr><th>Trade</th><th>Duration</th><th>Rate</th><th>Total</th></tr></thead>
+        <tbody>${labRows}</tbody>
+      </table>
+
+      <div class="timeline-banner">
+        <div>
+          <div style="font-family:'Poppins',sans-serif;font-size:13px;font-weight:700;color:var(--color-primary)">Estimated Timeline</div>
+          <div class="timeline-banner__label">From start to completion</div>
+        </div>
+        <div style="text-align:right">
+          <div class="timeline-banner__days" style="color:${accentColor}">${plan.timeline_days}</div>
+          <div class="timeline-banner__unit">days</div>
+        </div>
+      </div>
+    `;
+  }
+
+  /* Initial state */
+  setState('placeholder');
+</script>
+</body>
+</html>
