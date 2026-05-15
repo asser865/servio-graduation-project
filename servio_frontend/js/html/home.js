@@ -86,8 +86,8 @@ document.addEventListener('DOMContentLoaded', () => {
   loadServicesGrid();
 
   // ── Hero search navigation ─────────────────────────────────────────────
-  const heroInput    = document.querySelector('.hero-search__input');
-  const heroBtn      = document.querySelector('.hero-search__btn');
+  const heroInput = document.querySelector('.hero-search__input');
+  const heroBtn = document.querySelector('.hero-search__btn');
   const autocomplete = document.getElementById('hero-autocomplete');
 
   function navigateToMarketplace(query) {
@@ -97,7 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
       : './services-marketplace.html';
   }
 
-  if (heroBtn)   heroBtn.addEventListener('click', () => navigateToMarketplace());
+  if (heroBtn) heroBtn.addEventListener('click', () => navigateToMarketplace());
   if (heroInput) heroInput.addEventListener('keydown', e => { if (e.key === 'Enter') navigateToMarketplace(); });
 
   // ── Typewriter placeholder effect ─────────────────────────────────────
@@ -112,15 +112,15 @@ document.addEventListener('DOMContentLoaded', () => {
       'What service do you need?',
     ];
 
-    let twPhraseIdx   = 0;
-    let twCharIdx     = 0;
-    let twDeleting    = false;
-    let twTimer       = null;
-    let twPaused      = false;  // paused while user focuses the input
+    let twPhraseIdx = 0;
+    let twCharIdx = 0;
+    let twDeleting = false;
+    let twTimer = null;
+    let twPaused = false;  // paused while user focuses the input
 
-    const TYPE_SPEED   = 55;   // ms per character while typing
+    const TYPE_SPEED = 55;   // ms per character while typing
     const DELETE_SPEED = 28;   // ms per character while deleting
-    const PAUSE_AFTER  = 1800; // ms pause after fully typed
+    const PAUSE_AFTER = 1800; // ms pause after fully typed
     const PAUSE_BEFORE = 380;  // ms pause before starting next phrase
 
     function twTick() {
@@ -145,7 +145,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (twCharIdx === 0) {
           // Fully erased — move to next phrase
-          twDeleting  = false;
+          twDeleting = false;
           twPhraseIdx = (twPhraseIdx + 1) % TYPEWRITER_PHRASES.length;
           twTimer = setTimeout(twTick, PAUSE_BEFORE);
           return;
@@ -186,7 +186,7 @@ document.addEventListener('DOMContentLoaded', () => {
       : autocompleteServices;
 
     autocomplete.innerHTML = filtered.slice(0, 8).map(svc => {
-      const cat  = svc.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const cat = svc.toLowerCase().replace(/[^a-z0-9]/g, '');
       const meta = Object.entries(CATEGORY_META).find(([k]) => svc.toLowerCase().includes(k.replace('-', '')))?.[1];
       const emoji = meta ? meta.emoji : '🔧';
       return `<button class="hero-autocomplete__item" role="option" data-service="${svc}">${emoji} ${svc}</button>`;
@@ -222,7 +222,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const apiTitles = ((resp && resp.services) ? resp.services : []).map(s => s.title);
       if (apiTitles.length) autocompleteServices = apiTitles;
     })
-    .catch(() => {});
+    .catch(() => { });
 
   if (heroInput && autocomplete) {
     heroInput.addEventListener('focus', () => showAutocomplete(heroInput.value));
@@ -237,24 +237,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ── Elite Network carousel ────────────────────────────────────────────
   const eliteScroll = document.querySelector('#elite-scroll');
-  const elitePrev   = document.querySelector('.elite-carousel__btn--prev');
-  const eliteNext   = document.querySelector('.elite-carousel__btn--next');
+  const elitePrev = document.querySelector('.elite-carousel__btn--prev');
+  const eliteNext = document.querySelector('.elite-carousel__btn--next');
 
   function eliteScrollStep() {
     if (!eliteScroll) return 360;
     const card = eliteScroll.querySelector('.elite-card');
     if (!card) return 360;
     const gapStr = getComputedStyle(eliteScroll).gap;
-    const gap    = parseFloat(gapStr) || 24;
+    const gap = parseFloat(gapStr) || 24;
     return card.offsetWidth + gap;
   }
 
   function updateEliteCarouselButtons() {
     if (!eliteScroll || !elitePrev || !eliteNext) return;
-    const el  = eliteScroll;
+    const el = eliteScroll;
     const max = Math.max(0, el.scrollWidth - el.clientWidth);
     if (max <= 0) { elitePrev.disabled = true; eliteNext.disabled = true; return; }
-    const sl  = el.scrollLeft;
+    const sl = el.scrollLeft;
     const rtl = getComputedStyle(el).direction === 'rtl';
     const tol = 6;
     let atStart, atEnd;
@@ -271,8 +271,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function scrollElite(direction) {
     if (!eliteScroll) return;
-    const step  = eliteScrollStep();
-    const rtl   = getComputedStyle(eliteScroll).direction === 'rtl';
+    const step = eliteScrollStep();
+    const rtl = getComputedStyle(eliteScroll).direction === 'rtl';
     const delta = (rtl ? -direction : direction) * step;
     eliteScroll.scrollBy({ left: delta, behavior: 'smooth' });
   }
@@ -286,9 +286,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ── Section indicator scroll spy ───────────────────────────────────────
-  const indicatorNav   = document.querySelector('.home-section-indicator');
+  const indicatorNav = document.querySelector('.home-section-indicator');
   const indicatorLinks = Array.from(document.querySelectorAll('[data-home-indicator-link]'));
-  const sectionMap     = indicatorLinks
+  const sectionMap = indicatorLinks
     .map(link => {
       const id = link.getAttribute('href');
       if (!id || !id.startsWith('#')) return null;
@@ -311,7 +311,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const isActive = link === activeLink;
       link.classList.toggle('is-active', isActive);
       if (isActive) link.setAttribute('aria-current', 'true');
-      else           link.removeAttribute('aria-current');
+      else link.removeAttribute('aria-current');
     });
     if (activeSection) updateIndicatorTheme(activeSection);
   }
@@ -347,48 +347,53 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ── Hero background parallax ──────────────────────────────────────────
-  const heroBgImg   = document.querySelector('.home-hero__bg-img');
+  const heroBgImg = document.querySelector('.home-hero__bg-img');
   const heroSection = document.querySelector('.home-hero');
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   if (heroBgImg && heroSection && !reducedMotion) {
+    let rafPending = false;
     window.addEventListener('scroll', () => {
-      const scrolled = window.scrollY;
-      const heroH    = heroSection.offsetHeight;
-      if (scrolled < heroH) {
-        const pct = scrolled / heroH;
-        // Combine parallax with ken-burns — keep scale, shift Y gently
-        heroBgImg.style.transform = `scale(1.06) translateY(${pct * 14}%) translate(-1%, 1%)`;
-      }
+      if (rafPending) return;
+      rafPending = true;
+      requestAnimationFrame(() => {
+        rafPending = false;
+        const scrolled = window.scrollY;
+        const heroH = heroSection.offsetHeight;
+        if (scrolled < heroH) {
+          const pct = scrolled / heroH;
+          heroBgImg.style.transform = `scale(1.06) translateY(${pct * 14}%) translate(-1%, 1%)`;
+        }
+      });
     }, { passive: true });
   }
 
 
   // ── FOMO: Fake Live Booking Toasts ─────────────────────────────────────
   const bookingToast = document.getElementById('booking-toast');
-  const toastTitle   = document.getElementById('toast-title');
-  const toastSub     = document.getElementById('toast-sub');
-  const toastClose   = document.getElementById('toast-close');
+  const toastTitle = document.getElementById('toast-title');
+  const toastSub = document.getElementById('toast-sub');
+  const toastClose = document.getElementById('toast-close');
 
   if (bookingToast && toastTitle && toastSub) {
     const isArabic = (document.documentElement.getAttribute('lang') || '').toLowerCase().startsWith('ar');
 
     const FOMO_DATA_EN = [
-      { name: 'Khaled',  city: 'Maadi',        service: 'Plumbing',      time: '2 min ago' },
-      { name: 'Sara',    city: 'New Cairo',    service: 'AC Maintenance',time: '5 min ago' },
-      { name: 'Mohamed', city: 'Heliopolis',   service: 'Electrical',    time: '1 min ago' },
-      { name: 'Nour',    city: 'Zamalek',      service: 'Cleaning',      time: '8 min ago' },
-      { name: 'Ahmed',   city: '6th October',  service: 'Painting',      time: '3 min ago' },
-      { name: 'Laila',   city: 'Dokki',        service: 'Carpentry',     time: '10 min ago' }
+      { name: 'Khaled', city: 'Maadi', service: 'Plumbing', time: '2 min ago' },
+      { name: 'Sara', city: 'New Cairo', service: 'AC Maintenance', time: '5 min ago' },
+      { name: 'Mohamed', city: 'Heliopolis', service: 'Electrical', time: '1 min ago' },
+      { name: 'Nour', city: 'Zamalek', service: 'Cleaning', time: '8 min ago' },
+      { name: 'Ahmed', city: '6th October', service: 'Painting', time: '3 min ago' },
+      { name: 'Laila', city: 'Dokki', service: 'Carpentry', time: '10 min ago' }
     ];
 
     const FOMO_DATA_AR = [
-      { name: 'خالد',   city: 'المعادي',        service: 'سباكة',         time: 'منذ دقيقتين' },
-      { name: 'سارة',   city: 'القاهرة الجديدة', service: 'صيانة تكييف',     time: 'منذ 5 دقائق' },
-      { name: 'محمد',   city: 'مصر الجديدة',    service: 'كهرباء',        time: 'منذ دقيقة' },
-      { name: 'نور',    city: 'الزمالك',        service: 'تنظيف',         time: 'منذ 8 دقائق' },
-      { name: 'أحمد',   city: '6 أكتوبر',       service: 'نقاشة',         time: 'منذ 3 دقائق' },
-      { name: 'ليلى',   city: 'الدقي',         service: 'نجارة',         time: 'منذ 10 دقائق' }
+      { name: 'خالد', city: 'المعادي', service: 'سباكة', time: 'منذ دقيقتين' },
+      { name: 'سارة', city: 'القاهرة الجديدة', service: 'صيانة تكييف', time: 'منذ 5 دقائق' },
+      { name: 'محمد', city: 'مصر الجديدة', service: 'كهرباء', time: 'منذ دقيقة' },
+      { name: 'نور', city: 'الزمالك', service: 'تنظيف', time: 'منذ 8 دقائق' },
+      { name: 'أحمد', city: '6 أكتوبر', service: 'نقاشة', time: 'منذ 3 دقائق' },
+      { name: 'ليلى', city: 'الدقي', service: 'نجارة', time: 'منذ 10 دقائق' }
     ];
 
     const FOMO_DATA = isArabic ? FOMO_DATA_AR : FOMO_DATA_EN;
@@ -396,15 +401,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let fomoIndex = 0;
     let fomoTimer = null;
-    
+
     function showFomo() {
       // Don't show if window is hidden (save resources)
       if (document.hidden) return;
 
       const data = FOMO_DATA[fomoIndex];
       toastTitle.textContent = titleTemplate.replace('{name}', data.name);
-      toastSub.textContent   = `${data.service} · ${data.time}`;
-      
+      toastSub.textContent = `${data.service} · ${data.time}`;
+
       bookingToast.hidden = false;
       // Allow a frame for 'hidden' removal, then animate
       requestAnimationFrame(() => {

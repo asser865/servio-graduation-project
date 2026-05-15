@@ -289,7 +289,15 @@
               </div>
             </div>
 
+            <!-- Cash booking block banner -->
+            <div id="techCashBlockBanner" class="tech-cash-block-banner" hidden>
+              <!-- populated by JS -->
+            </div>
 
+            <!-- Outstanding debt section -->
+            <section id="techDebtSection" class="tech-debt-section" hidden>
+              <!-- populated by JS -->
+            </section>
 
             <!-- Bottom grid -->
             <div class="tech-bottom-grid" data-reveal>
@@ -430,12 +438,8 @@
                   <p class="avail-now-card__hint" data-i18n="tech_avail_hint">Toggle on to appear in search results and accept new bookings.</p>
                 </div>
               </div>
-              <label class="avail-toggle-switch" aria-label="Toggle availability" data-i18n-aria-label="tech_avail_toggle_aria">
-                <input type="checkbox" id="avail-now-toggle" data-avail-toggle />
-                <span class="avail-toggle-switch__track">
-                  <span class="avail-toggle-switch__thumb"></span>
-                </span>
-              </label>
+              <input type="checkbox" id="avail-now-toggle" class="avail-vi-input" data-avail-toggle />
+              <label for="avail-now-toggle" class="avail-vi-switch" aria-label="Toggle availability"></label>
             </div>
 
             <!-- ── Weekly Schedule ── -->
@@ -525,12 +529,22 @@
 
               <div class="avail-coverage-grid">
                 <div class="form-field">
-                  <label class="form-label" for="service-area" data-i18n="tech_service_area_lbl">Service Area</label>
+                  <label class="form-label" for="coverage-search">Coverage districts</label>
+                  <div class="field-icon-wrap">
+                    <svg class="field-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>
+                    <input class="form-input form-input--icon" type="search" id="coverage-search" placeholder="Search districts" autocomplete="off" />
+                  </div>
+                  <p class="form-hint">Select exact districts customers can book you in.</p>
+                </div>
+                <div class="coverage-chip-editor" id="coverage-area-chips" role="group" aria-label="Coverage districts"></div>
+                <p class="coverage-summary" id="coverage-summary">No coverage areas selected.</p>
+                <div class="form-field">
+                  <label class="form-label" for="service-area" data-i18n="tech_service_area_lbl">Custom area fallback</label>
                   <div class="field-icon-wrap">
                     <svg class="field-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                    <input class="form-input form-input--icon" type="text" id="service-area" name="serviceArea" placeholder="e.g. Cairo, Giza, Heliopolis" data-i18n-placeholder="tech_service_area_ph" />
+                    <input class="form-input form-input--icon" type="text" id="service-area" name="serviceArea" placeholder="Only if a district is missing" data-i18n-placeholder="tech_service_area_ph" />
                   </div>
-                  <p class="form-hint">Separate multiple areas with commas</p>
+                  <p class="form-hint">Use commas for custom areas not listed above.</p>
                 </div>
               </div>
 
@@ -727,6 +741,13 @@
                     <div class="profile-complete-fill" id="profile-complete-fill"></div>
                   </div>
                   <p class="settings-section__desc" data-i18n="tech_profile_complete_desc">Complete your profile so customers can find and trust you.</p>
+                  <ul class="setup-checklist" aria-label="Post approval setup checklist">
+                    <li>Exact services</li>
+                    <li>Service coverage</li>
+                    <li>Working hours</li>
+                    <li>Pricing</li>
+                    <li>Profile bio</li>
+                  </ul>
                 </div>
               </div>
 
@@ -1114,13 +1135,15 @@
                   <span>Services Offered</span>
                 </h2>
                 <p class="settings-section__desc">Select the specific services you provide. These appear on your profile and filter customer booking requests.</p>
-                <div id="services-catalog">
-                  <p style="color:var(--color-secondary,#9A8C73);font-size:0.875rem;">Loading services&hellip;</p>
-                </div>
-                <div class="form-field" style="margin-top:16px;">
-                  <label class="form-label" for="s-certifications">Certifications / Licenses</label>
-                  <textarea class="form-input form-textarea" id="s-certifications" name="certifications" rows="3" placeholder="e.g. Egyptian Syndicate of Engineers — No. 12345"></textarea>
-                  <span class="form-hint">One per line.</span>
+                <div class="settings-stack">
+                  <div id="services-catalog">
+                    <p style="color:var(--color-secondary,#9A8C73);font-size:0.875rem;">Loading services&hellip;</p>
+                  </div>
+                  <div class="form-field">
+                    <label class="form-label" for="s-certifications">Certifications / Licenses</label>
+                    <textarea class="form-input form-textarea" id="s-certifications" name="certifications" rows="3" placeholder="e.g. Egyptian Syndicate of Engineers — No. 12345"></textarea>
+                    <span class="form-hint">One per line.</span>
+                  </div>
                 </div>
                 <div class="settings-submit-row">
                   <button class="btn btn--primary" type="button" id="btn-save-skills">Save Changes</button>
@@ -1135,17 +1158,18 @@
                   <span data-i18n="tech_areas_title">Service Areas</span>
                 </h2>
                 <p class="settings-section__desc" data-i18n="tech_areas_desc">Select the districts you're willing to travel to for jobs.</p>
-                <div class="skill-tags" id="area-tags" role="group" aria-label="Service areas">
-                  <button type="button" class="skill-tag" data-area="Maadi" aria-pressed="false">Maadi</button>
-                  <button type="button" class="skill-tag" data-area="Heliopolis" aria-pressed="false">Heliopolis</button>
-                  <button type="button" class="skill-tag" data-area="Nasr City" aria-pressed="false">Nasr City</button>
-                  <button type="button" class="skill-tag" data-area="Zamalek" aria-pressed="false">Zamalek</button>
-                  <button type="button" class="skill-tag" data-area="New Cairo" aria-pressed="false">New Cairo</button>
-                  <button type="button" class="skill-tag" data-area="6th of October" aria-pressed="false">6th of October</button>
-                  <button type="button" class="skill-tag" data-area="Dokki" aria-pressed="false">Dokki</button>
-                  <button type="button" class="skill-tag" data-area="Giza" aria-pressed="false">Giza</button>
-                  <button type="button" class="skill-tag" data-area="Shubra" aria-pressed="false">Shubra</button>
-                  <button type="button" class="skill-tag" data-area="Ain Shams" aria-pressed="false">Ain Shams</button>
+                <div class="avail-coverage-grid">
+                  <div class="form-field">
+                    <label class="form-label" for="settings-coverage-search">Search districts</label>
+                    <input class="form-input" type="search" id="settings-coverage-search" placeholder="Search Maadi, Nasr City, New Cairo..." autocomplete="off" />
+                  </div>
+                  <div class="skill-tags coverage-chip-editor" id="area-tags" role="group" aria-label="Service areas"></div>
+                  <p class="coverage-summary" id="settings-coverage-summary">No coverage areas selected.</p>
+                  <div class="form-field">
+                    <label class="form-label" for="settings-service-area-custom">Custom areas</label>
+                    <input class="form-input" type="text" id="settings-service-area-custom" placeholder="Only if a district is missing" />
+                    <span class="form-hint">Use commas for custom districts not listed above.</span>
+                  </div>
                 </div>
                 <div class="settings-submit-row">
                   <button class="btn btn--primary" type="button" id="btn-save-areas" data-i18n="tech_save_changes">Save Changes</button>

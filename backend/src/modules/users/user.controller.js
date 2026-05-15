@@ -9,6 +9,7 @@ const User            = require('./user.model');
 const Review          = require('../reviews/review.model');
 const Booking         = require('../bookings/booking.model');
 const Payment         = require('../payments/payment.model');
+const CashDebt        = require('../payments/cash-debt.model');
 const Dispute         = require('../payments/dispute.model');
 const Service         = require('../services/service.model');
 const ApiError        = require('../../utils/ApiError');
@@ -74,6 +75,20 @@ function normalizeWorkerDecision(body) {
   if (body?.decision === 'rejected' || body?.isVerified === false) return 'rejected';
   return '';
 }
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function normalizeStringList(value) {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(
+    value
+      .map((item) => String(item || '').trim())
+      .filter(Boolean)
+  )];
+}
+
 const getMe = async (req, res) => {
   const user = await User.findById(req.user.id).select('-password');
   if (!user) throw new ApiError(StatusCodes.NOT_FOUND, 'User not found.');
@@ -86,7 +101,7 @@ const getMe = async (req, res) => {
 // HOW:  Optional ?serviceId (canonical) or ?category (legacy) filter.
 //       serviceId takes priority when both are provided.
 const getWorkers = async (req, res) => {
-  const { serviceId, category, page = 1, limit = 10 } = req.query;
+  const { serviceId, category, area, page = 1, limit = 10 } = req.query;
   const normalizedCategory = normalizeWorkerCategory(category);
 
   const filter = {
@@ -126,11 +141,22 @@ const getWorkers = async (req, res) => {
     ];
   }
 
+  const normalizedArea = String(area || '').trim();
+  if (normalizedArea) {
+    const exactAreaRegex = new RegExp(`^${escapeRegExp(normalizedArea)}$`, 'i');
+    const commaAreaRegex = new RegExp(`(^|,)\\s*${escapeRegExp(normalizedArea)}\\s*(,|$)`, 'i');
+    filter.$or = [
+      { coverageAreas: exactAreaRegex },
+      { serviceArea: commaAreaRegex },
+      { locationLabel: commaAreaRegex },
+    ];
+  }
+
   const skip = (Number(page) - 1) * Number(limit);
 
   const [workers, total] = await Promise.all([
     User.find(filter)
-      .select('name profileImage categories services skills averageRating totalReviews location locationLabel hourlyRate isVerified isAvailable serviceArea availability completedJobs yearsExperience bio')
+      .select('name profileImage categories services skills averageRating totalReviews location locationLabel hourlyRate isVerified isAvailable serviceArea coverageAreas availability completedJobs yearsExperience bio')
       .populate('services', 'title category')
       .sort({ averageRating: -1 })
       .skip(skip)
@@ -191,6 +217,7 @@ const updateProfile = async (req, res) => {
     'services',
     'isAvailable',
     'serviceArea',
+    'coverageAreas',
     'idFrontUrl',
     'idFrontName',
     'idBackUrl',
@@ -205,6 +232,9 @@ const updateProfile = async (req, res) => {
   allowedFields.forEach((field) => {
     if (req.body[field] !== undefined) updates[field] = req.body[field];
   });
+  if (updates.coverageAreas !== undefined) {
+    updates.coverageAreas = normalizeStringList(updates.coverageAreas);
+  }
 
   // Only workers may update their service assignments
   if (updates.services !== undefined && req.user?.role !== 'worker') {
@@ -582,6 +612,8 @@ const getPaymentAnalytics = async (req, res) => {
     openDisputes,
     paymentStatusStats,
     revenueByMonth,
+    cashDebtOutstandingResult,
+    cashDebtCollectedResult,
   ] = await Promise.all([
     Payment.aggregate([
       { $match: { status: 'released' } },
@@ -611,6 +643,13 @@ const getPaymentAnalytics = async (req, res) => {
       },
       { $sort: { '_id.year': 1, '_id.month': 1 } },
     ]),
+    CashDebt.aggregate([
+      { $match: { status: { $in: ['outstanding', 'partially_paid'] } } },
+      { $group: { _id: null, outstanding: { $sum: { $subtract: ['$amount', '$paidAmount'] } } } },
+    ]),
+    CashDebt.aggregate([
+      { $group: { _id: null, collected: { $sum: '$paidAmount' } } },
+    ]),
   ]);
 
   const paymentsByStatus = paymentStatusStats.reduce((acc, item) => {
@@ -626,6 +665,10 @@ const getPaymentAnalytics = async (req, res) => {
     openDisputes,
     paymentsByStatus,
     revenueByMonth,
+    cashDebtOutstanding:  cashDebtOutstandingResult[0]?.outstanding || 0,
+    cashDebtCollected:    cashDebtCollectedResult[0]?.collected     || 0,
+    onlinePlatformFees:   revenueResult[0]?.total                   || 0,
+    totalPlatformRevenue: (revenueResult[0]?.total || 0) + (cashDebtCollectedResult[0]?.collected || 0),
   });
 };
 
@@ -647,7 +690,9 @@ const toggleBlockedDate = async (req, res) => {
 
 const addAddress = async (req, res) => {
   const { label, street, city, state, zipCode } = req.body;
-  if (!street) throw new ApiError(StatusCodes.BAD_REQUEST, 'Street is required.');
+  const isSmartMatchArea = (label || '').trim() === 'Smart Match Area';
+  if (!isSmartMatchArea && !street) throw new ApiError(StatusCodes.BAD_REQUEST, 'Street is required.');
+  if (!city) throw new ApiError(StatusCodes.BAD_REQUEST, 'City is required.');
   const user = await User.findById(req.user.id);
   if (!user) throw new ApiError(StatusCodes.NOT_FOUND, 'User not found.');
   user.addresses.push({ label: label || 'Address', street, city, state, zipCode });

@@ -1,5 +1,7 @@
 import { initNavbar } from "./components/navbar.js";
 import { initAuthHeader } from "./components/auth-header.js";
+import { initNotifBell } from "./components/notif-bell.js";
+import { initNotifWatcher } from './components/notif-watcher.js';
 import { initChatWidget } from "./components/chat-widget.js";
 import { initScrollReveal } from "./components/scroll-reveal.js";
 import { initScrollEffects } from "./components/scroll-effects.js";
@@ -35,6 +37,10 @@ import { initBackToTop } from "./components/back-to-top.js";
   const isAuthPage  = path.includes('login.html') || path.includes('signup.html')
                    || path.includes('forgot-password.html') || path.includes('reset-password.html');
 
+  // Technician previewing their own public profile (read-only)
+  const isTechProfilePreview = path.includes('technician-profile')
+    && new URLSearchParams(window.location.search).get('preview') === '1';
+
   if (isAuthPage) return;
 
   // 1. Admin: Strictly isolated to Admin Dashboard
@@ -44,7 +50,8 @@ import { initBackToTop } from "./components/back-to-top.js";
   }
 
   // 2. Technician: Strictly isolated to Technician Dashboard
-  if (session.role === 'technician' && !isTechPage) {
+  //    Exception: allowed to view their own public profile with preview=1
+  if (session.role === 'technician' && !isTechPage && !isTechProfilePreview) {
     window.location.href = './technician-dashboard.html';
     return;
   }
@@ -64,6 +71,8 @@ const isAuthPage = document.body.classList.contains('auth-page');
 if (!isAuthPage) {
   initNavbar();
   initAuthHeader();
+  initNotifBell();
+  initNotifWatcher();
   initChatWidget();
   initScrollReveal();
   initScrollEffects();

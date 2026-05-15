@@ -8,41 +8,96 @@
 .contact-hero {
   position: relative;
   padding: 130px 0 80px;
-  background: #101217;
+  background: var(--color-bg);
   border-bottom: none;
   overflow: hidden;
 }
 
-.contact-hero__bg {
+/* ── Liquid Mesh Background ── */
+.contact-hero__liquid-bg {
   position: absolute;
   inset: 0;
-  pointer-events: none;
+  width: 100%;
+  height: 100%;
   z-index: 0;
+  background: var(--color-bg);
+  overflow: hidden;
+  filter: saturate(1.2);
+  -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
+  mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
 }
 
-.contact-hero__bg::before,
-.contact-hero__bg::after {
-  content: "";
+.liquid-orb {
   position: absolute;
   border-radius: 50%;
-  filter: blur(120px);
-  z-index: 3;
+  filter: blur(100px);
+  opacity: 0.5;
+  mix-blend-mode: screen;
 }
 
-.contact-hero__bg::before {
+.liquid-orb--1 {
   width: 600px;
   height: 600px;
-  background: radial-gradient(circle, rgba(254, 193, 149, 0.4), transparent 60%);
-  top: -150px;
-  left: -150px;
+  background: radial-gradient(circle, #BFB09A, transparent 70%);
+  top: -100px;
+  left: -100px;
+  animation: orbDrift1 25s ease-in-out infinite alternate;
 }
 
-.contact-hero__bg::after {
-  width: 700px;
-  height: 700px;
-  background: radial-gradient(circle, rgba(154, 140, 115, 0.35), transparent 60%);
-  bottom: -150px;
-  right: -150px;
+.liquid-orb--2 {
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, #6C3A1C, transparent 70%);
+  bottom: -100px;
+  right: -50px;
+  animation: orbDrift2 30s ease-in-out infinite alternate;
+}
+
+.liquid-orb--3 {
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, #1E1B4B, transparent 70%);
+  top: 40%;
+  left: 30%;
+  animation: orbDrift3 22s ease-in-out infinite alternate;
+}
+
+.liquid-orb--interactive {
+  width: 450px;
+  height: 450px;
+  background: radial-gradient(circle, rgba(191, 176, 154, 0.4), transparent 70%);
+  opacity: 0.6;
+  z-index: 1;
+  pointer-events: none;
+  filter: blur(80px);
+}
+
+.liquid-grain {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  opacity: 0.04;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+@keyframes orbDrift1 {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(100px, 50px) scale(1.1); }
+}
+
+@keyframes orbDrift2 {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(-80px, -60px) scale(1.15); }
+}
+
+@keyframes orbDrift3 {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(50px, -100px) scale(0.9); }
+}
+
+.contact-hero__bg {
+  display: none;
 }
 
 .contact-hero > .container {
@@ -108,7 +163,7 @@
 /* ── Form + Info grid ────────────────────────────────── */
 .contact-main {
   padding: 72px 0;
-  background: var(--color-surface-alt);
+  background: var(--color-bg); /* Merged background */
 }
 
 .contact-main__grid {

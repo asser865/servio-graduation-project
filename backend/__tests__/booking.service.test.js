@@ -4,12 +4,14 @@ jest.mock('../src/modules/users/user.model.js');
 jest.mock('../src/modules/services/service.model.js');
 jest.mock('../src/modules/bookings/booking.model.js');
 jest.mock('../src/modules/savedCards/savedCard.model.js');
+jest.mock('../src/modules/admin/settings.model.js');
 
 const User    = require('../src/modules/users/user.model.js');
 const Service = require('../src/modules/services/service.model.js');
 const Booking = require('../src/modules/bookings/booking.model.js');
 const SavedCard = require('../src/modules/savedCards/savedCard.model.js');
-const { createBooking } = require('../src/modules/bookings/booking.service.js');
+const Settings = require('../src/modules/admin/settings.model.js');
+const { createBooking, rescheduleBooking } = require('../src/modules/bookings/booking.service.js');
 
 const PLUMBING_SERVICE_ID = '664000000000000000000001';
 const HVAC_SERVICE_ID     = '664000000000000000000002';
@@ -68,6 +70,7 @@ beforeEach(() => {
   User.findOne    = jest.fn().mockResolvedValue(makeWorker());
   Service.findOne = jest.fn().mockResolvedValue(makeService());
   Booking.findOne = jest.fn().mockResolvedValue(null);
+  Settings.findOne = jest.fn().mockResolvedValue({ commissionRate: 10, cashPaymentsEnabled: true });
   Booking.create  = jest.fn().mockResolvedValue({
     ...baseBookingData,
     _id: 'booking123',
@@ -313,5 +316,78 @@ describe('createBooking — success', () => {
     expect(Booking.create).toHaveBeenCalledWith(
       expect.objectContaining({ worker: WORKER_ID, scheduledTime: '10:00', address: '12 Tahrir St, Cairo', paymentMethod: 'cash' })
     );
+  });
+
+  test('snapshots platform fee and demo card metadata at creation time', async () => {
+    Settings.findOne = jest.fn().mockResolvedValue({ commissionRate: 12.5, cashPaymentsEnabled: true });
+    await createBooking(USER_ID, {
+      ...baseBookingData,
+      paymentMethod: 'online',
+      paymentMeta: { last4: '4242', cardType: 'visa', expiry: '12/30', label: 'Demo Visa', cvv: '123' },
+    });
+    expect(Booking.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        paymentMethod: 'online',
+        paymentStatus: 'demo_pending',
+        platformFeeRate: 12.5,
+        platformFeeAmount: 37.5,
+        estimatedTotal: 337.5,
+        paymentMeta: expect.objectContaining({ last4: '4242', cardType: 'visa', expiry: '12/30', label: 'Demo Visa' }),
+      })
+    );
+    expect(Booking.create.mock.calls[0][0].paymentMeta.cvv).toBeUndefined();
+  });
+});
+
+describe('rescheduleBooking', () => {
+  const makeExistingBooking = (overrides = {}) => ({
+    _id: { toString: () => '664000000000000000000030' },
+    user: { toString: () => USER_ID },
+    worker: { toString: () => WORKER_ID },
+    status: 'pending',
+    ...overrides,
+  });
+
+  test('updates schedule for the booking owner when slot is valid', async () => {
+    const populated = { _id: '664000000000000000000030', scheduledTime: '11:00' };
+    const chain = {
+      populate: jest.fn().mockReturnThis(),
+      then: (resolve) => resolve(populated),
+    };
+    Booking.findById = jest.fn().mockResolvedValue(makeExistingBooking());
+    Booking.findByIdAndUpdate = jest.fn().mockReturnValue(chain);
+
+    const result = await rescheduleBooking(
+      '664000000000000000000030',
+      { scheduledDate: NEXT_MONDAY, scheduledTime: '11:00' },
+      USER_ID,
+      'user'
+    );
+
+    expect(result).toBe(populated);
+    expect(Booking.findOne).toHaveBeenCalledWith(expect.objectContaining({
+      worker: expect.anything(),
+      scheduledTime: '11:00',
+      status: expect.objectContaining({ $in: expect.arrayContaining(['pending', 'accepted', 'en_route', 'arrived', 'in_progress']) }),
+    }));
+    expect(Booking.findByIdAndUpdate).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ scheduledTime: '11:00' }),
+      expect.objectContaining({ new: true, runValidators: true })
+    );
+  });
+
+  test('rejects reschedule after technician is en route', async () => {
+    Booking.findById = jest.fn().mockResolvedValue(makeExistingBooking({ status: 'en_route' }));
+
+    await expect(rescheduleBooking(
+      '664000000000000000000030',
+      { scheduledDate: NEXT_MONDAY, scheduledTime: '11:00' },
+      USER_ID,
+      'user'
+    )).rejects.toMatchObject({
+      statusCode: 400,
+      message: expect.stringContaining('can no longer be rescheduled'),
+    });
   });
 });

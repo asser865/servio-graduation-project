@@ -2,6 +2,7 @@
 
 const NotifyRequest              = require('./notifyRequest.model');
 const { sendTechAvailableEmail } = require('../../utils/email');
+const { createNotification }     = require('./notification.service');
 
 /**
  * Fire-and-forget: find unfulfilled NotifyRequests that match the worker's
@@ -34,6 +35,17 @@ async function dispatchAvailabilityMatches(worker, baseUrl) {
       await sendTechAvailableEmail(req.email, worker.name, req.serviceCategory, bookingUrl);
       req.fulfilledAt = new Date();
       await req.save();
+      // Also create in-app notification if subscriber has an account
+      if (req.userId) {
+        createNotification(
+          req.userId,
+          'tech_available',
+          `Technician Available for ${req.serviceCategory}`,
+          `${worker.name} is now available for ${req.serviceCategory} in your area. Book now!`,
+          null,
+          bookingUrl
+        );
+      }
     } catch (err) {
       console.error(`[notify] Failed to notify ${req.email}:`, err.message);
     }

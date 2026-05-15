@@ -1,7 +1,8 @@
 const { StatusCodes } = require('http-status-codes');
-const Booking = require('../bookings/booking.model');
-const Payment = require('./payment.model');
-const Dispute = require('./dispute.model');
+const mongoose = require('mongoose');
+const Booking  = require('../bookings/booking.model');
+const Payment  = require('./payment.model');
+const Dispute  = require('./dispute.model');
 const Transaction = require('./transaction.model');
 const ApiError = require('../../utils/ApiError');
 
@@ -19,19 +20,11 @@ class DisputeService {
       throw new ApiError(StatusCodes.FORBIDDEN, 'This booking does not belong to you.');
     }
 
-    if (!['in_progress', 'completed'].includes(booking.status)) {
+    const validStatuses = ['in_progress', 'completed', 'awaiting_customer_confirmation'];
+    if (!validStatuses.includes(booking.status)) {
       throw new ApiError(
         StatusCodes.BAD_REQUEST,
         `Cannot open a dispute for a booking with status '${booking.status}'.`
-      );
-    }
-
-    const payment = await Payment.findOne({ booking: bookingId });
-    if (!payment) throw new ApiError(StatusCodes.NOT_FOUND, 'Payment not found for this booking.');
-    if (payment.status !== 'held') {
-      throw new ApiError(
-        StatusCodes.BAD_REQUEST,
-        `Cannot dispute a payment with status '${payment.status}'. Must be 'held'.`
       );
     }
 
@@ -43,26 +36,42 @@ class DisputeService {
       throw new ApiError(StatusCodes.CONFLICT, 'An open dispute already exists for this booking.');
     }
 
+    let payment = null;
+    if (booking.paymentMethod === 'online') {
+      payment = await Payment.findOne({ booking: bookingId });
+      if (!payment) throw new ApiError(StatusCodes.NOT_FOUND, 'Payment not found for this booking.');
+      if (payment.status !== 'held') {
+        throw new ApiError(StatusCodes.BAD_REQUEST, `Cannot dispute a payment with status '${payment.status}'.`);
+      }
+      payment.status = 'disputed';
+      await payment.save();
+
+      await Booking.findByIdAndUpdate(bookingId, {
+        status: 'disputed',
+        paymentStatus: 'disputed',
+      });
+
+      await Transaction.create({
+        payment: payment._id,
+        type: 'dispute',
+        amount: payment.amount,
+        currency: payment.currency,
+        direction: 'debit',
+        actor: userId,
+        note: `Dispute opened for booking ${bookingId}. Reason: ${reason.substring(0, 50)}`,
+      });
+    } else {
+      // Cash dispute — no Payment record
+      await Booking.findByIdAndUpdate(bookingId, { status: 'disputed' });
+    }
+
     const dispute = await Dispute.create({
       booking: bookingId,
-      payment: payment._id,
+      payment: payment?._id,
       raisedBy: userId,
       raisedByRole: 'user',
       reason,
       evidence,
-    });
-
-    payment.status = 'disputed';
-    await payment.save();
-
-    await Transaction.create({
-      payment: payment._id,
-      type: 'dispute',
-      amount: payment.amount,
-      currency: payment.currency,
-      direction: 'debit',
-      actor: userId,
-      note: `Dispute opened for booking ${bookingId}. Reason: ${reason.substring(0, 50)}`,
     });
 
     return dispute;
@@ -78,7 +87,6 @@ class DisputeService {
         `Cannot resolve a dispute with status '${dispute.status}'.`
       );
     }
-
     if (!['refund', 'release'].includes(decision)) {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Decision must be 'refund' or 'release'.");
     }
@@ -89,11 +97,16 @@ class DisputeService {
       await ps.refundPayment(dispute.payment._id.toString(), adminId, resolution);
       dispute.status = 'resolved_refund';
     } else {
-      await Booking.findByIdAndUpdate(dispute.booking._id, { status: 'completed' });
-      await ps.releasePaymentToWorker(
-        dispute.booking._id.toString(),
-        dispute.booking.user.toString()
-      );
+      // Release path
+      const session = await mongoose.startSession();
+      await session.withTransaction(async () => {
+        const booking = await Booking.findById(dispute.booking._id).session(session);
+        booking.status = 'completed';
+        booking.paymentStatus = 'released';
+        await booking.save({ session });
+        await ps.releaseHeldPayment(dispute.payment, booking, adminId, session);
+      });
+      await session.endSession();
       dispute.status = 'resolved_release';
     }
 

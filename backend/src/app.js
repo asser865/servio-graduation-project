@@ -19,8 +19,10 @@ const messageRoutes   = require('./modules/messages/message.routes');
 const paymentRoutes   = require('./modules/payments/payment.routes');
 const adminRoutes     = require('./modules/admin/audit.routes');
 const uploadRoutes    = require('./modules/uploads/upload.routes');
-const notifyRoutes    = require('./modules/notifications/notify.routes');
-const savedCardRoutes = require('./modules/savedCards/savedCard.routes');
+const notifyRoutes         = require('./modules/notifications/notify.routes');
+const notificationsRoutes  = require('./modules/notifications/notifications.routes');
+const savedCardRoutes      = require('./modules/savedCards/savedCard.routes');
+const platformRoutes  = require('./modules/platform/platform.routes');
 
 const { notFound, errorHandler } = require('./middleware/error.middleware');
 
@@ -89,8 +91,10 @@ app.use(`${API_PREFIX}/messages`, messageRoutes);
 app.use(`${API_PREFIX}/payments`, paymentRoutes);
 app.use(`${API_PREFIX}/admin`,       adminRoutes);
 app.use(`${API_PREFIX}/uploads`,     uploadRoutes);
-app.use(`${API_PREFIX}/notify`,      notifyRoutes);
+app.use(`${API_PREFIX}/notify`,         notifyRoutes);
+app.use(`${API_PREFIX}/notifications`,  notificationsRoutes);
 app.use(`${API_PREFIX}/saved-cards`, savedCardRoutes);
+app.use(`${API_PREFIX}/platform-settings`, platformRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

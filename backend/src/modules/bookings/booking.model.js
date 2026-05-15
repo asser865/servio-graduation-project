@@ -6,8 +6,12 @@
 
 const mongoose = require('mongoose');
 
-const BOOKING_STATUSES = ['pending', 'accepted', 'rejected', 'in_progress', 'completed', 'cancelled', 'disputed'];
-const PAYMENT_METHODS = ['cash', 'card'];
+const BOOKING_STATUSES = [
+  'pending', 'accepted', 'en_route', 'arrived', 'rejected', 'in_progress',
+  'awaiting_customer_confirmation', 'pending_admin_review',
+  'completed', 'cancelled', 'disputed',
+];
+const PAYMENT_METHODS = ['cash', 'card', 'online'];
 
 const bookingSchema = new mongoose.Schema(
   {
@@ -76,6 +80,42 @@ const bookingSchema = new mongoose.Schema(
       min:   [0, 'Price cannot be negative'],
     },
 
+    paymentMethod: {
+      type:     String,
+      enum:     PAYMENT_METHODS,
+      default:  'cash',
+      required: [true, 'Payment method is required'],
+    },
+
+    paymentStatus: {
+      type:    String,
+      enum:    [
+        'unpaid', 'held', 'released', 'refunded', 'failed', 'disputed',
+        'cash_pending_settlement', 'cash_settled', 'not_required',
+        // Legacy (kept for migration safety — no longer written by new code):
+        'demo_pending', 'cash_pending', 'paid',
+      ],
+      default: 'unpaid',
+    },
+
+    platformFeeRate: {
+      type:    Number,
+      min:     [0, 'Platform fee rate cannot be negative'],
+      default: 10,
+    },
+
+    platformFeeAmount: {
+      type:    Number,
+      min:     [0, 'Platform fee cannot be negative'],
+      default: 0,
+    },
+
+    estimatedTotal: {
+      type:    Number,
+      min:     [0, 'Estimated total cannot be negative'],
+      default: 0,
+    },
+
     scheduledTime: {
       type:    String,
       trim:    true,
@@ -94,16 +134,15 @@ const bookingSchema = new mongoose.Schema(
       trim:  true,
     },
 
+    workerCompletionImages: {
+      type:    [String],
+      default: [],
+    },
+
     // Required when status is cancelled or rejected
     cancellationReason: {
       type:  String,
       trim:  true,
-    },
-
-    paymentMethod: {
-      type:     String,
-      enum:     PAYMENT_METHODS,
-      required: [true, 'Payment method is required'],
     },
 
     savedCard: {
@@ -112,9 +151,24 @@ const bookingSchema = new mongoose.Schema(
     },
 
     paymentMeta: {
-      last4:    { type: String },
-      cardType: { type: String },
-      label:    { type: String },
+      savedCardId: { type: mongoose.Schema.Types.ObjectId, ref: 'SavedCard' },
+      last4:       { type: String },
+      cardType:    { type: String },
+      expiry:      { type: String },
+      label:       { type: String },
+    },
+
+    paymentDeadline: {
+      type: Date,
+    },
+
+    customerConfirmedAt: {
+      type: Date,
+    },
+
+    customerConfirmedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
     },
   },
   { timestamps: true }
@@ -127,8 +181,10 @@ bookingSchema.index({ worker: 1, status: 1 });
 // Prevents double-booking at the DB level (application-layer findOne is not atomic)
 bookingSchema.index(
   { worker: 1, scheduledDate: 1, scheduledTime: 1 },
-  { unique: true, partialFilterExpression: { status: { $in: ['pending', 'accepted', 'in_progress'] } } }
+  { unique: true, partialFilterExpression: { status: { $in: ['pending', 'accepted', 'en_route', 'arrived', 'in_progress'] } } }
 );
+
+bookingSchema.index({ status: 1, paymentMethod: 1, customerConfirmedAt: -1 });
 
 const Booking = mongoose.model('Booking', bookingSchema);
 

@@ -12,7 +12,7 @@ const transactionSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['charge', 'hold', 'release', 'refund', 'fee', 'dispute'],
+      enum: ['charge', 'hold', 'release', 'refund', 'fee', 'dispute', 'cash_debt_auto_deduct', 'cash_debt_manual_payment'],
       required: [true, 'Transaction type is required'],
     },
     amount: {
@@ -36,6 +36,10 @@ const transactionSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    cashDebt: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'CashDebt',
+    },
   },
   {
     timestamps: { createdAt: true, updatedAt: false },
@@ -51,6 +55,7 @@ transactionSchema.pre('save', async function () {
 transactionSchema.index({ payment: 1 });
 transactionSchema.index({ wallet: 1, createdAt: -1 });
 transactionSchema.index({ type: 1, createdAt: -1 });
+transactionSchema.index({ cashDebt: 1, createdAt: -1 });
 
 const Transaction = mongoose.model('Transaction', transactionSchema);
 

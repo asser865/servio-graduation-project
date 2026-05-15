@@ -10,6 +10,8 @@ import { uploadPublicFile } from '../api/uploads.js';
 import { getMyBookings, cancelBooking } from '../api/bookings.js';
 import { getMyReviews, createReview } from '../api/reviews.js';
 import { getSavedCards, addSavedCard, deleteSavedCard, setDefaultCard } from '../api/savedCards.js';
+import { snapshotFeeFromBooking, formatMoney as formatFeeMoney, paymentMethodLabel } from '../utils/fee.js';
+import { getNotifications as apiGetNotifications, markOneRead as apiMarkOneRead, markAllRead as apiMarkAllRead, clearAll as apiClearAll, deleteOne as apiDeleteOne } from '../api/notifications.js';
 
 const STAR_SVG = (fill = '#F59E0B', size = 14) =>
   `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="${fill}" stroke="${fill}" stroke-width="0"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
@@ -345,7 +347,7 @@ function initTabs() {
       if (root) root.innerHTML = '<div class="history-error-state"><p>Failed to load history. Please refresh.</p></div>';
     });
   }
-  updateNotifBadge();
+  apiGetNotifications(1, 0).then(res => updateNotifBadge(res.data?.unreadCount ?? 0)).catch(() => {});
 }
 
 /* ── Populate profile info ──────────────────────────────── */
@@ -530,53 +532,20 @@ function _diffAndNotify(bookings) {
   let snap;
   try { snap = JSON.parse(localStorage.getItem('servio_booking_snapshot') || '{}'); } catch { snap = {}; }
 
-  const NOTIF_MAP = {
-    accepted:    { type: 'booking_confirmed',   title: 'Booking Confirmed',   body: (svc, tech) => `${svc} with ${tech} is confirmed` },
-    in_progress: { type: 'booking_in_progress', title: 'Technician En Route', body: (svc, tech) => `${tech} is on the way` },
-    completed:   { type: 'booking_completed',   title: 'Service Completed',   body: (svc) => `Tap to rate your ${svc} experience` },
-    cancelled:   { type: 'booking_cancelled',   title: 'Booking Cancelled',   body: (svc) => `${svc} has been cancelled` },
-    rejected:    { type: 'booking_rejected',    title: 'Request Declined',    body: (svc) => `${svc} request was not accepted` },
-  };
-
-  let notifs = _getStoredNotifications();
   let changed = false;
-
   bookings.forEach(b => {
     if (!b._id) return;
-    const newStatus = b.status;
-    const oldStatus = snap[b._id];
-    if (newStatus === oldStatus) return;
-
-    const cfg = NOTIF_MAP[newStatus];
-    if (!cfg) { snap[b._id] = newStatus; return; }
-
-    const notifId = `${b._id}_${newStatus}`;
-    if (notifs.some(n => n.id === notifId)) { snap[b._id] = newStatus; return; }
-
-    const svc = b.service?.title || b.serviceCategory || 'Service';
-    const tech = b.worker?.name || 'your technician';
-
-    notifs.unshift({
-      id: notifId,
-      type: cfg.type,
-      title: cfg.title,
-      body: cfg.body(svc, tech),
-      bookingId: b._id,
-      status: newStatus,
-      timestamp: new Date().toISOString(),
-      read: false,
-    });
-    notifs.splice(50);
-    snap[b._id] = newStatus;
-    changed = true;
+    if (b.status !== snap[b._id]) { snap[b._id] = b.status; changed = true; }
   });
 
-  _saveNotifications(notifs);
   try { localStorage.setItem('servio_booking_snapshot', JSON.stringify(snap)); } catch (_) {}
 
+  // Backend creates real notifications; just refresh badge if status changed
   if (changed) {
-    renderNotifications();
-    updateNotifBadge();
+    apiGetNotifications(1, 0).then(res => {
+      const unread = res.data?.unreadCount ?? 0;
+      updateNotifBadge(unread);
+    }).catch(() => {});
   }
 }
 
@@ -592,7 +561,9 @@ async function loadHistoryData() {
 
   root.innerHTML = '';
   if (!bookings.length) {
-    root.innerHTML = '<div class="history-empty-state"><p>No completed bookings yet.</p></div>';
+    const emptyText = typeof window.t === 'function' ? window.t('cust_hist_empty_none') : 'No history items yet.';
+    root.innerHTML = `<div class="history-empty-state"><p>${emptyText}</p></div>`;
+    window.updateHistoryStatusTabs?.();
     return;
   }
 
@@ -603,19 +574,22 @@ async function loadHistoryData() {
   });
 
   // Update stats
+  const completedBookings = bookings.filter(b => b.status === 'completed');
   const countEl = document.getElementById('histStatCount');
-  if (countEl) countEl.textContent = bookings.length;
+  if (countEl) countEl.textContent = completedBookings.length;
   const spentEl = document.getElementById('histStatSpent');
-  if (spentEl) spentEl.textContent = bookings.reduce((s, b) => s + (b.totalPrice || 0), 0) + ' EGP';
+  if (spentEl) spentEl.textContent = formatFeeMoney(completedBookings.reduce((s, b) => s + (snapshotFeeFromBooking(b).estimatedTotal || 0), 0));
   const topEl = document.getElementById('histStatTopCategory');
   if (topEl) {
     const freq = {};
-    bookings.forEach(b => { const c = b.serviceCategory || b.service?.category || ''; if (c) freq[c] = (freq[c] || 0) + 1; });
+    completedBookings.forEach(b => { const c = b.serviceCategory || b.service?.category || ''; if (c) freq[c] = (freq[c] || 0) + 1; });
     const top = Object.entries(freq).sort((a, b) => b[1] - a[1])[0];
     if (top) { topEl.textContent = top[0]; topEl.removeAttribute('data-i18n'); }
   }
 
   revealAll(root);
+  window.updateHistoryStatusTabs?.();
+  window.applyHistoryFilters?.();
 
   // Wire invoice toggles
   root.querySelectorAll('[data-invoice-toggle]').forEach(btn => {
@@ -644,8 +618,9 @@ function buildHistoryCard(b, review) {
   const dateStr  = b.scheduledDate
     ? new Date(b.scheduledDate).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })
     : '—';
-  const priceRaw     = b.totalPrice != null ? String(b.totalPrice).replace('$', '').trim() : '—';
-  const paymentMethod = b.paymentMethod === 'cash' ? 'Cash' : 'Credit Card';
+  const totals       = snapshotFeeFromBooking(b);
+  const priceRaw     = totals.estimatedTotal ? formatFeeMoney(totals.estimatedTotal) : '—';
+  const paymentMethod = paymentMethodLabel(b.paymentMethod || b.payment, b.paymentMeta);
   const ref          = `#${(b._id || '').slice(-6).toUpperCase()}`;
   const isCompleted  = b.status === 'completed';
   const isCancelled  = b.status === 'cancelled' || b.status === 'rejected';
@@ -701,7 +676,7 @@ function buildHistoryCard(b, review) {
   }
 
   // Payment icon SVG
-  const payIcon = paymentMethod === 'Cash'
+  const payIcon = String(b.paymentMethod || b.payment).toLowerCase() === 'cash'
     ? `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M22 10H2"/></svg>`
     : `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>`;
 
@@ -712,6 +687,8 @@ function buildHistoryCard(b, review) {
   el.dataset.date     = b.scheduledDate || '';
   el.dataset.rating   = String(rating);
   el.dataset.cat      = catKey || 'default';
+  el.dataset.status   = isCancelled ? 'cancelled' : (isCompleted ? 'completed' : b.status || '');
+  el.dataset.reviewState = isCompleted ? (rating ? 'reviewed' : 'needs-review') : '';
 
   el.innerHTML = `
     <div class="history-v2__top-row">
@@ -721,7 +698,7 @@ function buildHistoryCard(b, review) {
           <div class="history-v2__title-row">
             <h4 class="history-v2__title">${title}</h4>
             <small class="history-v2__id">${ref}</small>
-            ${isCancelled ? `<span class="history-v2__status-badge badge-cancelled">Cancelled</span>` : ''}
+            ${isCancelled ? `<span class="history-v2__status-badge badge-cancelled">Canceled</span>` : ''}
             ${isCompleted && !isCancelled ? `<span class="history-v2__status-badge badge-completed">Completed</span>` : ''}
           </div>
           <p class="history-v2__provider">
@@ -734,7 +711,7 @@ function buildHistoryCard(b, review) {
         </div>
       </div>
       <div class="history-v2__meta">
-        <div class="history-v2__price">${priceRaw !== '—' ? priceRaw + ' EGP' : '—'}</div>
+        <div class="history-v2__price">${priceRaw}</div>
         <span class="history-v2__payment-badge">
           <span class="history-v2__payment-icon">${payIcon}</span>
           ${paymentMethod}
@@ -761,7 +738,7 @@ function buildHistoryCard(b, review) {
             <div class="payment-method-footer">
               <div class="payment-method-box">
                 <span class="history-v2__payment-icon">${payIcon}</span>
-                <p>Paid with ${paymentMethod}</p>
+                <p>${paymentMethod}</p>
               </div>
             </div>
           </div>
@@ -802,6 +779,9 @@ async function submitReview(btn) {
       </div>`;
 
     card.dataset.rating = String(rating);
+    card.dataset.reviewState = 'reviewed';
+    window.updateHistoryStatusTabs?.();
+    window.applyHistoryFilters?.();
     showToast('Review submitted. Thank you!', 'success');
   } catch (err) {
     btn.disabled = false;
@@ -816,7 +796,7 @@ async function submitReview(btn) {
 
 function renderBookingsTab(bookings) {
   const STATUS_TO_PANE = {
-    accepted: 'stab-bookings-active', in_progress: 'stab-bookings-active',
+    accepted: 'stab-bookings-active', en_route: 'stab-bookings-active', arrived: 'stab-bookings-active', in_progress: 'stab-bookings-active',
     pending: 'stab-bookings-pending',
   };
   const paneIds = ['stab-bookings-active', 'stab-bookings-pending'];
@@ -891,12 +871,14 @@ function buildBookingCard(b) {
   if (!b._id) return null;
 
   const STATUS_FILTER = {
-    pending: 'pending', accepted: 'confirmed', in_progress: 'confirmed',
+    pending: 'pending', accepted: 'confirmed', en_route: 'confirmed', arrived: 'confirmed', in_progress: 'confirmed',
     completed: 'completed', cancelled: 'cancelled', rejected: 'cancelled'
   };
   const BADGE_CONFIG = {
     pending:     { label: 'Booked',      style: 'background:rgba(234,179,8,0.1);color:#eab308;border-color:rgba(234,179,8,0.3)' },
     accepted:    { label: 'Confirmed',   style: '' },
+    en_route:    { label: 'En Route',    style: 'background:rgba(59,130,246,0.1);color:#60a5fa;border-color:rgba(59,130,246,0.35)' },
+    arrived:     { label: 'Arrived',     style: 'background:rgba(234,179,8,0.1);color:#eab308;border-color:#eab308' },
     in_progress: { label: 'In Progress', style: 'background:rgba(180,160,50,0.1);color:#eab308;border-color:#eab308' },
     completed:   { label: 'Completed',   style: 'background:rgba(34,197,94,0.1);color:#22c55e;border-color:rgba(34,197,94,0.3)' },
     cancelled:   { label: 'Cancelled',   style: 'background:rgba(156,163,175,0.1);color:#9ca3af;border-color:rgba(156,163,175,0.3)' },
@@ -904,8 +886,10 @@ function buildBookingCard(b) {
   };
   const STEPPER_CONFIG = {
     pending:     { done: 0, active: 0, fill: '0%' },
-    accepted:    { done: 1, active: 1, fill: '33%' },
-    in_progress: { done: 2, active: 2, fill: '66%' },
+    accepted:    { done: 1, active: 1, fill: '25%' },
+    en_route:    { done: 2, active: 2, fill: '50%' },
+    arrived:     { done: 3, active: 3, fill: '75%' },
+    in_progress: { done: 3, active: 3, fill: '75%' },
     completed:   { done: 4, active: -1, fill: '100%' }
   };
 
@@ -921,9 +905,9 @@ function buildBookingCard(b) {
   const formattedDate = b.scheduledDate
     ? new Date(b.scheduledDate).toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' })
     : '—';
-  const priceRaw = b.totalPrice != null ? String(b.totalPrice).replace('$', '').trim() : '—';
-  const price = priceRaw;
-  const paymentMethod = b.paymentMethod === 'cash' ? 'Cash' : 'Credit Card';
+  const totals = snapshotFeeFromBooking(b);
+  const price = totals.estimatedTotal ? totals.estimatedTotal.toFixed(2) : '—';
+  const paymentMethod = paymentMethodLabel(b.paymentMethod || b.payment, b.paymentMeta);
   const bookingRef = `#${b._id.slice(-6).toUpperCase()}`;
 
   // Avatar
@@ -944,9 +928,15 @@ function buildBookingCard(b) {
     ? `<a href="./technician-profile.html?id=${workerId}" class="provider-view-profile">View Profile</a>`
     : '';
 
-  // PIN
-  const pinStr = b.pin ? String(b.pin) : '----';
-  const pinHTML = pinStr.split('').slice(0, 4).map(d => `<span class="pin-code__digit">${d}</span>`).join('');
+  // Arrival PIN stays locked until the technician marks arrival.
+  const pinStr = b.pin ? String(b.pin).replace(/\D/g, '').slice(0, 4) : '';
+  const canRevealPin = status === 'arrived' && pinStr.length === 4;
+  const isPinVerified = ['in_progress', 'completed'].includes(status);
+  const pinHTML = canRevealPin
+    ? pinStr.split('').map(d => `<span class="pin-code__digit">${d}</span>`).join('')
+    : isPinVerified
+      ? '<div class="pin-code__locked pin-code__locked--verified">PIN verified</div>'
+      : '<div class="pin-code__locked"><span class="pin-code__lock-icon" aria-hidden="true">••••</span><span>Unlocks on arrival</span></div>';
 
   // Stepper
   const checkSVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="20 6 9 17 4 12"/></svg>`;
@@ -973,7 +963,7 @@ function buildBookingCard(b) {
   }
 
   // Invoice panel
-  const invoiceHTML = !isCancelled ? `<div class="booking-card__invoice-panel"><div class="invoice-content"><p class="invoice-content__title">Invoice ${bookingRef}</p><div class="invoice-table"><div class="invoice-table__row"><span>${title}</span><span>${price !== '—' ? price + ' EGP' : '—'}</span></div><div class="invoice-table__row"><span>Service Date</span><span>${formattedDate}</span></div><div class="invoice-table__row"><span>Platform Fee</span><span>0 EGP</span></div><div class="invoice-table__row is-total"><span>Total</span><span>${price !== '—' ? price + ' EGP' : '—'}</span></div></div><div class="booking-card__invoice-footer"><p>Payment Method: <strong>${paymentMethod}</strong></p></div></div></div>` : '';
+  const invoiceHTML = !isCancelled ? `<div class="booking-card__invoice-panel"><div class="invoice-content"><p class="invoice-content__title">Invoice ${bookingRef}</p><div class="invoice-table"><div class="invoice-table__row"><span>${title}</span><span>${formatFeeMoney(totals.base)}</span></div><div class="invoice-table__row"><span>Service Date</span><span>${formattedDate}</span></div><div class="invoice-table__row"><span>Platform Fee (${totals.feeRate}%)</span><span>${formatFeeMoney(totals.feeAmount)}</span></div><div class="invoice-table__row is-total"><span>Total</span><span>${formatFeeMoney(totals.estimatedTotal)}</span></div></div><div class="booking-card__invoice-footer"><p>Payment Method: <strong>${paymentMethod}</strong></p></div></div></div>` : '';
 
   const div = document.createElement('div');
   div.className = 'booking-card';
@@ -1020,7 +1010,7 @@ function buildBookingCard(b) {
       </div>
       <div class="booking-card__sidebar">
         <div class="sidebar-box">
-          <div class="sidebar-box__header">Your PIN</div>
+          <div class="sidebar-box__header">Arrival PIN</div>
           <div class="pin-code">${pinHTML}</div>
         </div>
         <div class="sidebar-box sidebar-box--amount">
@@ -1091,11 +1081,11 @@ async function populateStats(bookings = null) {
     }
 
     const total     = bookings.length;
-    const active    = bookings.filter(b => ['pending','accepted','in_progress'].includes(b.status)).length;
+    const active    = bookings.filter(b => ['pending','accepted','en_route','arrived','in_progress'].includes(b.status)).length;
     const completed = bookings.filter(b => b.status === 'completed').length;
     const totalSpent = bookings
-      .filter(b => b.status === 'completed' && b.totalPrice)
-      .reduce((sum, b) => sum + (b.totalPrice || 0), 0);
+      .filter(b => b.status === 'completed')
+      .reduce((sum, b) => sum + (snapshotFeeFromBooking(b).estimatedTotal || 0), 0);
 
     const goalTotal = 5;
     const pct = Math.min(Math.round((completed / goalTotal) * 100), 100);
@@ -1149,21 +1139,23 @@ function updateWelcomeText() {
   }
 }
 
-/* ── Notifications: localStorage persistence ─────────── */
-function _getStoredNotifications() {
-  try { return JSON.parse(localStorage.getItem('servio_notifications') || '[]'); } catch { return []; }
-}
+/* ── Notifications: API-backed ───────────────────────── */
+let _cachedNotifs = [];
+let _activeFilter = 'all';
 
-function _saveNotifications(arr) {
-  try {
-    localStorage.setItem('servio_notifications', JSON.stringify(arr));
-  } catch (e) {
-    if (e.name === 'QuotaExceededError') {
-      arr.splice(25);
-      try { localStorage.setItem('servio_notifications', JSON.stringify(arr)); } catch (_) {}
-    }
-  }
-}
+const NOTIF_TYPE_ICON = {
+  booking_created:     `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#6E56CF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg>`,
+  booking_accepted:    `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#22A05A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+  booking_rejected:    `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
+  booking_en_route:    `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#6E56CF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+  booking_arrived:     `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#6E56CF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`,
+  booking_in_progress: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#6E56CF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+  booking_completed:   `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+  booking_cancelled:   `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
+  tech_available:      `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#F59E0B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>`,
+  review_received:     `<svg viewBox="0 0 24 24" width="16" height="16" fill="#F59E0B" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,
+  system:              `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+};
 
 function _setBadge(el, count) {
   if (!el) return;
@@ -1177,101 +1169,217 @@ function _setBadge(el, count) {
   badge.hidden = count === 0;
 }
 
-function updateNotifBadge() {
-  const notifs = _getStoredNotifications();
-  const unread = notifs.filter(n => !n.read).length;
+function updateNotifBadge(count) {
+  const unread = count ?? _cachedNotifs.filter(n => !n.isRead).length;
   _setBadge(document.getElementById('tab-notifications'), unread);
   const mobileBtn = document.querySelector('[data-mobile-tab="notifications"]');
   if (mobileBtn) _setBadge(mobileBtn, unread);
 }
 
-function renderNotifications() {
+function _timeAgo(dateStr) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1)  return 'Just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 7)  return `${d}d ago`;
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function _normalizeNotifUrl(raw) {
+  if (!raw) return null;
+  try {
+    const u = new URL(raw, window.location.href);
+    return u.pathname + u.search + u.hash;
+  } catch {
+    return raw;
+  }
+}
+
+const _NOTIF_EMPTY_MSG = {
+  all:      'No notifications yet.',
+  unread:   'No unread notifications.',
+  bookings: 'No booking notifications.',
+  system:   'No system notifications.',
+};
+
+function _getFilteredNotifs() {
+  switch (_activeFilter) {
+    case 'unread':   return _cachedNotifs.filter(n => !n.isRead);
+    case 'bookings': return _cachedNotifs.filter(n => n.type?.startsWith('booking_'));
+    case 'system':   return _cachedNotifs.filter(n => !n.type?.startsWith('booking_'));
+    default:         return _cachedNotifs;
+  }
+}
+
+function _updateNotifStats() {
+  const total    = _cachedNotifs.length;
+  const unread   = _cachedNotifs.filter(n => !n.isRead).length;
+  const bookings = _cachedNotifs.filter(n => n.type?.startsWith('booking_')).length;
+  const system   = _cachedNotifs.filter(n => !n.type?.startsWith('booking_')).length;
+  const $ = id => document.getElementById(id);
+  if ($('notif-stat-unread-count')) $('notif-stat-unread-count').textContent = unread;
+  if ($('notif-stat-total-count'))  $('notif-stat-total-count').textContent  = total;
+  if ($('notif-count-all'))         $('notif-count-all').textContent         = total;
+  if ($('notif-count-unread'))      $('notif-count-unread').textContent      = unread;
+  if ($('notif-count-bookings'))    $('notif-count-bookings').textContent    = bookings;
+  if ($('notif-count-system'))      $('notif-count-system').textContent      = system;
+}
+
+function _renderFilteredList() {
   const list = document.getElementById('notif-list');
   if (!list) return;
-  const notifs = _getStoredNotifications();
 
-  if (!notifs.length) {
-    list.innerHTML = '<div class="notif-empty-state"><p>No notifications yet.</p></div>';
+  const items = _getFilteredNotifs();
+  list.innerHTML = '';
+
+  if (!items.length) {
+    list.innerHTML = `<div class="notif-empty-state"><p>${_NOTIF_EMPTY_MSG[_activeFilter] || 'No notifications.'}</p></div>`;
     return;
   }
 
-  const TYPE_ICON = {
-    booking_confirmed:   `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#22A05A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
-    booking_in_progress: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#6E56CF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
-    booking_completed:   `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
-    booking_cancelled:   `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
-    booking_rejected:    `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
-  };
-
-  const STATUS_TO_SUBTAB = {
-    accepted: 'bookings-active', in_progress: 'bookings-active',
-    pending: 'bookings-pending', completed: 'bookings-completed',
-    cancelled: 'bookings-cancelled', rejected: 'bookings-cancelled',
-  };
-
-  list.innerHTML = '';
-  notifs.forEach(n => {
+  items.forEach(n => {
+    const icon = NOTIF_TYPE_ICON[n.type] || NOTIF_TYPE_ICON.system;
     const el = document.createElement('div');
-    el.className = `notif-card-v2${n.read ? '' : ' is-unread'}`;
-    el.dataset.notifId = n.id;
-
-    const timeStr = n.timestamp ? new Date(n.timestamp).toLocaleString() : '';
-    const icon = TYPE_ICON[n.type] || TYPE_ICON.booking_confirmed;
-    const subtab = STATUS_TO_SUBTAB[n.status] || 'bookings-active';
-
+    el.className = `notif-card-v2${n.isRead ? '' : ' is-unread'}`;
+    el.dataset.notifId = n._id;
+    if (n.referenceUrl) el.dataset.notifUrl = _normalizeNotifUrl(n.referenceUrl);
     el.innerHTML = `
-      <div class="notif-card-v2__icon notif-card-v2__icon--booking">${icon}</div>
+      <div class="notif-card-v2__icon">${icon}</div>
       <div class="notif-card-v2__body">
         <p class="notif-card-v2__title">${n.title}</p>
         <p class="notif-card-v2__desc">${n.body}</p>
         <div class="notif-card-v2__actions">
-          <button class="btn btn--sm" type="button" data-notif-view-booking="${subtab}">View Booking</button>
-          <button class="btn btn--sm btn--danger-ghost" type="button" data-notif-dismiss="${n.id}">Dismiss</button>
+          ${n.referenceUrl ? `<button class="btn btn--sm" type="button" data-notif-open>View</button>` : ''}
+          ${!n.isRead ? `<button class="btn btn--sm btn--outline" type="button" data-notif-markread>Mark read</button>` : ''}
+          <button class="btn btn--sm btn--danger-ghost" type="button" data-notif-dismiss>Dismiss</button>
         </div>
-        <p class="notif-card-v2__time">${timeStr}</p>
-      </div>`;
+        <span class="notif-card-v2__time">${_timeAgo(n.createdAt)}</span>
+      </div>
+      ${!n.isRead ? '<span class="notif-card-v2__dot" aria-hidden="true"></span>' : ''}`;
     list.appendChild(el);
   });
 
-  list.addEventListener('click', (e) => {
-    const viewBtn = e.target.closest('[data-notif-view-booking]');
-    if (viewBtn) {
-      const subtab = viewBtn.dataset.notifViewBooking;
-      document.querySelector('[data-tab="bookings"]')?.click();
-      setTimeout(() => {
-        const btn = document.querySelector(`#bookings-stab-bar [data-stab="${subtab}"]`);
-        btn?.click();
-      }, 50);
+  list.addEventListener('click', async (e) => {
+    const card = e.target.closest('.notif-card-v2');
+    if (!card) return;
+    const id  = card.dataset.notifId;
+    const url = card.dataset.notifUrl;
+
+    if (e.target.closest('[data-notif-open]') && url) {
+      if (card.classList.contains('is-unread')) {
+        card.classList.remove('is-unread');
+        card.querySelector('.notif-card-v2__dot')?.remove();
+        card.querySelector('[data-notif-markread]')?.remove();
+        try { await apiMarkOneRead(id); } catch (_) {}
+        const n = _cachedNotifs.find(x => x._id === id);
+        if (n) n.isRead = true;
+        updateNotifBadge();
+        _updateNotifStats();
+      }
+      window.location.href = url;
       return;
     }
-    const dismissBtn = e.target.closest('[data-notif-dismiss]');
-    if (dismissBtn) {
-      const id = dismissBtn.dataset.notifDismiss;
-      let notifs = _getStoredNotifications();
-      notifs = notifs.filter(n => n.id !== id);
-      _saveNotifications(notifs);
-      dismissBtn.closest('.notif-card-v2')?.remove();
-      if (!list.querySelector('.notif-card-v2')) {
-        list.innerHTML = '<div class="notif-empty-state"><p>No notifications yet.</p></div>';
-      }
+
+    if (e.target.closest('[data-notif-markread]')) {
+      card.classList.remove('is-unread');
+      card.querySelector('.notif-card-v2__dot')?.remove();
+      e.target.closest('[data-notif-markread]').remove();
+      try { await apiMarkOneRead(id); } catch (_) {}
+      const n = _cachedNotifs.find(x => x._id === id);
+      if (n) n.isRead = true;
       updateNotifBadge();
+      _updateNotifStats();
+      if (_activeFilter === 'unread') {
+        card.remove();
+        if (!list.querySelector('.notif-card-v2')) {
+          list.innerHTML = `<div class="notif-empty-state"><p>${_NOTIF_EMPTY_MSG.unread}</p></div>`;
+        }
+      }
+      return;
     }
-  }, { once: false });
+
+    if (e.target.closest('[data-notif-dismiss]')) {
+      try { await apiDeleteOne(id); } catch (_) {}
+      _cachedNotifs = _cachedNotifs.filter(x => x._id !== id);
+      card.remove();
+      _updateNotifStats();
+      updateNotifBadge();
+      if (!list.querySelector('.notif-card-v2')) {
+        list.innerHTML = `<div class="notif-empty-state"><p>${_NOTIF_EMPTY_MSG[_activeFilter] || 'No notifications.'}</p></div>`;
+      }
+    }
+  });
+}
+
+async function renderNotifications() {
+  const list = document.getElementById('notif-list');
+  if (!list) return;
+
+  list.innerHTML = '<div class="notif-loading"><span>Loading…</span></div>';
+  try {
+    const res = await apiGetNotifications(50);
+    _cachedNotifs = res.notifications || [];
+    const unread = res.unreadCount ?? _cachedNotifs.filter(n => !n.isRead).length;
+    updateNotifBadge(unread);
+    _updateNotifStats();
+  } catch (_) {
+    list.innerHTML = '<div class="notif-empty-state"><p>Could not load notifications.</p></div>';
+    return;
+  }
+
+  _renderFilteredList();
 }
 
 function initNotifications() {
-  const markAllBtn = document.getElementById('mark-all-read');
-  if (markAllBtn) {
-    markAllBtn.addEventListener('click', () => {
-      const notifs = _getStoredNotifications().map(n => ({ ...n, read: true }));
-      _saveNotifications(notifs);
-      renderNotifications();
-      updateNotifBadge();
-      showToast(typeof window.t === 'function' ? window.t('toast_notif_read') : 'All notifications marked as read.', 'success');
+  document.querySelectorAll('.notif-filter-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.notif-filter-tab').forEach(t => {
+        t.classList.remove('is-active');
+        t.setAttribute('aria-selected', 'false');
+      });
+      tab.classList.add('is-active');
+      tab.setAttribute('aria-selected', 'true');
+      _activeFilter = tab.dataset.filter;
+      _renderFilteredList();
     });
-  }
+  });
+
+  document.getElementById('mark-all-read')?.addEventListener('click', async () => {
+    try {
+      await apiMarkAllRead();
+      _cachedNotifs.forEach(n => n.isRead = true);
+      updateNotifBadge(0);
+      _updateNotifStats();
+      _renderFilteredList();
+      showToast(typeof window.t === 'function' ? window.t('toast_notif_read') : 'All notifications marked as read.', 'success');
+    } catch (_) {
+      showToast('Failed to mark all as read.', 'error');
+    }
+  });
+
+  document.getElementById('notif-clear-all')?.addEventListener('click', async () => {
+    try {
+      await apiClearAll();
+      _cachedNotifs = [];
+      updateNotifBadge(0);
+      _updateNotifStats();
+      _renderFilteredList();
+      showToast('All notifications cleared.', 'success');
+    } catch (_) {
+      showToast('Failed to clear notifications.', 'error');
+    }
+  });
+
+  document.getElementById('notif-prefs-link')?.addEventListener('click', e => {
+    e.preventDefault();
+    document.querySelector('[data-tab="settings"]')?.click();
+    setTimeout(() => document.querySelector('[data-stab="notifications"]')?.click(), 80);
+  });
+
   renderNotifications();
-  updateNotifBadge();
 }
 
 /* ── Settings: photo upload ─────────────────────────────── */
@@ -1793,6 +1901,42 @@ function initHistoryPanel() {
   const filterRoot = document.getElementById('historyListRoot');
   const filters = document.querySelectorAll('[data-hist-filter]');
   const clearBtn = document.getElementById('clearHistFilters');
+  const statusTabs = document.querySelectorAll('[data-history-status-tab]');
+  const emptyMessages = {
+    all: 'cust_hist_empty_all',
+    completed: 'cust_hist_empty_completed',
+    'needs-review': 'cust_hist_empty_needs_review',
+    reviewed: 'cust_hist_empty_reviewed',
+    cancelled: 'cust_hist_empty_canceled',
+  };
+
+  function getActiveStatusTab() {
+    return document.querySelector('[data-history-status-tab].is-active')?.dataset.historyStatusTab || 'all';
+  }
+
+  function matchesStatusTab(card, activeStatus) {
+    if (activeStatus === 'all') return true;
+    if (activeStatus === 'completed') return card.dataset.status === 'completed';
+    if (activeStatus === 'cancelled') return card.dataset.status === 'cancelled';
+    return card.dataset.reviewState === activeStatus;
+  }
+
+  function updateHistoryStatusTabs() {
+    if (!filterRoot) return;
+    const cards = [...filterRoot.querySelectorAll('.history-card-v2')];
+    const counts = {
+      all: cards.length,
+      completed: cards.filter(card => card.dataset.status === 'completed').length,
+      'needs-review': cards.filter(card => card.dataset.reviewState === 'needs-review').length,
+      reviewed: cards.filter(card => card.dataset.reviewState === 'reviewed').length,
+      cancelled: cards.filter(card => card.dataset.status === 'cancelled').length,
+    };
+
+    Object.entries(counts).forEach(([key, count]) => {
+      const countEl = document.querySelector(`[data-history-status-count="${key}"]`);
+      if (countEl) countEl.textContent = String(count);
+    });
+  }
 
   function applyHistoryFilters() {
     if (!filterRoot) return;
@@ -1801,6 +1945,8 @@ function initHistoryPanel() {
     filters.forEach(f => { vals[f.dataset.histFilter] = f.value; });
 
     const now = Date.now();
+    const activeStatus = getActiveStatusTab();
+    let visibleCount = 0;
 
     cards.forEach(card => {
       // Date-based timeframe logic
@@ -1812,20 +1958,52 @@ function initHistoryPanel() {
       }
 
       const match =
+        matchesStatusTab(card, activeStatus) &&
         (!vals.category || card.dataset.category === vals.category) &&
         (!vals.payment  || card.dataset.payment  === vals.payment)  &&
         (!vals.rating   || parseInt(card.dataset.rating || 0) >= parseInt(vals.rating)) &&
         dateMatch;
 
       card.classList.toggle('is-hidden', !match);
+      if (match) visibleCount += 1;
     });
+
+    let emptyEl = filterRoot.querySelector('[data-history-filter-empty]');
+    if (!emptyEl) {
+      emptyEl = document.createElement('div');
+      emptyEl.className = 'history-empty-state history-empty-state--filtered';
+      emptyEl.dataset.historyFilterEmpty = 'true';
+      emptyEl.innerHTML = '<p></p>';
+      filterRoot.appendChild(emptyEl);
+    }
+
+    emptyEl.hidden = visibleCount > 0 || cards.length === 0;
+    const messageKey = emptyMessages[activeStatus] || emptyMessages.all;
+    const message = typeof window.t === 'function' ? window.t(messageKey) : messageKey;
+    const messageEl = emptyEl.querySelector('p');
+    if (messageEl) messageEl.textContent = message;
   }
+
+  statusTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      statusTabs.forEach(btn => {
+        const isActive = btn === tab;
+        btn.classList.toggle('is-active', isActive);
+        btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      });
+      applyHistoryFilters();
+    });
+  });
 
   filters.forEach(f => f.addEventListener('change', applyHistoryFilters));
   clearBtn?.addEventListener('click', () => {
     filters.forEach(f => { f.value = ''; });
     applyHistoryFilters();
   });
+
+  window.applyHistoryFilters = applyHistoryFilters;
+  window.updateHistoryStatusTabs = updateHistoryStatusTabs;
+  updateHistoryStatusTabs();
 
   // Localize history cards (Price, Currency, Payment Badge, Date)
   function localizeHistoryCards() {

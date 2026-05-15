@@ -408,8 +408,22 @@
 
 .coverage-areas {
   display: flex;
+  flex-direction: column;
   flex-wrap: wrap;
   gap: 0.5rem;
+}
+
+.coverage-summary-profile {
+  margin: 0;
+  color: var(--color-on-surface, #fff);
+  font-size: .82rem;
+  font-weight: 700;
+}
+
+.coverage-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
 }
 
 .coverage-tag {

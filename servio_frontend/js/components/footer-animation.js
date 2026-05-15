@@ -2,7 +2,6 @@ export function initFooterAnimation() {
   const footer = document.querySelector('.site-footer');
   if (!footer) return;
 
-  // Inject canvas if it doesn't exist
   if (!document.getElementById('footer-sparks')) {
     const canvasEl = document.createElement('canvas');
     canvasEl.id = 'footer-sparks';
@@ -21,22 +20,23 @@ export function initFooterAnimation() {
 
   const canvas = document.getElementById('footer-sparks');
   const ctx = canvas.getContext('2d');
-  
+
   const OPT = {
-    amount: 150, // amount of concurrent sparks
+    amount: 80,
     speed: 0.05,
     lifetime: 300,
-    direction: { x: -0.2, y: -0.8 }, // float upwards and slightly left
-    size: [1.5, 1.5], // pixel radius
+    direction: { x: -0.2, y: -0.8 },
+    size: [1.5, 1.5],
     maxopacity: 0.8,
     randColor: true,
     acceleration: [5, 40]
   };
 
   let sparks = [];
+  let animationFrame;
+  let isVisible = false;
 
   function setCanvasWidth() {
-    // Only resize if footer dimensions changed
     if (ctx.canvas.width !== footer.offsetWidth || ctx.canvas.height !== footer.offsetHeight) {
       ctx.canvas.width = footer.offsetWidth;
       ctx.canvas.height = footer.offsetHeight;
@@ -52,21 +52,13 @@ export function initFooterAnimation() {
     this.y = y;
     this.age = 0;
     this.acceleration = rand(OPT.acceleration[0], OPT.acceleration[1]);
-    
-    // Choose dynamic variations of the beige/brown colors from the palette
     const colors = ['181, 153, 116', '112, 85, 51', '227, 213, 202', '255, 255, 255'];
-    this.color = OPT.randColor 
-      ? colors[rand(0, colors.length - 1)] 
-      : '181, 153, 116';
-      
+    this.color = OPT.randColor ? colors[rand(0, colors.length - 1)] : '181, 153, 116';
     this.opacity = OPT.maxopacity - this.age / (OPT.lifetime * rand(1, 10));
-
-    // Handle whether we are in dark mode or light mode for opacity capping
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
     if (!isDark && this.color === '255, 255, 255') {
-       this.color = '154, 140, 115'; // shift white to dark beige in light mode
+      this.color = '154, 140, 115';
     }
-
     this.go = function () {
       this.x += OPT.speed * OPT.direction.x * this.acceleration / 2;
       this.y += OPT.speed * OPT.direction.y * this.acceleration / 2;
@@ -81,16 +73,12 @@ export function initFooterAnimation() {
   }
 
   function drawSpark(spark) {
-    let x = spark.x,
-      y = spark.y;
     spark.go();
     ctx.beginPath();
     ctx.fillStyle = `rgba(${spark.color}, ${spark.opacity})`;
-    ctx.arc(x, y, OPT.size[0], 0, Math.PI * 2);
+    ctx.arc(spark.x, spark.y, OPT.size[0], 0, Math.PI * 2);
     ctx.fill();
   }
-
-  let animationFrame;
 
   function draw() {
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
@@ -104,18 +92,31 @@ export function initFooterAnimation() {
     animationFrame = window.requestAnimationFrame(draw);
   }
 
-  function init() {
+  let sparkInterval;
+
+  function start() {
+    if (isVisible) return;
+    isVisible = true;
     setCanvasWidth();
-    setInterval(() => {
-      if (sparks.length < OPT.amount) {
-        addSpark();
-      }
+    sparkInterval = setInterval(() => {
+      if (sparks.length < OPT.amount) addSpark();
     }, 1000 / OPT.amount);
     animationFrame = window.requestAnimationFrame(draw);
   }
 
+  function stop() {
+    isVisible = false;
+    clearInterval(sparkInterval);
+    cancelAnimationFrame(animationFrame);
+    sparks = [];
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    entries[0].isIntersecting ? start() : stop();
+  }, { threshold: 0.1 });
+
+  observer.observe(footer);
   window.addEventListener('resize', setCanvasWidth);
-  init();
 }
 
 // .

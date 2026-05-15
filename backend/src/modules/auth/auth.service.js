@@ -56,6 +56,8 @@ const registerUser = async (data) => {
     role,
     address,
     locationLabel,
+    serviceArea,
+    coverageAreas,
     skills,
     hourlyRate,
     bio,
@@ -134,6 +136,10 @@ const registerUser = async (data) => {
   const roleMap = { technician: 'worker', customer: 'user' };
   const normalizedRole = roleMap[role] || role || 'user';
   const isWorker = normalizedRole === 'worker';
+  const normalizedCoverageAreas = Array.isArray(coverageAreas)
+    ? [...new Set(coverageAreas.map(area => String(area || '').trim()).filter(Boolean))]
+    : [];
+  const initialServiceArea = serviceArea !== undefined ? serviceArea : locationLabel;
 
   // Validate submitted service IDs for workers
   let validatedServices = [];
@@ -155,6 +161,8 @@ const registerUser = async (data) => {
     ...(profileImage  !== undefined && { profileImage }),
     // Worker-specific fields (ignored/undefined for customer registrations)
     ...(locationLabel !== undefined && { locationLabel }),
+    ...(initialServiceArea !== undefined && { serviceArea: initialServiceArea }),
+    ...(normalizedCoverageAreas.length > 0 && { coverageAreas: normalizedCoverageAreas }),
     ...(skills        !== undefined && { skills }),
     ...(categories.length > 0          && { categories }),
     ...(hourlyRate    !== undefined && { hourlyRate }),

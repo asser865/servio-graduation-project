@@ -1,4 +1,4 @@
-/* ─── BOOKING PAGE ─── */
+/* â”€â”€â”€ BOOKING PAGE â”€â”€â”€ */
 
 /* ===================== PAGE LAYOUT ===================== */
 .booking-page {
@@ -7,22 +7,48 @@
   padding-bottom: 6rem;
 }
 
-/* ===================== BOOKING HERO – ENHANCED ===================== */
+/* ===================== BOOKING HERO â€“ ENHANCED ===================== */
+
+.page-booking main#main {
+  padding-top: 0;
+}
 
 .booking-hero {
   position: relative;
-  padding: 7rem 0 3rem;
+  padding: 6.5rem 0 3.5rem;
   background: var(--color-primary);
   overflow: hidden;
   isolation: isolate;
+  /* Mask to create a buttery smooth blend at the bottom */
+  -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
+  mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
 }
 
-/* ── Background decoration ── */
+/* â”€â”€ Background decoration â”€â”€ */
 .booking-hero__bg {
   position: absolute;
   inset: 0;
   z-index: 0;
   pointer-events: none;
+}
+
+.booking-hero__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.8;
+}
+
+/* Film grain effect for premium feel */
+.booking-hero__bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  opacity: 0.04;
+  pointer-events: none;
+  mix-blend-mode: overlay;
 }
 
 .booking-hero__bg-glow {
@@ -49,15 +75,7 @@
   opacity: 0.1;
 }
 
-.booking-hero__bg-dots {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  color: #ffffff;
-}
-
-/* ── Breadcrumb on dark bg ── */
+/* â”€â”€ Breadcrumb on dark bg â”€â”€ */
 .booking-hero__breadcrumb {
   display: flex;
   align-items: center;
@@ -91,7 +109,7 @@
   color: rgba(255, 255, 255, 0.7);
 }
 
-/* ── Progress Arrows Direction Control ── */
+/* â”€â”€ Progress Arrows Direction Control â”€â”€ */
 .btn svg {
   transition: transform 0.3s ease-in-out;
   flex-shrink: 0;
@@ -110,7 +128,7 @@
 }
 
 
-/* ── Split layout ── */
+/* â”€â”€ Split layout â”€â”€ */
 .booking-hero__inner {
   position: relative;
   z-index: 1;
@@ -127,7 +145,7 @@
   }
 }
 
-/* ── Left: content ── */
+/* â”€â”€ Left: content â”€â”€ */
 .booking-hero__content {
   max-width: 560px;
 }
@@ -167,7 +185,7 @@
   margin-bottom: 1.75rem;
 }
 
-/* ── Trust badges ── */
+/* â”€â”€ Trust badges â”€â”€ */
 .booking-hero__trust {
   display: flex;
   flex-wrap: wrap;
@@ -209,7 +227,7 @@
 .trust-pill--insured svg { color: #60a5fa; }
 .trust-pill--insured { border-color: rgba(96,165,250,0.2); }
 
-/* ── Right: Technician context card ── */
+/* â”€â”€ Right: Technician context card â”€â”€ */
 .booking-hero__card-wrap {
   flex-shrink: 0;
 }
@@ -389,16 +407,19 @@
   background: rgba(255,255,255,0.1);
 }
 
-/* ── Dark mode tweaks (hero is already dark, just fine-tune) ── */
+/* â”€â”€ Dark mode tweaks (hero is already dark, just fine-tune) â”€â”€ */
 [data-theme="dark"] .booking-hero {
   background: #181c21;
+  /* Sharper blend for dark mode to match deep surface colors */
+  -webkit-mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
+  mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
 }
 
 [data-theme="dark"] .booking-hero__bg-glow--1 {
   opacity: 0.12;
 }
 
-/* ── Reduced motion ── */
+/* â”€â”€ Reduced motion â”€â”€ */
 @media (prefers-reduced-motion: reduce) {
   .avail-dot {
     animation: none;
@@ -765,7 +786,7 @@
   box-shadow: 0 0 0 3px rgba(154,140,115,0.14);
 }
 
-/* Autofill badge — no layout shift (parent field has stable height) */
+/* Autofill badge â€” no layout shift (parent field has stable height) */
 .field-autofill-badge {
   display: inline-flex;
   align-items: center;
@@ -831,7 +852,7 @@
 }
 
 .address-card.is-selected::after {
-  content: '✓';
+  content: 'âœ“';
   position: absolute;
   top: -8px;
   right: -8px;
@@ -914,7 +935,7 @@
 .timeslot-heading svg { color: var(--color-accent); flex-shrink: 0; }
 .timeslot-heading .required { color: #e74c3c; font-size: 0.85rem; }
 
-/* ── Min-height prevents layout shift when slots appear/change ── */
+/* â”€â”€ Min-height prevents layout shift when slots appear/change â”€â”€ */
 #timeslotContainer { min-height: 64px; }
 
 /* ===================== TIME SLOTS ===================== */
@@ -980,7 +1001,7 @@
   transform: translateY(-1px);
 }
 
-/* Unavailable — muted + subtle strikethrough, NOT harsh */
+/* Unavailable â€” muted + subtle strikethrough, NOT harsh */
 .timeslot-pill:disabled,
 .timeslot-pill.is-unavailable {
   opacity: 0.35;
@@ -995,7 +1016,7 @@
 .payment-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.85rem;
+  gap: 1rem;
   margin-bottom: 1.25rem;
 }
 
@@ -1008,12 +1029,25 @@
   display: flex;
   align-items: center;
   gap: 0.85rem;
-  padding: 1rem 1.1rem;
+  min-height: 150px;
+  padding: 1.25rem;
   border: 2px solid var(--color-border);
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: all 200ms ease;
   background: var(--color-bg);
+}
+
+.payment-option.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+  filter: grayscale(0.35);
+}
+
+.payment-option.is-disabled:hover {
+  border-color: var(--color-border);
+  background: var(--color-bg);
+  transform: none;
 }
 
 .payment-option:hover {
@@ -1060,6 +1094,7 @@
   line-height: 1.4;
   color: var(--color-text-light);
   font-weight: 400;
+  max-width: 24ch;
 }
 
 .payment-option.is-selected .payment-option__icon svg {
@@ -1454,7 +1489,7 @@
 [data-theme="dark"] .payment-option.is-selected {
   background: var(--color-surface-raised);
   border-color: var(--color-accent);
-  box-shadow: 
+  box-shadow:
     0 8px 24px rgba(0, 0, 0, 0.35),
     0 0 0 1px var(--color-accent),
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
@@ -1505,7 +1540,7 @@
   color: var(--color-text-light);
 }
 
-/* ── Phase 2: Payment Enhancements ── */
+/* â”€â”€ Phase 2: Payment Enhancements â”€â”€ */
 
 .payment-badge--protected {
   background: #d1fae5;
@@ -1563,7 +1598,7 @@
   gap: 0.6rem;
   font-size: 0.83rem;
   line-height: 1.5;
-  /* Amber/warning tone — polished, not harsh red */
+  /* Amber/warning tone â€” polished, not harsh red */
   color: #92400e;
   background: rgba(251, 191, 36, 0.08);
   border: 1px solid rgba(251, 191, 36, 0.22);
@@ -1679,6 +1714,17 @@
   border: 1px solid rgba(154, 140, 115, 0.2);
 }
 
+.pay-modal__demo-note {
+  margin: -0.75rem 0 1rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid rgba(46, 204, 113, 0.22);
+  border-radius: 12px;
+  background: rgba(46, 204, 113, 0.08);
+  color: var(--color-text-light);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
 .pay-modal__form .field { margin-bottom: 0.85rem; }
 
 .pay-modal__row {
@@ -1703,6 +1749,16 @@
   border-radius: var(--radius-sm);
   padding: 0.6rem 0.9rem;
   margin-bottom: 0.75rem;
+}
+
+.pay-modal__empty {
+  padding: 1rem;
+  border: 1px dashed var(--color-border);
+  border-radius: 12px;
+  color: var(--color-text-light);
+  font-size: 0.86rem;
+  line-height: 1.45;
+  text-align: center;
 }
 
 .pay-modal__submit {
@@ -1797,7 +1853,7 @@
   background: rgba(154, 140, 115, 0.12);
 }
 
-/* ===================== TECH CARD — Book button ===================== */
+/* ===================== TECH CARD â€” Book button ===================== */
 .tech-card__actions {
   display: flex;
   gap: 0.5rem;
@@ -1825,7 +1881,7 @@
 
 /* . */
 
-/* ── Custom Calendar Widget ─────────────────────────────────────────────────── */
+/* â”€â”€ Custom Calendar Widget â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .cal-widget {
   background: var(--color-surface-raised, #2D323B);
   border: 1px solid var(--color-border, #393E46);
@@ -2006,15 +2062,15 @@
 /* Dark mode tweaks for address selector */
 [data-theme="dark"] .address-card { background: var(--color-bg); }
 [data-theme="dark"] .address-card.is-selected { background: var(--color-surface-raised); }
-[data-theme="dark"] .modal-content { 
-  background: var(--color-surface); 
-  border-color: rgba(255,255,255,0.08); 
+[data-theme="dark"] .modal-content {
+  background: var(--color-surface);
+  border-color: rgba(255,255,255,0.08);
 }
 [data-theme="dark"] .address-add-btn:hover {
   background: rgba(154, 140, 115, 0.08);
 }
 
-/* ── Two-step service picker ────────────────────────────── */
+/* â”€â”€ Two-step service picker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 #svcPicker { margin-top: 4px; }
 
 .svc-picker-hint {
@@ -2023,7 +2079,7 @@
   margin: 0 0 10px;
 }
 
-/* Phase 1 — category cards grid */
+/* Phase 1 â€” category cards grid */
 .svc-cat-cards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
@@ -2049,7 +2105,7 @@
 .svc-cat-card__icon { font-size: 1.5rem; line-height: 1; }
 .svc-cat-card__label { font-size: 0.75rem; font-weight: 600; color: var(--color-text, #E3D5CA); line-height: 1.2; }
 
-/* Phase 2 — sub-service list */
+/* Phase 2 â€” sub-service list */
 .svc-picker-subs { margin-top: 4px; }
 .svc-back-btn {
   background: none;
@@ -2115,4 +2171,349 @@
   cursor: pointer;
   text-decoration: underline;
   padding: 0;
+}
+
+.site-footer {
+  margin-top: 3rem;
+  opacity: 0.84;
+}
+
+/* ===================== PROFESSIONAL CHECKOUT POLISH ===================== */
+.booking-layout {
+  gap: clamp(1.5rem, 3vw, 2.75rem);
+}
+
+.booking-stepper {
+  position: relative;
+  padding: 1.2rem 1.35rem;
+  border-radius: 22px;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,0.035), rgba(255,255,255,0)),
+    var(--color-surface);
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.18);
+}
+
+.step-num {
+  width: 38px;
+  height: 38px;
+  font-weight: 800;
+}
+
+.step-label__title {
+  font-size: 0.9rem;
+  letter-spacing: -0.01em;
+}
+
+.step-label__sub {
+  margin-top: 0.12rem;
+  opacity: 0.78;
+}
+
+.booking-form-card {
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0)),
+    var(--color-surface);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.22);
+}
+
+.step-panel {
+  padding: clamp(1.4rem, 3vw, 2.35rem);
+}
+
+.step-panel__heading {
+  font-size: clamp(1.35rem, 2vw, 1.75rem);
+  letter-spacing: -0.035em;
+}
+
+.step-panel__sub {
+  max-width: 46rem;
+  color: var(--color-text-light);
+  line-height: 1.6;
+}
+
+.payment-grid {
+  align-items: stretch;
+}
+
+.payment-option {
+  align-items: flex-start;
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.026), rgba(255,255,255,0)),
+    var(--color-bg);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.035);
+}
+
+.payment-option:hover,
+.payment-option.is-selected {
+  transform: translateY(-2px);
+}
+
+.payment-option__icon {
+  margin-top: 0.1rem;
+}
+
+.payment-badge {
+  position: absolute;
+  right: 1rem;
+  bottom: 1rem;
+  border-radius: 999px;
+  padding: 0.28rem 0.65rem;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+
+
+
+
+/* Compact horizontal notes composer */
+.page-booking .form-row--notes {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.notes-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1.25rem;
+  width: 100%;
+  margin: 1.25rem 0 1.5rem;
+  padding: 1rem;
+  border: 1px solid rgba(229, 216, 195, 0.14);
+  border-radius: 16px;
+  background: rgba(12, 16, 22, 0.28);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+.notes-card__left {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  flex: none;
+  max-width: none;
+  min-width: 0;
+}
+
+.notes-card__label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  font-size: 1rem;
+  line-height: 1.35;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.notes-card__label svg {
+  color: var(--color-accent);
+  width: 18px;
+  height: 18px;
+  margin-top: 0.15rem;
+  flex: 0 0 auto;
+}
+
+.notes-card__desc {
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--color-text-light);
+  margin: 0;
+  max-width: none;
+}
+
+.notes-card__right {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  flex: none;
+  min-width: 0;
+}
+
+.notes-card__right textarea {
+  width: 100%;
+  height: 84px;
+  min-height: 84px;
+  max-height: 126px;
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(229, 216, 195, 0.2);
+  border-radius: 14px;
+  background: rgba(9, 13, 19, 0.68);
+  color: var(--color-text);
+  font-size: 0.96rem;
+  line-height: 1.45;
+  resize: none;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(203, 188, 164, 0.55) transparent;
+  transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.04),
+    inset 0 2px 10px rgba(0,0,0,0.16);
+}
+
+.notes-card__right textarea::-webkit-scrollbar {
+  width: 8px;
+}
+
+.notes-card__right textarea::-webkit-scrollbar-thumb {
+  background: rgba(203, 188, 164, 0.55);
+  border-radius: 999px;
+}
+
+.notes-card__right textarea::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.notes-card__right textarea::placeholder {
+  color: rgba(229, 216, 195, 0.46);
+}
+
+.notes-card__right textarea:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  background: rgba(9, 13, 19, 0.82);
+  box-shadow:
+    0 0 0 3px rgba(203, 188, 164, 0.16),
+    inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+.notes-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  flex-wrap: wrap;
+  padding-top: 0;
+}
+
+.notes-prompt-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.notes-prompt-chip {
+  min-height: 34px;
+  background: rgba(255,255,255,0.055);
+  border: 1px solid rgba(229, 216, 195, 0.16);
+  border-radius: 10px;
+  padding: 0.42rem 0.72rem;
+  font-size: 0.78rem;
+  line-height: 1.2;
+  font-weight: 700;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.notes-prompt-chip:hover {
+  background: rgba(203, 188, 164, 0.15);
+  border-color: var(--color-accent);
+  transform: translateY(-1px);
+}
+
+.notes-prompt-chip:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.notes-meter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 34px;
+  margin-left: auto;
+  font-size: 0.78rem;
+  line-height: 1.2;
+  font-weight: 700;
+  color: var(--color-text-light);
+  background: rgba(0,0,0,0.18);
+  border: 1px solid rgba(229, 216, 195, 0.1);
+  padding: 0.42rem 0.7rem;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.notes-meter #bookNotesCounter {
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.notes-meter #bookNotesCounter.is-near-limit {
+  color: #f59e0b;
+}
+
+/* Cleanup end of file */
+.summary-card {
+  overflow: hidden;
+  border-radius: 24px;
+}
+
+.summary-card__header {
+  background:
+    linear-gradient(135deg, rgba(255,255,255,0.34), rgba(255,255,255,0.08)),
+    rgba(203, 188, 164, 0.82);
+}
+
+@media (max-width: 900px) {
+  .booking-layout {
+    grid-template-columns: 1fr;
+  }
+  .notes-card {
+    margin: 1.25rem 0 1.5rem;
+    padding: 0.95rem;
+  }
+
+  .notes-card__left,
+  .notes-card__desc {
+    max-width: none;
+  }
+}
+
+[dir="rtl"] .notes-meter {
+  margin-right: auto;
+  margin-left: 0;
+}
+
+@media (max-width: 540px) {
+  .notes-card {
+    padding: 0.85rem;
+    border-radius: 14px;
+  }
+
+  .notes-card__right textarea {
+    height: 78px;
+    min-height: 78px;
+    font-size: 0.9rem;
+  }
+
+  .notes-card__footer {
+    align-items: stretch;
+  }
+
+  .notes-prompt-grid,
+  .notes-meter {
+    width: 100%;
+  }
+
+  .notes-meter {
+    justify-content: space-between;
+    margin-left: 0;
+  }
+}
+
+/* Disabled payment option (e.g. cash blocked) */
+.payment-option.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.payment-option .payment-note {
+  font-size: 0.75rem;
+  color: var(--color-warning, #e67e22);
+  margin-top: 0.25rem;
 }

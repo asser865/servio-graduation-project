@@ -107,6 +107,10 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>
           <span data-i18n="admin_nav_settlements">Cash Settlements</span>
         </button>
+        <button class="admin-nav__btn" data-tab="payments">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>
+          <span>Payments <span id="adminPaymentsBadge" class="tab-badge" hidden>0</span></span>
+        </button>
         <button class="admin-nav__btn" data-tab="analytics">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
           <span data-i18n="admin_nav_analytics">Analytics</span>
@@ -1101,6 +1105,43 @@
         </div>
       </section>
 
+      <!-- ── Panel: Payments ───────────────────── -->
+      <section class="admin-panel" data-panel="payments">
+        <div class="admin-panel__header">
+          <h2>Payments</h2>
+        </div>
+
+        <div class="admin-section">
+          <div class="admin-section-header">
+            <h2>Pending Approvals</h2>
+            <div class="admin-filter-row">
+              <select id="approvalMethodFilter">
+                <option value="">All Methods</option>
+                <option value="online">Online</option>
+                <option value="cash">Cash</option>
+              </select>
+            </div>
+          </div>
+          <div id="adminPendingApprovalsList"><!-- populated by JS --></div>
+        </div>
+
+        <div class="admin-section">
+          <div class="admin-section-header">
+            <h2>Cash Debts</h2>
+            <div id="adminCashDebtsSummary" class="admin-summary-row"><!-- populated by JS --></div>
+            <div class="admin-filter-row">
+              <select id="debtStatusFilter">
+                <option value="">All</option>
+                <option value="outstanding">Outstanding</option>
+                <option value="partially_paid">Partially Paid</option>
+                <option value="paid">Paid</option>
+              </select>
+            </div>
+          </div>
+          <div id="adminCashDebtsList"><!-- populated by JS --></div>
+        </div>
+      </section>
+
 
       <!-- ── Panel: Analytics ───────────────────── -->
       <section class="admin-panel" data-panel="analytics">
@@ -1299,9 +1340,9 @@
               <h3 class="admin-settings-section__title" data-i18n="admin_stab_platform">Platform Rules</h3>
               <div class="admin-settings-grid">
                 <div class="admin-settings-field">
-                  <label for="commissionRate" data-i18n="admin_commission_rate">Platform Commission (%)</label>
+                  <label for="commissionRate" data-i18n="admin_commission_rate">Platform Fee (%)</label>
                   <input type="number" id="commissionRate" value="10" min="0" max="100" />
-                  <small data-i18n="admin_commission_hint">The percentage deducted from each completed transaction.</small>
+                  <small data-i18n="admin_commission_hint">Used to calculate the customer platform fee at booking time.</small>
                 </div>
                 <div class="admin-settings-field">
                   <label for="maxCashLiability" data-i18n="admin_max_cash_liability">Cash Debt Ceiling (EGP)</label>
@@ -1323,6 +1364,20 @@
                   <input type="number" id="minBookingAmount" value="50" min="0" />
                   <small data-i18n="admin_min_booking_hint">The minimum service amount a customer can book.</small>
                 </div>
+                <div class="admin-settings-field">
+                  <label for="settingCashDebtWarningThreshold">Debt Warning Threshold (EGP)</label>
+                  <input type="number" id="settingCashDebtWarningThreshold" min="1">
+                </div>
+                <div class="admin-settings-field">
+                  <label for="settingCashDebtBlockThreshold">Debt Block Threshold (EGP)</label>
+                  <input type="number" id="settingCashDebtBlockThreshold" min="1">
+                </div>
+              </div>
+              <div class="admin-settings-toggle-row">
+                <div class="admin-settings-toggle-info">
+                  <span class="admin-settings-toggle-label">Auto-block when threshold exceeded</span>
+                </div>
+                <input type="checkbox" id="settingCashDebtAutoBlockEnabled">
               </div>
               <!-- Toggle: Cash Payments -->
               <div class="admin-settings-toggle-row">
@@ -2623,6 +2678,24 @@
     }
     .doc-lightbox__close:hover { background: rgba(255,255,255,.3); }
   </style>
+
+  <div id="adminMarkPaidModal" class="modal-overlay" hidden>
+    <div class="modal-box">
+      <h3>Mark Debt Paid</h3>
+      <input type="hidden" id="markPaidDebtId">
+      <p>Remaining: <strong id="markPaidRemaining"></strong></p>
+      <label>Amount to pay (EGP):
+        <input type="number" id="markPaidAmount" min="1" step="1">
+      </label>
+      <label>Admin note (optional):
+        <input type="text" id="markPaidNote" maxlength="200">
+      </label>
+      <div class="modal-actions">
+        <button id="markPaidSubmit" class="btn btn--primary">Confirm</button>
+        <button id="markPaidCancel" class="btn btn--ghost">Cancel</button>
+      </div>
+    </div>
+  </div>
 
 </body>
 </html>

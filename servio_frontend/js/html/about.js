@@ -1,6 +1,40 @@
 // Animated counters for stats
-      document.addEventListener('DOMContentLoaded', () => {
-        const counters = document.querySelectorAll('[data-count]');
+document.addEventListener('DOMContentLoaded', () => {
+  // ── Liquid Background Mouse Follower ────────────────────────
+  const interactiveOrb = document.querySelector('.liquid-orb--interactive');
+  const heroSection = document.querySelector('.about-hero');
+
+  if (interactiveOrb && heroSection) {
+    let mouseX = 0;
+    let mouseY = 0;
+    let currentX = 0;
+    let currentY = 0;
+    const lerpAmount = 0.08; // Buttery smooth lag
+
+    const updateOrbPosition = () => {
+      // Linear interpolation for smooth motion
+      currentX += (mouseX - currentX) * lerpAmount;
+      currentY += (mouseY - currentY) * lerpAmount;
+
+      // Center the orb on the cursor
+      const xOffset = currentX - interactiveOrb.offsetWidth / 2;
+      const yOffset = currentY - interactiveOrb.offsetHeight / 2;
+
+      interactiveOrb.style.transform = `translate3d(${xOffset}px, ${yOffset}px, 0)`;
+      requestAnimationFrame(updateOrbPosition);
+    };
+
+    heroSection.addEventListener('mousemove', (e) => {
+      const rect = heroSection.getBoundingClientRect();
+      mouseX = e.clientX - rect.left;
+      mouseY = e.clientY - rect.top;
+    });
+
+    // Start the animation loop
+    updateOrbPosition();
+  }
+
+  const counters = document.querySelectorAll('[data-count]');
         const observerOptions = { threshold: 0.5 };
 
         const animateCounter = (el) => {

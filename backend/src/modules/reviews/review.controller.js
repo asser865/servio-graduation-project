@@ -8,6 +8,7 @@ const Review          = require('./review.model');
 const Booking         = require('../bookings/booking.model');
 const ApiError        = require('../../utils/ApiError');
 const ApiResponse     = require('../../utils/ApiResponse');
+const notifSvc        = require('../notifications/notification.service');
 
 // ── CREATE REVIEW (User Only) ────────────────────────────────────────────────
 // WHAT: Allows users to rate a worker after a booking is "completed".
@@ -35,6 +36,13 @@ const createReview = async (req, res) => {
     rating,
     comment,
   });
+
+  notifSvc.notifyReviewReceived(
+    booking.worker,
+    req.user.name || 'A customer',
+    rating,
+    bookingId
+  );
 
   return ApiResponse.success(res, StatusCodes.CREATED, 'Review submitted successfully.', review);
 };
