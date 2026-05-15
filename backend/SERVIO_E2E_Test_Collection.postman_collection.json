@@ -1,0 +1,1238 @@
+{
+  "info": {
+    "_postman_id": "a7b22b9f-ce70-4f52-9982-0c108c284a56",
+    "name": "SERVIO E2E Test Collection",
+    "description": "End-to-end tests for the SERVIO backend API. Run folders in order: Health → Register → Login → Me → Role Guards → Validation → Public Routes → AI.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "44028444"
+  },
+  "item": [
+    {
+      "name": "00 - Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('success is true', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.be.true;",
+                  "  pm.expect(body.message).to.include('running');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            },
+            "description": "Verify the server is running. Does NOT require MongoDB."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "01 - Register",
+      "item": [
+        {
+          "name": "Register Customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "",
+                  "pm.test('Response envelope shape', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('success', true);",
+                  "  pm.expect(body).to.have.property('message');",
+                  "  pm.expect(body).to.have.property('data');",
+                  "  pm.expect(body.data).to.have.property('token');",
+                  "  pm.expect(body.data).to.have.property('user');",
+                  "});",
+                  "",
+                  "pm.test('Role stored as user (not customer)', () => {",
+                  "  const user = pm.response.json().data.user;",
+                  "  pm.expect(user.role).to.equal('user');",
+                  "});",
+                  "",
+                  "pm.test('Password not in response', () => {",
+                  "  const user = pm.response.json().data.user;",
+                  "  pm.expect(user).to.not.have.property('password');",
+                  "  pm.expect(user).to.not.have.property('resetPasswordToken');",
+                  "});",
+                  "",
+                  "const body = pm.response.json();",
+                  "if (body.success && body.data && body.data.token) {",
+                  "  pm.environment.set('customer_token', body.data.token);",
+                  "  pm.environment.set('customer_id', body.data.user._id);",
+                  "  console.log('customer_token saved');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Admin 2\",\n  \"email\": \"admin2@g.com\",\n  \"password\": \"admin123\",\n  \"role\": \"admin\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "register"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Register Technician",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "",
+                  "pm.test('Role stored as worker (not technician)', () => {",
+                  "  const user = pm.response.json().data.user;",
+                  "  pm.expect(user.role).to.equal('worker');",
+                  "});",
+                  "",
+                  "pm.test('Worker starts unverified', () => {",
+                  "  const user = pm.response.json().data.user;",
+                  "  pm.expect(user.isVerified).to.equal(false);",
+                  "  pm.expect(user.verificationStatus).to.equal('pending');",
+                  "});",
+                  "",
+                  "pm.test('Password not in response', () => {",
+                  "  const user = pm.response.json().data.user;",
+                  "  pm.expect(user).to.not.have.property('password');",
+                  "});",
+                  "",
+                  "const body = pm.response.json();",
+                  "if (body.success && body.data && body.data.token) {",
+                  "  pm.environment.set('technician_token', body.data.token);",
+                  "  pm.environment.set('technician_id', body.data.user._id);",
+                  "  console.log('technician_token saved');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Technician One\",\n  \"email\": \"tech1@servio.test\",\n  \"password\": \"Password1\",\n  \"role\": \"technician\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "register"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Register - Duplicate Email (expect 409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 409 Conflict', () => pm.response.to.have.status(409));",
+                  "",
+                  "pm.test('Error envelope shape', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.be.false;",
+                  "  pm.expect(body.message).to.include('already exists');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Customer Duplicate\",\n  \"email\": \"customer1@servio.test\",\n  \"password\": \"Password1\",\n  \"role\": \"customer\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "register"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Register - Missing Email (expect 422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422', () => pm.response.to.have.status(422));",
+                  "",
+                  "pm.test('Validation error shape', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.be.false;",
+                  "  pm.expect(body.message).to.include('Validation failed');",
+                  "  pm.expect(body.errors).to.be.an('array').with.length.above(0);",
+                  "  pm.expect(body.errors[0]).to.have.property('field');",
+                  "  pm.expect(body.errors[0]).to.have.property('message');",
+                  "});",
+                  "",
+                  "pm.test('Error points to email field', () => {",
+                  "  const errors = pm.response.json().errors;",
+                  "  const emailError = errors.find(e => e.field === 'email');",
+                  "  pm.expect(emailError).to.exist;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"No Email User\",\n  \"password\": \"Password1\",\n  \"role\": \"customer\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "register"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Register - Weak Password (expect 422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422', () => pm.response.to.have.status(422));",
+                  "",
+                  "pm.test('Password field error returned', () => {",
+                  "  const errors = pm.response.json().errors;",
+                  "  const passError = errors.find(e => e.field === 'password');",
+                  "  pm.expect(passError).to.exist;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Weak Password User\",\n  \"email\": \"weak@servio.test\",\n  \"password\": \"abc\",\n  \"role\": \"customer\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "register"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "02 - Login",
+      "item": [
+        {
+          "name": "Login as Customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Response envelope shape', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.be.true;",
+                  "  pm.expect(body.data).to.have.property('token');",
+                  "  pm.expect(body.data).to.have.property('user');",
+                  "});",
+                  "",
+                  "pm.test('Password not in response', () => {",
+                  "  pm.expect(pm.response.json().data.user).to.not.have.property('password');",
+                  "});",
+                  "",
+                  "const body = pm.response.json();",
+                  "if (body.success && body.data && body.data.token) {",
+                  "  pm.environment.set('customer_token', body.data.token);",
+                  "  console.log('customer_token refreshed');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"customer1@servio.test\",\n  \"password\": \"Password1\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login as Technician",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Role is worker in response', () => {",
+                  "  pm.expect(pm.response.json().data.user.role).to.equal('worker');",
+                  "});",
+                  "",
+                  "const body = pm.response.json();",
+                  "if (body.success && body.data && body.data.token) {",
+                  "  pm.environment.set('technician_token', body.data.token);",
+                  "  console.log('technician_token refreshed');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"tech1@servio.test\",\n  \"password\": \"Password1\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login - Wrong Password (expect 401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "",
+                  "pm.test('Error envelope shape', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.be.false;",
+                  "  pm.expect(body.message).to.include('Invalid');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"customer1@servio.test\",\n  \"password\": \"WrongPassword9\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login - Missing Password (expect 422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422', () => pm.response.to.have.status(422));",
+                  "",
+                  "pm.test('Password field error', () => {",
+                  "  const errors = pm.response.json().errors;",
+                  "  pm.expect(errors.some(e => e.field === 'password')).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"customer1@servio.test\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "03 - GET /auth/me",
+      "item": [
+        {
+          "name": "GET /auth/me - Customer Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Response has user object', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.be.true;",
+                  "  pm.expect(body.data).to.have.property('user');",
+                  "  pm.expect(body.data.user).to.have.property('_id');",
+                  "  pm.expect(body.data.user).to.have.property('email');",
+                  "  pm.expect(body.data.user).to.have.property('role');",
+                  "});",
+                  "",
+                  "pm.test('Role is user (customer alias)', () => {",
+                  "  pm.expect(pm.response.json().data.user.role).to.equal('user');",
+                  "});",
+                  "",
+                  "pm.test('Password not exposed', () => {",
+                  "  pm.expect(pm.response.json().data.user).to.not.have.property('password');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customer_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/auth/me",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "me"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /auth/me - Technician Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Role is worker (technician alias)', () => {",
+                  "  pm.expect(pm.response.json().data.user.role).to.equal('worker');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{technician_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/auth/me",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "me"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /auth/me - No Token (expect 401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "",
+                  "pm.test('Error envelope shape', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.be.false;",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/me",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "me"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /auth/me - Invalid Token (expect 401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "",
+                  "pm.test('Error mentions invalid token', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.be.false;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer this.is.not.a.valid.jwt" }],
+            "url": {
+              "raw": "{{base_url}}/auth/me",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "me"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "04 - Role Guards",
+      "item": [
+        {
+          "name": "Worker-Only Route with Customer Token (expect 403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 403 Forbidden', () => pm.response.to.have.status(403));",
+                  "",
+                  "pm.test('Error envelope shape', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.be.false;",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customer_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/bookings/worker",
+              "host": ["{{base_url}}"],
+              "path": ["bookings", "worker"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Worker-Only Route with No Token (expect 401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/bookings/worker",
+              "host": ["{{base_url}}"],
+              "path": ["bookings", "worker"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Worker Route with Technician Token (expect 200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 - worker can access worker route', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{technician_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/bookings/worker",
+              "host": ["{{base_url}}"],
+              "path": ["bookings", "worker"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Admin-Only Route with Customer Token (expect 403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 403', () => pm.response.to.have.status(403));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customer_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/users",
+              "host": ["{{base_url}}"],
+              "path": ["users"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "05 - Public Routes",
+      "item": [
+        {
+          "name": "List Services (public)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Response envelope shape', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.be.true;",
+                  "  pm.expect(body.data).to.have.property('services');",
+                  "  pm.expect(body.data.services).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/services",
+              "host": ["{{base_url}}"],
+              "path": ["services"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Services - Filter by Category",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('All returned services match category', () => {",
+                  "  const services = pm.response.json().data.services;",
+                  "  services.forEach(s => pm.expect(s.category).to.equal('plumbing'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/services?category=plumbing",
+              "host": ["{{base_url}}"],
+              "path": ["services"],
+              "query": [{ "key": "category", "value": "plumbing" }]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Workers (public)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Response has workers array', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.be.true;",
+                  "  pm.expect(body.data).to.have.property('workers');",
+                  "  pm.expect(body.data.workers).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test('All returned workers are verified', () => {",
+                  "  const workers = pm.response.json().data.workers;",
+                  "  workers.forEach(w => pm.expect(w.isVerified).to.be.true);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/users/workers",
+              "host": ["{{base_url}}"],
+              "path": ["users", "workers"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Worker Profile (public)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 or 404', () => {",
+                  "  pm.expect([200, 404]).to.include(pm.response.code);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/users/workers/{{technician_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["users", "workers", "{{technician_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get My Profile (authenticated)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Returns user data', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customer_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/users/me",
+              "host": ["{{base_url}}"],
+              "path": ["users", "me"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "06 - 404 Not Found",
+      "item": [
+        {
+          "name": "Unknown Route (expect 404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                  "",
+                  "pm.test('Error envelope shape', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.be.false;",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/does-not-exist",
+              "host": ["{{base_url}}"],
+              "path": ["does-not-exist"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "07 - AI Room Analysis",
+      "item": [
+        {
+          "name": "Analyze Room - Valid (expect 200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Response envelope shape', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.be.true;",
+                  "  pm.expect(body.data).to.have.property('data');",
+                  "});",
+                  "",
+                  "pm.test('room_analysis present', () => {",
+                  "  const data = pm.response.json().data.data;",
+                  "  pm.expect(data).to.have.property('room_analysis');",
+                  "  pm.expect(data.room_analysis).to.have.property('room_type');",
+                  "  pm.expect(data.room_analysis).to.have.property('wall_condition');",
+                  "  pm.expect(data.room_analysis).to.have.property('detected_features').that.is.an('array');",
+                  "});",
+                  "",
+                  "pm.test('Three finishing plans returned', () => {",
+                  "  const plans = pm.response.json().data.data.finishing_plans;",
+                  "  pm.expect(plans).to.be.an('array').with.lengthOf(3);",
+                  "  const names = plans.map(p => p.plan_name);",
+                  "  pm.expect(names).to.include('Economy');",
+                  "  pm.expect(names).to.include('Standard');",
+                  "  pm.expect(names).to.include('Premium');",
+                  "});",
+                  "",
+                  "pm.test('Each plan has required cost fields', () => {",
+                  "  const plans = pm.response.json().data.data.finishing_plans;",
+                  "  plans.forEach(p => {",
+                  "    pm.expect(p).to.have.property('total_cost_egp').that.is.a('number');",
+                  "    pm.expect(p).to.have.property('materials_subtotal_egp').that.is.a('number');",
+                  "    pm.expect(p).to.have.property('labor_subtotal_egp').that.is.a('number');",
+                  "    pm.expect(p).to.have.property('materials').that.is.an('array');",
+                  "    pm.expect(p).to.have.property('labor').that.is.an('array');",
+                  "    pm.expect(p).to.have.property('timeline_days').that.is.a('number');",
+                  "  });",
+                  "});",
+                  "",
+                  "pm.test('recommended_plan is one of the three', () => {",
+                  "  const rec = pm.response.json().data.data.recommended_plan;",
+                  "  pm.expect(['Economy', 'Standard', 'Premium']).to.include(rec);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{customer_token}}" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": [],
+                  "description": "Select a room JPEG/PNG photo from your machine"
+                },
+                { "key": "length_m",   "value": "5",      "type": "text" },
+                { "key": "width_m",    "value": "4",      "type": "text" },
+                { "key": "height_m",   "value": "2.8",    "type": "text" },
+                { "key": "budget_egp", "value": "50000",  "type": "text" },
+                { "key": "style",      "value": "modern", "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/ai/analyze-room",
+              "host": ["{{base_url}}"],
+              "path": ["ai", "analyze-room"]
+            },
+            "description": "Full happy-path test. Requires: both servers running (backend :5000, ai-service :8001), valid customer_token, and a real room photo selected for the image field."
+          },
+          "response": []
+        },
+        {
+          "name": "Analyze Room - No Token (expect 401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "",
+                  "pm.test('Error envelope shape', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.be.false;",
+                  "  pm.expect(body).to.have.property('message');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "length_m",   "value": "5",     "type": "text" },
+                { "key": "width_m",    "value": "4",     "type": "text" },
+                { "key": "height_m",   "value": "2.8",   "type": "text" },
+                { "key": "budget_egp", "value": "50000", "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/ai/analyze-room",
+              "host": ["{{base_url}}"],
+              "path": ["ai", "analyze-room"]
+            },
+            "description": "No Authorization header. Must be rejected at auth middleware before reaching AI service."
+          },
+          "response": []
+        },
+        {
+          "name": "Analyze Room - Missing Image (expect 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "",
+                  "pm.test('Error mentions image', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.be.false;",
+                  "  pm.expect(body.message.toLowerCase()).to.include('image');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{customer_token}}" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "length_m",   "value": "5",     "type": "text" },
+                { "key": "width_m",    "value": "4",     "type": "text" },
+                { "key": "height_m",   "value": "2.8",   "type": "text" },
+                { "key": "budget_egp", "value": "50000", "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/ai/analyze-room",
+              "host": ["{{base_url}}"],
+              "path": ["ai", "analyze-room"]
+            },
+            "description": "No image field sent. Backend must return 400 before forwarding to AI service."
+          },
+          "response": []
+        },
+        {
+          "name": "Analyze Room - Missing Dimensions (expect 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "",
+                  "pm.test('Error mentions required fields', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.be.false;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{customer_token}}" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": [],
+                  "description": "Select any image"
+                },
+                { "key": "budget_egp", "value": "50000", "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/ai/analyze-room",
+              "host": ["{{base_url}}"],
+              "path": ["ai", "analyze-room"]
+            },
+            "description": "Image present but length_m, width_m, height_m missing. Backend must return 400."
+          },
+          "response": []
+        },
+        {
+          "name": "Analyze Room - Small Budget Bedroom",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Economy plan fits near budget', () => {",
+                  "  const plans = pm.response.json().data.data.finishing_plans;",
+                  "  const economy = plans.find(p => p.plan_name === 'Economy');",
+                  "  pm.expect(economy).to.exist;",
+                  "  pm.expect(economy.total_cost_egp).to.be.a('number');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{customer_token}}" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": [],
+                  "description": "Select a bedroom photo"
+                },
+                { "key": "length_m",   "value": "3.5",   "type": "text" },
+                { "key": "width_m",    "value": "3",      "type": "text" },
+                { "key": "height_m",   "value": "2.6",    "type": "text" },
+                { "key": "budget_egp", "value": "20000",  "type": "text" },
+                { "key": "style",      "value": "minimalist", "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/ai/analyze-room",
+              "host": ["{{base_url}}"],
+              "path": ["ai", "analyze-room"]
+            },
+            "description": "Small bedroom, tight budget. Tests that Economy plan is returned and cost fields are numeric."
+          },
+          "response": []
+        },
+        {
+          "name": "Analyze Room - Large Living Room Premium",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Premium plan present with higher cost', () => {",
+                  "  const plans = pm.response.json().data.data.finishing_plans;",
+                  "  const premium = plans.find(p => p.plan_name === 'Premium');",
+                  "  const economy = plans.find(p => p.plan_name === 'Economy');",
+                  "  pm.expect(premium.total_cost_egp).to.be.greaterThan(economy.total_cost_egp);",
+                  "});",
+                  "",
+                  "pm.test('Materials have unit prices in EGP', () => {",
+                  "  const plans = pm.response.json().data.data.finishing_plans;",
+                  "  const premium = plans.find(p => p.plan_name === 'Premium');",
+                  "  premium.materials.forEach(m => {",
+                  "    pm.expect(m.unit_price_egp).to.be.a('number').and.greaterThan(0);",
+                  "    pm.expect(m.total_egp).to.be.a('number').and.greaterThan(0);",
+                  "  });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{customer_token}}" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": [],
+                  "description": "Select a living room photo"
+                },
+                { "key": "length_m",   "value": "7",      "type": "text" },
+                { "key": "width_m",    "value": "6",      "type": "text" },
+                { "key": "height_m",   "value": "3",      "type": "text" },
+                { "key": "budget_egp", "value": "200000", "type": "text" },
+                { "key": "style",      "value": "luxury",  "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/ai/analyze-room",
+              "host": ["{{base_url}}"],
+              "path": ["ai", "analyze-room"]
+            },
+            "description": "Large living room, high budget. Verifies Premium > Economy in cost and that material prices are numeric."
+          },
+          "response": []
+        },
+        {
+          "name": "Analyze Room - Bathroom",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('All three plans returned', () => {",
+                  "  const plans = pm.response.json().data.data.finishing_plans;",
+                  "  pm.expect(plans).to.have.lengthOf(3);",
+                  "});",
+                  "",
+                  "pm.test('Labor entries have daily_rate_egp', () => {",
+                  "  const plans = pm.response.json().data.data.finishing_plans;",
+                  "  plans.forEach(p => {",
+                  "    p.labor.forEach(l => {",
+                  "      pm.expect(l.daily_rate_egp).to.be.a('number').and.greaterThan(0);",
+                  "      pm.expect(l.total_egp).to.be.a('number').and.greaterThan(0);",
+                  "    });",
+                  "  });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{customer_token}}" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": [],
+                  "description": "Select a bathroom photo"
+                },
+                { "key": "length_m",   "value": "2.5",  "type": "text" },
+                { "key": "width_m",    "value": "2",     "type": "text" },
+                { "key": "height_m",   "value": "2.8",   "type": "text" },
+                { "key": "budget_egp", "value": "35000", "type": "text" },
+                { "key": "style",      "value": "modern", "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/ai/analyze-room",
+              "host": ["{{base_url}}"],
+              "path": ["ai", "analyze-room"]
+            },
+            "description": "Bathroom dimensions. Verifies labor entries have valid rate fields."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
