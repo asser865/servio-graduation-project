@@ -2414,6 +2414,8 @@ BookingModel _toBookingModel(BackendBooking b) {
     id: b.id,
     reference: '#SRV-$shortId',
     serviceName: b.serviceName.isNotEmpty ? b.serviceName : 'Service',
+    serviceId: b.serviceId,
+    serviceCategory: b.serviceCategory,
     technicianName: b.workerName.isNotEmpty ? b.workerName : 'Technician',
     technicianId: b.workerId,
     date: date,

@@ -372,7 +372,7 @@ const getUserBookings = async (userId, { status, page = 1, limit = 10 }) => {
 
   const [bookings, total] = await Promise.all([
     Booking.find(filter)
-      .populate('worker', 'name profileImage averageRating')
+      .populate('worker', 'name profileImage averageRating availability availabilityType isAvailable')
       .populate('service', 'title category basePrice priceUnit')
       .populate('savedCard', 'last4 expiry cardType label isDefault')
       .sort({ createdAt: -1 })

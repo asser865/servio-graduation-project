@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/api/bookings_api.dart';
+import '../../core/api/users_api.dart';
 import '../../core/models/booking_model.dart';
 import '../../core/state/notifications_provider.dart';
 import '../../design_system/servio_theme_extension.dart';
@@ -11,6 +12,7 @@ import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
 import '../../design_system/widgets/servio_status_chip.dart';
 import '../booking/booking_flow_data.dart';
+import '../booking/booking_step_one_screen.dart';
 import '../messages/chat_screen.dart';
 import 'write_review_screen.dart';
 
@@ -149,6 +151,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
             final booking = active[index];
             return _LiveBookingCard(
               booking: booking,
+              onRebook: () => _rebook(context, booking),
               onViewDetails: () {
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
@@ -173,6 +176,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
             final booking = history[index];
             return _LiveBookingCard(
               booking: booking,
+              onRebook: () => _rebook(context, booking),
               onViewDetails: () {
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
@@ -192,6 +196,35 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
               'after you complete a booking and write a review.',
         );
     }
+  }
+
+  Future<void> _rebook(BuildContext context, BookingModel booking) async {
+    var data = _rebookFlowDataFromBooking(booking);
+    if (data.technicianId.trim().isNotEmpty &&
+        data.technicianAvailability.isEmpty) {
+      try {
+        final client = context.read<ApiClient>();
+        final worker = await UsersApi(client).getWorkerById(data.technicianId);
+        data = data.copyWith(
+          technicianAvailability: worker.availability,
+          technicianName: worker.displayName,
+          hourlyRate: worker.hourlyRate > 0
+              ? '${worker.hourlyRate} EGP/hr'
+              : data.hourlyRate,
+        );
+      } catch (_) {
+        // The booking flow can still open; final booking validation remains
+        // enforced by the backend if availability cannot be refreshed here.
+      }
+    }
+    if (!context.mounted) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => BookingStepOneScreen(
+          data: data,
+        ),
+      ),
+    );
   }
 }
 
@@ -233,10 +266,12 @@ class _LiveBookingCard extends StatelessWidget {
   const _LiveBookingCard({
     required this.booking,
     required this.onViewDetails,
+    required this.onRebook,
   });
 
   final BookingModel booking;
   final VoidCallback onViewDetails;
+  final VoidCallback onRebook;
 
   static ServioStatusChipType _chipType(BookingStatus status) =>
       switch (status) {
@@ -311,12 +346,22 @@ class _LiveBookingCard extends StatelessWidget {
                 isActive
                     ? ServioPrimaryButton(
                         label: 'View Details', onPressed: onViewDetails)
-                    : SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton(
-                          onPressed: onViewDetails,
-                          child: const Text('View Details'),
-                        ),
+                    : Row(
+                        children: <Widget>[
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: onRebook,
+                              child: const Text('Re-book'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: onViewDetails,
+                              child: const Text('View Details'),
+                            ),
+                          ),
+                        ],
                       ),
               ],
             ),
@@ -515,11 +560,23 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
               const SizedBox(height: 20),
               OutlinedButton(
                 onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => WriteReviewScreen(
-                        technicianName: data.technicianName,
-                        jobSummary: data.serviceName,
+                  if (data.backendId.trim().isNotEmpty) {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => WriteReviewScreen(
+                          technicianName: data.technicianName,
+                          jobSummary: data.serviceName,
+                          bookingId: data.backendId,
+                        ),
+                      ),
+                    );
+                    return;
+                  }
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Booking details are still loading. Please try again.',
                       ),
                     ),
                   );
@@ -750,6 +807,8 @@ BookingFlowData _flowDataFromBooking(BookingModel booking) {
   return BookingFlowData(
     backendId: booking.id,
     serviceName: booking.serviceName,
+    serviceId: booking.serviceId,
+    category: booking.serviceCategory,
     technicianName: booking.technicianName,
     technicianId: booking.technicianId,
     date: booking.date,
@@ -765,6 +824,26 @@ BookingFlowData _flowDataFromBooking(BookingModel booking) {
     savedCardLast4: booking.paymentCardLast4,
     statusLabel: _LiveBookingCard._chipLabel(booking.status),
     statusCode: _statusCodeFromStatus(booking.status),
+  );
+}
+
+BookingFlowData _rebookFlowDataFromBooking(BookingModel booking) {
+  return BookingFlowData(
+    serviceName: booking.serviceName,
+    serviceId: booking.serviceId,
+    category: booking.serviceCategory,
+    technicianName: booking.technicianName,
+    technicianId: booking.technicianId,
+    specialty: booking.serviceName,
+    priceLabel: booking.amount,
+    hourlyRate: booking.amount,
+    notes: booking.notes,
+    paymentMethod: booking.paymentMethod,
+    paymentMethodCode:
+        booking.paymentMethod.toLowerCase().contains('card') ? 'card' : 'cash',
+    savedCardLabel: _cardLabelFor(booking),
+    savedCardLast4: booking.paymentCardLast4,
+    technicianAvailability: booking.technicianAvailability,
   );
 }
 

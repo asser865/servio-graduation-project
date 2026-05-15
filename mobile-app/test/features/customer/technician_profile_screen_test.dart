@@ -258,4 +258,84 @@ void main() {
     expect(find.text('Confirm Your Booking'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('booking preserves selected service instead of first service',
+      (tester) async {
+    await tester.pumpWidget(
+      await _wrap(
+        const TechnicianProfileScreen(
+          technicianId: 'worker1',
+          selectedServiceId: 'service-plumbing',
+          selectedServiceName: 'Plumbing',
+          selectedServiceCategory: 'plumbing',
+        ),
+        httpClient: _mockClient(<String, Map<String, dynamic>>{
+          'worker1': _worker(
+            services: const <Map<String, dynamic>>[
+              <String, dynamic>{
+                '_id': 'service-painting',
+                'title': 'Painting',
+                'category': 'painting',
+              },
+              <String, dynamic>{
+                '_id': 'service-plumbing',
+                'title': 'Plumbing',
+                'category': 'plumbing',
+              },
+            ],
+            categories: const <String>['painting', 'plumbing'],
+          ),
+        }),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Book technician'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Confirm Your Booking'), findsOneWidget);
+    expect(find.text('Plumbing'), findsWidgets);
+    expect(find.text('Painting'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('booking preserves cleaning selection for multi-service tech',
+      (tester) async {
+    await tester.pumpWidget(
+      await _wrap(
+        const TechnicianProfileScreen(
+          technicianId: 'worker1',
+          selectedServiceId: 'service-cleaning',
+          selectedServiceName: 'Cleaning',
+          selectedServiceCategory: 'cleaning',
+        ),
+        httpClient: _mockClient(<String, Map<String, dynamic>>{
+          'worker1': _worker(
+            services: const <Map<String, dynamic>>[
+              <String, dynamic>{
+                '_id': 'service-painting',
+                'title': 'Painting',
+                'category': 'painting',
+              },
+              <String, dynamic>{
+                '_id': 'service-cleaning',
+                'title': 'Cleaning',
+                'category': 'cleaning',
+              },
+            ],
+            categories: const <String>['painting', 'cleaning'],
+          ),
+        }),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Book technician'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Confirm Your Booking'), findsOneWidget);
+    expect(find.text('Cleaning'), findsWidgets);
+    expect(find.text('Painting'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 }

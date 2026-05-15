@@ -5,6 +5,7 @@ import '../../core/api/api_client.dart';
 import '../../core/api/reviews_api.dart';
 import '../../core/api/users_api.dart';
 import '../../core/models/backend_worker_model.dart';
+import '../../core/models/service_category.dart';
 import '../../core/models/user_account.dart';
 import '../../core/state/app_state.dart';
 import '../../core/state/workers_state.dart';
@@ -17,9 +18,18 @@ import '../booking/booking_step_one_screen.dart';
 import '../messages/chat_screen.dart';
 
 class TechnicianProfileScreen extends StatefulWidget {
-  const TechnicianProfileScreen({this.technicianId, super.key});
+  const TechnicianProfileScreen({
+    this.technicianId,
+    this.selectedServiceId,
+    this.selectedServiceName,
+    this.selectedServiceCategory,
+    super.key,
+  });
 
   final String? technicianId;
+  final String? selectedServiceId;
+  final String? selectedServiceName;
+  final String? selectedServiceCategory;
 
   @override
   State<TechnicianProfileScreen> createState() =>
@@ -159,6 +169,30 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
     final primaryBackendService =
         worker.services.isNotEmpty ? worker.services.first : null;
     final primaryService = serviceLabels.isNotEmpty ? serviceLabels.first : '';
+    final selectedBackendService = _selectedWorkerService(
+      worker,
+      serviceId: widget.selectedServiceId,
+      serviceName: widget.selectedServiceName,
+      category: widget.selectedServiceCategory,
+    );
+    final selectedServiceName = _firstNonEmpty(<String?>[
+      widget.selectedServiceName,
+      selectedBackendService?.displayName,
+      primaryService,
+      _copy(locale, en: 'Service visit', ar: 'زيارة خدمة'),
+    ]);
+    final selectedServiceId = _firstNonEmpty(<String?>[
+      selectedBackendService?.id,
+      widget.selectedServiceId,
+      primaryBackendService?.id,
+    ]);
+    final selectedServiceCategory = _firstNonEmpty(<String?>[
+      selectedBackendService?.category,
+      widget.selectedServiceCategory,
+      primaryBackendService?.category,
+      worker.categories.isNotEmpty ? worker.categories.first : null,
+      worker.skills.isNotEmpty ? worker.skills.first : null,
+    ]);
     final availabilityLabel =
         _availabilityLabel(worker.availabilityType, locale);
     final locationLabel = worker.locationLabel.isNotEmpty
@@ -419,24 +453,10 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
                                     data: BookingFlowData(
                                       technicianName: workerName,
                                       technicianId: worker.id,
-                                      serviceId:
-                                          primaryBackendService?.id ?? '',
-                                      category:
-                                          (primaryBackendService?.category ??
-                                                      '')
-                                                  .isNotEmpty
-                                              ? primaryBackendService!.category
-                                              : (worker.categories.isNotEmpty
-                                                  ? worker.categories.first
-                                                  : (worker.skills.isNotEmpty
-                                                      ? worker.skills.first
-                                                      : '')),
-                                      serviceName: primaryService.isNotEmpty
-                                          ? primaryService
-                                          : _copy(locale,
-                                              en: 'Service visit',
-                                              ar: 'زيارة خدمة'),
-                                      specialty: primaryService,
+                                      serviceId: selectedServiceId,
+                                      category: selectedServiceCategory,
+                                      serviceName: selectedServiceName,
+                                      specialty: selectedServiceName,
                                       hourlyRate: rateLabel,
                                       technicianAvailability:
                                           worker.availability,
@@ -1488,6 +1508,46 @@ IconData _specialtyIcon(String specialty) {
     'flooring' => Icons.grid_on_rounded,
     _ => Icons.handyman_rounded,
   };
+}
+
+BackendWorkerService? _selectedWorkerService(
+  BackendWorker worker, {
+  String? serviceId,
+  String? serviceName,
+  String? category,
+}) {
+  final selectedId = serviceId?.trim() ?? '';
+  if (selectedId.isNotEmpty) {
+    for (final service in worker.services) {
+      if (service.id == selectedId) return service;
+    }
+  }
+
+  final selectedCategory = normalizeServiceCategory(category);
+  if (selectedCategory.isNotEmpty) {
+    for (final service in worker.services) {
+      if (normalizeServiceCategory(service.category) == selectedCategory) {
+        return service;
+      }
+    }
+  }
+
+  final selectedName = serviceName?.trim().toLowerCase() ?? '';
+  if (selectedName.isNotEmpty) {
+    for (final service in worker.services) {
+      if (service.displayName.toLowerCase() == selectedName) return service;
+    }
+  }
+
+  return null;
+}
+
+String _firstNonEmpty(List<String?> values) {
+  for (final value in values) {
+    final trimmed = value?.trim() ?? '';
+    if (trimmed.isNotEmpty) return trimmed;
+  }
+  return '';
 }
 
 String _normalizeAvailabilityDay(String value) =>

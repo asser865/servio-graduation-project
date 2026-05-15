@@ -71,6 +71,11 @@ void main() {
       expect(booking.serviceId, equals('service789'));
     });
 
+    test('parses service category from service.category', () {
+      final booking = BackendBooking.fromJson(fullJson);
+      expect(booking.serviceCategory, equals('home'));
+    });
+
     test('parses worker id from worker field when it is a raw string', () {
       final booking = BackendBooking.fromJson(fullJson);
       expect(booking.workerId, equals('worker456'));
@@ -99,6 +104,24 @@ void main() {
         BackendBooking.fromJson(assignedToJson).workerId,
         equals('worker-from-assignedTo'),
       );
+    });
+
+    test('parses availability from populated worker', () {
+      final json = Map<String, dynamic>.from(fullJson)
+        ..['worker'] = {
+          '_id': 'worker456',
+          'name': 'Ahmed Nabil',
+          'availability': [
+            {'day': 'monday', 'from': '09:00', 'to': '17:00'},
+          ],
+        };
+
+      final booking = BackendBooking.fromJson(json);
+
+      expect(booking.workerAvailability, hasLength(1));
+      expect(booking.workerAvailability.first.day, equals('monday'));
+      expect(booking.workerAvailability.first.from, equals('09:00'));
+      expect(booking.workerAvailability.first.to, equals('17:00'));
     });
 
     test('workerName is empty when worker is a raw id string (not populated)',
@@ -136,6 +159,7 @@ void main() {
       expect(booking.notes, equals(''));
       expect(booking.serviceName, equals(''));
       expect(booking.serviceId, equals(''));
+      expect(booking.serviceCategory, equals(''));
       expect(booking.workerId, equals(''));
       expect(booking.workerName, equals(''));
       expect(booking.customerName, equals(''));

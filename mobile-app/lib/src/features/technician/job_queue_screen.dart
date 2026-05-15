@@ -26,7 +26,9 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
     'Pending',
     'Confirmed',
     'In Progress',
-    'Completed'
+    'Completed',
+    'Cancelled',
+    'Rejected',
   ];
 
   List<BackendBooking> _jobs = [];
@@ -62,7 +64,6 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
     }
 
     if (workerId.isEmpty || session.account?.role != UserRole.technician) {
-      _logJobQueueDebug('Missing authenticated technician session.');
       setState(() {
         _error = 'Log in as a technician to view assigned jobs.';
         _loading = false;
@@ -70,29 +71,12 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
       return;
     }
 
-    _logJobQueueDebug('Authenticated worker id: $workerId');
-    _logJobQueueDebug(
-      'Booking query: GET /bookings/worker?limit=50&workerId=$workerId '
-      '(backend filters Booking.worker)',
-    );
-
     try {
       final jobs = await BookingsApi(client).getWorkerBookings(
         workerId: workerId,
       );
       final assignedJobs =
           jobs.where((job) => _isAssignedToWorker(job, workerId)).toList();
-      final hiddenCount = jobs.length - assignedJobs.length;
-      if (hiddenCount > 0) {
-        _logJobQueueDebug(
-          'Filtered out $hiddenCount booking(s) whose worker id did not '
-          'match $workerId.',
-        );
-      }
-      _logJobQueueDebug(
-        'Backend response count: ${jobs.length}; assigned count: '
-        '${assignedJobs.length}.',
-      );
       if (!mounted) return;
       setState(() {
         _jobs = assignedJobs;
@@ -116,8 +100,32 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
     const statusMap = <int, Set<String>>{
       0: <String>{'pending'},
       1: <String>{'accepted', 'confirmed', 'scheduled'},
-      2: <String>{'in_progress', 'inprogress', 'active', 'started'},
-      3: <String>{'completed', 'done'},
+      2: <String>{
+        'arrived',
+        'en_route',
+        'enroute',
+        'in_progress',
+        'inprogress',
+        'active',
+        'started',
+      },
+      3: <String>{
+        'awaiting_customer_confirmation',
+        'pending_admin_review',
+        'completed',
+        'done',
+      },
+      4: <String>{
+        'cancelled',
+        'canceled',
+        'cancelled_by_customer',
+        'canceled_by_customer',
+        'cancelled_by_provider',
+        'canceled_by_provider',
+        'cancelled_by_worker',
+        'canceled_by_worker',
+      },
+      5: <String>{'rejected', 'declined'},
     };
     final statuses = statusMap[tab] ?? const <String>{};
     return jobs
@@ -189,76 +197,77 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
                 color: servio.backgroundSoft,
-                borderRadius: BorderRadius.circular(ServioRadius.full),
+                borderRadius: BorderRadius.circular(ServioRadius.lg),
               ),
-              child: Row(
-                children: List<Widget>.generate(_tabs.length, (int index) {
-                  final active = index == _tabIndex;
-                  final count = _jobsForTab(index).length.toString();
+              child: LayoutBuilder(
+                builder: (BuildContext context, BoxConstraints constraints) {
+                  const spacing = 6.0;
+                  final tabWidth = (constraints.maxWidth - spacing * 2) / 3;
 
-                  return Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _tabIndex = index),
-                      child: AnimatedContainer(
-                        duration: ServioMotion.micro,
-                        curve: ServioMotion.curve,
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          color: active
-                              ? Theme.of(context).colorScheme.surface
-                              : Colors.transparent,
-                          borderRadius:
-                              BorderRadius.circular(ServioRadius.full),
-                        ),
-                        child: Column(
-                          children: <Widget>[
-                            Text(
-                              _tabs[index],
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .labelSmall
-                                  ?.copyWith(
-                                    color: active
-                                        ? servio.accent
-                                        : servio.textSecondary,
-                                  ),
-                              textAlign: TextAlign.center,
+                  return Wrap(
+                    spacing: spacing,
+                    runSpacing: spacing,
+                    children: List<Widget>.generate(_tabs.length, (int index) {
+                      final active = index == _tabIndex;
+                      final count = _jobsForTab(index).length.toString();
+                      final tabColor = _tabColor(index, servio);
+
+                      return SizedBox(
+                        width: tabWidth,
+                        child: GestureDetector(
+                          onTap: () => setState(() => _tabIndex = index),
+                          child: AnimatedContainer(
+                            duration: ServioMotion.micro,
+                            curve: ServioMotion.curve,
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: active
+                                  ? Theme.of(context).colorScheme.surface
+                                  : Colors.transparent,
+                              borderRadius:
+                                  BorderRadius.circular(ServioRadius.full),
                             ),
-                            const SizedBox(height: 4),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: ServioColors.tint(
-                                  index == 0
-                                      ? servio.warning
-                                      : index == 3
-                                          ? servio.success
-                                          : servio.info,
+                            child: Column(
+                              children: <Widget>[
+                                Text(
+                                  _tabs[index],
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .labelSmall
+                                      ?.copyWith(
+                                        color: active
+                                            ? servio.accent
+                                            : servio.textSecondary,
+                                      ),
+                                  textAlign: TextAlign.center,
                                 ),
-                                borderRadius:
-                                    BorderRadius.circular(ServioRadius.full),
-                              ),
-                              child: Text(
-                                count,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .labelSmall
-                                    ?.copyWith(
-                                      color: index == 0
-                                          ? servio.warning
-                                          : index == 3
-                                              ? servio.success
-                                              : servio.info,
-                                    ),
-                              ),
+                                const SizedBox(height: 4),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: ServioColors.tint(tabColor),
+                                    borderRadius: BorderRadius.circular(
+                                        ServioRadius.full),
+                                  ),
+                                  child: Text(
+                                    count,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(color: tabColor),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
-                      ),
-                    ),
+                      );
+                    }),
                   );
-                }),
+                },
               ),
             ),
             const SizedBox(height: 20),
@@ -358,6 +367,9 @@ class _JobCard extends StatelessWidget {
       case 'confirmed':
       case 'scheduled':
         return ServioStatusChipType.info;
+      case 'arrived':
+      case 'en_route':
+      case 'enroute':
       case 'in_progress':
       case 'inprogress':
       case 'active':
@@ -365,7 +377,20 @@ class _JobCard extends StatelessWidget {
         return ServioStatusChipType.info;
       case 'completed':
       case 'done':
+      case 'awaiting_customer_confirmation':
+      case 'pending_admin_review':
         return ServioStatusChipType.success;
+      case 'cancelled':
+      case 'canceled':
+      case 'cancelled_by_customer':
+      case 'canceled_by_customer':
+      case 'cancelled_by_provider':
+      case 'canceled_by_provider':
+      case 'cancelled_by_worker':
+      case 'canceled_by_worker':
+      case 'rejected':
+      case 'declined':
+        return ServioStatusChipType.danger;
       default:
         return ServioStatusChipType.warning;
     }
@@ -379,6 +404,11 @@ class _JobCard extends StatelessWidget {
       case 'confirmed':
       case 'scheduled':
         return 'Confirmed';
+      case 'arrived':
+        return 'Arrived';
+      case 'en_route':
+      case 'enroute':
+        return 'En Route';
       case 'in_progress':
       case 'inprogress':
       case 'active':
@@ -387,9 +417,21 @@ class _JobCard extends StatelessWidget {
       case 'completed':
       case 'done':
         return 'Completed';
+      case 'awaiting_customer_confirmation':
+        return 'Awaiting Customer';
+      case 'pending_admin_review':
+        return 'Pending Review';
       case 'cancelled':
+      case 'canceled':
+      case 'cancelled_by_customer':
+      case 'canceled_by_customer':
+      case 'cancelled_by_provider':
+      case 'canceled_by_provider':
+      case 'cancelled_by_worker':
+      case 'canceled_by_worker':
         return 'Cancelled';
       case 'rejected':
+      case 'declined':
         return 'Rejected';
       default:
         return status;
@@ -501,24 +543,19 @@ class _JobCard extends StatelessWidget {
   }
 }
 
+Color _tabColor(int index, ServioThemeExtension servio) {
+  return switch (index) {
+    0 => servio.warning,
+    3 => servio.success,
+    4 || 5 => servio.danger,
+    _ => servio.info,
+  };
+}
+
 bool _isAssignedToWorker(BackendBooking job, String workerId) {
   final bookingWorkerId = job.workerId.trim();
-  final matches = bookingWorkerId == workerId;
-  if (!matches) {
-    _logJobQueueDebug(
-      'Skipping booking ${job.id}: worker id "$bookingWorkerId" does not '
-      'match authenticated worker "$workerId".',
-    );
-  }
-  return matches;
+  return bookingWorkerId == workerId;
 }
 
 String _normalizedStatus(String status) =>
     status.trim().toLowerCase().replaceAll('-', '_');
-
-void _logJobQueueDebug(String message) {
-  assert(() {
-    debugPrint('[JobQueue] $message');
-    return true;
-  }());
-}

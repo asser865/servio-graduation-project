@@ -1,5 +1,5 @@
 // ─── Purpose ──────────────────────────────────────────────────────────────────
-// Reviews are scoped to completed bookings (enforced by the service layer).
+// Reviews are scoped to post-work bookings (enforced by the service layer).
 // Using booking as unique prevents a user from reviewing the same job twice.
 // The post-save hook keeps User.averageRating in sync automatically without
 // requiring the caller to do any extra work.

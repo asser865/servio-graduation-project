@@ -308,11 +308,20 @@ class _AiSmartMatchScreenState extends State<AiSmartMatchScreen> {
                             ? 'Recommended by SERVIO AI for this request.'
                             : worker.reason,
                         onTap: () {
+                          final recommendation = _recommendation!;
                           Navigator.of(context).push(
                             MaterialPageRoute<void>(
                               builder: (_) => TechnicianProfileScreen(
                                 technicianId:
                                     worker.id.isEmpty ? null : worker.id,
+                                selectedServiceCategory:
+                                    recommendation.predictedCategory.isEmpty
+                                        ? null
+                                        : recommendation.predictedCategory,
+                                selectedServiceName:
+                                    recommendation.serviceName.isEmpty
+                                        ? null
+                                        : recommendation.serviceName,
                               ),
                             ),
                           );
