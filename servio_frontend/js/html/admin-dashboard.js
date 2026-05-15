@@ -7,6 +7,14 @@ import { getAllUsers, deleteUser, updateUserStatus, updatePassword, reviewWorker
 import { getServices, createService, updateService, deleteService as apiDeleteService } from '../api/services.js';
 import { getAllBookings } from '../api/bookings.js';
 import { getAuditLogs, deleteAuditLog, getAdminSettings, updateAdminSettings, getAnalytics } from '../api/admin.js';
+import {
+  getPendingApprovals,
+  adminApprovePayment,
+  adminRejectCash,
+  adminRefund,
+  getCashDebts,
+  markCashDebtPaid,
+} from '../api/payments.js';
 
 // Auth guard
 const session = JSON.parse(localStorage.getItem('servio_session') || 'null');
@@ -1065,6 +1073,12 @@ function initAdminDashboard() {
     if (saved.flagCashPayments!= null) _setToggle('flagCashPayments',saved.flagCashPayments);
     if (saved.flagTechSignup  != null) _setToggle('flagTechSignup',  saved.flagTechSignup);
     if (saved.flagReviews     != null) _setToggle('flagReviews',     saved.flagReviews);
+    const warnEl = document.getElementById('settingCashDebtWarningThreshold');
+    const blockEl = document.getElementById('settingCashDebtBlockThreshold');
+    const autoEl  = document.getElementById('settingCashDebtAutoBlockEnabled');
+    if (warnEl)  warnEl.value   = saved.cashDebtWarningThreshold ?? 1000;
+    if (blockEl) blockEl.value  = saved.cashDebtBlockThreshold ?? 5000;
+    if (autoEl)  autoEl.checked = saved.cashDebtAutoBlockEnabled !== false;
   }
 
   // Load settings from API, fall back to localStorage
@@ -1085,6 +1099,12 @@ function initAdminDashboard() {
   // Platform form
   document.getElementById('adminSettingsForm')?.addEventListener('submit', async e => {
     e.preventDefault();
+    const warn  = Number(document.getElementById('settingCashDebtWarningThreshold')?.value);
+    const block = Number(document.getElementById('settingCashDebtBlockThreshold')?.value);
+    if (warn > 0 && block > 0 && block <= warn) {
+      showToast(window.t?.('admin_debt_block_gt_warning') || 'Block threshold must be greater than warning threshold.', 'error');
+      return;
+    }
     await _saveConfig({
       commissionRate:       document.getElementById('commissionRate')?.value,
       maxCashLiability:     document.getElementById('maxCashLiability')?.value,
@@ -1092,6 +1112,9 @@ function initAdminDashboard() {
       minDepositPct:        document.getElementById('minDepositPct')?.value,
       minBookingAmount:     document.getElementById('minBookingAmount')?.value,
       cashPaymentsEnabled:  _getToggle('toggleCashPayments'),
+      cashDebtWarningThreshold: Number(document.getElementById('settingCashDebtWarningThreshold')?.value || 1000),
+      cashDebtBlockThreshold:   Number(document.getElementById('settingCashDebtBlockThreshold')?.value || 5000),
+      cashDebtAutoBlockEnabled: document.getElementById('settingCashDebtAutoBlockEnabled')?.checked !== false,
     });
     showToast(_T('toast_admin_settings_saved'), 'success');
   });
@@ -1529,6 +1552,12 @@ function initAdminDashboard() {
     if (btn.dataset.tab === 'audit') {
       btn.addEventListener('click', () => { _auditPage = 1; _loadAuditPage(); });
     }
+    if (btn.dataset.tab === 'payments') {
+      btn.addEventListener('click', () => {
+        renderPendingApprovals();
+        renderCashDebts();
+      });
+    }
   });
 
   // Initial load
@@ -1782,7 +1811,7 @@ async function loadAdminData() {
     const res = await getAllBookings({ limit: 100 });
     const bookings = res.bookings || [];
     const bTotal = res.pagination?.total ?? bookings.length;
-    const bActive = bookings.filter(b => ['pending','accepted','in_progress'].includes(b.status)).length;
+    const bActive = bookings.filter(b => ['pending','accepted','en_route','arrived','in_progress'].includes(b.status)).length;
     const bCompleted = bookings.filter(b => b.status === 'completed').length;
     const bDisputed = bookings.filter(b => b.status === 'disputed').length;
     const bCancelled = bookings.filter(b => b.status === 'cancelled').length;
@@ -1793,7 +1822,7 @@ async function loadAdminData() {
         bkRoot.innerHTML = '<tr><td colspan="6" class="center-align" style="padding: 2rem;">No bookings found.</td></tr>';
       } else {
         bkRoot.innerHTML = bookings.slice(0, 50).map(b => {
-          const sc = { pending:'bk-badge--active', accepted:'bk-badge--active', in_progress:'bk-badge--active', completed:'bk-badge--completed', cancelled:'bk-badge--cancelled', disputed:'bk-badge--overdue' }[b.status] || '';
+          const sc = { pending:'bk-badge--active', accepted:'bk-badge--active', en_route:'bk-badge--active', arrived:'bk-badge--active', in_progress:'bk-badge--active', completed:'bk-badge--completed', cancelled:'bk-badge--cancelled', disputed:'bk-badge--overdue' }[b.status] || '';
           const date = b.scheduledDate ? new Date(b.scheduledDate).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '—';
           return `<tr class="booking-row" data-status="${b.status}">
             <td class="bk-cust">${b.user?.name || '—'}</td>
@@ -1947,6 +1976,184 @@ function bindAdminActions() {
   });
 }
 
+// ── Payments Tab ──────────────────────────────
+
+async function renderPendingApprovals(filter = {}) {
+  const container = document.getElementById('adminPendingApprovalsList');
+  if (!container) return;
+  container.innerHTML = '<p>Loading...</p>';
+
+  try {
+    const { items } = await getPendingApprovals(filter);
+    if (!items.length) {
+      container.innerHTML = '<p class="empty-state">No pending approvals.</p>';
+      return;
+    }
+
+    container.innerHTML = `
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Customer</th><th>Worker</th><th>Service</th>
+            <th>Method</th><th>Amount</th><th>Worker Earns</th>
+            <th>Platform Fee</th><th>Confirmed At</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${items.map(item => `
+            <tr data-booking-id="${item.bookingId}" data-method="${item.paymentMethod}">
+              <td>${item.customer?.name || '—'}</td>
+              <td>${item.worker?.name || '—'}</td>
+              <td>${item.service || '—'}</td>
+              <td><span class="badge badge--${item.paymentMethod}">${item.paymentMethod}</span></td>
+              <td>${item.totalPaid || item.amount || '—'} EGP</td>
+              <td>${item.workerEarning != null ? item.workerEarning + ' EGP' : '—'}</td>
+              <td>${item.platformFee != null ? item.platformFee + ' EGP' : '—'}</td>
+              <td>${item.customerConfirmedAt ? new Date(item.customerConfirmedAt).toLocaleDateString() : '—'}</td>
+              <td class="admin-actions">
+                <button class="btn btn--sm btn--success js-approve-btn" data-id="${item.bookingId}">Approve</button>
+                ${item.paymentMethod === 'cash' ? `<button class="btn btn--sm btn--danger js-reject-cash-btn" data-id="${item.bookingId}">Reject</button>` : ''}
+                ${item.paymentId ? `<button class="btn btn--sm btn--warning js-refund-btn" data-id="${item.paymentId}">Refund</button>` : ''}
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+
+    container.querySelectorAll('.js-approve-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm(window.t?.('admin_approve_confirm') || 'Approve this payment release? This cannot be undone.')) return;
+        try {
+          await adminApprovePayment(btn.dataset.id);
+          showToast('Approved.', 'success');
+          renderPendingApprovals(filter);
+        } catch (err) {
+          showToast(err?.response?.data?.message || 'Approval failed.', 'error');
+        }
+      });
+    });
+
+    container.querySelectorAll('.js-reject-cash-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const reason = prompt('Reason for rejection (required):');
+        if (!reason) return;
+        try {
+          await adminRejectCash(btn.dataset.id, { reason });
+          showToast('Rejected.', 'info');
+          renderPendingApprovals(filter);
+        } catch (err) {
+          showToast(err?.response?.data?.message || 'Rejection failed.', 'error');
+        }
+      });
+    });
+
+    container.querySelectorAll('.js-refund-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm(window.t?.('admin_refund_confirm') || 'Issue a refund? Booking will be cancelled.')) return;
+        const reason = prompt('Refund reason:');
+        if (!reason) return;
+        try {
+          await adminRefund(btn.dataset.id, { reason });
+          showToast('Refunded.', 'info');
+          renderPendingApprovals(filter);
+        } catch (err) {
+          showToast(err?.response?.data?.message || 'Refund failed.', 'error');
+        }
+      });
+    });
+  } catch (err) {
+    container.innerHTML = `<p class="error-state">Failed to load: ${err?.message}</p>`;
+  }
+}
+
+async function renderCashDebts(filter = {}) {
+  const container = document.getElementById('adminCashDebtsList');
+  if (!container) return;
+  container.innerHTML = '<p>Loading...</p>';
+
+  try {
+    const { items, summary } = await getCashDebts(filter);
+
+    const summaryEl = document.getElementById('adminCashDebtsSummary');
+    if (summaryEl) {
+      summaryEl.innerHTML = `
+        <span>Outstanding: <strong>${summary.totalOutstanding} EGP</strong></span>
+        <span>Partial: <strong>${summary.totalPartiallyPaid} EGP</strong></span>
+        <span>Collected: <strong>${summary.totalPaid} EGP</strong></span>
+      `;
+    }
+
+    if (!items.length) {
+      container.innerHTML = '<p class="empty-state">No cash debts found.</p>';
+      return;
+    }
+
+    container.innerHTML = `
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Worker</th><th>Booking</th><th>Amount</th>
+            <th>Paid</th><th>Status</th><th>Created</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${items.map(d => `
+            <tr>
+              <td>${d.worker?.name || '—'}</td>
+              <td>${d.bookingId || '—'}</td>
+              <td>${d.amount} EGP</td>
+              <td>${d.paidAmount} EGP</td>
+              <td><span class="badge badge--${d.status}">${d.status.replace('_', ' ')}</span></td>
+              <td>${new Date(d.createdAt).toLocaleDateString()}</td>
+              <td>
+                ${d.status !== 'paid' ? `<button class="btn btn--sm btn--primary js-mark-paid-btn" data-id="${d.debtId}" data-remaining="${d.amount - d.paidAmount}">
+                  ${window.t?.('admin_mark_paid') || 'Mark Paid'}
+                </button>` : '—'}
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+
+    container.querySelectorAll('.js-mark-paid-btn').forEach(btn => {
+      btn.addEventListener('click', () => openMarkPaidModal(btn.dataset.id, Number(btn.dataset.remaining)));
+    });
+  } catch (err) {
+    container.innerHTML = `<p class="error-state">Failed to load: ${err?.message}</p>`;
+  }
+}
+
+function openMarkPaidModal(debtId, remaining) {
+  const modal = document.getElementById('adminMarkPaidModal');
+  if (!modal) return;
+  document.getElementById('markPaidDebtId').value = debtId;
+  document.getElementById('markPaidRemaining').textContent = remaining + ' EGP';
+  document.getElementById('markPaidAmount').value = remaining;
+  document.getElementById('markPaidAmount').max = remaining;
+  modal.hidden = false;
+}
+
+document.getElementById('markPaidSubmit')?.addEventListener('click', async () => {
+  const debtId    = document.getElementById('markPaidDebtId').value;
+  const amount    = Number(document.getElementById('markPaidAmount').value);
+  const adminNote = document.getElementById('markPaidNote').value.trim() || undefined;
+  if (!amount || amount <= 0) { showToast('Enter a valid amount.', 'error'); return; }
+  try {
+    await markCashDebtPaid(debtId, { amount, adminNote });
+    document.getElementById('adminMarkPaidModal').hidden = true;
+    showToast('Payment recorded.', 'success');
+    renderCashDebts();
+  } catch (err) {
+    showToast(err?.response?.data?.message || 'Failed to record payment.', 'error');
+  }
+});
+
+document.getElementById('markPaidCancel')?.addEventListener('click', () => {
+  document.getElementById('adminMarkPaidModal').hidden = true;
+});
+
 initAdminDashboard();
 
 // ── Preview Mode: View Site as Customer ───────
@@ -1999,6 +2206,4 @@ document.getElementById('viewSiteAsCustomer')?.addEventListener('click', () => {
     }
   });
 })();
-
-
 

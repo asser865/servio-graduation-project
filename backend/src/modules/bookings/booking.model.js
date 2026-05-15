@@ -134,6 +134,11 @@ const bookingSchema = new mongoose.Schema(
       trim:  true,
     },
 
+    workerCompletionImages: {
+      type:    [String],
+      default: [],
+    },
+
     // Required when status is cancelled or rejected
     cancellationReason: {
       type:  String,

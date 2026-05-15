@@ -486,6 +486,29 @@
     </div>
   </div>
 
+  <div class="history-status-tabs reveal" id="historyStatusTabs" role="tablist" aria-label="History status filters">
+    <button class="history-status-tab is-active" type="button" role="tab" aria-selected="true" data-history-status-tab="all">
+      <span data-i18n="cust_hist_tab_all">All</span>
+      <strong data-history-status-count="all">0</strong>
+    </button>
+    <button class="history-status-tab" type="button" role="tab" aria-selected="false" data-history-status-tab="completed">
+      <span data-i18n="cust_hist_tab_completed">Completed</span>
+      <strong data-history-status-count="completed">0</strong>
+    </button>
+    <button class="history-status-tab" type="button" role="tab" aria-selected="false" data-history-status-tab="needs-review">
+      <span data-i18n="cust_hist_tab_needs_review">Needs Review</span>
+      <strong data-history-status-count="needs-review">0</strong>
+    </button>
+    <button class="history-status-tab" type="button" role="tab" aria-selected="false" data-history-status-tab="reviewed">
+      <span data-i18n="cust_hist_tab_reviewed">Reviewed</span>
+      <strong data-history-status-count="reviewed">0</strong>
+    </button>
+    <button class="history-status-tab" type="button" role="tab" aria-selected="false" data-history-status-tab="cancelled">
+      <span data-i18n="cust_hist_tab_canceled">Canceled</span>
+      <strong data-history-status-count="cancelled">0</strong>
+    </button>
+  </div>
+
   <!-- History Filters -->
   <div class="history-filters reveal">
     <select id="histFilterCategory" data-hist-filter="category">
@@ -586,18 +609,39 @@
   <div class="dash-panel__header">
     <div class="dash-panel__header-row">
       <div>
-        <h1 class="dash-panel__title" data-i18n="cust_nav_notifications">Notifications</h1>
-        <p class="dash-panel__subtitle" data-i18n="cust_notif_sub">Updates on your bookings and account.</p>
+        <h1 class="dash-panel__title">Notifications</h1>
+        <p class="dash-panel__subtitle">Manage your updates and alerts.</p>
       </div>
-      <button class="btn btn--sm btn--outline" id="mark-all-read" type="button" data-i18n="cust_mark_all_read">Mark All Read</button>
+      <a class="notif-prefs-link" href="#" id="notif-prefs-link" title="Notification Preferences">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Preferences
+      </a>
     </div>
   </div>
 
-  <div id="notif-list">
-    <div class="notif-empty-state" hidden>
-      <p>No notifications yet.</p>
+  <!-- Stats + bulk actions bar -->
+  <div class="notif-mgmt-bar">
+    <div class="notif-stats">
+      <span class="notif-stat"><strong id="notif-stat-unread-count">0</strong> Unread</span>
+      <span class="notif-stat-sep">·</span>
+      <span class="notif-stat"><strong id="notif-stat-total-count">0</strong> Total</span>
+    </div>
+    <div class="notif-bulk-actions">
+      <button class="btn btn--sm btn--outline" id="mark-all-read" type="button">Mark all read</button>
+      <button class="btn btn--sm btn--danger-ghost" id="notif-clear-all" type="button">Clear all</button>
     </div>
   </div>
+
+  <!-- Filter tabs -->
+  <div class="notif-filter-tabs" role="tablist" aria-label="Filter notifications">
+    <button class="notif-filter-tab is-active" type="button" role="tab" aria-selected="true"  data-filter="all">All      <span class="notif-filter-tab__count" id="notif-count-all">0</span></button>
+    <button class="notif-filter-tab"            type="button" role="tab" aria-selected="false" data-filter="unread">Unread  <span class="notif-filter-tab__count" id="notif-count-unread">0</span></button>
+    <button class="notif-filter-tab"            type="button" role="tab" aria-selected="false" data-filter="bookings">Bookings <span class="notif-filter-tab__count" id="notif-count-bookings">0</span></button>
+    <button class="notif-filter-tab"            type="button" role="tab" aria-selected="false" data-filter="system">System  <span class="notif-filter-tab__count" id="notif-count-system">0</span></button>
+  </div>
+
+  <!-- Notification list -->
+  <div id="notif-list"></div>
 
 </section>
 

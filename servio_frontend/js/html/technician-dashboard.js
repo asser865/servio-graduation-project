@@ -9,6 +9,8 @@ import { uploadPublicFile } from '../api/uploads.js';
 import { getWorkerBookings, updateBookingStatus } from '../api/bookings.js';
 import { getWorkerReviews } from '../api/reviews.js';
 import { getServices } from '../api/services.js';
+import { getMyDebts } from '../api/payments.js';
+import { getNotifications as apiGetTechNotifs, markOneRead as apiMarkTechNotifRead, markAllRead as apiMarkTechAllRead } from '../api/notifications.js';
 
 const TAB_KEY = 'servio_activeTab_technician';
 
@@ -17,6 +19,105 @@ let _pendingPhotoUrl = null;
 const DAYS_KEYS = ['avail_day_mon','avail_day_tue','avail_day_wed','avail_day_thu','avail_day_fri','avail_day_sat','avail_day_sun'];
 const SKILLS_KEYS = ['skill_plumbing','skill_electrical','skill_hvac','skill_painting','skill_carpentry',
   'skill_cleaning','skill_roofing','skill_flooring','skill_appliance','skill_landscaping','skill_general'];
+
+const DEFAULT_COVERAGE_AREAS = [
+  'Maadi',
+  'Heliopolis',
+  'Nasr City',
+  'Zamalek',
+  'New Cairo',
+  '6th of October',
+  'Dokki',
+  'Giza',
+  'Shubra',
+  'Ain Shams',
+  'Mohandessin',
+  'Sheikh Zayed',
+  'Mokattam',
+  'Madinaty',
+  'Rehab',
+  'Garden City',
+  'Downtown Cairo',
+  'Abbasiya',
+  'Haram',
+  'Faisal',
+];
+
+function normalizeAreaList(items) {
+  const values = Array.isArray(items) ? items : String(items || '').split(',');
+  const seen = new Set();
+  const result = [];
+  values.forEach(item => {
+    const area = String(item || '').trim();
+    const key = area.toLowerCase();
+    if (!area || seen.has(key)) return;
+    seen.add(key);
+    result.push(area);
+  });
+  return result;
+}
+
+function getCoverageAreasFromAccount(account) {
+  if (Array.isArray(account?.coverageAreas) && account.coverageAreas.length) {
+    return normalizeAreaList(account.coverageAreas);
+  }
+  return normalizeAreaList([account?.serviceArea, account?.locationLabel].filter(Boolean).join(','));
+}
+
+function getSelectedCoverageAreas(container) {
+  if (!container) return [];
+  if (Array.isArray(container.__selectedCoverageAreas)) {
+    return normalizeAreaList(container.__selectedCoverageAreas);
+  }
+  return normalizeAreaList([...container.querySelectorAll('[data-area][aria-pressed="true"]')].map(btn => btn.dataset.area));
+}
+
+function updateCoverageSummary(summaryEl, areas) {
+  if (!summaryEl) return;
+  const count = areas.length;
+  summaryEl.textContent = count
+    ? `Covers ${count} area${count === 1 ? '' : 's'}: ${areas.join(', ')}`
+    : 'No coverage areas selected.';
+}
+
+function renderCoverageEditor({ container, searchInput, summaryEl, selectedAreas = [], customInput }) {
+  if (!container) return;
+  const selectedList = normalizeAreaList(selectedAreas.length ? selectedAreas : (container.__selectedCoverageAreas || []));
+  container.__selectedCoverageAreas = selectedList;
+  const selected = new Set(selectedList.map(area => area.toLowerCase()));
+  const query = String(searchInput?.value || '').trim().toLowerCase();
+  const allAreas = normalizeAreaList([...DEFAULT_COVERAGE_AREAS, ...selectedList]);
+  const visibleAreas = allAreas.filter(area => !query || area.toLowerCase().includes(query));
+
+  container.innerHTML = '';
+  visibleAreas.forEach(area => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'skill-tag coverage-chip';
+    btn.dataset.area = area;
+    btn.setAttribute('aria-pressed', String(selected.has(area.toLowerCase())));
+    btn.textContent = area;
+    btn.addEventListener('click', () => {
+      const pressed = btn.getAttribute('aria-pressed') === 'true';
+      btn.setAttribute('aria-pressed', String(!pressed));
+      container.__selectedCoverageAreas = pressed
+        ? normalizeAreaList(container.__selectedCoverageAreas || []).filter(item => item.toLowerCase() !== area.toLowerCase())
+        : normalizeAreaList([...(container.__selectedCoverageAreas || []), area]);
+      const merged = normalizeAreaList([
+        ...(container.__selectedCoverageAreas || []),
+        ...(customInput ? normalizeAreaList(customInput.value) : []),
+      ]);
+      updateCoverageSummary(summaryEl, merged);
+    });
+    container.appendChild(btn);
+  });
+
+  const current = normalizeAreaList([
+    ...(container.__selectedCoverageAreas || []),
+    ...(customInput ? normalizeAreaList(customInput.value) : []),
+  ]);
+  updateCoverageSummary(summaryEl, current);
+}
 
 // Tab label map for topbar title (keys resolved via t() at render time)
 const TAB_LABEL_KEYS = {
@@ -205,8 +306,31 @@ function populateProfile() {
     const val = effectiveAccount[f.dataset.settingsField];
     if (val != null && val !== '') f.value = val;
   });
+  const initialCoverage = getCoverageAreasFromAccount(effectiveAccount);
   const serviceAreaInput = document.getElementById('service-area');
-  if (serviceAreaInput && effectiveAccount.serviceArea) serviceAreaInput.value = effectiveAccount.serviceArea;
+  if (serviceAreaInput) {
+    serviceAreaInput.value = Array.isArray(effectiveAccount.coverageAreas) && effectiveAccount.coverageAreas.length
+      ? ''
+      : (effectiveAccount.serviceArea || '');
+  }
+  renderCoverageEditor({
+    container: document.getElementById('coverage-area-chips'),
+    searchInput: document.getElementById('coverage-search'),
+    summaryEl: document.getElementById('coverage-summary'),
+    selectedAreas: initialCoverage,
+    customInput: serviceAreaInput,
+  });
+  document.getElementById('coverage-search')?.addEventListener('input', () => renderCoverageEditor({
+    container: document.getElementById('coverage-area-chips'),
+    searchInput: document.getElementById('coverage-search'),
+    summaryEl: document.getElementById('coverage-summary'),
+    selectedAreas: normalizeAreaList([...getSelectedCoverageAreas(document.getElementById('coverage-area-chips')), ...normalizeAreaList(serviceAreaInput?.value || '')]),
+    customInput: serviceAreaInput,
+  }));
+  serviceAreaInput?.addEventListener('input', () => updateCoverageSummary(
+    document.getElementById('coverage-summary'),
+    normalizeAreaList([...getSelectedCoverageAreas(document.getElementById('coverage-area-chips')), ...normalizeAreaList(serviceAreaInput.value)])
+  ));
 
   // Render avatar — photo takes priority over initials
   const imgStyle = 'width:100%;height:100%;object-fit:cover;border-radius:50%;';
@@ -305,6 +429,14 @@ function populateProfile() {
       if (user.portfolioUrl)    acc.portfolio    = user.portfolioUrl;
       localStorage.setItem('servio_account', JSON.stringify(acc));
     } catch (_) {}
+
+    // Wire "View Profile" link so tech sees their own public profile (read-only)
+    const techId = user._id || user.id;
+    if (techId) {
+      document.querySelectorAll('a[data-i18n="tech_view_profile"]').forEach(link => {
+        link.href = `./technician-profile.html?id=${techId}&preview=1`;
+      });
+    }
   }).catch(() => {});
 }
 
@@ -419,7 +551,8 @@ async function populateStats() {
   setStatSub('month-earnings-change', deltaStr);
 
   setStat('pending-requests', pending.length);
-  setStatSub('pending-requests-note', pending.length > 0 ? (_t('tech_action_needed') || 'Action needed') : (_t('tech_no_pending') || 'All clear'));
+  const _tSafe = k => { const v = typeof window.t === 'function' ? window.t(k) : null; return (v && v !== k) ? v : null; };
+  setStatSub('pending-requests-note', pending.length > 0 ? (_tSafe('tech_action_needed') || 'Action needed') : (_tSafe('tech_no_pending') || 'All clear'));
 
   // Outstanding balance stat card
   const outstandingEl = document.querySelector('[data-stat="outstanding-balance"]');
@@ -451,8 +584,9 @@ async function populateStats() {
   populateOverviewIncoming(pending);
   populateOverviewSchedule(bookings);
 
-  // Populate notifications from booking activity
-  populateNotifications(bookings);
+  // Load notifications from backend API
+  loadNotifications();
+  setInterval(loadNotifications, 20_000);
 
   return { bookings, pending, completed, monthEarnings, outstandingAmount };
 }
@@ -469,15 +603,35 @@ function initAvailableNowToggle(initialState) {
   const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
 
   function applyUIState(isOn) {
-    const safeT = (k, def) => { 
-      const r = _t(k); 
-      return (r === k || !r) ? def : r; 
+    const safeT = (k, def) => {
+      const r = _t(k);
+      return (r === k || !r) ? def : r;
     };
     toggle.checked = isOn;
     if (card)  card.classList.toggle('is-active', isOn);
     if (pill) {
       pill.textContent = isOn ? safeT('avail_status_online', 'Online') : safeT('avail_status_offline', 'Offline');
       pill.classList.toggle('is-online', isOn);
+    }
+
+    // When offline: visually mark all day rows as not available
+    const scheduleEl = document.getElementById('avail-schedule');
+    if (scheduleEl) {
+      scheduleEl.querySelectorAll('.avail-day-row').forEach(row => {
+        if (!isOn) {
+          row.classList.add('is-toggled-offline');
+          const chip = row.querySelector('.avail-day-toggle-chip');
+          if (chip) chip.setAttribute('aria-disabled', 'true');
+          const times = row.querySelector('.avail-day-row__times');
+          if (times) times.style.opacity = '0.3';
+        } else {
+          row.classList.remove('is-toggled-offline');
+          const chip = row.querySelector('.avail-day-toggle-chip');
+          if (chip) chip.removeAttribute('aria-disabled');
+          const times = row.querySelector('.avail-day-row__times');
+          if (times) times.style.opacity = '';
+        }
+      });
     }
   }
 
@@ -500,9 +654,10 @@ function initAvailableNowToggle(initialState) {
           s.isAvailable = isOn;
           localStorage.setItem('servio_session', JSON.stringify(s));
         } catch (_) {}
+        const _tSafe2 = (k, def) => { const v = _t(k); return (v && v !== k) ? v : def; };
         const msg = isOn
-          ? (_t('toast_avail_on')  || 'You are now visible and accepting bookings.')
-          : (_t('toast_avail_off') || 'You are now offline. New bookings are paused.');
+          ? _tSafe2('toast_avail_on',  'You are now visible and accepting bookings.')
+          : _tSafe2('toast_avail_off', 'You are now offline. New bookings are paused.');
         showToast(msg, isOn ? 'success' : 'info');
       } catch (err) {
         // Revert on error
@@ -805,9 +960,10 @@ async function initJobQueue() {
     return;
   }
 
-  const pending = bookings.filter(b => b.status === 'pending');
-  const ongoing = bookings.filter(b => ['accepted','in_progress'].includes(b.status));
-  const done    = bookings.filter(b => ['completed','rejected','cancelled'].includes(b.status));
+  const pending    = bookings.filter(b => b.status === 'pending');
+  const ongoing    = bookings.filter(b => ['accepted','en_route','arrived','in_progress'].includes(b.status));
+  const done       = bookings.filter(b => b.status === 'completed');
+  const cancelled  = bookings.filter(b => ['cancelled','rejected'].includes(b.status));
 
   // Default tab: show active if exists, else pending, else done
   const defaultTab = ongoing.length ? 'active' : pending.length ? 'pending' : 'done';
@@ -859,13 +1015,19 @@ async function initJobQueue() {
       aria-selected="${defaultTab === 'done'}" data-stab="jq-done">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg>
       Completed${badgeHtml(done.length)}
+    </button>
+    <button class="stab-btn" role="tab"
+      aria-selected="false" data-stab="jq-cancelled">
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
+      Cancelled${badgeHtml(cancelled.length)}
     </button>`;
   container.appendChild(tabBar);
 
   // ── Panes ──
-  container.appendChild(makePane('pending', pending, 'No pending requests.'));
-  container.appendChild(makePane('active',  ongoing, 'No active jobs right now.'));
-  container.appendChild(makePane('done',    done,    'No completed jobs yet.'));
+  container.appendChild(makePane('pending',   pending,   'No pending requests.'));
+  container.appendChild(makePane('active',    ongoing,   'No active jobs right now.'));
+  container.appendChild(makePane('done',      done,      'No completed jobs yet.'));
+  container.appendChild(makePane('cancelled', cancelled, 'No cancelled jobs.'));
 
   // ── Tab switching ──
   tabBar.addEventListener('click', e => {
@@ -937,7 +1099,7 @@ function buildStepperHtml(localState) {
               </div>
               <span class="jq-step__label">${label}</span>
             </div>
-            ${i < steps.length - 1 ? `<div class="jq-step-line ${done ? 'is-done' : ''}"></div>` : ''}
+            ${i < steps.length - 1 ? `<div class="jq-step-line ${done ? 'is-done' : (i === cur ? 'is-active' : '')}"></div>` : ''}
           `;
         }).join('')}
       </div>
@@ -952,7 +1114,6 @@ function buildJobCard(b, _t) {
   const service  = b.serviceName || b.service?.title || b.serviceCategory || 'Service';
   const badge    = (b.serviceCategory || b.service?.category || 'service').replace(/_/g,' ').toUpperCase();
   const customer = b.user?.name  || '—';
-  const phone    = b.user?.phone || '';
   const address  = b.address || '—';
   const mapsUrl  = `https://maps.google.com/?q=${encodeURIComponent(address)}`;
   const date     = b.scheduledDate
@@ -962,25 +1123,38 @@ function buildJobCard(b, _t) {
   const price   = b.totalPrice != null ? `${Number(b.totalPrice).toLocaleString('en-US')} EGP` : '—';
   const payment = b.paymentMethod === 'cash' ? 'Cash' : 'Credit Card';
   const pin     = b.pin || '';
-  const desc    = b.description ? `<p class="jq-premium-desc">${b.description}</p>` : '';
+  const category = b.serviceCategory || b.service?.category || 'other';
+  const _rawIconSvg = (CATEGORY_ICONS[category] || CATEGORY_ICONS.other || '');
+  const notesRaw = String(b.description || '').trim();
+  const notesText = notesRaw ? escapeHtml(notesRaw) : 'No customer notes provided.';
+  const notesCard = `
+    <div class="jq-customer-notes ${notesRaw ? '' : 'is-empty'}">
+      <div class="jq-customer-notes__label">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Customer notes
+      </div>
+      <p class="jq-customer-notes__text">${notesText}</p>
+    </div>`;
 
   const statusCfg = {
     pending:     { label:'Pending Acceptance', dot:'amber'  },
     accepted:    { label:'Accepted',           dot:'blue'   },
+    en_route:    { label:'En Route',           dot:'blue'   },
+    arrived:     { label:'Arrived',            dot:'amber'  },
     in_progress: { label:'In Progress',        dot:'purple' },
     completed:   { label:'Completed',          dot:'green'  },
     cancelled:   { label:'Cancelled',          dot:'grey'   },
     rejected:    { label:'Declined',           dot:'grey'   },
   };
   const { label: statusLabel, dot: dotColor } = statusCfg[b.status] || { label: b.status, dot:'grey' };
-  const isActive = ['accepted','in_progress'].includes(b.status);
+  const isActive = ['accepted','en_route','arrived','in_progress'].includes(b.status);
 
   let flowHtml = '';
   if (b.status === 'pending') {
     flowHtml = `
       <div class="jq-flow" data-booking-id="${id}" data-pin="${pin}"
         data-customer="${customer}" data-address="${address}"
-        data-date="${date}" data-time="${time}" data-price="${price}" data-payment="${payment}" data-service="${service}">
+        data-date="${date}" data-time="${time}" data-price="${price}" data-payment="${payment}" data-service="${service}" data-notes="${escapeHtml(notesRaw)}">
         <div class="jq-section" data-section="pending">
           <div class="jq-premium-actions">
             <button class="btn-premium btn-premium--primary" data-flow-action="accept">
@@ -994,10 +1168,7 @@ function buildJobCard(b, _t) {
           </div>
         </div>
       </div>`;
-  } else if (b.status === 'accepted' || b.status === 'in_progress') {
-    const phoneRow = phone
-      ? `<div class="jq-meta-row"><span>Phone</span><a href="tel:${phone}" class="jq-phone-link">${phone}</a></div>`
-      : '';
+  } else if (['accepted','en_route','arrived','in_progress'].includes(b.status)) {
     flowHtml = `
       <div class="jq-flow" data-booking-id="${id}" data-pin="${pin}" data-customer="${customer}" data-address="${address}">
         <div class="jq-section" data-section="accepted">
@@ -1061,42 +1232,59 @@ function buildJobCard(b, _t) {
         </div>
         <div class="jq-section" data-section="in-progress" hidden>
           <div class="jq-premium-timer-card">
-            <div class="jq-timer-header">
-              <div class="jq-timer-live-dot"></div>
-              <div class="jq-timer-text" id="timer-${id}">00:00:00</div>
-              <span class="jq-timer-pill">LIVE</span>
+            <div class="jq-timer-split">
+              <div class="jq-timer-left">
+                <div class="jq-timer-live-indicator">
+                  <div class="jq-timer-live-dot"></div>
+                  <span class="jq-timer-status-label">In Progress</span>
+                </div>
+                <div class="jq-timer-clock-row">
+                  <div class="jq-timer-text" id="timer-${id}">00:00:00</div>
+                  <span class="jq-timer-pill">LIVE</span>
+                </div>
+              </div>
+              <div class="jq-timer-split-divider"></div>
+              <div class="jq-timer-right">
+                <button class="btn-premium btn-premium--emerald" data-flow-action="complete">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  Mark Job Complete
+                </button>
+                <a href="./messages.html?booking=${id}" class="jq-timer-chat-btn" target="_blank">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                  Message Customer
+                </a>
+              </div>
             </div>
-            <div class="jq-timer-details">
-              <div class="detail-row"><span>Customer</span><strong>${customer}</strong></div>
-              <div class="detail-row"><span>Service</span><strong>${service}</strong></div>
-              <div class="detail-row"><span>Payout</span><strong class="text-emerald">${price}</strong></div>
-              ${phoneRow}
-            </div>
-          </div>
-          <div class="jq-flow-footer">
-            <button class="btn-premium btn-premium--emerald" data-flow-action="complete">
-              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              Mark Job Complete
-            </button>
           </div>
         </div>
         <div class="jq-section" data-section="complete-confirm" hidden>
-          <div class="jq-premium-confirm-card">
-            <div class="jq-confirm-icon-box">
-              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          <div class="jq-confirm-strip">
+            <div class="jq-confirm-strip__icon">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
             </div>
-            <div class="jq-confirm-content">
+            <div class="jq-confirm-strip__text">
               <h4>Confirm Completion</h4>
               <p>Ensure all work is finished before submitting.</p>
             </div>
           </div>
-          <div class="jq-notes-field">
-            <label>Notes for customer <span>(optional)</span></label>
-            <textarea class="jq-notes-textarea" placeholder="Describe the work done..." maxlength="400" rows="3"></textarea>
-          </div>
-          <div class="jq-premium-actions">
-            <button class="btn-premium btn-premium--ghost" data-flow-action="back-to-inprogress">Back</button>
-            <button class="btn-premium btn-premium--primary" data-flow-action="submit-complete">Submit Completion</button>
+          <div class="jq-completion-entry">
+            <div class="jq-notes-field jq-notes-field--work">
+              <label>Work done <span>(optional)</span></label>
+              <div class="jq-work-field-wrap">
+                <textarea class="jq-notes-textarea" placeholder="Describe the work completed..." maxlength="400" rows="2"></textarea>
+                <label class="jq-proof-upload jq-proof-upload--inline" title="Add completion image" aria-label="Add completion image">
+                  <input class="jq-completion-image-input" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+                  <span class="jq-proof-upload__icon">
+                    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                  </span>
+                  <span class="jq-proof-upload__filename" data-completion-file>JPG, PNG, or WEBP up to 5 MB</span>
+                </label>
+              </div>
+            </div>
+            <div class="jq-completion-separator" aria-hidden="true"></div>
+            <div class="jq-completion-side">
+              <button class="btn-premium btn-premium--primary jq-submit-completion-btn" data-flow-action="submit-complete">Submit Completion</button>
+            </div>
           </div>
         </div>
       </div>`;
@@ -1115,7 +1303,7 @@ function buildJobCard(b, _t) {
         <div class="jq-completion-value">${price}</div>
       </div>`;
   } else {
-    flowHtml = `<div class="jq-premium-status-note">${statusLabel}</div>`;
+    flowHtml = '';
   }
 
   const article = document.createElement('article');
@@ -1126,9 +1314,10 @@ function buildJobCard(b, _t) {
 
   const serviceIconHtml = `
     <div class="jq-premium-icon-wrap jq-premium-icon-wrap--${dotColor}">
-      <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+      ${_rawIconSvg.replace(/width="\d+" height="\d+"/g, 'width="28" height="28"')}
     </div>
   `;
+  const identityIconSvg = _rawIconSvg.replace(/width="\d+" height="\d+"/g, 'width="20" height="20"');
 
   article.innerHTML = `
     <div class="jq-premium-card__header">
@@ -1141,10 +1330,33 @@ function buildJobCard(b, _t) {
         <span class="status-label">${statusLabel}</span>
       </div>
     </div>
-    
-    ${isActive ? `<div class="jq-premium-stepper-wrap" id="stepper-${id}">${buildStepperHtml(b.status === 'in_progress' ? 'in-progress' : 'accepted')}</div>` : ''}
-    
-    <div class="jq-premium-card__body">
+
+    ${isActive ? `
+    <div class="jq-identity-bar">
+      <div class="jq-identity-bar__icon jq-identity-bar__icon--${dotColor}">
+        ${identityIconSvg}
+      </div>
+      <div class="jq-identity-bar__info">
+        <div class="jq-identity-bar__name">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          ${customer}
+        </div>
+        <div class="jq-identity-bar__sub">
+          ${service}
+          <span class="jq-identity-bar__sep">·</span>
+          <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+          ${address}
+        </div>
+      </div>
+      <div class="jq-identity-bar__payout">
+        <div class="jq-identity-bar__amount">${price}</div>
+        <div class="jq-identity-bar__label">PAYOUT</div>
+      </div>
+    </div>
+    <div class="jq-premium-stepper-wrap" id="stepper-${id}">${buildStepperHtml({ accepted:'accepted', en_route:'en-route', arrived:'arrived', in_progress:'in-progress' }[b.status] || 'accepted')}</div>
+    ` : ''}
+
+    <div class="jq-premium-card__body${isActive ? ' jq-premium-card__body--hidden' : ''}">
       <div class="jq-body-main">
         ${serviceIconHtml}
         <div class="jq-body-content">
@@ -1165,7 +1377,7 @@ function buildJobCard(b, _t) {
               </span>
             </div>
           </div>
-          ${desc}
+          ${notesCard}
         </div>
       </div>
       <div class="jq-body-payout">
@@ -1173,10 +1385,33 @@ function buildJobCard(b, _t) {
         <div class="payout-label">TOTAL PAYOUT</div>
       </div>
     </div>
-    
+
     <div class="jq-premium-card__footer">
       ${flowHtml}
     </div>
+
+    ${isActive ? `
+    <button class="jq-details-toggle" data-details-toggle type="button">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      Job Details
+    </button>
+    <div class="jq-details-body" data-details-body>
+      <div class="jq-details-inner">
+        <div class="jq-details-row">
+          <span>Date &amp; Time</span>
+          <span>${date}${time ? ' · ' + time : ''}</span>
+        </div>
+        <div class="jq-details-row">
+          <span>Payment</span>
+          <span>${payment}</span>
+        </div>
+        <div class="jq-details-row jq-details-row--notes">
+          <span>Notes</span>
+          <span>${notesRaw ? escapeHtml(notesRaw) : 'None'}</span>
+        </div>
+      </div>
+    </div>
+    ` : ''}
   `;
   return article;
 }
@@ -1197,6 +1432,9 @@ function wireArrivalFlows(container) {
       localStorage.setItem(storeKey, name);
       const stepperWrap = document.getElementById(`stepper-${bookingId}`);
       if (stepperWrap) stepperWrap.innerHTML = buildStepperHtml(name);
+      const _card = flow.closest('.jq-premium-card');
+      _card?.querySelector('[data-details-body]')?.classList.remove('open');
+      _card?.querySelector('[data-details-toggle]')?.classList.remove('open');
     }
 
     /* ── Timer (wall-clock based so refresh-safe) ── */
@@ -1219,10 +1457,22 @@ function wireArrivalFlows(container) {
 
     /* ── Restore persisted state on load ── */
     const stored = localStorage.getItem(storeKey);
-    if (stored) {
-      showSection(stored);
-      if (stored === 'in-progress') startTimer();
+    const backendState = { accepted: 'accepted', en_route: 'en-route', arrived: 'arrived', in_progress: 'in-progress' }[flow.closest('.jq-premium-card')?.dataset.status || ''];
+    const initialState = stored || backendState;
+    if (initialState) {
+      showSection(initialState);
+      if (initialState === 'in-progress') startTimer();
     }
+
+    /* ── Job Details accordion ── */
+    const _accordionCard = flow.closest('.jq-premium-card');
+    _accordionCard?.querySelector('[data-details-toggle]')?.addEventListener('click', () => {
+      const body   = _accordionCard.querySelector('[data-details-body]');
+      const toggle = _accordionCard.querySelector('[data-details-toggle]');
+      if (!body) return;
+      const isOpen = body.classList.toggle('open');
+      toggle.classList.toggle('open', isOpen);
+    });
 
     /* ── PIN box auto-advance + backspace ── */
     const pinGroup = flow.querySelector('[data-pin-group]');
@@ -1248,8 +1498,39 @@ function wireArrivalFlows(container) {
     }
 
     /* ── Accept modal ── */
+    flow.querySelectorAll('.jq-completion-image-input').forEach(input => {
+      input.addEventListener('change', () => {
+        const file = input.files?.[0];
+        const label = input.closest('.jq-proof-upload')?.querySelector('[data-completion-file]');
+        const uploadBox = input.closest('.jq-proof-upload');
+        uploadBox?.classList.remove('is-invalid');
+        if (!file) {
+          if (label) label.textContent = 'JPG, PNG, or WEBP up to 5 MB';
+          return;
+        }
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+        if (!allowedTypes.includes(file.type) || file.size > 5 * 1024 * 1024) {
+          input.value = '';
+          uploadBox?.classList.add('is-invalid');
+          if (label) label.textContent = 'Choose a JPG, PNG, or WEBP under 5 MB';
+          showToast('Completion image must be JPG, PNG, or WEBP under 5 MB.', 'error');
+          return;
+        }
+        if (label) label.textContent = file.name;
+        uploadBox?.classList.add('has-file');
+      });
+    });
+
     function showAcceptModal() {
-      const { service, customer, address, date, time, price, payment } = flow.dataset;
+      const { service, customer, address, date, time, price, payment, notes } = flow.dataset;
+      const notesHtml = `
+        <div class="jqm-notes-card ${notes ? '' : 'is-empty'}">
+          <div class="jqm-notes-card__label">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            Customer notes
+          </div>
+          <p class="jqm-notes-card__text">${notes ? escapeHtml(notes) : 'No customer notes provided.'}</p>
+        </div>`;
       const circumference = 2 * Math.PI * 16; // r=16 → ~100.5
       openJobModal(`
         <div class="jqm-accept">
@@ -1280,6 +1561,7 @@ function wireArrivalFlows(container) {
             <div class="jqm-row jqm-row--payout"><span>Payout</span><strong>${price || '—'}</strong></div>
             <div class="jqm-row"><span>Payment</span><strong>${payment || '—'}</strong></div>
           </div>
+          ${notesHtml}
           <div class="jqm-actions">
             <button class="jqm-btn-pass" id="modal-pass-btn">Pass on this job</button>
             <button class="jqm-btn-confirm-accept" id="modal-accept-btn">
@@ -1321,6 +1603,26 @@ function wireArrivalFlows(container) {
               sw.id = `stepper-${bookingId}`;
               sw.innerHTML = buildStepperHtml('accepted');
               card.querySelector('.jq-premium-card__body')?.before(sw);
+            }
+            const cardBody = card.querySelector('.jq-premium-card__body');
+            if (cardBody && !cardBody.classList.contains('jq-premium-card__body--hidden')) {
+              cardBody.classList.add('jq-premium-card__body--hidden');
+            }
+            if (card && !card.querySelector('.jq-identity-bar')) {
+              const iBar = document.createElement('div');
+              iBar.className = 'jq-identity-bar';
+              iBar.innerHTML = `
+              <div class="jq-identity-bar__info">
+                <div class="jq-identity-bar__name">${flow.dataset.customer || '—'}</div>
+                <div class="jq-identity-bar__sub">${flow.dataset.service || ''} · ${flow.dataset.address || ''}</div>
+              </div>
+              <div class="jq-identity-bar__payout">
+                <div class="jq-identity-bar__amount">${flow.dataset.price || '—'}</div>
+                <div class="jq-identity-bar__label">PAYOUT</div>
+              </div>`;
+              const sw = card.querySelector('.jq-premium-stepper-wrap');
+              if (sw) sw.before(iBar);
+              else cardBody.before(iBar);
             }
           }
           showSection('accepted');
@@ -1406,12 +1708,28 @@ function wireArrivalFlows(container) {
       if (action === 'decline') { showDeclineModal(); return; }
 
       if (action === 'on-my-way') {
+        btn.disabled = true;
+        try {
+          await updateBookingStatus(bookingId, 'en_route');
+        } catch (err) {
+          btn.disabled = false;
+          showToast(err?.message || 'Failed to update status.', 'error');
+          return;
+        }
         showSection('en-route');
         showToast('Customer notified — you\'re on your way!', 'info');
         return;
       }
 
       if (action === 'arrived') {
+        btn.disabled = true;
+        try {
+          await updateBookingStatus(bookingId, 'arrived');
+        } catch (err) {
+          btn.disabled = false;
+          showToast(err?.message || 'Failed to update arrival.', 'error');
+          return;
+        }
         showSection('arrived');
         setTimeout(() => flow.querySelector('.jq-pin-box')?.focus(), 80);
         showToast('Ask the customer for their 4-digit PIN.', 'info');
@@ -1466,13 +1784,27 @@ function wireArrivalFlows(container) {
 
       if (action === 'submit-complete') {
         const notes = flow.querySelector('.jq-notes-textarea')?.value?.trim() || '';
-        btn.disabled = true; btn.textContent = 'Submitting…';
+        const imageInput = flow.querySelector('.jq-completion-image-input');
+        const completionImage = imageInput?.files?.[0] || null;
+        btn.disabled = true; btn.textContent = 'Submitting...';
         try {
-          await updateBookingStatus(bookingId, 'completed');
+          btn.textContent = 'Submitting...';
+          let completionImageUrl = '';
+          if (completionImage) {
+            btn.textContent = 'Uploading image...';
+            const uploaded = await uploadPublicFile(completionImage, 'completion');
+            completionImageUrl = uploaded?.url || '';
+            btn.textContent = 'Submitting...';
+          }
+          btn.textContent = 'Submitting...';
+          await updateBookingStatus(bookingId, 'awaiting_customer_confirmation', {
+            workerNotes: notes,
+            workerCompletionImages: completionImageUrl ? [completionImageUrl] : [],
+          });
           clearInterval(timerInterval);
           const duration = document.getElementById(`timer-${bookingId}`)?.textContent || '—';
           const customer = flow.dataset.customer || '—';
-          const payoutAmount = flow.closest('.jq-premium-card')?.querySelector('.payout-amount')?.textContent?.trim() || '—';
+          const payoutAmount = flow.closest('.jq-premium-card')?.querySelector('.jq-identity-bar__amount, .payout-amount')?.textContent?.trim() || '—';
           localStorage.removeItem(storeKey);
           localStorage.removeItem(timerKey);
 
@@ -1486,15 +1818,21 @@ function wireArrivalFlows(container) {
                   <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="3"><polyline points="4,12 9,17 20,6"/></svg>
                 </div>
                 <div class="jq-done-info">
-                  <p class="jq-done-label">Job Completed Successfully</p>
+                  <p class="jq-done-label">Awaiting Customer Confirmation</p>
                   <p class="jq-done-sub">${customer} · ${duration}</p>
                 </div>
                 <div class="jq-done-earnings">${payoutAmount}</div>
               </div>
               ${notes ? `<div class="jq-done-notes">
-                <div class="jq-notes-label">Service Notes:</div>
-                <p>${notes}</p>
+                <div class="jq-notes-label">Work done:</div>
+                <p>${escapeHtml(notes)}</p>
               </div>` : ''}`;
+            if (completionImageUrl) {
+              card.insertAdjacentHTML('beforeend', `
+                <div class="jq-done-image">
+                  <img src="${completionImageUrl}" alt="Completed work photo">
+                </div>`);
+            }
 
             const doneSection = document.getElementById('jq-completed-section');
             if (doneSection) {
@@ -1502,7 +1840,7 @@ function wireArrivalFlows(container) {
               doneSection.querySelector('.jq-completed-list')?.prepend(card);
             }
           }
-          showToast('Job complete! Earnings added to your wallet. 🎉', 'success');
+          showToast('Completion submitted! Waiting for customer confirmation.', 'success');
         } catch (err) {
           btn.disabled = false; btn.textContent = 'Submit Completion';
           showToast(err?.message || 'Failed to complete job.', 'error');
@@ -1521,7 +1859,9 @@ function populateOverviewIncoming(pendingBookings) {
 
   const preview = pendingBookings.slice(0, 3);
   if (preview.length === 0) {
-    container.innerHTML = `<p style="color:var(--color-text-muted);font-size:0.85rem;padding:12px 0;">${_t('tech_no_pending_requests') || 'No pending requests right now.'}</p>`;
+    const _raw = typeof window.t === 'function' ? window.t('tech_no_pending_requests') : null;
+    const noReqMsg = (_raw && _raw !== 'tech_no_pending_requests') ? _raw : 'No pending requests right now.';
+    container.innerHTML = `<p style="color:var(--color-text-muted);font-size:0.85rem;padding:12px 0;">${noReqMsg}</p>`;
     return;
   }
 
@@ -1558,7 +1898,7 @@ function populateOverviewSchedule(bookings) {
   const upcoming = bookings
     .filter(b => {
       const d = new Date(b.scheduledDate);
-      return d >= now && (b.status === 'pending' || b.status === 'accepted' || b.status === 'in_progress');
+      return d >= now && ['pending','accepted','en_route','arrived','in_progress'].includes(b.status);
     })
     .sort((a, b) => new Date(a.scheduledDate) - new Date(b.scheduledDate))
     .slice(0, 4);
@@ -1656,7 +1996,9 @@ function populateEarnings(allBookings, completed, monthEarnings, lastMonthEarnin
       .slice(0, 10);
 
     if (recentCompleted.length === 0) {
-      recentList.innerHTML = `<p style="color:var(--color-text-muted);font-size:0.85rem;padding:12px 0;">${_t('tech_no_completed_jobs') || 'No completed jobs yet.'}</p>`;
+      const _raw2 = typeof window.t === 'function' ? window.t('tech_no_completed_jobs') : null;
+      const noJobsMsg = (_raw2 && _raw2 !== 'tech_no_completed_jobs') ? _raw2 : 'No completed jobs yet.';
+      recentList.innerHTML = `<p style="color:var(--color-text-muted);font-size:0.85rem;padding:12px 0;">${noJobsMsg}</p>`;
     } else {
       recentList.innerHTML = recentCompleted.map(b => {
         const service = b.service?.title || b.service?.category || 'Service';
@@ -1691,70 +2033,70 @@ function populateEarnings(allBookings, completed, monthEarnings, lastMonthEarnin
   }
 }
 
-// ── Populate notifications from booking activity ──────────────────────────────
-function populateNotifications(bookings) {
+// ── Load notifications from backend API ───────────────────────────────────────
+async function loadNotifications() {
   const list = document.getElementById('notif-items-list');
+  const emptyEl = document.getElementById('notif-empty');
   if (!list) return;
-  const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
 
-  // Generate notifications from recent booking events
-  const notifs = [];
-  const now = new Date();
+  try {
+    const res = await apiGetTechNotifs(30);
+    const notifs = res.notifications || [];
+    const unread = res.unreadCount ?? notifs.filter(n => !n.isRead).length;
+    updateTopbarBadge(unread > 0 ? unread : 0);
 
-  bookings.slice(0, 20).forEach(b => {
-    const service = b.service?.title || b.service?.category || 'Service';
-    const customer = b.user?.name || '—';
-    const updated = new Date(b.updatedAt || b.createdAt);
-    const ageMs = now - updated;
-    const ageMinutes = Math.floor(ageMs / 60000);
-    const ageHours   = Math.floor(ageMs / 3600000);
-    const ageDays    = Math.floor(ageMs / 86400000);
+    if (!notifs.length) {
+      list.innerHTML = '';
+      if (emptyEl) emptyEl.hidden = false;
+      return;
+    }
+    if (emptyEl) emptyEl.hidden = true;
 
-    let timeStr;
-    if (ageMinutes < 60)   timeStr = `${ageMinutes || 1} min ago`;
-    else if (ageHours < 24) timeStr = `${ageHours} hr ago`;
-    else if (ageDays === 1) timeStr = 'Yesterday';
-    else                    timeStr = `${ageDays} days ago`;
+    const typeIcon = {
+      booking_created:    `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
+      booking_accepted:   `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>`,
+      booking_cancelled:  `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
+      booking_completed:  `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>`,
+      booking_action_required: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+      review_received:    `<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,
+      payment_released:   `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`,
+      system:             `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+    };
 
-    let icon, msg, isUnread = false;
-    if (b.status === 'pending') {
-      icon = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`;
-      msg = `New job request: <strong>${service}</strong> from ${customer}`;
-      isUnread = ageMinutes < 60;
-    } else if (b.status === 'completed') {
-      icon = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`;
-      const amount = b.totalPrice != null ? `EGP ${Number(b.totalPrice).toLocaleString('en-US')}` : '';
-      msg = amount ? `Payment of <strong>${amount}</strong> received for <strong>${service}</strong>` : `Job completed: <strong>${service}</strong>`;
-    } else if (b.status === 'cancelled') {
-      icon = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`;
-      msg = `Booking cancelled: <strong>${service}</strong> by ${customer}`;
-    } else {
-      return; // skip accepted/in_progress in notifications
+    function timeAgo(dateStr) {
+      const diff = Date.now() - new Date(dateStr).getTime();
+      const m = Math.floor(diff / 60000);
+      if (m < 1)  return 'Just now';
+      if (m < 60) return `${m}m ago`;
+      const h = Math.floor(m / 60);
+      if (h < 24) return `${h}h ago`;
+      return `${Math.floor(h / 24)}d ago`;
     }
 
-    notifs.push({ icon, msg, timeStr, isUnread });
-  });
+    function normalizeUrl(raw) {
+      if (!raw) return null;
+      try {
+        const u = new URL(raw, window.location.href);
+        return u.pathname + u.search + u.hash;
+      } catch { return raw; }
+    }
 
-  if (notifs.length === 0) {
-    list.innerHTML = '';
-    const emptyEl = document.getElementById('notif-empty');
-    if (emptyEl) emptyEl.hidden = false;
-    updateTopbarBadge(0);
-    return;
+    list.innerHTML = notifs.map(n => {
+      const icon = typeIcon[n.type] || typeIcon.system;
+      const url = normalizeUrl(n.referenceUrl);
+      return `
+        <div class="notif-item${!n.isRead ? ' is-unread' : ''}" data-notif-id="${n._id}"${url ? ` data-notif-url="${url}"` : ''}>
+          <span class="notif-item__dot"></span>
+          <span class="notif-item__icon notif-item__icon--job">${icon}</span>
+          <div class="notif-item__body">
+            <p class="notif-item__msg">${n.title}</p>
+            <span class="notif-item__time">${timeAgo(n.createdAt)}</span>
+          </div>
+        </div>`;
+    }).join('');
+  } catch (_) {
+    if (list) list.innerHTML = '<div style="padding:1rem;opacity:.6;font-size:.875rem;">Could not load notifications.</div>';
   }
-
-  list.innerHTML = notifs.map((n, i) => `
-    <div class="notif-item${n.isUnread ? ' is-unread' : ''}" data-notif-id="live-${i}">
-      <span class="notif-item__dot"></span>
-      <span class="notif-item__icon notif-item__icon--job">${n.icon}</span>
-      <div class="notif-item__body">
-        <p class="notif-item__msg">${n.msg}</p>
-        <span class="notif-item__time">${n.timeStr}</span>
-      </div>
-    </div>`).join('');
-
-  const unreadCount = notifs.filter(n => n.isUnread).length;
-  updateTopbarBadge(unreadCount);
 }
 
 /* ── Fix 6: Password show/hide toggles ─────────────────── */
@@ -2036,7 +2378,13 @@ function initSettingsForm() {
     saveCoverageBtn.addEventListener('click', async () => {
       const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
       const serviceAreaInput = document.getElementById('service-area');
-      const serviceArea = serviceAreaInput?.value.trim() || '';
+      const coverageChips = document.getElementById('coverage-area-chips');
+      const customAreas = normalizeAreaList(serviceAreaInput?.value || '');
+      const coverageAreas = normalizeAreaList([
+        ...getSelectedCoverageAreas(coverageChips),
+        ...customAreas,
+      ]);
+      const serviceArea = coverageAreas.join(', ');
       const selectedSkills = [];
       document.querySelectorAll('#categories-grid .avail-category-chip.is-selected').forEach(chip => {
         selectedSkills.push(chip.dataset.skill || chip.querySelector('span')?.textContent || '');
@@ -2051,17 +2399,27 @@ function initSettingsForm() {
 
       try {
         const profileUpdate = {};
-        profileUpdate.serviceArea = serviceArea; // allow empty to clear
+        profileUpdate.coverageAreas = coverageAreas; // allow empty to clear
+        profileUpdate.serviceArea = serviceArea; // preserve legacy display behavior
         profileUpdate.skills = selectedSkills; // allow empty array to clear
         await updateMe(profileUpdate);
 
         try {
           const acc = JSON.parse(localStorage.getItem('servio_account') || '{}');
           acc.serviceArea = serviceArea;
+          acc.coverageAreas = coverageAreas;
           acc.skills = selectedSkills;
           acc.specialty = selectedSkills.join(', ');
           localStorage.setItem('servio_account', JSON.stringify(acc));
         } catch (_) {}
+        if (serviceAreaInput) serviceAreaInput.value = customAreas.join(', ');
+        renderCoverageEditor({
+          container: coverageChips,
+          searchInput: document.getElementById('coverage-search'),
+          summaryEl: document.getElementById('coverage-summary'),
+          selectedAreas: coverageAreas,
+          customInput: serviceAreaInput,
+        });
 
         if (coverageFeedback) { coverageFeedback.hidden = false; setTimeout(() => { coverageFeedback.hidden = true; }, 3500); }
         showToast(_t('tech_coverage_saved_msg') || 'Coverage saved successfully!', 'success');
@@ -2102,10 +2460,14 @@ function initSettingsTabs() {
 /* ── Profile completeness bar ────────────────────────────── */
 function updateProfileCompleteness() {
   const account = typeof getAccount === 'function' ? getAccount() : null;
-  const fields = ['fullName', 'email', 'phone', 'specialty', 'hourlyRate'];
-  const filled = fields.filter(f => account && account[f] && String(account[f]).trim()).length;
+  const fields = ['fullName', 'email', 'phone', 'specialty', 'hourlyRate', 'bio'];
+  const coverageFilled = getCoverageAreasFromAccount(account || {}).length > 0;
+  const availabilityFilled = Array.isArray(account?.availability) && account.availability.length > 0;
+  const filled = fields.filter(f => account && account[f] && String(account[f]).trim()).length
+    + (coverageFilled ? 1 : 0)
+    + (availabilityFilled ? 1 : 0);
   const avatar = document.querySelector('.settings-avatar-preview img');
-  const total  = fields.length + 1;
+  const total  = fields.length + 3;
   const score  = Math.round(((filled + (avatar ? 1 : 0)) / total) * 100);
   const pct  = document.getElementById('profile-complete-pct');
   const bar  = document.getElementById('profile-complete-bar');
@@ -2319,6 +2681,80 @@ function initDashLogout() {
     } catch (_) { /* ignore */ }
     window.location.href = './login.html?redirect=' + encodeURIComponent(window.location.pathname + window.location.search);
   });
+}
+
+/* ── Profile completion banner ──────────────────────────────
+   Shows a dismissible banner for approved techs who have
+   incomplete profile fields. Shown once per user per browser.
+─────────────────────────────────────────────────────────── */
+function initProfileCompletionBanner() {
+  const account = getAccount();
+  const status  = account?.status || account?.verificationStatus || '';
+  if (status !== 'approved' && status !== 'verified') return;
+
+  const userId     = account?._id || account?.id || 'anon';
+  const storageKey = `servio_pcb_dismissed_${userId}`;
+  if (localStorage.getItem(storageKey)) return;
+
+  const missing = [];
+  if (!account?.bio?.trim())
+    missing.push({ label: 'Profile bio',      tab: 'profile',   stab: null });
+  if (!account?.photoUrl && !account?.profilePhoto && !account?.avatar)
+    missing.push({ label: 'Profile photo',    tab: 'profile',   stab: null });
+  if (!account?.services?.length && !account?.skills?.length)
+    missing.push({ label: 'Services offered', tab: 'settings',  stab: 'stab-btn-services' });
+  if (!account?.serviceArea && !account?.coverageAreas?.length)
+    missing.push({ label: 'Service areas',    tab: 'settings',  stab: 'stab-btn-services' });
+  if (!account?.hourlyRate && !account?.startingRate && !account?.minFee)
+    missing.push({ label: 'Pricing rules',    tab: 'settings',  stab: 'stab-btn-services' });
+
+  if (!missing.length) return;
+
+  const banner = document.createElement('div');
+  banner.className = 'pcb';
+  banner.id        = 'profileCompletionBanner';
+  banner.setAttribute('role', 'alert');
+  banner.innerHTML = `
+    <div class="pcb__inner">
+      <span class="pcb__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+      </span>
+      <div class="pcb__body">
+        <p class="pcb__title">Your account is approved — complete your profile to start receiving bookings</p>
+        <div class="pcb__chips">
+          ${missing.map(m => `<button type="button" class="pcb__chip" data-goto-tab="${m.tab}" data-goto-stab="${m.stab || ''}">${m.label}</button>`).join('')}
+        </div>
+      </div>
+      <button class="pcb__cta btn btn--sm" type="button" data-goto-tab="settings" data-goto-stab="stab-btn-services">Go to Settings</button>
+      <button class="pcb__close" type="button" aria-label="Dismiss">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>`;
+
+  const dashContent = document.querySelector('.dash-content');
+  if (dashContent) dashContent.prepend(banner); else document.querySelector('#main')?.prepend(banner);
+
+  const dismiss = () => {
+    banner.classList.add('pcb--out');
+    setTimeout(() => banner.remove(), 320);
+    localStorage.setItem(storageKey, '1');
+  };
+
+  const navigate = (tab, stab) => {
+    document.querySelector(`[data-tab="${tab}"]`)?.click();
+    if (stab) setTimeout(() => document.getElementById(stab)?.click(), 120);
+    dismiss();
+  };
+
+  banner.querySelector('.pcb__close').addEventListener('click', dismiss);
+  banner.querySelector('.pcb__cta').addEventListener('click', e => {
+    navigate(e.currentTarget.dataset.gotoTab, e.currentTarget.dataset.gotoStab);
+  });
+  banner.querySelectorAll('.pcb__chip').forEach(chip =>
+    chip.addEventListener('click', () => navigate(chip.dataset.gotoTab, chip.dataset.gotoStab))
+  );
 }
 
 /* ── Pending account guard ──────────────────────────────────
@@ -2640,19 +3076,25 @@ function initNotifPanel() {
   });
 
   // Mark individual item as read on click
-  panel.addEventListener('click', e => {
+  panel.addEventListener('click', async e => {
     const item = e.target.closest('.notif-item');
-    if (item && item.classList.contains('is-unread')) {
-      item.classList.remove('is-unread');
-      refreshBadgeAndEmpty();
+    if (item) {
+      if (item.classList.contains('is-unread')) {
+        item.classList.remove('is-unread');
+        const id = item.dataset.notifId;
+        if (id) apiMarkTechNotifRead(id).catch(() => {});
+        refreshBadgeAndEmpty();
+      }
+      const url = item.dataset.notifUrl;
+      if (url) { setTimeout(() => { window.location.href = url; }, 100); }
+      e.stopPropagation();
     }
-    // Don't close on item click — let user read multiple
-    e.stopPropagation();
   });
 
   // Mark all read
   markAllBtn?.addEventListener('click', e => {
     panel.querySelectorAll('.notif-item.is-unread').forEach(el => el.classList.remove('is-unread'));
+    apiMarkTechAllRead().catch(() => {});
     refreshBadgeAndEmpty();
     e.stopPropagation();
   });
@@ -2737,6 +3179,61 @@ async function initReviewsTab(workerId) {
   }).join('');
 }
 
+async function renderDebtSection() {
+  const section = document.getElementById('techDebtSection');
+  if (!section) return;
+
+  try {
+    const { items, summary } = await getMyDebts();
+
+    const { totalOutstanding, totalPartiallyPaid, autoDeductedTotal, blockThreshold, remainingBeforeBlock } = summary;
+    const totalOwed = totalOutstanding + totalPartiallyPaid;
+
+    section.hidden = totalOwed === 0 && items.every(d => d.status === 'paid');
+
+    const t = window.t || (k => k);
+
+    section.innerHTML = `
+      <div class="tech-debt-header">
+        <h3>${t('admin_outstanding_debt')}</h3>
+        ${totalOwed > 0 ? `<span class="tech-debt-badge">${totalOwed} EGP</span>` : ''}
+      </div>
+      <div class="tech-debt-stats">
+        <div class="tech-debt-stat">
+          <span class="label">${t('tech_debt_remaining_before_block')}</span>
+          <span class="value ${remainingBeforeBlock < 500 ? 'text-danger' : ''}">${remainingBeforeBlock} EGP</span>
+        </div>
+        <div class="tech-debt-stat">
+          <span class="label">${t('tech_debt_auto_deducted')}</span>
+          <span class="value">${autoDeductedTotal} EGP</span>
+        </div>
+      </div>
+      <ul class="tech-debt-list">
+        ${items.map(d => `
+          <li class="tech-debt-item tech-debt-item--${d.status}">
+            <span class="tech-debt-item__amount">${d.amount} EGP</span>
+            <span class="tech-debt-item__paid">${d.paidAmount} EGP paid</span>
+            <span class="tech-debt-item__status">${d.status.replace('_', ' ')}</span>
+          </li>
+        `).join('')}
+      </ul>
+    `;
+  } catch (_) {
+    if (section) section.hidden = true;
+  }
+}
+
+function renderCashBlockBanner(worker) {
+  const banner = document.getElementById('techCashBlockBanner');
+  if (!banner) return;
+  const blocked = worker?.restrictions?.cashBookingsBlocked === true;
+  banner.hidden = !blocked;
+  if (blocked) {
+    const t = window.t || (k => k);
+    banner.textContent = t('tech_debt_blocked');
+  }
+}
+
 async function initDashboard() {
   populateProfile();
   updateWelcomeText();
@@ -2757,12 +3254,14 @@ async function initDashboard() {
   initPhase2();
   initVerificationTab();
   initPendingGuard();
+  initProfileCompletionBanner();
 
   // Fetch live availability data and seed the panel
   let liveAvailability = null;
   let liveIsAvailable = false;
   let liveSkills = null;
   let liveServiceArea = '';
+  let liveCoverageAreas = [];
   let liveBlockedDates = [];
   try {
     const res = await getMe();
@@ -2771,11 +3270,21 @@ async function initDashboard() {
     liveIsAvailable  = user?.isAvailable   || false;
     liveSkills       = user?.skills        || null;
     liveServiceArea  = user?.serviceArea   || '';
+    liveCoverageAreas = getCoverageAreasFromAccount(user || {});
     liveBlockedDates = user?.blockedDates  || [];
     // Populate service area input
     const saInput = document.getElementById('service-area');
-    if (saInput && liveServiceArea) saInput.value = liveServiceArea;
+    if (saInput) saInput.value = Array.isArray(user?.coverageAreas) && user.coverageAreas.length ? '' : liveServiceArea;
+    renderCoverageEditor({
+      container: document.getElementById('coverage-area-chips'),
+      searchInput: document.getElementById('coverage-search'),
+      summaryEl: document.getElementById('coverage-summary'),
+      selectedAreas: liveCoverageAreas,
+      customInput: saInput,
+    });
     if (user?._id) initReviewsTab(user._id);
+    await renderDebtSection();
+    renderCashBlockBanner(user);
   } catch (_) {
     // Fall back to cached data
     const acc = getAccount();
@@ -2783,6 +3292,7 @@ async function initDashboard() {
     liveIsAvailable  = acc?.isAvailable   || false;
     liveSkills       = acc?.skills        || null;
     liveServiceArea  = acc?.serviceArea   || '';
+    liveCoverageAreas = getCoverageAreasFromAccount(acc || {});
     liveBlockedDates = acc?.blockedDates  || [];
   }
 
@@ -2995,6 +3505,25 @@ const CATEGORY_LABELS = {
   other:        'Other',
 };
 
+const CATEGORY_ICONS = {
+  plumbing:     '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"/><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"/></svg>',
+  electrical:   '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>',
+  hvac:         '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12h20"/><path d="M12 2v20"/><path d="m20 16-4-4 4-4"/><path d="m4 8 4 4-4 4"/><path d="m16 4-4 4-4-4"/><path d="m8 20 4-4 4 4"/></svg>',
+  carpentry:    '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 12-8.373 8.373a1 1 0 1 1-3-3L12 9"/><path d="m18 15 4-4"/><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172V7l-2.26-2.26a6 6 0 0 0-4.202-1.756L9 2.96l.92.82A6.18 6.18 0 0 1 12 8.4V10l2 2h1.172a2 2 0 0 1 1.414.586L18 14"/></svg>',
+  appliance:    '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="15" x="2" y="4" rx="2"/><path d="M8 4v15M16 4v15M2 9h20M2 14h20"/></svg>',
+  handyman:     '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
+  renovation:   '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
+  painting:     '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>',
+  flooring:     '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>',
+  drywall:      '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M2 9h20M2 15h20M8 3v6M16 3v6M8 15v6M16 15v6"/></svg>',
+  roofing:      '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-7 9 7"/><path d="M3 9v13h18V9"/><path d="M9 22V12h6v10"/></svg>',
+  cleaning:     '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4.5 8-11.8A8 8 0 0 0 12 2a8 8 0 0 0-8 8.2c0 7.3 8 11.8 8 11.8z"/><circle cx="12" cy="10" r="3"/></svg>',
+  'pest-control':'<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 12h8M12 8v8"/><circle cx="12" cy="12" r="9"/><path d="M4.93 4.93l14.14 14.14"/></svg>',
+  landscaping:  '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22v-7l-2-2"/><path d="M17 8v.8A6 6 0 0 1 13.8 20v0H10v0A6.5 6.5 0 0 1 7 8h0a5 5 0 0 1 10 0z"/><path d="m14 14-2 2-2-2"/></svg>',
+  installation: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>',
+  other:        '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
+};
+
 async function initServicesCatalog() {
   const catalog = document.getElementById('services-catalog');
   const saveBtn = document.getElementById('btn-save-skills');
@@ -3047,26 +3576,59 @@ async function initServicesCatalog() {
 
   const catBadge = cat => {
     if (verifiedCats.includes(cat))  return '<span class="svc-cat-badge svc-cat-badge--verified">Verified</span>';
-    if (pendingCats.includes(cat))   return '<span class="svc-cat-badge svc-cat-badge--pending">Pending Admin Approval</span>';
-    return '<span class="svc-cat-badge svc-cat-badge--new">Requires Re-verification</span>';
+    if (pendingCats.includes(cat))   return '<span class="svc-cat-badge svc-cat-badge--pending">Pending</span>';
+    return '<span class="svc-cat-badge svc-cat-badge--new">Re-verify</span>';
   };
 
-  catalog.innerHTML = Object.entries(grouped).map(([cat, services]) => `
-    <div class="svc-cat-group">
-      <div class="svc-cat-header">${CATEGORY_LABELS[cat] || cat} ${catBadge(cat)}</div>
-      <div class="svc-cat-options">
-        ${services.map(svc => {
-          const id      = (svc._id || svc.id || '').toString();
-          const checked = selectedIds.has(id) ? 'checked' : '';
-          return `<label class="svc-check-label">
-            <input type="checkbox" class="svc-checkbox" value="${id}" data-category="${svc.category || ''}" ${checked} />
-            <span class="svc-check-name">${svc.title}</span>
-            <span class="svc-check-price">${formatPrice(svc)}</span>
+  const entries = Object.entries(grouped);
+  catalog.innerHTML = `<div class="svc-accordion">${entries.map(([cat, services], idx) => {
+    const selCount = services.filter(s => selectedIds.has((s._id || s.id || '').toString())).length;
+    const open = selCount > 0;
+    const isLastOdd = idx === entries.length - 1 && entries.length % 2 !== 0;
+    const icon = CATEGORY_ICONS[cat] || '';
+    return `<div class="svc-acc-item${open ? ' is-open' : ''}${isLastOdd ? ' svc-acc-item--full' : ''}" data-cat="${cat}">
+      <button class="svc-acc-toggle" type="button" aria-expanded="${open}">
+        <span class="svc-acc-toggle__name">${icon}${CATEGORY_LABELS[cat] || cat}${catBadge(cat)}</span>
+        <span class="svc-acc-toggle__meta">
+          <span class="svc-sel-count"${selCount === 0 ? ' hidden' : ''}>${selCount} selected</span>
+          <svg class="svc-acc-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+        </span>
+      </button>
+      <div class="svc-acc-body"${open ? '' : ' hidden'}>
+        <div class="svc-pill-grid">${services.map(svc => {
+          const id = (svc._id || svc.id || '').toString();
+          const chk = selectedIds.has(id);
+          return `<label class="svc-pill${chk ? ' is-checked' : ''}">
+            <input type="checkbox" class="svc-checkbox" value="${id}" data-category="${svc.category || ''}" ${chk ? 'checked' : ''} />
+            <svg class="svc-pill__check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+            <span class="svc-pill__name">${svc.title}</span>
+            <span class="svc-pill__price">${formatPrice(svc)}</span>
           </label>`;
-        }).join('')}
+        }).join('')}</div>
       </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('')}</div>`;
+
+  catalog.querySelectorAll('.svc-acc-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const item = btn.closest('.svc-acc-item');
+      const body = item.querySelector('.svc-acc-body');
+      const open = item.classList.toggle('is-open');
+      btn.setAttribute('aria-expanded', String(open));
+      body.hidden = !open;
+    });
+  });
+
+  catalog.querySelectorAll('.svc-pill').forEach(pill => {
+    const cb = pill.querySelector('.svc-checkbox');
+    cb.addEventListener('change', () => {
+      pill.classList.toggle('is-checked', cb.checked);
+      const item = pill.closest('.svc-acc-item');
+      const countEl = item.querySelector('.svc-sel-count');
+      const n = item.querySelectorAll('.svc-checkbox:checked').length;
+      if (countEl) { countEl.textContent = n + ' selected'; countEl.hidden = n === 0; }
+    });
+  });
 
   saveBtn?.addEventListener('click', async () => {
     const checkedIds  = [...catalog.querySelectorAll('.svc-checkbox:checked')].map(cb => cb.value);
@@ -3105,30 +3667,54 @@ async function initAreaTags() {
   const container = document.getElementById('area-tags');
   const saveBtn   = document.getElementById('btn-save-areas');
   const saveMsg   = document.getElementById('areas-save-msg');
+  const searchInput = document.getElementById('settings-coverage-search');
+  const customInput = document.getElementById('settings-service-area-custom');
+  const summaryEl = document.getElementById('settings-coverage-summary');
   if (!container) return;
 
-  // Load saved areas from backend
+  let savedAreas = [];
   try {
     const me = await getMe();
-    const serviceArea = me.data?.serviceArea || me.serviceArea || '';
-    const savedAreas  = serviceArea ? serviceArea.split(',').map(a => a.trim()).filter(Boolean) : [];
-    container.querySelectorAll('.skill-tag').forEach(tag => {
-      if (savedAreas.includes(tag.dataset.area)) tag.setAttribute('aria-pressed', 'true');
-    });
-  } catch (e) { /* leave all unselected */ }
+    const user = me?.data?.user || me?.data || me;
+    savedAreas = getCoverageAreasFromAccount(user || {});
+  } catch (e) {
+    savedAreas = getCoverageAreasFromAccount(getAccount() || {});
+  }
 
-  container.querySelectorAll('.skill-tag').forEach(tag => {
-    tag.addEventListener('click', () => {
-      const pressed = tag.getAttribute('aria-pressed') === 'true';
-      tag.setAttribute('aria-pressed', String(!pressed));
-    });
+  const rerender = () => renderCoverageEditor({
+    container,
+    searchInput,
+    summaryEl,
+    selectedAreas: normalizeAreaList([
+      ...getSelectedCoverageAreas(container),
+      ...normalizeAreaList(customInput?.value || ''),
+    ]),
+    customInput,
   });
 
+  renderCoverageEditor({ container, searchInput, summaryEl, selectedAreas: savedAreas, customInput });
+  searchInput?.addEventListener('input', rerender);
+  customInput?.addEventListener('input', () => updateCoverageSummary(
+    summaryEl,
+    normalizeAreaList([...getSelectedCoverageAreas(container), ...normalizeAreaList(customInput.value)])
+  ));
+
   saveBtn?.addEventListener('click', async () => {
-    const selected = [...container.querySelectorAll('.skill-tag[aria-pressed="true"]')]
-      .map(t => t.dataset.area);
+    const selected = normalizeAreaList([
+      ...getSelectedCoverageAreas(container),
+      ...normalizeAreaList(customInput?.value || ''),
+    ]);
+    const serviceArea = selected.join(', ');
     try {
-      await updateMe({ serviceArea: selected.join(', ') });
+      await updateMe({ coverageAreas: selected, serviceArea });
+      try {
+        const acc = getAccount() || {};
+        acc.coverageAreas = selected;
+        acc.serviceArea = serviceArea;
+        localStorage.setItem('servio_account', JSON.stringify(acc));
+      } catch (_) {}
+      savedAreas = selected;
+      renderCoverageEditor({ container, searchInput, summaryEl, selectedAreas: selected, customInput });
       if (saveMsg) { saveMsg.hidden = false; setTimeout(() => { saveMsg.hidden = true; }, 2500); }
     } catch (e) {
       showToast('Failed to save service areas. Please try again.', 'error');

@@ -7,17 +7,98 @@
 .about-hero {
   position: relative;
   padding: 130px 0 80px;
-  background: #101217;
+  background: var(--color-bg); /* Merge with page background */
   overflow: hidden;
   border-bottom: none;
 }
 
-/* ── Background orbs with slow drift ── */
-.about-hero__bg {
+/* ── Liquid Mesh Background ── */
+.about-hero__liquid-bg {
   position: absolute;
   inset: 0;
-  pointer-events: none;
+  width: 100%;
+  height: 100%;
   z-index: 0;
+  background: var(--color-bg);
+  overflow: hidden;
+  filter: saturate(1.2);
+  /* Add a smooth mask at the bottom to merge with the next section */
+  -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
+  mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
+}
+
+.liquid-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(100px);
+  opacity: 0.5;
+  mix-blend-mode: screen;
+}
+
+.liquid-orb--1 {
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, #BFB09A, transparent 70%);
+  top: -100px;
+  left: -100px;
+  animation: orbDrift1 25s ease-in-out infinite alternate;
+}
+
+.liquid-orb--2 {
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, #6C3A1C, transparent 70%);
+  bottom: -100px;
+  right: -50px;
+  animation: orbDrift2 30s ease-in-out infinite alternate;
+}
+
+.liquid-orb--3 {
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, #1E1B4B, transparent 70%);
+  top: 40%;
+  left: 30%;
+  animation: orbDrift3 22s ease-in-out infinite alternate;
+}
+
+.liquid-orb--interactive {
+  width: 450px;
+  height: 450px;
+  background: radial-gradient(circle, rgba(191, 176, 154, 0.4), transparent 70%);
+  opacity: 0.6;
+  z-index: 1;
+  pointer-events: none;
+  filter: blur(80px);
+}
+
+.liquid-grain {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  opacity: 0.04;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+@keyframes orbDrift1 {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(100px, 50px) scale(1.1); }
+}
+
+@keyframes orbDrift2 {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(-80px, -60px) scale(1.15); }
+}
+
+@keyframes orbDrift3 {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(50px, -100px) scale(0.9); }
+}
+
+/* ── Hide the old bg as we are using the new liquid one ── */
+.about-hero__bg {
+  display: none;
 }
 
 .about-hero__bg::before,
@@ -72,7 +153,7 @@
 
 .about-hero .container {
   position: relative;
-  z-index: 1;
+  z-index: 10;
 }
 
 .about-hero__content {
@@ -255,7 +336,7 @@
 /* ===================== OUR STORY ===================== */
 .about-story {
   padding: 80px 0;
-  background: var(--color-surface-alt);
+  background: var(--color-bg); /* Merged background */
 }
 
 .about-story__grid {
@@ -371,7 +452,7 @@
 /* ===================== WHAT MAKES DIFFERENT ===================== */
 .about-different {
   padding: 80px 0;
-  background: var(--color-surface);
+  background: var(--color-bg); /* Merged background */
 }
 
 .about-different__header {
@@ -466,7 +547,7 @@
 /* ===================== VALUES ===================== */
 .about-values-section {
   padding: 80px 0;
-  background: var(--color-surface-alt);
+  background: var(--color-bg); /* Merged background */
 }
 
 .about-values__header {
@@ -555,7 +636,7 @@
 /* ===================== CTA BANNER ===================== */
 .about-cta {
   padding: 60px 0 80px;
-  background: var(--color-surface);
+  background: var(--color-bg); /* Merged background */
 }
 
 .about-cta__panel {

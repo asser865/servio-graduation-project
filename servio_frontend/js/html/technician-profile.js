@@ -33,6 +33,27 @@ function setText(target, value) {
 
 const CLOCK_SVG = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
 
+function normalizeAreaList(items) {
+  const values = Array.isArray(items) ? items : String(items || '').split(',');
+  const seen = new Set();
+  const result = [];
+  values.forEach(item => {
+    const area = String(item || '').trim();
+    const key = area.toLowerCase();
+    if (!area || seen.has(key)) return;
+    seen.add(key);
+    result.push(area);
+  });
+  return result;
+}
+
+function getCoverageAreas(worker) {
+  if (Array.isArray(worker.coverageAreas) && worker.coverageAreas.length) {
+    return normalizeAreaList(worker.coverageAreas);
+  }
+  return normalizeAreaList([worker.serviceArea, worker.locationLabel, worker.city].filter(Boolean).join(','));
+}
+
 // ── Credentials & Availability ─────────────────────────────────────────────────
 
 function renderCredentials(worker) {
@@ -158,12 +179,10 @@ function render(worker, lang) {
 
   const coverageAreas = el('coverage-areas');
   if (coverageAreas) {
-    const areaTags = [];
-    if (worker.serviceArea)   areaTags.push(worker.serviceArea);
-    if (worker.locationLabel) areaTags.push(worker.locationLabel);
-    if (worker.city)          areaTags.push(worker.city);
+    const areaTags = getCoverageAreas(worker);
     coverageAreas.innerHTML = areaTags.length
-      ? areaTags.map(a => `<span class="coverage-tag">${escapeHtml(a)}</span>`).join('')
+      ? `<p class="coverage-summary-profile">Covers ${areaTags.length} area${areaTags.length === 1 ? '' : 's'}</p>
+         <div class="coverage-chip-list">${areaTags.map(a => `<span class="coverage-tag">${escapeHtml(a)}</span>`).join('')}</div>`
       : '<span class="coverage-tag" style="opacity:0.5">Not specified</span>';
   }
 
@@ -391,11 +410,88 @@ function initLightbox() {
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLightbox(); });
 }
 
+// ── Preview mode (tech viewing own profile) ────────────────────────────────────
+
+function applyPreviewMode() {
+  // Hide header, footer, and chrome — tech sees pure customer view
+  [
+    'header', '.site-header',
+    'footer', '.site-footer',
+    '.skip-link', '.scroll-progress',
+  ].forEach(sel => {
+    document.querySelectorAll(sel).forEach(el => { el.style.display = 'none'; });
+  });
+
+  // Banner at the top of main
+  const main = document.querySelector('main');
+  if (main) {
+    const banner = document.createElement('div');
+    banner.style.cssText = [
+      'position:sticky',
+      'top:0',
+      'z-index:200',
+      'display:flex',
+      'align-items:center',
+      'justify-content:space-between',
+      'gap:1rem',
+      'padding:0 1.5rem',
+      'height:48px',
+      'background:rgba(10,10,18,0.82)',
+      'backdrop-filter:blur(12px)',
+      '-webkit-backdrop-filter:blur(12px)',
+      'border-bottom:1px solid rgba(255,255,255,0.08)',
+      'font-size:0.8125rem',
+    ].join(';');
+
+    banner.innerHTML = `
+      <div style="display:flex;align-items:center;gap:0.55rem;color:rgba(255,255,255,0.55);font-size:0.75rem;letter-spacing:0.04em;text-transform:uppercase;font-weight:500">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:0.7"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        Customer view
+      </div>
+      <div style="display:flex;align-items:center;gap:0.5rem;color:rgba(255,255,255,0.85);font-weight:500;font-size:0.8125rem;">
+        <span style="width:7px;height:7px;border-radius:50%;background:#f59e0b;flex-shrink:0;box-shadow:0 0 6px #f59e0b99"></span>
+        Preview Mode
+      </div>
+      <a href="./technician-dashboard.html" style="
+        display:inline-flex;align-items:center;gap:0.4rem;
+        color:rgba(255,255,255,0.9);text-decoration:none;
+        font-size:0.8rem;font-weight:500;
+        background:rgba(255,255,255,0.08);
+        border:1px solid rgba(255,255,255,0.12);
+        border-radius:999px;padding:0.3rem 0.9rem;
+        transition:background 0.2s;
+        white-space:nowrap;
+      "
+      onmouseover="this.style.background='rgba(255,255,255,0.15)'"
+      onmouseout="this.style.background='rgba(255,255,255,0.08)'">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        Back to Dashboard
+      </a>`;
+
+    main.insertBefore(banner, main.firstChild);
+  }
+
+  // Hide header booking/message actions
+  const profileActions = document.querySelector('.profile-actions');
+  if (profileActions) profileActions.style.display = 'none';
+
+  // Replace sticky booking card with a locked notice
+  const bookingCard = document.querySelector('.booking-action-card');
+  if (bookingCard) {
+    bookingCard.innerHTML = `
+      <div style="text-align:center;padding:1.5rem 1rem;opacity:0.7">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" style="display:block;margin:0 auto 0.5rem"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <p style="margin:0;font-size:0.85rem;line-height:1.5">Booking and messaging are<br>locked in preview mode.</p>
+      </div>`;
+  }
+}
+
 // ── Init ───────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', async () => {
   const techId = getParam('id');
   const serviceKey = getParam('service') || '';
+  const isPreview = getParam('preview') === '1';
 
   if (!techId) {
     window.location.replace('./technician-listing.html');
@@ -428,14 +524,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       renderRatingBars(reviews);
     });
 
-    // Wire all Book Now buttons
-    const bookingHref = `./booking.html?worker=${techId}${serviceKey ? '&service=' + serviceKey : ''}`;
-    const bookNowBtn = document.getElementById('bookNowBtn');
-    const bookServiceBtn = document.getElementById('bookServiceBtn');
-    if (bookNowBtn) bookNowBtn.href = bookingHref;
-    if (bookServiceBtn) bookServiceBtn.href = bookingHref;
-    const bookBtn = el('book-btn') || document.querySelector('[data-book-btn]') || document.querySelector('.profile-cta__btn');
-    if (bookBtn) bookBtn.href = bookingHref;
+    if (isPreview) {
+      applyPreviewMode();
+    } else {
+      // Wire all Book Now buttons
+      const bookingHref = `./booking.html?worker=${techId}${serviceKey ? '&service=' + serviceKey : ''}`;
+      const bookNowBtn = document.getElementById('bookNowBtn');
+      const bookServiceBtn = document.getElementById('bookServiceBtn');
+      if (bookNowBtn) bookNowBtn.href = bookingHref;
+      if (bookServiceBtn) bookServiceBtn.href = bookingHref;
+      const bookBtn = el('book-btn') || document.querySelector('[data-book-btn]') || document.querySelector('.profile-cta__btn');
+      if (bookBtn) bookBtn.href = bookingHref;
+    }
 
     runAnimations();
     initCounters();

@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Booking Confirmed | SERVIO</title>
-  <meta name="description" content="Your SERVIO booking has been confirmed. Track your booking and manage your appointment." />
+  <title>Booking Status | SERVIO</title>
+  <meta name="description" content="Track your SERVIO booking, technician status, payment summary, and secure arrival PIN." />
   <script src="../js/config.js"></script>
   <script src="../js/theme-init.js"></script>
   <script src="../js/lang-init.js"></script>
@@ -14,7 +14,6 @@
   <div class="scroll-progress" data-scroll-progress aria-hidden="true"></div>
   <a class="skip-link" href="#main">Skip to content</a>
 
-  <!-- ══════════════════════════ HEADER ══════════════════════════ -->
   <header class="site-header" data-site-header>
     <div class="container header__inner">
       <a class="brand" href="./index.html" aria-label="SERVIO Home">
@@ -52,7 +51,7 @@
           </ul>
         </div>
         <button class="btn btn--sm btn--header-theme" type="button" data-theme-button aria-label="Toggle dark mode">
-        <span class="theme-button__icon theme-button__icon--moon" aria-hidden="true">
+          <span class="theme-button__icon theme-button__icon--moon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
             </svg>
@@ -66,296 +65,203 @@
         </button>
         <a class="btn btn--sm btn--header-login" href="./login.html" data-i18n="nav_login">Login</a>
         <a class="btn btn--sm btn--header-signup" href="./signup.html" data-i18n="nav_signup">Sign Up</a>
-
-        <button class="hamburger" type="button" aria-label="Toggle menu" aria-expanded="false"
-          aria-controls="primary-nav" data-nav-toggle>
-          <span class="hamburger__lines" aria-hidden="true">
-            <span></span><span></span><span></span>
-          </span>
+        <button class="hamburger" type="button" aria-label="Toggle menu" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+          <span class="hamburger__lines" aria-hidden="true"><span></span><span></span><span></span></span>
         </button>
       </div>
     </div>
   </header>
 
-  <!-- ══════════════════════════ MAIN ══════════════════════════ -->
   <main id="main" class="confirmation-page">
-
-    <!-- ── SUCCESS HERO ── -->
-    <div class="confirmation-hero">
-      <div class="success-icon-wrap" id="successIcon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="20 6 9 17 4 12"></polyline>
-        </svg>
+    <div class="confirmation-hero__glow" aria-hidden="true"></div>
+    <section class="confirmation-hero" aria-labelledby="confTitle">
+      <div class="container confirmation-hero__inner">
+        <div class="conf-status-orb" id="successIcon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        </div>
+        <p class="confirmation-kicker" id="confStatusEyebrow">Service tracking receipt</p>
+        <h1 id="confTitle">Request Sent</h1>
+        <p class="confirmation-hero__sub" id="conf-hero-sub">Your service request has been submitted.</p>
+        <button class="booking-ref" id="refCopyBtn" type="button" aria-label="Copy booking reference">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+          <span class="booking-ref__label" data-booking-ref>Booking #...</span>
+          <span class="booking-ref__copied" data-i18n="conf_copied">Copied!</span>
+        </button>
+        <p class="conf-last-updated" id="confLastUpdated">Last updated just now</p>
       </div>
-      <h1 data-i18n="booking_conf_title">Booking Confirmed!</h1>
-      <p class="confirmation-hero__sub" id="conf-hero-sub">
-        Your service request has been submitted.
-      </p>
-      <button class="booking-ref" id="refCopyBtn" aria-label="Copy booking reference">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-        </svg>
-        <span class="booking-ref__label" data-booking-ref>Booking #...</span>
-        <span class="booking-ref__copied" data-i18n="conf_copied">Copied!</span>
-      </button>
-    </div>
+    </section>
 
-    <!-- ── BOOKING STATUS TRACKER ── -->
+    <section class="conf-summary-band" aria-label="Appointment summary">
+      <div class="container conf-summary-grid">
+        <div class="conf-summary-item"><span>Service</span><strong id="summaryService">-</strong></div>
+        <div class="conf-summary-item"><span>Date & time</span><strong id="summarySchedule">-</strong></div>
+        <div class="conf-summary-item"><span>Technician</span><strong id="summaryTechnician">-</strong></div>
+        <div class="conf-summary-item"><span>Address</span><strong id="summaryAddress">-</strong></div>
+        <div class="conf-summary-item conf-summary-item--total"><span>Estimated total</span><strong id="summaryTotal">-</strong></div>
+      </div>
+    </section>
+
     <section class="booking-tracker" aria-label="Booking Status">
       <div class="container">
         <div class="tracker-meta">
           <p class="tracker-current-label" data-i18n="conf_tracker_label">Current Status</p>
-          <div class="tracker-current-status">
+          <div class="tracker-current-status" id="trackerCurrentPill">
             <span class="tracker-pulse-dot" aria-hidden="true"></span>
-            <span data-i18n="conf_tracker_status">Awaiting Technician Confirmation</span>
+            <span id="confTrackerStatus">Awaiting Technician Confirmation</span>
           </div>
         </div>
         <div class="tracker-steps" role="list" aria-label="Booking progress">
-          <div class="tracker-step is-done" role="listitem">
-            <div class="tracker-step__circle">
-              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
-            </div>
-            <span class="tracker-step__label" data-i18n="conf_bar_booked">Booked</span>
-          </div>
-          <div class="tracker-connector is-done" aria-hidden="true"></div>
-          <div class="tracker-step is-current" role="listitem">
-            <div class="tracker-step__circle">2</div>
-            <span class="tracker-step__label" data-i18n="conf_bar_confirms">Technician<br>Confirms</span>
-          </div>
+          <div class="tracker-step" role="listitem" data-step="pending"><div class="tracker-step__circle">1</div><span class="tracker-step__label" data-i18n="conf_bar_booked">Booked</span></div>
           <div class="tracker-connector" aria-hidden="true"></div>
-          <div class="tracker-step" role="listitem">
-            <div class="tracker-step__circle">3</div>
-            <span class="tracker-step__label" data-i18n="conf_bar_enroute">En Route</span>
-          </div>
+          <div class="tracker-step" role="listitem" data-step="accepted"><div class="tracker-step__circle">2</div><span class="tracker-step__label" data-i18n="conf_bar_confirms">Technician<br>Confirms</span></div>
           <div class="tracker-connector" aria-hidden="true"></div>
-          <div class="tracker-step" role="listitem">
-            <div class="tracker-step__circle">4</div>
-            <span class="tracker-step__label" data-i18n="conf_bar_arrives">Arrived</span>
-          </div>
+          <div class="tracker-step" role="listitem" data-step="en_route"><div class="tracker-step__circle">3</div><span class="tracker-step__label" data-i18n="conf_bar_enroute">En Route</span></div>
           <div class="tracker-connector" aria-hidden="true"></div>
-          <div class="tracker-step" role="listitem">
-            <div class="tracker-step__circle">5</div>
-            <span class="tracker-step__label" data-i18n="conf_bar_inprogress">In Progress</span>
-          </div>
+          <div class="tracker-step" role="listitem" data-step="arrived"><div class="tracker-step__circle">4</div><span class="tracker-step__label" data-i18n="conf_bar_arrives">Arrived</span></div>
           <div class="tracker-connector" aria-hidden="true"></div>
-          <div class="tracker-step" role="listitem">
-            <div class="tracker-step__circle">6</div>
-            <span class="tracker-step__label" data-i18n="conf_bar_complete">Complete</span>
-          </div>
+          <div class="tracker-step" role="listitem" data-step="in_progress"><div class="tracker-step__circle">5</div><span class="tracker-step__label" data-i18n="conf_bar_inprogress">In Progress</span></div>
+          <div class="tracker-connector" aria-hidden="true"></div>
+          <div class="tracker-step" role="listitem" data-step="completed"><div class="tracker-step__circle">6</div><span class="tracker-step__label" data-i18n="conf_bar_complete">Complete</span></div>
         </div>
       </div>
     </section>
 
-    <!-- PIN card -->
-    <div class="confirmation-pin-card">
-      <h3 data-i18n="conf_pin_title">Your Arrival PIN</h3>
-      <div class="pin-digits" id="confirmationPin">----</div>
-      <p data-i18n="conf_pin_desc">Share this 4-digit PIN with your technician when they arrive to start the job clock. Keep it private until then.</p>
-    </div>
-
-    <!-- Payment summary -->
-    <div class="confirmation-payment-card">
-      <h3 data-i18n="conf_payment_title">Payment Summary</h3>
-      <div id="confirmationPaymentDetails">Loading payment details...</div>
-    </div>
-
-    <!-- ── MAIN LAYOUT ── -->
     <div class="container confirmation-layout">
+      <div class="confirmation-main-column">
+        <section class="conf-panel conf-next-panel" data-reveal aria-labelledby="nextTitle">
+          <div>
+            <p class="conf-panel__eyebrow">What happens next</p>
+            <h2 id="nextTitle">Waiting for technician confirmation</h2>
+            <p id="nextBody">We will notify you as soon as the technician accepts the request.</p>
+          </div>
+          <div class="conf-next-deadline" id="responseDeadline">Expected confirmation soon</div>
+          <div class="conf-next-list" id="nextStepsList"></div>
+        </section>
 
-      <!-- LEFT: details + timeline -->
-      <div>
-
-        <!-- Booking details card -->
-        <div class="conf-card" data-reveal>
-
-          <!-- Technician section -->
-          <div class="conf-card__section">
-            <div class="conf-section__title">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
-              </svg>
-              <span data-i18n="conf_section_tech">Technician</span>
+        <section class="conf-panel conf-tech-panel" data-reveal aria-labelledby="techTitle">
+          <div class="conf-panel__head">
+            <div>
+              <p class="conf-panel__eyebrow" data-i18n="conf_section_tech">Technician</p>
+              <h2 id="techTitle">Assigned professional</h2>
             </div>
-            <div class="conf-tech-row">
-              <div class="conf-tech-row__main">
-              <img class="conf-tech-row__avatar" id="conf-tech-avatar"
-                src="../assets/images/avatar-placeholder.svg"
-                alt="Technician" />
+            <span class="status-badge status-badge--pending" id="confTechStatus">Awaiting Confirmation</span>
+          </div>
+          <div class="conf-tech-row">
+            <div class="conf-tech-row__main">
+              <img class="conf-tech-row__avatar" id="conf-tech-avatar" src="../assets/images/avatar-placeholder.svg" alt="Technician" />
               <div class="conf-tech-row__info">
-                <div class="conf-tech-row__name" id="conf-tech-name">—</div>
-                <div class="conf-tech-row__role" id="conf-tech-role">—</div>
+                <div class="conf-tech-row__name" id="conf-tech-name">-</div>
+                <div class="conf-tech-row__role" id="conf-tech-role">-</div>
                 <div class="conf-tech-row__rating">
                   <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-                  <span id="conf-tech-rating">—</span>
+                  <span id="conf-tech-rating">-</span>
                 </div>
               </div>
-              </div>
-              <div class="conf-tech-row__status">
-                <span class="status-badge status-badge--pending" data-i18n="conf_status_pending">Awaiting Confirmation</span>
-              </div>
             </div>
           </div>
+          <div class="conf-trust-row">
+            <span>Identity verified</span>
+            <span>SERVIO guarantee</span>
+            <span>No off-platform payment</span>
+          </div>
+        </section>
 
-          <!-- Service section -->
-          <div class="conf-card__section">
-            <div class="conf-section__title">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
-              </svg>
-              <span data-i18n="conf_section_service">Service Details</span>
+        <section class="conf-panel confirmation-pin-card" data-reveal aria-labelledby="pinTitle">
+          <div class="conf-panel__head">
+            <div>
+              <p class="conf-panel__eyebrow">Secure verification</p>
+              <h2 id="pinTitle" data-i18n="conf_pin_title">Arrival PIN</h2>
             </div>
-            <div class="conf-row">
-              <span class="conf-row__label" data-i18n="conf_row_service">Service</span>
-              <span class="conf-row__value" id="conf-service-value">—</span>
-            </div>
-            <div class="conf-row">
-              <span class="conf-row__label" data-i18n="conf_row_date">Date</span>
-              <span class="conf-row__value" id="conf-date-value">—</span>
-            </div>
-            <div class="conf-row">
-              <span class="conf-row__label" data-i18n="conf_row_timeslot">Time Slot</span>
-              <span class="conf-row__value" id="conf-time-value">—</span>
-            </div>
-            <div class="conf-row">
-              <span class="conf-row__label" data-i18n="conf_row_address">Address</span>
-              <span class="conf-row__value" id="conf-address-value">—</span>
+            <span class="pin-lock" id="pinStateLabel">Locked</span>
+          </div>
+          <div class="pin-locked-visual" id="pinVisual" aria-live="polite">
+            <span class="pin-lock-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            </span>
+            <strong id="confirmationPin">PIN locked</strong>
+          </div>
+          <p id="pinHelpText">The PIN will unlock when your technician arrives. Do not share it by message or phone.</p>
+          <button class="btn btn--primary btn--sm pin-reveal-btn" type="button" id="revealPinBtn" hidden>Reveal PIN</button>
+        </section>
+
+        <section class="conf-panel conf-details-panel" data-reveal aria-labelledby="detailsTitle">
+          <div class="conf-panel__head">
+            <div>
+              <p class="conf-panel__eyebrow" data-i18n="conf_section_service">Service Details</p>
+              <h2 id="detailsTitle">Appointment details</h2>
             </div>
           </div>
+          <div class="conf-row"><span class="conf-row__label" data-i18n="conf_row_service">Service</span><span class="conf-row__value" id="conf-service-value">-</span></div>
+          <div class="conf-row"><span class="conf-row__label" data-i18n="conf_row_date">Date</span><span class="conf-row__value" id="conf-date-value">-</span></div>
+          <div class="conf-row"><span class="conf-row__label" data-i18n="conf_row_timeslot">Time Slot</span><span class="conf-row__value" id="conf-time-value">-</span></div>
+          <div class="conf-row"><span class="conf-row__label" data-i18n="conf_row_address">Address</span><span class="conf-row__value" id="conf-address-value">-</span></div>
+        </section>
 
-          <!-- Payment section -->
-          <div class="conf-card__section">
-            <div class="conf-section__title">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="2" y="6" width="20" height="12" rx="2" /><line x1="2" y1="10" x2="22" y2="10" />
-              </svg>
-              <span data-i18n="conf_section_payment">Payment</span>
-            </div>
-            <div class="conf-row">
-              <span class="conf-row__label" data-i18n="conf_row_method">Method</span>
-              <span class="conf-row__value" id="conf-payment-method-value">—</span>
-            </div>
-            <div class="conf-row" id="conf-base-rate-row">
-              <span class="conf-row__label" data-i18n="conf_row_base_rate">Base Rate (1 hr)</span>
-              <span class="conf-row__value" id="conf-base-rate-value">—</span>
-            </div>
-            <div class="conf-row" id="conf-platform-fee-row">
-              <span class="conf-row__label" data-i18n="conf_row_fee">Platform Fee (5%)</span>
-              <span class="conf-row__value" id="conf-platform-fee-value">—</span>
-            </div>
-            <div class="conf-row conf-row--total">
-              <span class="conf-row__label" data-i18n="conf_row_total">Estimated Total</span>
-              <span class="conf-row__value" id="conf-total-value">—</span>
+        <section class="conf-panel confirmation-payment-card" data-reveal aria-labelledby="paymentTitle">
+          <div class="conf-panel__head">
+            <div>
+              <p class="conf-panel__eyebrow" data-i18n="conf_section_payment">Payment</p>
+              <h2 id="paymentTitle" data-i18n="conf_payment_title">Payment Summary</h2>
             </div>
           </div>
-
-        </div>
-
-
+          <div class="conf-row"><span class="conf-row__label" data-i18n="conf_row_method">Method</span><span class="conf-row__value" id="conf-payment-method-value">-</span></div>
+          <div class="conf-row" id="conf-base-rate-row"><span class="conf-row__label" data-i18n="conf_row_base_rate">Base Rate (1 hr)</span><span class="conf-row__value" id="conf-base-rate-value">-</span></div>
+          <div class="conf-row" id="conf-platform-fee-row"><span class="conf-row__label" data-i18n="conf_row_fee">Platform Fee</span><span class="conf-row__value" id="conf-platform-fee-value">-</span></div>
+          <div class="conf-row conf-row--total"><span class="conf-row__label" data-i18n="conf_row_total">Estimated Total</span><span class="conf-row__value" id="conf-total-value">-</span></div>
+          <p class="conf-payment-note" id="confirmationPaymentDetails">Loading payment details...</p>
+        </section>
       </div>
 
-      <!-- RIGHT SIDEBAR -->
-      <aside>
-
-        <!-- Action buttons -->
-        <div class="conf-sidebar-card" data-reveal>
+      <aside class="confirmation-sidebar">
+        <section class="conf-sidebar-card" data-reveal aria-label="Booking actions">
           <div class="conf-actions">
             <a href="./booking-details.html" id="viewDetailsBtn" class="btn btn--primary btn--full conf-actions__btn--lead">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-              <span data-i18n="booking_conf_view">View Booking Details</span>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+              <span data-i18n="booking_conf_view">Track This Booking</span>
             </a>
             <a href="./messages.html" class="btn btn--full btn--sm">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
               <span id="conf-msg-tech-name">Message Technician</span>
             </a>
             <a href="./customer-dashboard.html" class="btn btn--full btn--sm">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
               <span data-i18n="conf_dashboard">Go to Dashboard</span>
             </a>
-            <button class="btn btn--outline btn--full btn--sm" id="viewHistoryBtn" data-i18n="conf_view_history">View Booking History</button>
-            <a href="./index.html" class="btn btn--full btn--sm" data-i18n="booking_conf_home">
-              Back to Home
-            </a>
+            <button class="btn btn--outline btn--full btn--sm" id="viewHistoryBtn" type="button" data-i18n="conf_view_history">View Booking History</button>
+            <a href="./technician-listing.html" class="btn btn--outline btn--full btn--sm" id="findAnotherBtn" hidden>Find another technician</a>
+            <p class="conf-cancel-policy" id="cancelPolicyText">Free cancellation while the request is awaiting confirmation.</p>
             <button class="btn btn--full btn--sm conf-actions__btn--danger" type="button" id="cancelBtn">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
               <span data-i18n="conf_cancel">Cancel Booking</span>
             </button>
           </div>
-        </div>
+        </section>
 
-        <!-- Help -->
-        <div class="help-card" data-reveal data-reveal-delay="120">
-          <strong class="u-display-block u-margin-bottom-8 u-color-text" data-i18n="conf_need_help">Need help?</strong>
-          <p data-i18n="conf_help_text">
-            If you have any issues with your booking, our support team is available
-            24/7. Contact Support or call +20 100 000 0000.
-          </p>
-        </div>
-
+        <section class="help-card" data-reveal data-reveal-delay="120">
+          <strong data-i18n="conf_need_help">Need help?</strong>
+          <p data-i18n="conf_help_text">If you have any issues with your booking, our support team is available 24/7.</p>
+          <div class="support-actions">
+            <a href="tel:+201000000000">Call Support</a>
+            <a href="./messages.html">Chat with Support</a>
+            <a href="./contact.html">Report an Issue</a>
+          </div>
+        </section>
       </aside>
-
     </div>
-    <!-- end .confirmation-layout -->
   </main>
 
-  <!-- ══════════════════════════ FOOTER ══════════════════════════ -->
-  <footer class="site-footer">
-    <div class="container footer__grid">
-      <div class="footer__brand-col">
-        <h2 class="footer__brand-text" data-i18n="footer_stay_connected">Stay Connected</h2>
-        <p class="footer__desc" data-i18n="footer_newsletter_desc">Join our newsletter for the latest updates and exclusive offers.</p>
-        <form class="footer__newsletter">
-          <input type="email" placeholder="Enter your email" data-i18n-placeholder="footer_email_ph" class="footer__input" required>
-          <button type="submit" class="footer__submit-btn" aria-label="Subscribe">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-          </button>
-        </form>
-      </div>
-      <div class="footer__nav-col">
-        <h3 class="footer__title" data-i18n="footer_quick_links">Quick Links</h3>
-        <ul class="footer__links" role="list">
-          <li><a class="footer__link" href="./index.html" data-i18n="nav_home">Home</a></li>
-          <li><a class="footer__link" href="./about.html" data-i18n="footer_about">About Us</a></li>
-          <li><a class="footer__link" href="./services-marketplace.html" data-i18n="nav_services">Services</a></li>
-          <li><a class="footer__link" href="#" data-i18n="footer_products">Products</a></li>
-          <li><a class="footer__link" href="./contact.html" data-i18n="nav_contact">Contact</a></li>
-        </ul>
-      </div>
-      <div class="footer__nav-col">
-        <h3 class="footer__title" data-i18n="footer_contact_us">Contact Us</h3>
-        <address class="footer__address">
-          <p data-i18n="footer_city">Cairo, Egypt</p>
-
-          <p data-i18n="footer_phone">Phone: +20 100 000 0000</p>
-          <p data-i18n-html="footer_email">Email: hello@servio.eg</p>
-        </address>
-      </div>
-      <div class="footer__nav-col">
-        <h3 class="footer__title" data-i18n="footer_follow_us">Follow Us</h3>
-        <div class="footer__socials">
-          <a href="#" class="social-link" aria-label="Facebook">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg>
-          </a>
-          <a href="#" class="social-link" aria-label="Twitter">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"></path></svg>
-          </a>
-          <a href="#" class="social-link" aria-label="Instagram">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
-          </a>
-          <a href="#" class="social-link" aria-label="LinkedIn">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path><rect x="2" y="9" width="4" height="12"></rect><circle cx="4" cy="4" r="2"></circle></svg>
-          </a>
-        </div>
-      </div>
-    </div>
-    <div class="container footer__bottom-wrapper">
-      <div class="footer__bottom">
-        <p class="footer__fineprint" data-i18n="footer_rights">© <span id="year">2026</span> SERVIO. All rights reserved.</p>
-        <div class="footer__bottom-links">
-          <a href="#" class="footer__small-link" data-i18n="footer_privacy">Privacy Policy</a>
-          <a href="#" class="footer__small-link" data-i18n="footer_terms">Terms of Service</a>
-          <a href="#" class="footer__small-link" data-i18n="footer_cookies">Cookie Settings</a>
-        </div>
-      </div>
+  <footer class="confirmation-service-footer">
+    <div class="container confirmation-service-footer__inner">
+      <span>SERVIO support is available 24/7</span>
+      <a href="tel:+201000000000">+20 100 000 0000</a>
+      <a href="mailto:hello@servio.eg">hello@servio.eg</a>
+      <a href="#">Privacy Policy</a>
+      <a href="#">Terms of Service</a>
     </div>
   </footer>
 
@@ -364,5 +270,3 @@
   <script type="module" src="../js/html/booking-confirmation.js"></script>
 </body>
 </html>
-
-<!-- . -->

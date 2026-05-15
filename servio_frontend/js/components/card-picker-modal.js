@@ -11,6 +11,7 @@ const CARD_ICONS = {
 
 let _selectedCardId = null;
 let _onConfirm = null;
+let _returnFocusEl = null;
 
 function detectCardType(num) {
   const first = num.replace(/\D/g, '')[0];
@@ -66,7 +67,11 @@ function renderCardList(cards) {
   if (!list) return;
 
   list.innerHTML = '';
-  cards.forEach(card => list.appendChild(buildCardItem(card)));
+  if (!cards.length) {
+    list.innerHTML = '<div class="pay-modal__empty">No saved cards yet. Add one to continue with card payment.</div>';
+  } else {
+    cards.forEach(card => list.appendChild(buildCardItem(card)));
+  }
 
   const atLimit = cards.length >= 3;
   if (addNewBtn) addNewBtn.style.display = atLimit ? 'none' : '';
@@ -105,6 +110,7 @@ function validateAddForm() {
 export function openCardPickerModal(totalAmount, onConfirmCallback) {
   _onConfirm = onConfirmCallback;
   _selectedCardId = null;
+  _returnFocusEl = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
   const overlay = document.getElementById('cardPickerOverlay');
   const modal   = document.getElementById('cardPickerModal');
@@ -114,6 +120,7 @@ export function openCardPickerModal(totalAmount, onConfirmCallback) {
   if (amount) amount.textContent = `Total: ${totalAmount} EGP`;
 
   overlay.hidden = false;
+  modal.setAttribute('tabindex', '-1');
   document.body.style.overflow = 'hidden';
 
   if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -123,6 +130,7 @@ export function openCardPickerModal(totalAmount, onConfirmCallback) {
 
   showView('cpListView');
   resetAddForm();
+  setTimeout(() => modal.focus(), 0);
 
   getSavedCards()
     .then(res => {
@@ -150,10 +158,12 @@ export function closeCardPickerModal() {
     animate(overlay, { opacity: [1, 0] }, { duration: 0.2 }).then(() => {
       overlay.hidden = true;
       document.body.style.overflow = '';
+      _returnFocusEl?.focus?.();
     });
   } else {
     overlay.hidden = true;
     document.body.style.overflow = '';
+    _returnFocusEl?.focus?.();
   }
 }
 
@@ -207,7 +217,7 @@ document.getElementById('cpSaveNewBtn')?.addEventListener('click', async () => {
   const label    = document.getElementById('cpLabel')?.value.trim() || '';
 
   const btn = document.getElementById('cpSaveNewBtn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
 
   try {
     const res  = await addSavedCard({ last4, cardType, expiry, label });
@@ -239,6 +249,7 @@ document.getElementById('cpConfirmBtn')?.addEventListener('click', () => {
           savedCardId: card._id,
           last4: card.last4,
           cardType: card.cardType,
+          expiry: card.expiry,
           label: card.label || '',
         });
       }

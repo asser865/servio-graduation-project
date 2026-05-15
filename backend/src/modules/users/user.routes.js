@@ -21,6 +21,8 @@ const profileUpdateValidation = [
   body('locationLabel').optional().trim().isLength({ max: 200 }).withMessage('Location label too long'),
   body('yearsExperience').optional().isInt({ min: 0 }).withMessage('Years of experience must be a non-negative integer'),
   body('availabilityType').optional().isIn(['weekdays', 'weekends', 'both', '']).withMessage('Invalid availability type'),
+  body('coverageAreas').optional().isArray().withMessage('Coverage areas must be an array'),
+  body('coverageAreas.*').optional().isString().trim().notEmpty().isLength({ max: 100 }).withMessage('Each coverage area must be a non-empty string up to 100 characters'),
   body('skills').optional().isArray().withMessage('Skills must be an array'),
   body('skills.*').optional().isString().trim().notEmpty().withMessage('Each skill must be a non-empty string'),
   body('categories').optional().isArray().withMessage('Categories must be an array'),

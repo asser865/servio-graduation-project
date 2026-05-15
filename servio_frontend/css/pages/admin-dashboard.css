@@ -364,7 +364,6 @@
 }
 .admin-panel__header h2 { font-size: 1.25rem; font-weight: 700; margin: 0; }
 .admin-panel__date { font-size: 0.8rem; color: var(--color-text-muted); margin-inline-start: auto; }
-.admin-section { margin-bottom: 2rem; }
 .admin-section__title {
   font-size: 0.95rem;
   font-weight: 600;
@@ -3655,3 +3654,94 @@
 
 /* Active session */
 [dir="rtl"] .admin-active-session__info { text-align: right; }
+
+.tab-badge {
+  display: inline-block;
+  background: #dc3545;
+  color: #fff;
+  border-radius: 20px;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  margin-left: 0.25rem;
+  vertical-align: middle;
+}
+
+.admin-summary-row {
+  display: flex;
+  gap: 1.5rem;
+  font-size: 0.875rem;
+  flex-wrap: wrap;
+  color: var(--color-text-muted, #666);
+}
+
+.admin-section {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.admin-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.admin-section-header h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--color-text);
+}
+
+.admin-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.admin-filter-row select {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.825rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+[data-theme="dark"] .admin-section {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+[data-theme="dark"] .admin-filter-row select {
+  background: var(--color-bg);
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+/* payments tab table wrapper */
+[data-panel="payments"] .admin-table-wrap {
+  overflow-x: auto;
+}
+
+.badge--online { background: #0d6efd; color: #fff; border-radius: 4px; padding: 0.1rem 0.4rem; font-size: 0.75rem; }
+.badge--cash { background: #198754; color: #fff; border-radius: 4px; padding: 0.1rem 0.4rem; font-size: 0.75rem; }
+.badge--outstanding { background: #dc3545; color: #fff; border-radius: 4px; padding: 0.1rem 0.4rem; font-size: 0.75rem; }
+.badge--partially_paid { background: #fd7e14; color: #fff; border-radius: 4px; padding: 0.1rem 0.4rem; font-size: 0.75rem; }
+.badge--paid { background: #198754; color: #fff; border-radius: 4px; padding: 0.1rem 0.4rem; font-size: 0.75rem; }
+
+@media (max-width: 640px) {
+  .admin-table thead { display: none; }
+  .admin-table tr { display: flex; flex-direction: column; border-bottom: 1px solid var(--color-border, #e0e0e0); padding: 0.5rem 0; }
+  .admin-table td { padding: 0.25rem 0.5rem; font-size: 0.8rem; }
+}

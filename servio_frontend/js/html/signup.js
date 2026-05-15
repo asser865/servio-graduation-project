@@ -82,7 +82,7 @@ function loadDraft(form, state) {
     // discard the entire draft and start fresh. Browsers always clear file inputs
     // on page load, so restoring to those steps causes silent validation failures
     // that trap the user. Starting fresh is the safest and clearest UX.
-    const fileOrSuccessSteps = ['tech-verification', 'tech-review', 'customer-finish'];
+    const fileOrSuccessSteps = ['tech-verification', 'tech-application-review', 'tech-review', 'customer-finish'];
     const restoredStep = state.flow[draft.idx || 0];
     if (restoredStep && fileOrSuccessSteps.includes(restoredStep)) {
       localStorage.removeItem(DRAFT_KEY);
@@ -133,6 +133,15 @@ function setError(form, key, message) {
   if (!el) return;
   el.textContent = message || "";
   el.hidden = !message;
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function isValidEmail(v) {
@@ -197,6 +206,7 @@ function computeFlow(role) {
       "tech-availability",
       "tech-pricing",
       "tech-verification",
+      "tech-application-review",
       "tech-review",
     ];
   }
@@ -652,6 +662,57 @@ function initPortfolioPreview(form) {
 /* ═══════════════════════════════════════════════════════════
    Main init
    ═══════════════════════════════════════════════════════════ */
+function refreshApplicationReview(form, state) {
+  const setReview = (key, value) => {
+    const target = qs(`[data-review-target="${key}"]`, form);
+    if (!target) return;
+    target.textContent = value || "-";
+  };
+
+  const fullName = qs('input[name="fullName"]', form)?.value?.trim() || "";
+  const email = qs('input[name="email"]', form)?.value?.trim() || "";
+  const phone = qs('input[name="phone"]', form)?.value?.trim() || "";
+  const serviceArea = qs('input[name="serviceArea"]', form)?.value?.trim() || "";
+  const availability = qs('input[name="availability"]', form)?.value || "";
+  const hourlyRate = qs('input[name="hourlyRate"]', form)?.value || "";
+  const currency = qs('select[name="currency"]', form)?.value || "EGP";
+  const years = qs('input[name="yearsExperience"]', form)?.value || "0";
+
+  const selectedServices = Array.from(state.skills || [])
+    .map(skill => SKILLS_DISPLAY[skill] || skill)
+    .join(", ");
+
+  const availabilityLabel = {
+    weekdays: "Weekdays",
+    weekends: "Weekends",
+    both: "Weekdays and weekends",
+  }[availability] || availability;
+
+  setReview("account", [fullName, email, phone].filter(Boolean).join(" | "));
+  setReview("services", selectedServices);
+  setReview("experience", `${years} year${Number(years) === 1 ? "" : "s"}`);
+  setReview("coverage", serviceArea);
+  setReview("availability", availabilityLabel);
+  setReview("rate", hourlyRate ? `${hourlyRate} ${currency}/hr` : "");
+
+  const docsTarget = qs('[data-review-target="documents"]', form);
+  if (docsTarget) {
+    const docs = [
+      ["Profile photo", qs('input[name="profilePhoto"]', form)?.files?.length],
+      ["National ID front", qs('input[name="idFront"]', form)?.files?.length],
+      ["National ID back", qs('input[name="idBack"]', form)?.files?.length],
+      ["Selfie with ID", qs('input[name="idSelfie"]', form)?.files?.length],
+      ["CV / Resume", qs('input[name="cvFile"]', form)?.files?.length],
+      ["Portfolio photos", qs('input[name="portfolio"]', form)?.files?.length],
+    ];
+    docsTarget.innerHTML = docs.map(([label, count]) => {
+      const uploaded = Number(count || 0) > 0;
+      const suffix = uploaded && Number(count) > 1 ? ` (${count})` : "";
+      return `<span class="signup-review-doc${uploaded ? " is-uploaded" : ""}">${escapeHtml(label + suffix)}</span>`;
+    }).join("");
+  }
+}
+
 export function initSignup() {
   initLoginRedirect();
   const form = qs("[data-signup-form]");
@@ -677,6 +738,9 @@ export function initSignup() {
 
   let isInitialLoad = true;
 
+  const currentStepElement = () => qs(`[data-step="${state.flow[state.idx]}"]`, form);
+  const currentNextButton = () => qs("[data-next]", currentStepElement() || form);
+
   const showStep = (key) => {
     stepSections.forEach((s) => setHidden(s, s.dataset.step !== key));
     const i = state.flow.indexOf(key);
@@ -689,14 +753,18 @@ export function initSignup() {
     if (progressContainer) progressContainer.hidden = isStepOne || isSuccess;
 
     if (!isSuccess && !isStepOne) {
-      const total = state.role === "technician" ? state.flow.length : state.flow.length - 1;
-      updateProgress(progress, state.idx, total);
+      const progressSteps = state.flow.filter(step => step !== "role" && step !== "tech-review" && step !== "customer-finish");
+      updateProgress(progress, Math.max(progressSteps.indexOf(key), 0), progressSteps.length);
     }
 
     saveDraft(form, state);
 
     if (key === "otp") {
       refreshOtpStepUI(form, state);
+    }
+
+    if (key === "tech-application-review") {
+      refreshApplicationReview(form, state);
     }
 
     const showIndicator = state.role && !isStepOne && !isSuccess;
@@ -753,6 +821,7 @@ export function initSignup() {
       Promise.all(Array.from(portfolioInput?.files || []).slice(0, 5).map(file => uploadPublicFile(file, 'portfolio'))),
     ]);
 
+    const initialServiceArea = qs('input[name="serviceArea"]', form)?.value?.trim() || "";
     const payload = {
       name:             qs('input[name="fullName"]', form)?.value?.trim() || "",
       email:            qs('input[name="email"]', form)?.value?.trim() || "",
@@ -760,7 +829,9 @@ export function initSignup() {
       password:         qs('input[name="password"]', form)?.value || "",
       role:             "worker",
       skills:           Array.from(state.skills),
-      locationLabel:    qs('input[name="serviceArea"]', form)?.value?.trim() || "",
+      locationLabel:    initialServiceArea,
+      serviceArea:      initialServiceArea,
+      coverageAreas:    [],
       hourlyRate:       Number(qs('input[name="hourlyRate"]', form)?.value) || 0,
       bio:              qs('textarea[name="bio"]', form)?.value?.trim() || "",
       yearsExperience:  Number(qs('input[name="yearsExperience"]', form)?.value) || 0,
@@ -797,7 +868,7 @@ export function initSignup() {
 
     if (next === "tech-review") {
       // Find the submit button and show loading state
-      const submitBtn = qs('[data-next]', form);
+      const submitBtn = currentNextButton();
       if (submitBtn) {
         submitBtn.disabled = true;
         const btnSpan = submitBtn.querySelector('span');
@@ -818,7 +889,8 @@ export function initSignup() {
               skills:                      data?.skills || [],
               specialty:                   (data?.skills || []).join(', '),
               hourlyRate:                  data?.hourlyRate || '',
-              serviceArea:                 data?.locationLabel || '',
+              serviceArea:                 data?.serviceArea || data?.locationLabel || '',
+              coverageAreas:               data?.coverageAreas || [],
               verificationStatus:          data?.verificationStatus || 'pending',
               verificationRejectionReason: data?.verificationRejectionReason || '',
               uploadedDocs: {
@@ -846,7 +918,7 @@ export function initSignup() {
         })
         .catch((err) => {
           // Re-enable submit button on failure so user can retry
-          const submitBtn = qs('[data-next]', form);
+          const submitBtn = currentNextButton();
           if (submitBtn) {
             submitBtn.disabled = false;
             const btnSpan = submitBtn.querySelector('span');
@@ -860,7 +932,7 @@ export function initSignup() {
           _isSubmitting = false;
 
           // Show error on the page
-          const errEl = qs('[data-error-for="tech-verification"]', form) || qs('[data-error-for="email"]', form);
+          const errEl = qs('[data-error-for="tech-application-review"]', form) || qs('[data-error-for="tech-verification"]', form) || qs('[data-error-for="email"]', form);
           if (errEl) {
             const fieldErrors = err?.data?.errors;
             const detail = fieldErrors?.length
@@ -916,10 +988,10 @@ export function initSignup() {
     const progressContainer = qs("#signupProgress");
     if (progressContainer) progressContainer.hidden = isStepOne || isSuccess;
 
-    const total = state.role === "technician" ? state.flow.length : state.flow.length - 1;
     updateRoleIndicator(state.role, state.role && !isStepOne && !isSuccess);
     if (!isStepOne && !isSuccess) {
-      updateProgress(progress, state.idx, total);
+      const progressSteps = state.flow.filter(step => step !== "role" && step !== "tech-review" && step !== "customer-finish");
+      updateProgress(progress, Math.max(progressSteps.indexOf(currentKey), 0), progressSteps.length);
     }
     renderSkills(form, state.skills, search?.value || "");
   });
@@ -991,5 +1063,3 @@ export function initSignup() {
 }
 
 initSignup();
-
-

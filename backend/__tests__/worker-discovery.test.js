@@ -216,6 +216,45 @@ describe('getWorkers — invalid category', () => {
   });
 });
 
+describe('getWorkers — area filter', () => {
+  test('matches structured coverage areas first and preserves legacy fallbacks', async () => {
+    User.find = jest.fn().mockReturnValue(buildQuery([]));
+    User.countDocuments = jest.fn().mockResolvedValue(0);
+
+    const req = { query: { area: 'Maadi' } };
+    await getWorkers(req, mockRes());
+
+    const expectedAreaFallback = expect.objectContaining({
+      $or: expect.arrayContaining([
+        expect.objectContaining({ coverageAreas: expect.any(RegExp) }),
+        expect.objectContaining({ serviceArea: expect.any(RegExp) }),
+        expect.objectContaining({ locationLabel: expect.any(RegExp) }),
+      ]),
+    });
+
+    expect(User.find).toHaveBeenCalledWith(expectedAreaFallback);
+    expect(User.countDocuments).toHaveBeenCalledWith(expectedAreaFallback);
+  });
+
+  test('keeps serviceId as the exact matching source when area is also provided', async () => {
+    User.find = jest.fn().mockReturnValue(buildQuery([]));
+    User.countDocuments = jest.fn().mockResolvedValue(0);
+
+    const req = { query: { serviceId: PLUMBING_ID, area: 'Maadi' } };
+    await getWorkers(req, mockRes());
+
+    expect(User.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        services: PLUMBING_ID,
+        $or: expect.any(Array),
+      })
+    );
+    expect(User.find).toHaveBeenCalledWith(
+      expect.not.objectContaining({ categories: expect.anything() })
+    );
+  });
+});
+
 describe('getWorkers — no filters', () => {
   test('returns all active verified workers when no filters are provided', async () => {
     User.find = jest.fn().mockReturnValue(buildQuery([]));

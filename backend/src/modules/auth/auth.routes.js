@@ -46,6 +46,19 @@ const registerValidation = [
   body('services.*')
     .optional()
     .isMongoId().withMessage('Each service must be a valid MongoDB ObjectId'),
+
+  body('serviceArea')
+    .optional({ checkFalsy: true })
+    .trim()
+    .isLength({ max: 200 }).withMessage('Service area cannot exceed 200 characters'),
+
+  body('coverageAreas')
+    .optional()
+    .isArray().withMessage('Coverage areas must be an array'),
+
+  body('coverageAreas.*')
+    .optional()
+    .isString().trim().notEmpty().isLength({ max: 100 }).withMessage('Each coverage area must be a non-empty string up to 100 characters'),
 ];
 
 const loginValidation = [

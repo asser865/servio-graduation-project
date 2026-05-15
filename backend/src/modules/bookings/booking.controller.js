@@ -29,11 +29,23 @@ const updateStatus = async (req, res) => {
     req.params.id,
     req.body.status,
     req.user.id,
-    req.user.role
+    req.user.role,
+    req.body
   );
   const status = req.body.status === 'cancelled' ? 'warn' : 'ok';
   logEvent({ req, type: 'booking', action: `Booking ${req.body.status}`, target: booking._id?.toString(), status });
   return ApiResponse.success(res, StatusCodes.OK, 'Booking status updated.', booking);
+};
+
+const reschedule = async (req, res) => {
+  const booking = await bookingService.rescheduleBooking(
+    req.params.id,
+    req.body,
+    req.user.id,
+    req.user.role
+  );
+  logEvent({ req, type: 'booking', action: 'Booking rescheduled', target: booking._id?.toString() });
+  return ApiResponse.success(res, StatusCodes.OK, 'Booking rescheduled.', booking);
 };
 
 const getAllBookings = async (req, res) => {
@@ -60,7 +72,7 @@ const getWorkerBookedSlots = async (req, res) => {
   const bookings = await Booking.find({
     worker: workerId,
     scheduledDate: { $gte: start, $lte: end },
-    status: { $in: ['pending', 'accepted', 'in_progress'] },
+    status: { $in: ['pending', 'accepted', 'en_route', 'arrived', 'in_progress'] },
   }).select('scheduledTime');
 
   return ApiResponse.success(res, StatusCodes.OK, 'Booked slots retrieved.', {
@@ -68,4 +80,4 @@ const getWorkerBookedSlots = async (req, res) => {
   });
 };
 
-module.exports = { create, getMyBookings, getWorkerBookings, updateStatus, getAllBookings, getBookingById, getWorkerBookedSlots };
+module.exports = { create, getMyBookings, getWorkerBookings, updateStatus, reschedule, getAllBookings, getBookingById, getWorkerBookedSlots };

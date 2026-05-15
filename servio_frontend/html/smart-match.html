@@ -101,7 +101,7 @@
     </section>
 
     <!-- COMPOSER -->
-    <section class="container" data-reveal="scale" data-reveal-delay="300">
+    <section class="container ai-composer-section" data-reveal="scale" data-reveal-delay="300">
       <div class="ai-composer">
         <textarea id="ai-query-input" class="ai-composer__textarea" placeholder="e.g. I want a plumber to fix my water leak within one hour near Nasr City that will do the work wont exceed 50... EGP" data-i18n-placeholder="sm_composer_ph"></textarea>
         <div class="ai-composer__footer">
@@ -116,105 +116,20 @@
               <path class="star-base" d="M10,21.236,6.755,14.745.264,11.5,6.755,8.255,10,1.764l3.245,6.491L19.736,11.5l-6.491,3.245ZM18,21l1.5,3L21,21l3-1.5L21,18l-1.5-3L18,18l-3,1.5ZM19.333,4.667,20.5,7l1.167-2.333L24,3.5,21.667,2.333,20.5,0,19.333,2.333,17,3.5Z"></path>
             </svg>
             <span data-i18n="sm_generate">Generate</span>
-            <div class="star-1">
-              <svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" version="1.1" style="shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd" viewBox="0 0 784.11 815.53">
-                <path class="fil0" d="M392.05 0c-20.9,210.08 -184.06,378.41 -392.05,407.78 207.96,29.37 371.12,197.68 392.05,407.74 20.93,-210.06 184.09,-378.37 392.05,-407.74 -207.98,-29.38 -371.16,-197.69 -392.06,-407.78z"></path>
-              </svg>
-            </div>
-            <div class="star-2">
-              <svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" version="1.1" style="shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd" viewBox="0 0 784.11 815.53">
-                <path class="fil0" d="M392.05 0c-20.9,210.08 -184.06,378.41 -392.05,407.78 207.96,29.37 371.12,197.68 392.05,407.74 20.93,-210.06 184.09,-378.37 392.05,-407.74 -207.98,-29.38 -371.16,-197.69 -392.06,-407.78z"></path>
-              </svg>
-            </div>
-            <div class="star-3">
-              <svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" version="1.1" style="shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd" viewBox="0 0 784.11 815.53">
-                <path class="fil0" d="M392.05 0c-20.9,210.08 -184.06,378.41 -392.05,407.78 207.96,29.37 371.12,197.68 392.05,407.74 20.93,-210.06 184.09,-378.37 392.05,-407.74 -207.98,-29.38 -371.16,-197.69 -392.06,-407.78z"></path>
-              </svg>
-            </div>
-            <div class="star-4">
-              <svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" version="1.1" style="shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd" viewBox="0 0 784.11 815.53">
-                <path class="fil0" d="M392.05 0c-20.9,210.08 -184.06,378.41 -392.05,407.78 207.96,29.37 371.12,197.68 392.05,407.74 20.93,-210.06 184.09,-378.37 392.05,-407.74 -207.98,-29.38 -371.16,-197.69 -392.06,-407.78z"></path>
-              </svg>
-            </div>
-            <div class="star-5">
-              <svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" version="1.1" style="shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd" viewBox="0 0 784.11 815.53">
-                <path class="fil0" d="M392.05 0c-20.9,210.08 -184.06,378.41 -392.05,407.78 207.96,29.37 371.12,197.68 392.05,407.74 20.93,-210.06 184.09,-378.37 392.05,-407.74 -207.98,-29.38 -371.16,-197.69 -392.06,-407.78z"></path>
-              </svg>
-            </div>
-            <div class="star-6">
-              <svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" version="1.1" style="shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd" viewBox="0 0 784.11 815.53">
-                <path class="fil0" d="M392.05 0c-20.9,210.08 -184.06,378.41 -392.05,407.78 207.96,29.37 371.12,197.68 392.05,407.74 20.93,-210.06 184.09,-378.37 392.05,-407.74 -207.98,-29.38 -371.16,-197.69 -392.06,-407.78z"></path>
-              </svg>
-            </div>
           </button>
         </div>
       </div>
 
-      <!-- SUGGESTIONS -->
-      <div class="ai-suggestions">
-        <button class="ai-suggestion" data-i18n="smart_suggestion_1">Electrician for a complete panel wiring rewrite before tomorrow under 200 EGP</button>
-        <button class="ai-suggestion" data-i18n="smart_suggestion_2">Architectural designer in Madinaty specialized in modern minimalism</button>
-        <button class="ai-suggestion" data-i18n="smart_suggestion_3">I want a plumber to fix my water leak within one hour near Nasr City that wont exceed 50 EGP</button>
-      </div>
     </section>
 
     <!-- PROCESSING STATE -->
+    <div id="ai-processing-divider" class="ai-processing-divider" hidden></div>
     <section id="ai-processing" class="ai-processing container" hidden aria-live="polite">
       <!-- Injected by JS -->
     </section>
 
-    <!-- RESULTS (Simulated) -->
-    <section id="ai-results" class="ai-results container" hidden>
-      <div class="ai-results__header">
-        <h2 class="ai-results__title" data-i18n="sm_results_title">Found 1 Perfect Match</h2>
-        <span class="ai-results__badge" data-i18n="sm_results_badge">98% Match Score</span>
-      </div>
-
-      <div class="ai-results-grid">
-        <!-- Exact match Technician Card -->
-        <article class="tech-card" data-reveal>
-          <div class="tech-card__header">
-            <img class="tech-card__avatar" src="https://images.unsplash.com/photo-1540569014015-19a7be504e3a?q=80&w=256&auto=format&fit=crop" alt="Sarah Jenkins" />
-            <div class="tech-card__info">
-              <h3>Omar Tarek</h3>
-              <span data-i18n="smart_match_role">Master Plumber — 12 yrs exp.</span>
-            </div>
-            <div class="tech-card__rating">
-              <span>★ 4.9</span>
-            </div>
-          </div>
-          <ul class="tech-card__details">
-            <li>
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor">
-                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                <circle cx="12" cy="10" r="3"></circle>
-              </svg>
-              <span data-i18n="smart_match_distance">0.8 miles away (Nasr City)</span>
-            </li>
-            <li>
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor">
-                <circle cx="12" cy="12" r="10"></circle>
-                <polyline points="12 6 12 12 16 14"></polyline>
-              </svg>
-              <span class="tech-card__available" data-i18n="smart_available_badge">Available Within 45 Mins</span>
-            </li>
-            <li>
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor">
-                <path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-              </svg>
-              <span>45 EGP Flat Rate Repair</span>
-            </li>
-          </ul>
-          <div class="tech-card__tags">
-            <span class="tech-tag" data-i18n="smart_tag_verified_emergency">Verified Emergency</span>
-            <span class="tech-tag" data-i18n="smart_tag_leak_specialist">Leak Specialist</span>
-          </div>
-          <div class="tech-card__footer">
-            <a class="btn btn--full" href="./booking.html" data-i18n="sm_accept_book">Accept &amp; Book Now</a>
-          </div>
-        </article>
-      </div>
-    </section>
+    <!-- RESULTS — populated by smart-match.js -->
+    <section id="ai-results" class="ai-results container" hidden></section>
 
   </main>
 

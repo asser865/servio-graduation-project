@@ -21,8 +21,11 @@ import { animate, stagger } from 'https://cdn.jsdelivr.net/npm/motion@12.38.0/+e
 import { getWorker, getMe, addAddress }  from '../api/users.js';
 import { getServices }       from '../api/services.js';
 import { createBooking, getWorkerBookedSlots } from '../api/bookings.js';
+import { getPlatformSettings } from '../api/platform.js';
+import { holdPayment } from '../api/payments.js';
 import { openCardPickerModal, closeCardPickerModal } from '../components/card-picker-modal.js';
 import { showToast } from '../components/toast.js';
+import { calculateBookingFee, formatMoney, DEFAULT_PLATFORM_FEE_RATE } from '../utils/fee.js';
 
 // ─── URL params ───────────────────────────────────────────────────────────────
 
@@ -38,6 +41,7 @@ const state = {
   worker: null,
   selectedTime: null,
   selectedPayment: 'online',
+  platformSettings: { commissionRate: DEFAULT_PLATFORM_FEE_RATE, cashPaymentsEnabled: true },
   data: {
     serviceId: '',
     serviceCategory: '',
@@ -62,6 +66,8 @@ const serviceCategory = document.getElementById('serviceCategory');
 const serviceName     = document.getElementById('serviceName');
 const bookDate    = document.getElementById('bookDate');
 const bookAddress = document.getElementById('bookAddress');
+const bookNotes   = document.getElementById('bookNotes');
+const bookNotesCounter = document.getElementById('bookNotesCounter');
 
 const step2Back   = document.getElementById('step2Back');
 const step2Next   = document.getElementById('step2Next');
@@ -78,6 +84,8 @@ const reviewPayment  = document.getElementById('reviewPayment');
 const reviewBaseRate = document.getElementById('reviewBaseRate');
 const reviewFee      = document.getElementById('reviewFee');
 const reviewTotal    = document.getElementById('reviewTotal');
+const reviewCard     = document.getElementById('reviewCard');
+const reviewNotes    = document.getElementById('reviewNotes');
 
 // otherProblemRow removed — general bookings use bookNotes textarea instead
 
@@ -266,10 +274,44 @@ document.addEventListener('click', (e) => {
 
 // ─── Payment option selection ─────────────────────────────────────────────────
 
+const NOTE_PROMPTS = {
+  issue: 'Problem: ',
+  timing: 'Started: ',
+  tried: 'Already tried: ',
+  access: 'Access notes: ',
+};
+
+function updateNotesCounter() {
+  if (!bookNotes || !bookNotesCounter) return;
+  const max = Number(bookNotes.getAttribute('maxlength')) || 1000;
+  const length = bookNotes.value.length;
+  bookNotesCounter.textContent = `${length}/${max}`;
+  bookNotesCounter.classList.toggle('is-near-limit', length >= Math.floor(max * 0.9));
+}
+
+bookNotes?.addEventListener('input', updateNotesCounter);
+document.querySelectorAll('[data-note-prompt]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    if (!bookNotes) return;
+    const addition = NOTE_PROMPTS[btn.dataset.notePrompt] || '';
+    if (!addition) return;
+    const current = bookNotes.value.trimEnd();
+    const prefix = current ? '\n' : '';
+    bookNotes.value = `${current}${prefix}${addition}`;
+    bookNotes.focus();
+    bookNotes.setSelectionRange(bookNotes.value.length, bookNotes.value.length);
+    updateNotesCounter();
+  });
+});
+updateNotesCounter();
+
 paymentOpts.forEach((opt) => {
   opt.addEventListener('click', () => {
+    if (opt.classList.contains('is-disabled')) return;
     paymentOpts.forEach((o) => o.classList.remove('is-selected'));
     opt.classList.add('is-selected');
+    const radio = opt.querySelector('input[type="radio"]');
+    if (radio) radio.checked = true;
     const val = opt.dataset.payment;
     state.selectedPayment = val;
     state.data.payment = val;
@@ -305,7 +347,7 @@ step3Back?.addEventListener('click', () => goToStep(2));
 
 // ─── Confirm button ───────────────────────────────────────────────────────────
 
-confirmBtn?.addEventListener('click', (e) => {
+confirmBtn?.addEventListener('click', async (e) => {
   e.preventDefault();
   if (!termsCheck || !termsCheck.checked) {
     animate(termsCheck?.closest('.terms-check') || confirmBtn,
@@ -327,16 +369,29 @@ confirmBtn?.addEventListener('click', (e) => {
   collectStep2();
 
   if (state.data.payment === 'online') {
+    // Step 1: create booking first (no paymentMeta)
+    state.data.paymentMeta = null;
+    const booking = await finalizeBooking({ returnBooking: true });
+    if (!booking) return;
+
+    // Step 2: pick card and hold
     const rate  = state.worker?.hourlyRate || 0;
-    const total = (rate * 1.10).toFixed(2);
+    const total = calculateBookingFee(rate, state.platformSettings.commissionRate).estimatedTotal.toFixed(2);
     openCardPickerModal(total, async (paymentMeta) => {
-      state.data.paymentMeta = paymentMeta;
-      await finalizeBooking();
+      try {
+        await holdPayment(booking._id, { savedCardId: paymentMeta.savedCardId });
+        state.data.paymentMeta = paymentMeta;
+        populateReview();
+        goToConfirmationOrNext(booking);
+      } catch (err) {
+        const msg = err?.response?.data?.message || err?.message || 'Payment failed. Please try another card.';
+        showToast(msg, 'error');
+      }
     });
   } else {
     state.data.paymentMeta = null;
     animate(confirmBtn, { scale: [1, 0.95, 1.02, 1] }, { duration: 0.3 });
-    setTimeout(() => finalizeBooking(), 320);
+    setTimeout(() => finalizeBooking({}), 320);
   }
 });
 
@@ -399,6 +454,7 @@ function collectStep1() {
   state.data.date    = bookDate?.value || '';
   state.data.address = bookAddress?.value.trim() || '';
   state.data.time    = state.data.time || '';
+  state.data.notes   = bookNotes?.value.trim() || '';
 }
 
 function collectStep2() {
@@ -408,7 +464,7 @@ function collectStep2() {
 
 // ─── Populate review step ─────────────────────────────────────────────────────
 
-const PAYMENT_LABELS = { online: 'Online Payment', cash: 'Cash on Arrival' };
+const PAYMENT_LABELS = { online: 'Card payment', cash: 'Cash after service' };
 
 function populateReview() {
   if (reviewTechName) reviewTechName.textContent = state.worker?.name || '—';
@@ -417,14 +473,21 @@ function populateReview() {
   if (reviewTime)     reviewTime.textContent      = state.data.time || '—';
   if (reviewAddress)  reviewAddress.textContent   = state.data.address || '—';
   if (reviewPayment)  reviewPayment.textContent   = PAYMENT_LABELS[state.data.payment] || state.data.payment;
+  if (reviewCard) {
+    const meta = state.data.paymentMeta;
+    reviewCard.textContent = state.data.payment === 'online'
+      ? (meta?.last4 ? `${String(meta.cardType || 'Card').toUpperCase()} ending ${meta.last4} - no real charge` : 'Select a saved card before the request is sent.')
+      : 'No card required.';
+  }
+  if (reviewNotes)    reviewNotes.textContent     = state.data.notes || 'No additional notes added.';
 
   const rate = state.worker?.hourlyRate || 0;
-  const fee  = rate * 0.10;
-  const total = rate + fee;
+  const totals = calculateBookingFee(rate, state.platformSettings.commissionRate);
 
-  if (reviewBaseRate) reviewBaseRate.textContent = `${rate.toFixed(2)} EGP / hr`;
-  if (reviewFee)      reviewFee.textContent      = `${fee.toFixed(2)} EGP`;
-  if (reviewTotal)    reviewTotal.textContent    = `${total.toFixed(2)} EGP+`;
+  setText('reviewFeeLabel', `Platform Fee (${totals.feeRate}%)`);
+  if (reviewBaseRate) reviewBaseRate.textContent = `${formatMoney(totals.base)} / hr`;
+  if (reviewFee)      reviewFee.textContent      = formatMoney(totals.feeAmount);
+  if (reviewTotal)    reviewTotal.textContent    = `${formatMoney(totals.estimatedTotal)}+`;
 }
 
 function formatDate(raw) {
@@ -570,8 +633,9 @@ function formatTimeLabel(slot) {
 
 function updateWorkerUI(worker) {
   const name     = worker.name     || 'Professional';
-  const rating   = typeof worker.averageRating === 'number' ? worker.averageRating.toFixed(1) : '5.0';
   const reviews  = worker.totalReviews || 0;
+  const hasReviews = reviews > 0 && typeof worker.averageRating === 'number';
+  const rating   = hasReviews ? worker.averageRating.toFixed(1) : 'New SERVIO Pro';
   const years    = worker.yearsExperience;
   const jobs     = worker.completedJobs;
   const rate     = worker.hourlyRate || 0;
@@ -606,7 +670,7 @@ function updateWorkerUI(worker) {
   setText('heroCardService', specialty);
   setText('heroRatingNum', rating);
   const ratingCount = document.getElementById('heroRatingCount');
-  if (ratingCount) ratingCount.textContent = `(${reviews} review${reviews !== 1 ? 's' : ''})`;
+  if (ratingCount) ratingCount.textContent = hasReviews ? `(${reviews} review${reviews !== 1 ? 's' : ''})` : '';
   setText('heroStatYears', years ? `${years}+` : '—');
   setText('heroStatJobs', jobs ? `${jobs}+` : '—');
 
@@ -642,17 +706,41 @@ function updateWorkerUI(worker) {
   if (sidebarRatingText) sidebarRatingText.textContent = `${rating} · ${reviews} reviews`;
   const sidebarTechRating = document.getElementById('sidebarTechRating');
   if (sidebarTechRating) sidebarTechRating.style.opacity = '1';
+  if (sidebarRatingText && !hasReviews) sidebarRatingText.textContent = 'New SERVIO Pro';
+  const starPill = document.querySelector('.trust-pill--star');
+  if (starPill) starPill.style.display = hasReviews && Number(worker.averageRating) >= 4.8 ? '' : 'none';
 
-  const fee   = rate * 0.10;
-  const total = rate + fee;
-  setText('sidebarBaseRate', `${rate.toFixed(2)} EGP`);
-  setText('sidebarFee',      `${fee.toFixed(2)} EGP`);
-  setText('sidebarTotal',    `${total.toFixed(2)} EGP+`);
+  const totals = calculateBookingFee(rate, state.platformSettings.commissionRate);
+  setText('sidebarFeeLabel', `Platform fee (${totals.feeRate}%)`);
+  setText('sidebarBaseRate', formatMoney(totals.base));
+  setText('sidebarFee',      formatMoney(totals.feeAmount));
+  setText('sidebarTotal',    `${formatMoney(totals.estimatedTotal)}+`);
 }
 
 function setText(id, val) {
   const el = document.getElementById(id);
   if (el) el.textContent = val;
+}
+
+function applyPaymentSettings() {
+  const cashOption = document.querySelector('.payment-option[data-payment="cash"]');
+  const cashInput = cashOption?.querySelector('input[type="radio"]');
+  if (!cashOption || !cashInput) return;
+
+  const cashEnabled = state.platformSettings.cashPaymentsEnabled !== false;
+  cashOption.classList.toggle('is-disabled', !cashEnabled);
+  cashInput.disabled = !cashEnabled;
+  cashOption.setAttribute('aria-disabled', String(!cashEnabled));
+
+  if (!cashEnabled && state.data.payment === 'cash') {
+    state.data.payment = 'online';
+    state.selectedPayment = 'online';
+    const onlineOption = document.querySelector('.payment-option[data-payment="online"]');
+    onlineOption?.classList.add('is-selected');
+    const onlineInput = onlineOption?.querySelector('input[type="radio"]');
+    if (onlineInput) onlineInput.checked = true;
+    cashOption.classList.remove('is-selected');
+  }
 }
 
 // ─── Two-step service picker ──────────────────────────────────────────────────
@@ -980,7 +1068,38 @@ async function init() {
     return;
   }
 
+  try {
+    const settings = await getPlatformSettings();
+    state.platformSettings = {
+      commissionRate: settings?.commissionRate ?? DEFAULT_PLATFORM_FEE_RATE,
+      cashPaymentsEnabled: settings?.cashPaymentsEnabled !== false,
+    };
+  } catch (_) {
+    state.platformSettings = { commissionRate: DEFAULT_PLATFORM_FEE_RATE, cashPaymentsEnabled: true };
+  }
+  applyPaymentSettings();
   state.worker = worker;
+
+  // Disable cash option if worker has cash bookings blocked
+  const cashOption = document.querySelector('.payment-option[data-payment="cash"]');
+  if (cashOption) {
+    const cashBlocked = worker?.restrictions?.cashBookingsBlocked === true;
+    cashOption.classList.toggle('is-disabled', cashBlocked);
+    const cashNote = cashOption.querySelector('.payment-note');
+    if (cashNote) cashNote.textContent = cashBlocked
+      ? (window.t?.('tech_cash_disabled') || 'Cash payments are not available for this technician.')
+      : '';
+    if (cashBlocked) {
+      const cashInput = cashOption.querySelector('input');
+      if (cashInput) cashInput.setAttribute('disabled', 'disabled');
+      if (state.data.payment === 'cash') {
+        state.data.payment = 'online';
+        state.selectedPayment = 'online';
+        document.querySelector('.payment-option[data-payment="online"]')?.classList.add('is-selected');
+        cashOption.classList.remove('is-selected');
+      }
+    }
+  }
 
   updateWorkerUI(worker);
 
@@ -1016,7 +1135,7 @@ init().catch(err => console.error('Booking init error:', err));
 
 // ─── Finalize booking ─────────────────────────────────────────────────────────
 
-async function finalizeBooking() {
+async function finalizeBooking({ returnBooking = false } = {}) {
   collectStep1();
   collectStep2();
 
@@ -1025,6 +1144,7 @@ async function finalizeBooking() {
 
   // Try real API first
   let bookingId = null;
+  let createdBooking = null;
   if (workerId && state.data.serviceCategory) {
     try {
       const payload = {
@@ -1036,13 +1156,14 @@ async function finalizeBooking() {
         scheduledTime:   state.selectedTime || '',
         address:         state.data.address,
         description:     document.getElementById('bookNotes')?.value.trim() || '',
-        paymentMethod:   state.data.payment === 'cash' ? 'cash' : 'card',
-        savedCardId:     state.data.payment === 'online' ? state.data.paymentMeta?.savedCardId : undefined,
+        paymentMethod:   state.data.payment,
+        savedCardId:     state.data.paymentMeta?.savedCardId || undefined,
         ...(state.data.paymentMeta ? { paymentMeta: state.data.paymentMeta } : {}),
       };
       const res = await createBooking(payload);
-      bookingId = res.data?._id || res._id || res.data?.booking?._id || null;
-      state.data.backendBooking = res.data?.booking || res.data || res;
+      createdBooking = res.data?.booking || res.data || res.booking || res;
+      bookingId = createdBooking?._id || null;
+      state.data.backendBooking = createdBooking;
     } catch (e) {
       const msg = e?.message || '';
       let userMsg = 'Booking failed. Please try again.';
@@ -1071,13 +1192,15 @@ async function finalizeBooking() {
     category:   state.data.serviceType,
     payment:    state.data.payment,
     paymentMethod,
+    paymentStatus: createdBooking?.paymentStatus || (state.data.payment === 'cash' ? 'cash_pending_settlement' : 'unpaid'),
+    paymentMeta: createdBooking?.paymentMeta || state.data.paymentMeta || null,
     date:          readableDate,
     scheduledDate: readableDate,
     time:          state.data.time,
     scheduledTime: state.selectedTime || state.data.time,
     address:       state.data.address,
-    pin: state.data.backendBooking?.pin || null,
-    status:    'Booked',
+    pin:       createdBooking?.pin || state.data.backendBooking?.pin || null,
+    status:    createdBooking?.status || 'pending',
     timestamp: Date.now(),
     technician: {
       name:     state.worker?.name     || '—',
@@ -1086,7 +1209,12 @@ async function finalizeBooking() {
       rating:   state.worker?.averageRating != null ? Number(state.worker.averageRating).toFixed(1) : '—',
       phone:    state.worker?.phone || '',
     },
-    rate:              state.worker?.hourlyRate || state.worker?.rate || state.worker?.baseRate || null,
+    rate:              createdBooking?.totalPrice ?? state.worker?.hourlyRate ?? state.worker?.rate ?? state.worker?.baseRate ?? null,
+    totalPrice:        createdBooking?.totalPrice ?? state.worker?.hourlyRate ?? 0,
+    platformFeeRate:   createdBooking?.platformFeeRate ?? state.platformSettings.commissionRate,
+    platformFeeAmount: createdBooking?.platformFeeAmount,
+    estimatedTotal:    createdBooking?.estimatedTotal,
+    notes:             state.data.notes,
     workerLocation:    state.worker?.location || state.worker?.city || state.worker?.area || '',
     workerReviewCount: state.worker?.reviewCount || state.worker?.totalReviews || 0,
     workerAvatar:      state.worker?.avatar || state.worker?.photo || state.worker?.profileImage || null,
@@ -1098,6 +1226,19 @@ async function finalizeBooking() {
   if (existing.length > 50) existing.splice(0, existing.length - 50);
   localStorage.setItem('servio_bookings', JSON.stringify(existing));
 
+  if (returnBooking) return createdBooking || null;
+  window.location.href = './booking-confirmation.html';
+}
+
+function goToConfirmationOrNext(booking, paymentMeta) {
+  // Save updated booking data with hold status
+  const existing = JSON.parse(localStorage.getItem('servio_active_booking') || '{}');
+  const updated = Object.assign({}, existing, {
+    _id:           booking._id,
+    paymentStatus: booking.paymentStatus || 'held',
+    paymentMeta:   paymentMeta || null,
+  });
+  localStorage.setItem('servio_active_booking', JSON.stringify(updated));
   window.location.href = './booking-confirmation.html';
 }
 
@@ -1191,4 +1332,107 @@ function updateStepper(prefersReducedMotion) {
 
   const fields = document.querySelectorAll('#step-1 .field');
   if (fields.length) animate(fields, { opacity: [0, 1], y: [8, 0] }, { duration: 0.35, delay: stagger(0.06, { start: 0.55 }), easing: 'ease-out' });
+})();
+
+// ─── Hero Canvas Animation ───────────────────────────────────────────────────
+
+(function initBookingHeroAnimation() {
+  const canvas = document.getElementById('hero-booking-canvas');
+  if (!canvas) return;
+
+  const ctx = canvas.getContext('2d');
+  let animationFrameId;
+  const orbs = [];
+  let mousePos = { x: -1000, y: -1000 };
+
+  class Orb {
+    constructor() {
+      this.init();
+    }
+    init() {
+      this.x = Math.random() * canvas.width;
+      this.y = Math.random() * canvas.height;
+      this.size = Math.random() * 300 + 150;
+      this.baseSize = this.size;
+      // Using brand colors: soft gold/brown tones
+      this.color = Math.random() > 0.5 ? 'rgba(154, 140, 115, 0.12)' : 'rgba(219, 203, 180, 0.08)';
+      this.vx = (Math.random() - 0.5) * 0.4;
+      this.vy = (Math.random() - 0.5) * 0.4;
+    }
+    update() {
+      this.x += this.vx;
+      this.y += this.vy;
+
+      // Subtle mouse interaction: orbs follow the mouse slightly
+      const dx = mousePos.x - this.x;
+      const dy = mousePos.y - this.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 500) {
+        this.x += dx * 0.005;
+        this.y += dy * 0.005;
+        this.size = this.baseSize * (1 + (500 - dist) / 1000);
+      } else {
+        this.size += (this.baseSize - this.size) * 0.02;
+      }
+
+      // Edge wrap-around with safety margin
+      if (this.x < -this.size) this.x = canvas.width + this.size;
+      if (this.x > canvas.width + this.size) this.x = -this.size;
+      if (this.y < -this.size) this.y = canvas.height + this.size;
+      if (this.y > canvas.height + this.size) this.y = -this.size;
+    }
+    draw() {
+      const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.size);
+      gradient.addColorStop(0, this.color);
+      gradient.addColorStop(0.5, this.color.replace('0.', '0.0')); // Fade out faster
+      gradient.addColorStop(1, 'rgba(0,0,0,0)');
+      
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  const initOrbs = () => {
+    orbs.length = 0;
+    const count = Math.max(6, Math.floor(canvas.width / 200));
+    for (let i = 0; i < count; i++) {
+      orbs.push(new Orb());
+    }
+  };
+
+  const animate = () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    
+    // 'screen' mode creates a beautiful glowing overlap effect
+    ctx.globalCompositeOperation = isDark ? 'screen' : 'multiply';
+    if (!isDark) ctx.globalAlpha = 0.4; // Soften for light mode
+    
+    orbs.forEach(orb => {
+      orb.update();
+      orb.draw();
+    });
+    
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1.0;
+    animationFrameId = requestAnimationFrame(animate);
+  };
+
+  window.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    mousePos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  });
+
+  const resize = () => {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+    initOrbs();
+  };
+
+  window.addEventListener('resize', resize);
+  resize();
+  animate();
 })();

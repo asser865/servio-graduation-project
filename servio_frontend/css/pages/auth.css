@@ -3345,3 +3345,123 @@ body:has(.auth) .chat-widget {
 
 
 /* . */
+/* Technician signup application review — Enhanced Premium UI */
+.signup-review-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.signup-review-item {
+  min-width: 0;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-left: 3px solid var(--color-accent, #9A8C73);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.signup-review-item--full {
+  grid-column: 1 / -1;
+}
+
+.signup-review-item__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.signup-review-item__header svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  stroke: var(--color-accent, #9A8C73);
+  opacity: 0.8;
+}
+
+.signup-review-item__label {
+  display: block;
+  color: var(--color-accent, #9A8C73);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+}
+
+.signup-review-item__value {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  padding-left: 2px;
+}
+
+.signup-review-docs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+  padding-left: 2px;
+}
+
+.signup-review-doc {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 4px 12px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(227, 213, 202, 0.5);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.signup-review-doc.is-uploaded {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.3);
+  color: #4ade80;
+}
+
+.signup-review-doc.is-uploaded::before {
+  content: "✓";
+  margin-right: 2px;
+  font-weight: 900;
+  font-size: 0.72rem;
+}
+
+[dir="rtl"] .signup-review-doc.is-uploaded::before {
+  margin-right: 0;
+  margin-left: 2px;
+}
+
+.auth-review-note {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: rgba(154, 140, 115, 0.07);
+  border: 1px solid rgba(154, 140, 115, 0.15);
+  border-left: 3px solid var(--color-accent, #9A8C73);
+  font-size: 0.83rem;
+  line-height: 1.6;
+  color: rgba(227, 213, 202, 0.75);
+}
+
+[dir="rtl"] .auth-review-note {
+  border-left: none;
+  border-right: 3px solid var(--color-accent);
+}
+
+@media (max-width: 640px) {
+  .signup-review-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}

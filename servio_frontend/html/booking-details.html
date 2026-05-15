@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Booking Details | SERVIO</title>
-  <meta name="description" content="Track and manage your active booking on SERVIO." />
+  <meta name="description" content="Track and manage your SERVIO booking, technician status, secure Arrival PIN, payment summary, and receipt." />
   <script src="../js/config.js"></script>
   <script src="../js/theme-init.js"></script>
   <script src="../js/lang-init.js"></script>
@@ -15,7 +15,6 @@
   <div class="scroll-progress" data-scroll-progress aria-hidden="true"></div>
   <a class="skip-link" href="#main">Skip to content</a>
 
-  <!-- ══════════════════════════ HEADER ══════════════════════════ -->
   <header class="site-header" data-site-header>
     <div class="container header__inner">
       <a class="brand" href="./index.html" aria-label="SERVIO Home">
@@ -45,7 +44,7 @@
               <path fill="currentColor" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm7.93 9h-3.11a15.6 15.6 0 0 0-1.3-5.06A8.03 8.03 0 0 1 19.93 11ZM12 4c.78.95 1.9 3.1 2.56 7H9.44C10.1 7.1 11.22 4.95 12 4ZM4.07 13h3.11a15.6 15.6 0 0 0 1.3 5.06A8.03 8.03 0 0 1 4.07 13ZM7.18 11H4.07a8.03 8.03 0 0 1 4.41-5.06A15.6 15.6 0 0 0 7.18 11Zm2.26 2h5.12c-.66 3.9-1.78 6.05-2.56 7-.78-.95-1.9-3.1-2.56-7Zm6.08 5.06A15.6 15.6 0 0 0 16.82 13h3.11a8.03 8.03 0 0 1-4.41 5.06Z" />
             </svg>
             <span class="lang__current">EN</span>
-            <span class="lang__caret" aria-hidden="true">▾</span>
+            <span class="lang__caret" aria-hidden="true">v</span>
           </button>
           <ul class="lang__menu" role="listbox" aria-label="Select language">
             <li role="option" aria-selected="true">EN</li>
@@ -53,331 +52,306 @@
           </ul>
         </div>
         <button class="btn btn--sm btn--header-theme" type="button" data-theme-button aria-label="Toggle dark mode">
-        <span class="theme-button__icon theme-button__icon--moon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-            </svg>
+          <span class="theme-button__icon theme-button__icon--moon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
           </span>
           <span class="theme-button__icon theme-button__icon--sun" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="4.25"></circle>
-              <path d="M12 2.5v2.5M12 19v2.5M4.93 4.93l1.77 1.77M17.3 17.3l1.77 1.77M2.5 12H5M19 12h2.5M4.93 19.07l1.77-1.77M17.3 6.7l1.77-1.77"></path>
-            </svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.25"></circle><path d="M12 2.5v2.5M12 19v2.5M4.93 4.93l1.77 1.77M17.3 17.3l1.77 1.77M2.5 12H5M19 12h2.5M4.93 19.07l1.77-1.77M17.3 6.7l1.77-1.77"></path></svg>
           </span>
         </button>
-
         <div class="header__auth-slot" data-auth-slot>
           <a class="btn btn--sm btn--header-login" href="./login.html" data-i18n="nav_login">Login</a>
           <a class="btn btn--sm btn--header-signup" href="./signup.html" data-i18n="nav_signup">Sign Up</a>
         </div>
-
-        <button class="hamburger" type="button" aria-label="Toggle menu" aria-expanded="false"
-          aria-controls="primary-nav" data-nav-toggle>
-          <span class="hamburger__lines" aria-hidden="true">
-            <span></span>
-            <span></span>
-            <span></span>
-          </span>
+        <button class="hamburger" type="button" aria-label="Toggle menu" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+          <span class="hamburger__lines" aria-hidden="true"><span></span><span></span><span></span></span>
         </button>
       </div>
     </div>
   </header>
 
-  <!-- ══════════════════════════ MAIN ══════════════════════════ -->
   <main id="main" class="bk-page">
-
-    <!-- ── EMPTY STATE (shown when no booking in localStorage) ── -->
-    <div class="bk-empty" id="bkEmptyState" style="display:none">
+    <section class="bk-empty" id="bkEmptyState" hidden>
       <div class="bk-empty__icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="4" width="18" height="18" rx="2"/>
-          <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
-          <line x1="3" y1="10" x2="21" y2="10"/>
-          <path d="M9 16l2 2 4-4"/>
-        </svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M16 2v4M8 2v4M3 10h18M9 16l2 2 4-4"></path></svg>
       </div>
-      <h1 class="bk-empty__title" data-i18n="bkd_empty_title">No Active Booking Found</h1>
-      <p class="bk-empty__sub" data-i18n="bkd_empty_sub">It looks like there's no booking to display right now.</p>
+      <h1 data-i18n="bkd_empty_title">No Active Booking Found</h1>
+      <p data-i18n="bkd_empty_sub">It looks like there is no booking to display right now.</p>
       <a class="btn btn--primary" href="./customer-dashboard.html" data-i18n="bkd_empty_back">Back to Dashboard</a>
-    </div>
+    </section>
 
-    <!-- ── BOOKING CONTENT ── -->
     <div id="bkContent" hidden>
-
-      <!-- HERO HEADER CARD -->
-      <section class="bk-hero" aria-label="Booking overview">
-        <div class="bk-hero__dots" aria-hidden="true"></div>
-        <div class="container">
-          <!-- Breadcrumb -->
+      <section class="bk-hero" aria-labelledby="bkService">
+        <!-- Live Visual Effects Canvas -->
+        <canvas id="bk-hero-canvas" class="bk-hero__canvas" aria-hidden="true"></canvas>
+        <div class="bk-hero__texture" aria-hidden="true"></div>
+        <div class="container bk-hero__inner">
           <nav class="bk-breadcrumb" aria-label="Breadcrumb">
             <a href="./customer-dashboard.html" data-i18n="bkd_breadcrumb_dashboard">Dashboard</a>
-            <span class="bk-breadcrumb__sep" aria-hidden="true">›</span>
+            <span aria-hidden="true">/</span>
             <a href="./customer-dashboard.html" data-i18n="bkd_breadcrumb_bookings">My Bookings</a>
-            <span class="bk-breadcrumb__sep" aria-hidden="true">›</span>
-            <span class="bk-breadcrumb__current" aria-current="page" data-i18n="bkd_breadcrumb_details">Booking Details</span>
+            <span aria-hidden="true">/</span>
+            <span aria-current="page" data-i18n="bkd_breadcrumb_details">Booking Details</span>
           </nav>
 
-          <!-- Header card -->
-          <div class="bk-header-card">
-            <div class="bk-header-card__meta">
-              <div class="bk-header-card__id"><span data-i18n="bk_booking_hash">Booking #</span><span id="bkId">S-2848</span></div>
-              <div class="bk-header-card__service" id="bkService">HVAC Maintenance</div>
-              <div class="bk-header-card__datetime">
-                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-                </svg>
-                <span id="bkDate">Thu, 27 Mar 2026</span>
-                <span aria-hidden="true">·</span>
-                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-                </svg>
-                <span id="bkTime">2:00 PM</span>
+          <div class="bk-hero__main">
+            <div class="bk-hero__content-group">
+              <p class="bk-hero__eyebrow" id="bkStatusEyebrow">Awaiting technician confirmation</p>
+
+              <div class="bk-hero__id-row">
+                <button class="bk-ref-chip" id="bkCopyRefBtn" type="button" aria-label="Copy booking reference">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                  <span data-i18n="bk_booking_hash">Booking #</span><strong id="bkId">...</strong>
+                </button>
+                <div class="bk-status-badge bk-status-badge--warning" id="bkStatusBadge" role="status" aria-live="polite">
+                  <span class="bk-status-badge__dot" aria-hidden="true"></span>
+                  <span id="bkStatusText">Request Sent</span>
+                </div>
+                <div class="bk-last-updated-pill">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                  <span id="bkLastUpdated" aria-live="polite">Last updated just now</span>
+                </div>
+              </div>
+              <h1 id="bkService" class="bk-hero__title">Service</h1>
+              <p id="bkHeroBody" class="bk-hero__body">Your request is reserved while the technician confirms availability.</p>
+              <div class="bk-hero__meta">
+                <span id="bkDate">...</span>
+                <span aria-hidden="true">&bull;</span>
+                <span id="bkTime">...</span>
               </div>
             </div>
-
-            <!-- Status Badge -->
-            <div class="bk-status-badge bk-status-badge--in-progress" id="bkStatusBadge" role="status" aria-label="Booking status">
-              <span class="bk-status-badge__pulse" aria-hidden="true"></span>
-              <span id="bkStatusText" data-i18n="status_in_progress">In Progress</span>
-            </div>
           </div>
+        </div>
+
+        <!-- Professional Separation Divider (Elegant Curve) -->
+        <div class="bk-hero__divider" aria-hidden="true">
+          <svg preserveAspectRatio="none" viewBox="0 0 1200 120" xmlns="http://www.w3.org/2000/svg">
+            <path d="M0,120 C400,0 800,0 1200,120 L0,120 Z" fill="currentColor"></path>
+          </svg>
         </div>
       </section>
 
-      <!-- CANCELLED BANNER (shown only if status = Cancelled) -->
-      <div class="container" id="bkCancelledBannerWrap" hidden>
-        <div class="bk-cancelled-banner" role="alert">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
-          </svg>
-          <span data-i18n="bkd_cancelled">This booking has been cancelled.</span>
-        </div>
+
+
+      <div class="container">
+        <div id="bkStateBanner" class="bk-state-banner" hidden></div>
       </div>
 
-      <!-- BODY GRID -->
       <div class="container bk-grid">
-
-        <!-- ═══════════ LEFT COLUMN ═══════════ -->
         <div class="bk-main">
+          <section class="bk-card bk-card--tracker" aria-labelledby="bkStatusTitle">
+            <div class="bk-card__head">
+              <div>
+                <p class="bk-card__kicker">Live progress</p>
+                <h2 id="bkStatusTitle" data-i18n="bkd_status_title">Booking Status</h2>
+              </div>
+            </div>
+            <ol class="bk-timeline" id="bkTimeline" aria-label="Booking progress"></ol>
+          </section>
 
-          <!-- Status Timeline -->
-          <div class="bk-card" data-reveal>
-            <h2 class="bk-card__title" data-i18n="bkd_status_title">Booking Status</h2>
-            <ol class="bk-timeline" id="bkTimeline" aria-label="Booking progress">
-              <!-- Populated by JS -->
-            </ol>
-          </div>
+          <section class="bk-card bk-card--next" aria-labelledby="bkNextTitle">
+            <p class="bk-card__kicker">What happens next</p>
+            <h2 id="bkNextTitle">Technician response pending</h2>
+            <p id="bkNextBody">Most technicians respond within 30 minutes.</p>
+          </section>
 
-          <!-- Technician Card -->
-          <div class="bk-card" data-reveal>
-            <h2 class="bk-card__title" data-i18n="bkd_tech_title">Your Technician</h2>
+          <section class="bk-card" aria-labelledby="bkTechTitle">
+            <div class="bk-card__head">
+              <div>
+                <p class="bk-card__kicker">Trusted professional</p>
+                <h2 id="bkTechTitle" data-i18n="bkd_tech_title">Your Technician</h2>
+              </div>
+              <span class="bk-verified-pill">SERVIO verified</span>
+            </div>
+
             <div class="bk-tech">
-              <div class="bk-tech__avatar" id="bkTechInitials" aria-hidden="true">HA</div>
+              <div class="bk-tech__avatar">
+                <img id="bkTechAvatarImg" src="" alt="" hidden />
+                <span id="bkTechInitials" aria-hidden="true">T</span>
+              </div>
               <div class="bk-tech__info">
-                <div class="bk-tech__name" id="bkTechName">Hassan Ali</div>
-                <div class="bk-tech__specialty" id="bkTechSpecialty" data-i18n="tech_role_hvac">HVAC Specialist</div>
-                <div class="bk-tech__rating" aria-label="Rating">
-                  <span class="bk-tech__stars" aria-hidden="true">★★★★★</span>
-                  <div class="bk-tech__rating-summary">
-                    <span class="bk-tech__rating-val" id="bkTechRating">4.9</span>
-                    <span class="bk-tech__rating-max" data-i18n="bkd_out_of_5">out of 5</span>
-                  </div>
+                <h3 id="bkTechnicianName">Technician</h3>
+                <p id="bkTechSpecialty">Verified professional</p>
+                <div class="bk-tech__rating">
+                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                  <span id="bkTechRating">New technician</span>
                 </div>
               </div>
             </div>
-            <div class="bk-tech__actions">
-              <a href="./messages.html" class="btn btn--outline bk-tech__btn" id="bkMsgLink">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                </svg>
+
+            <div class="bk-tech-actions">
+              <a class="btn btn--outline bk-action-inline" id="bkMsgLink" href="./messages.html">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
                 <span data-i18n="bkd_msg_tech">Message Technician</span>
               </a>
-              <a href="tel:+201000000000" class="btn btn--outline bk-tech__btn" id="bkCallLink">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.62 3.38 2 2 0 0 1 3.6 1.21h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.91a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 16z"/>
-                </svg>
+              <a class="btn btn--outline bk-action-inline" id="bkCallLink" href="tel:+201000000000">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.62 3.38 2 2 0 0 1 3.6 1.21h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.91a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 16z"></path></svg>
                 <span data-i18n="bkd_call">Call</span>
               </a>
             </div>
-          </div>
+          </section>
 
-          <!-- Job Details -->
-          <div class="bk-card" data-reveal>
-            <h2 class="bk-card__title" data-i18n="bkd_job_title">Job Details</h2>
-            <dl class="bk-details">
-              <div class="bk-details__row">
-                <dt data-i18n="bkd_dt_service">Service</dt>
-                <dd id="bkCategory">HVAC Maintenance</dd>
+          <section class="bk-card" aria-labelledby="bkJobTitle">
+            <div class="bk-card__head">
+              <div>
+                <p class="bk-card__kicker">Appointment record</p>
+                <h2 id="bkJobTitle" data-i18n="bkd_job_title">Job Details</h2>
               </div>
-              <div class="bk-details__row">
-                <dt data-i18n="bkd_dt_location">Location</dt>
-                <dd id="bkLocation">12 Nile View St, Maadi, Cairo</dd>
-              </div>
-              <div class="bk-details__row">
-                <dt data-i18n="bkd_dt_scheduled">Scheduled</dt>
-                <dd id="bkScheduledDate">Thu, 27 Mar 2026</dd>
-              </div>
-              <div class="bk-details__row">
-                <dt data-i18n="bkd_dt_timeslot">Time Slot</dt>
-                <dd id="bkScheduledTime">2:00 PM – 4:00 PM</dd>
-              </div>
-              <div class="bk-details__row">
-                <dt data-i18n="bkd_dt_duration">Duration</dt>
-                <dd id="bkDuration">~2 hours</dd>
-              </div>
-              <div class="bk-details__row">
-                <dt data-i18n="bkd_dt_payment">Payment</dt>
-                <dd id="bkPaymentMethodDetail">Online Card</dd>
-              </div>
-            </dl>
-          </div>
-
-        </div><!-- /bk-main -->
-
-        <!-- ═══════════ RIGHT COLUMN (ASIDE) ═══════════ -->
-        <div class="bk-aside">
-
-          <!-- PIN Card -->
-          <div class="bk-pin-card" data-reveal>
-            <div class="bk-pin-card__icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-              </svg>
             </div>
-            <div class="bk-pin-card__label" id="bkPinLabel" data-i18n="bkd_pin_label">Your Arrival PIN</div>
-            <div class="bk-pin-card__digits" id="bkPin" data-i18n-aria-label="bk_arrival_pin_label">7 4 2 9</div>
-            <p class="bk-pin-card__help" data-i18n="bkd_pin_help">Give this to your technician when they arrive</p>
-          </div>
-
-          <!-- Payment Summary -->
-          <div class="bk-card" data-reveal>
-            <h2 class="bk-card__title" data-i18n="bkd_payment_title">Payment Summary</h2>
             <dl class="bk-details">
-              <div class="bk-details__row">
-                <dt data-i18n="bkd_dt_method">Method</dt>
-                <dd id="bkPaySummaryMethod">Online Card</dd>
-              </div>
-              <div class="bk-details__row">
-                <dt data-i18n="bkd_dt_amount">Amount</dt>
-                <dd id="bkPayAmount"><strong>EGP 450</strong></dd>
-              </div>
-              <div class="bk-details__row">
-                <dt data-i18n="bkd_dt_status">Status</dt>
-                <dd>
-                  <span class="bk-pay-status" id="bkPayStatus" data-i18n="bk_deposit_paid">Deposit Paid</span>
-                </dd>
-              </div>
+              <div><dt data-i18n="bkd_dt_service">Service</dt><dd id="bkCategory">-</dd></div>
+              <div><dt data-i18n="bkd_dt_location">Location</dt><dd id="bkLocation">-</dd></div>
+              <div><dt data-i18n="bkd_dt_scheduled">Scheduled</dt><dd id="bkScheduledDate">-</dd></div>
+              <div><dt data-i18n="bkd_dt_timeslot">Time Slot</dt><dd id="bkScheduledTime">-</dd></div>
+              <div><dt data-i18n="bkd_dt_duration">Duration</dt><dd id="bkDuration">-</dd></div>
+              <div><dt data-i18n="bkd_dt_payment">Payment</dt><dd id="bkPaymentMethodDetail">-</dd></div>
+              <div class="bk-details__notes"><dt>Customer Notes</dt><dd id="bkDescription">-</dd></div>
             </dl>
+          </section>
+        </div>
+
+        <aside class="bk-aside">
+          <section class="bk-pin-card" id="bkPinCard" aria-labelledby="bkPinLabel">
+            <div class="bk-pin-card__top">
+              <span class="bk-pin-card__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+              </span>
+              <span class="bk-pin-state" id="bkPinState">Locked</span>
+            </div>
+            <p class="bk-card__kicker">Secure verification</p>
+            <h2 id="bkPinLabel" data-i18n="bkd_pin_label">Your Arrival PIN</h2>
+            <div class="bk-pin-value" id="bkPinValue" aria-live="polite">PIN locked</div>
+            <p id="bkPinHelp">The PIN unlocks when your technician arrives.</p>
+            <button class="btn btn--primary btn--full" type="button" id="bkRevealPinBtn" hidden>Reveal PIN</button>
+          </section>
+
+          <section class="bk-card" aria-labelledby="bkPaymentTitle">
+            <div class="bk-card__head">
+              <div>
+                <p class="bk-card__kicker">Payment clarity</p>
+                <h2 id="bkPaymentTitle" data-i18n="bkd_payment_title">Payment Summary</h2>
+              </div>
+            </div>
+            <dl class="bk-details bk-details--payment">
+              <div><dt data-i18n="bkd_dt_method">Method</dt><dd id="bkPaySummaryMethod">-</dd></div>
+              <div><dt>Base rate</dt><dd id="bkPayBase">-</dd></div>
+              <div><dt>Platform fee</dt><dd id="bkPayFee">-</dd></div>
+              <div class="bk-details__total"><dt data-i18n="bkd_dt_amount">Estimated total</dt><dd id="bkPayAmount">-</dd></div>
+              <div><dt data-i18n="bkd_dt_status">Status</dt><dd><span class="bk-pay-status" id="bkPayStatus">-</span></dd></div>
+            </dl>
+            <p class="bk-note" id="bkPaymentNote">Final price may change if approved parts or extra work are required.</p>
+
+          <!-- Escrow action bar — shown for awaiting_customer_confirmation -->
+          <div id="bkEscrowActions" class="bk-escrow-actions" hidden>
+            <!-- populated by JS -->
           </div>
 
-          <!-- Booking Actions -->
-          <div class="bk-card" data-reveal>
-            <h2 class="bk-card__title" data-i18n="bkd_actions_title">Booking Actions</h2>
+          <!-- Failed hold retry banner -->
+          <div id="bkRetryPayment" class="bk-retry-payment" hidden>
+            <p class="bk-retry-payment__msg">Your payment could not be processed.</p>
+            <button id="bkRetryBtn" class="btn btn--primary btn--sm">Retry Payment</button>
+          </div>
+          </section>
+
+          <section class="bk-card" aria-labelledby="bkActionsTitle">
+            <div class="bk-card__head">
+              <div>
+                <p class="bk-card__kicker">Manage booking</p>
+                <h2 id="bkActionsTitle" data-i18n="bkd_actions_title">Booking Actions</h2>
+              </div>
+            </div>
             <div class="bk-actions">
-              <button type="button" class="btn btn--outline-danger bk-action-btn" id="bkCancelBtn">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
-                </svg>
+              <button type="button" class="btn btn--outline-danger btn--full" id="bkCancelBtn">
                 <span data-i18n="bkd_cancel">Cancel Booking</span>
               </button>
-              <button type="button" class="btn btn--outline bk-action-btn" id="bkRescheduleBtn">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-                </svg>
+              <button type="button" class="btn btn--outline btn--full" id="bkRescheduleBtn">
                 <span data-i18n="bkd_reschedule">Reschedule</span>
               </button>
-              <button type="button" class="btn btn--outline bk-action-btn" id="bkReceiptBtn">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="7 10 12 15 17 10"/>
-                  <line x1="12" y1="15" x2="12" y2="3"/>
-                </svg>
+              <button type="button" class="btn btn--outline btn--full" id="bkReceiptBtn">
                 <span data-i18n="bkd_download_receipt">Download Receipt</span>
               </button>
             </div>
-          </div>
+            <p class="bk-policy" id="bkPolicyText">Free cancellation while the request is awaiting confirmation.</p>
+          </section>
 
-        </div><!-- /bk-aside -->
-
-      </div><!-- /bk-grid -->
-    </div><!-- /bkContent -->
-
+          <section class="bk-card bk-support-card" aria-label="Support">
+            <p class="bk-card__kicker">Need help?</p>
+            <h2>Support is available 24/7</h2>
+            <div class="bk-support-actions">
+              <a href="tel:+201000000000" id="bkSupportCall">Call Support</a>
+              <a href="./messages.html">Chat with Support</a>
+              <a href="./contact.html">Report an Issue</a>
+            </div>
+          </section>
+        </aside>
+      </div>
+    </div>
   </main>
 
-  <!-- ══════════════════════════ MOBILE STICKY BAR ══════════════════════════ -->
-  <div class="bk-mobile-bar" id="bkMobileBar" role="complementary" aria-label="Quick contact">
+  <div class="bk-mobile-bar" id="bkMobileBar" role="complementary" aria-label="Booking quick action" hidden>
     <div class="bk-mobile-bar__info">
-      <div class="bk-mobile-bar__avatar" id="bkBarInitials" aria-hidden="true">HA</div>
-      <span class="bk-mobile-bar__name" id="bkBarName">Hassan Ali</span>
+      <span class="bk-mobile-bar__avatar" id="bkBarInitials" aria-hidden="true">T</span>
+      <span class="bk-mobile-bar__name" id="bkBarName">Technician</span>
     </div>
-    <a href="./messages.html" class="btn btn--primary bk-mobile-bar__msg" id="bkBarMsgLink">
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-      </svg>
-      <span data-i18n="bkd_mobile_msg">Message</span>
-    </a>
+    <button class="btn btn--primary" type="button" id="bkMobilePrimary">Message Technician</button>
   </div>
 
-  <!-- ══════════════════════════ CANCEL DIALOG ══════════════════════════ -->
   <div class="bk-dialog-overlay" id="bkCancelDialog" role="dialog" aria-modal="true" aria-labelledby="bkDialogTitle" hidden>
     <div class="bk-dialog">
-      <div class="bk-dialog__icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-          <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-        </svg>
-      </div>
-      <h2 class="bk-dialog__title" id="bkDialogTitle" data-i18n="bkd_dialog_cancel_title">Cancel Booking?</h2>
-      <p class="bk-dialog__body" id="bkDialogBody"><span data-i18n="bk_cancel_confirm_prefix">Are you sure you want to cancel booking</span> <strong id="bkDialogId">S-2848</strong><span data-i18n="bk_cancel_confirm_suffix">? This action cannot be undone.</span></p>
+      <div class="bk-dialog__icon bk-dialog__icon--danger" aria-hidden="true">!</div>
+      <h2 id="bkDialogTitle" data-i18n="bkd_dialog_cancel_title">Cancel Booking?</h2>
+      <p><span data-i18n="bk_cancel_confirm_prefix">Are you sure you want to cancel booking</span> <strong id="bkDialogId">-</strong><span data-i18n="bk_cancel_confirm_suffix">? This action cannot be undone.</span></p>
+      <label class="bk-cancel-reason" for="bkCancelReason">
+        <span>Cancellation reason</span>
+        <select id="bkCancelReason">
+          <option value="Schedule changed">Schedule changed</option>
+          <option value="Booked by mistake">Booked by mistake</option>
+          <option value="Technician did not respond">Technician did not respond</option>
+          <option value="Other">Other</option>
+        </select>
+      </label>
       <div class="bk-dialog__actions">
-        <button type="button" class="btn--ghost" id="bkDialogKeep" data-i18n="bkd_dialog_keep">Keep Booking</button>
-        <button type="button" class="btn--danger" id="bkDialogConfirm" data-i18n="bkd_dialog_yes_cancel">Yes, Cancel</button>
+        <button type="button" class="btn btn--outline" id="bkDialogKeep" data-i18n="bkd_dialog_keep">Keep Booking</button>
+        <button type="button" class="btn btn--danger" id="bkDialogConfirm" data-i18n="bkd_dialog_yes_cancel">Yes, Cancel</button>
       </div>
     </div>
   </div>
 
-  <!-- ══════════════════════════ RESCHEDULE DIALOG ══════════════════════════ -->
   <div class="bk-dialog-overlay" id="bkRescheduleDialog" role="dialog" aria-modal="true" aria-labelledby="bkRsDialogTitle" hidden>
     <div class="bk-dialog">
-      <div class="bk-dialog__icon bk-dialog__icon--info" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
-          <line x1="3" y1="10" x2="21" y2="10"/>
-        </svg>
+      <div class="bk-dialog__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M16 2v4M8 2v4M3 10h18"></path></svg>
       </div>
-      <h2 class="bk-dialog__title" id="bkRsDialogTitle" data-i18n="bkd_dialog_rs_title">Reschedule Booking</h2>
-      <p class="bk-dialog__body" data-i18n="bkd_dialog_rs_body">Select a new date and time that works best for you.</p>
-
+      <h2 id="bkRsDialogTitle" data-i18n="bkd_dialog_rs_title">Reschedule Booking</h2>
+      <p data-i18n="bkd_dialog_rs_body">Select a new date and time that works best for you.</p>
       <div class="bk-form-group">
         <label class="bk-label" for="newBookingDate" data-i18n="bkd_new_date">New Date</label>
         <input type="date" id="newBookingDate" class="bk-input" />
       </div>
-
       <div class="bk-form-group">
         <label class="bk-label" for="newBookingSlot" data-i18n="bkd_new_slot">New Time Slot</label>
-        <div class="bk-select-wrap">
-          <select id="newBookingSlot" class="bk-input bk-select">
-            <option value="8:00 AM – 10:00 AM">8:00 AM – 10:00 AM</option>
-            <option value="10:00 AM – 12:00 PM">10:00 AM – 12:00 PM</option>
-            <option value="12:00 PM – 2:00 PM">12:00 PM – 2:00 PM</option>
-            <option value="2:00 PM – 4:00 PM" selected>2:00 PM – 4:00 PM</option>
-            <option value="4:00 PM – 6:00 PM">4:00 PM – 6:00 PM</option>
-          </select>
-        </div>
+        <select id="newBookingSlot" class="bk-input">
+          <option value="08:00">8:00 AM</option>
+          <option value="09:00">9:00 AM</option>
+          <option value="10:00">10:00 AM</option>
+          <option value="11:00">11:00 AM</option>
+          <option value="12:00">12:00 PM</option>
+          <option value="13:00">1:00 PM</option>
+          <option value="14:00">2:00 PM</option>
+          <option value="15:00">3:00 PM</option>
+          <option value="16:00">4:00 PM</option>
+          <option value="17:00">5:00 PM</option>
+        </select>
       </div>
-
       <div class="bk-dialog__actions">
-        <button type="button" class="btn--ghost" id="bkRsDialogCancel" data-i18n="bkd_keep_existing">Keep Existing</button>
-        <button type="button" class="btn btn--primary" id="bkRsDialogConfirm" style="padding: 0.65rem 1.5rem" data-i18n="bkd_confirm_slot">Confirm New Slot</button>
+        <button type="button" class="btn btn--outline" id="bkRsDialogCancel" data-i18n="bkd_keep_existing">Keep Existing</button>
+        <button type="button" class="btn btn--primary" id="bkRsDialogConfirm" data-i18n="bkd_confirm_slot">Confirm New Slot</button>
       </div>
     </div>
   </div>
 
-  <!-- ══════════════════════════ TOAST CONTAINER ══════════════════════════ -->
   <div class="bk-toast-wrap" id="bkToastWrap" aria-live="polite" aria-atomic="true"></div>
 
-  <!-- ══════════════════════════ FOOTER ══════════════════════════ -->
   <footer class="site-footer">
     <div class="container footer__grid">
       <div class="footer__brand-col">
@@ -404,7 +378,6 @@
         <h3 class="footer__title" data-i18n="footer_contact_us">Contact Us</h3>
         <address class="footer__address">
           <p data-i18n="footer_city">Cairo, Egypt</p>
-
           <p data-i18n="footer_phone">Phone: +20 100 000 0000</p>
           <p data-i18n-html="footer_email">Email: hello@servio.eg</p>
         </address>
@@ -412,24 +385,16 @@
       <div class="footer__nav-col">
         <h3 class="footer__title" data-i18n="footer_follow_us">Follow Us</h3>
         <div class="footer__socials">
-          <a href="#" class="social-link" aria-label="Facebook">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg>
-          </a>
-          <a href="#" class="social-link" aria-label="Twitter">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"></path></svg>
-          </a>
-          <a href="#" class="social-link" aria-label="Instagram">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
-          </a>
-          <a href="#" class="social-link" aria-label="LinkedIn">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path><rect x="2" y="9" width="4" height="12"></rect><circle cx="4" cy="4" r="2"></circle></svg>
-          </a>
+          <a href="#" class="social-link" aria-label="Facebook"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg></a>
+          <a href="#" class="social-link" aria-label="Twitter"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"></path></svg></a>
+          <a href="#" class="social-link" aria-label="Instagram"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg></a>
+          <a href="#" class="social-link" aria-label="LinkedIn"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path><rect x="2" y="9" width="4" height="12"></rect><circle cx="4" cy="4" r="2"></circle></svg></a>
         </div>
       </div>
     </div>
     <div class="container footer__bottom-wrapper">
       <div class="footer__bottom">
-        <p class="footer__fineprint" data-i18n="footer_rights">© <span id="year">2026</span> SERVIO. All rights reserved.</p>
+        <p class="footer__fineprint" data-i18n="footer_rights">Â© <span id="year">2026</span> SERVIO. All rights reserved.</p>
         <div class="footer__bottom-links">
           <a href="#" class="footer__small-link" data-i18n="footer_privacy">Privacy Policy</a>
           <a href="#" class="footer__small-link" data-i18n="footer_terms">Terms of Service</a>
@@ -439,11 +404,8 @@
     </div>
   </footer>
 
-  <!-- ══════════════════════════ SCRIPTS ══════════════════════════ -->
   <script src="../js/lang.js"></script>
   <script type="module" src="../js/main.js"></script>
   <script type="module" src="../js/html/booking-details.js"></script>
 </body>
 </html>
-
-<!-- . -->

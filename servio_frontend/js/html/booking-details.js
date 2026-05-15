@@ -6,10 +6,9 @@
     const currentPage = currentPath.substring(currentPath.lastIndexOf('/') + 1) || 'index.html';
     const redirectParam = encodeURIComponent('./' + currentPage + window.location.search);
     window.location.href = './login.html?redirect=' + redirectParam;
-    throw new Error('Unauthenticated — redirecting to login');
+    throw new Error('Unauthenticated - redirecting to login');
   }
 
-  // ── Role Guard ──────────────────────────────────────────
   if (session.role === 'admin') {
     window.location.href = './admin-dashboard.html';
   } else if (session.role === 'technician') {
@@ -17,602 +16,1027 @@
   }
 })();
 
-import { getBooking, cancelBooking } from '../api/bookings.js';
+import { getBooking, cancelBooking, rescheduleBooking } from '../api/bookings.js';
+import { snapshotFeeFromBooking, formatMoney as formatFeeMoney, paymentMethodLabel } from '../utils/fee.js';
+import { holdPayment, confirmCompletion, openDispute } from '../api/payments.js';
+import { openCardPickerModal } from '../components/card-picker-modal.js';
 
-// ─── Service name → i18n key map ─────────────────────────────────────────────
-const SERVICE_KEY_MAP = {
-  'pipe repair & leak fix':      'booking_svc_pipe_repair',
-  'drain cleaning':              'booking_svc_drain',
-  'fixture installation':        'booking_svc_fixture',
-  'water heater service':        'booking_svc_water_heater',
-  'full plumbing inspection':    'booking_svc_inspection',
-  'emergency callout':           'booking_svc_emergency',
-  'hvac maintenance':            'home_cat_hvac_maintenance',
-  'a/c maintenance & hvac':      'home_cat_hvac',
-  'plumbing':                    'home_cat_plumbing',
-  'electrical':                  'home_cat_electrical',
-  'professional cleaning':       'home_cat_cleaning',
-  'painting':                    'home_cat_painting',
-  'carpentry':                   'home_cat_carpentry',
-  'appliance services':          'home_cat_appliance',
-  'handyman tasks':              'home_cat_handyman',
-  'home finishing & renovation': 'home_cat_renovation',
-  'flooring':                    'home_cat_flooring',
-  'drywall':                     'home_cat_drywall',
-  'roofing':                     'home_cat_roofing',
-  'pest control':                'home_cat_pest',
-  'landscaping':                 'home_cat_landscaping',
-  'installation services':       'home_cat_installation',
+const POLL_MS = 45000;
+const FINAL_STATUSES = new Set(['completed', 'cancelled', 'rejected', 'disputed']);
+const TRACKER_STEPS = ['pending', 'accepted', 'en_route', 'arrived', 'in_progress', 'completed'];
+const ACTIVE_STATUSES = new Set(['pending', 'accepted', 'en_route', 'arrived', 'in_progress']);
+const CANCELLABLE_STATUSES = new Set(['pending']);
+const RESCHEDULABLE_STATUSES = new Set(['pending', 'accepted']);
+
+const STATUS_UI = {
+  pending: {
+    label: 'Request Sent',
+    eyebrow: 'Awaiting technician confirmation',
+    body: 'Your request is reserved while the technician confirms availability.',
+    badge: 'warning',
+    nextTitle: 'Technician response pending',
+    nextBody: 'Most technicians respond within 30 minutes. If the window passes, support can help you find another professional.',
+    primary: 'Message Technician',
+    policy: 'Free cancellation while the request is awaiting confirmation.',
+  },
+  accepted: {
+    label: 'Booking Confirmed',
+    eyebrow: 'Technician assigned',
+    body: 'Your technician confirmed the appointment and will update the trip status here.',
+    badge: 'success',
+    nextTitle: 'Technician preparing',
+    nextBody: 'You will see live updates when the technician starts heading to your address.',
+    primary: 'Message Technician',
+    policy: 'You can reschedule before the technician starts travelling.',
+  },
+  en_route: {
+    label: 'Technician On The Way',
+    eyebrow: 'Live arrival update',
+    body: 'Keep your phone nearby and keep the Arrival PIN private until arrival.',
+    badge: 'warning',
+    nextTitle: 'Arrival is next',
+    nextBody: 'The PIN unlocks only after the technician marks arrival. Do not share it by phone or chat.',
+    primary: 'Call Technician',
+    policy: 'Self-service cancellation is closed. Contact support if there is a problem.',
+  },
+  arrived: {
+    label: 'Technician Arrived',
+    eyebrow: 'Verify before work starts',
+    body: 'Reveal the Arrival PIN only after confirming the technician is physically at your door.',
+    badge: 'warning',
+    nextTitle: 'Verify arrival',
+    nextBody: 'After the technician enters the PIN, the job clock starts and the booking moves to in progress.',
+    primary: 'Reveal PIN',
+    policy: 'The technician has arrived. Contact support for cancellation or safety issues.',
+  },
+  in_progress: {
+    label: 'Job In Progress',
+    eyebrow: 'PIN verified',
+    body: 'The PIN was verified and the service is underway.',
+    badge: 'warning',
+    nextTitle: 'Service underway',
+    nextBody: 'Use messages for job details and support if anything changes during the visit.',
+    primary: 'Message Technician',
+    policy: 'This job is in progress. Support can help with urgent issues.',
+  },
+  completed: {
+    label: 'Service Complete',
+    eyebrow: 'Booking completed',
+    body: 'Your service is complete. Review the final details and download your receipt.',
+    badge: 'success',
+    nextTitle: 'Review and receipt',
+    nextBody: 'Keep the receipt for your records. Final price can include approved parts or extra work.',
+    primary: 'Download Receipt',
+    policy: 'Completed bookings cannot be cancelled.',
+  },
+  cancelled: {
+    label: 'Booking Cancelled',
+    eyebrow: 'No visit scheduled',
+    body: 'This booking has been cancelled.',
+    badge: 'danger',
+    nextTitle: 'Booking cancelled',
+    nextBody: 'No technician will be dispatched for this booking.',
+    primary: 'Book Another Service',
+    policy: 'This booking is already cancelled.',
+  },
+  rejected: {
+    label: 'Request Declined',
+    eyebrow: 'Technician unavailable',
+    body: 'The technician could not accept this request.',
+    badge: 'danger',
+    nextTitle: 'Find another technician',
+    nextBody: 'Start a new booking or contact support to choose another available professional.',
+    primary: 'Book Another Service',
+    policy: 'Declined requests cannot be cancelled.',
+  },
+  disputed: {
+    label: 'Booking Under Review',
+    eyebrow: 'Support case active',
+    body: 'SERVIO support is reviewing this booking.',
+    badge: 'danger',
+    nextTitle: 'Support review active',
+    nextBody: 'Keep messages and receipt details available while support reviews the case.',
+    primary: 'Contact Support',
+    policy: 'This booking is under review. Contact support for next steps.',
+  },
+  awaiting_customer_confirmation: {
+    label:   'Awaiting Confirmation',
+    badge:   'warning',
+    primary: 'Confirm Complete',
+    body:    'Your technician has finished. Please confirm the job is complete or report an issue.',
+  },
+  pending_admin_review: {
+    label:   'Under Review',
+    badge:   'info',
+    primary: null,
+    body:    null,
+  },
 };
 
-// ─── Timeline step definitions ──────────────────────────────────────────────
-function getSteps() {
-  const t = (window.t || function(k){ return k; });
-  return [
-    { key: 'Booked',      labelKey: 'bkd_step_booked',      subKey: 'bkd_step_booked_sub' },
-    { key: 'Confirmed',   labelKey: 'bkd_step_confirmed',   subKey: 'bkd_step_confirmed_sub' },
-    { key: 'En Route',    labelKey: 'bkd_step_enroute',     subKey: 'bkd_step_enroute_sub' },
-    { key: 'Arrived',     labelKey: 'bkd_step_arrived',     subKey: 'bkd_step_arrived_sub' },
-    { key: 'In Progress', labelKey: 'bkd_step_inprogress',  subKey: 'bkd_step_inprogress_sub' },
-    { key: 'Complete',    labelKey: 'bkd_step_complete',    subKey: 'bkd_step_complete_sub' }
-  ].map(s => ({ ...s, label: t(s.labelKey), sub: t(s.subKey) }));
+let booking = null;
+let pollTimer = null;
+let lastUpdatedAt = Date.now();
+let pinRevealed = false;
+let lastFocus = null;
+
+const $ = (id) => document.getElementById(id);
+
+function t(key, fallback) {
+  return typeof window.t === 'function' ? window.t(key) || fallback : fallback;
 }
 
-// Status → badge CSS modifier
-const STATUS_CLASS = {
-  'Booked':      'bk-status-badge--booked',
-  'Confirmed':   'bk-status-badge--confirmed',
-  'En Route':    'bk-status-badge--en-route',
-  'Arrived':     'bk-status-badge--confirmed',
-  'In Progress': 'bk-status-badge--in-progress',
-  'Complete':    'bk-status-badge--complete',
-  'Cancelled':   'bk-status-badge--cancelled',
-};
+function setText(id, value) {
+  const el = $(id);
+  if (el) el.textContent = safeText(value);
+}
 
-// ─── DOM refs ────────────────────────────────────────────────────────────────
-const bkEmptyState     = document.getElementById('bkEmptyState');
-const bkContent        = document.getElementById('bkContent');
-const bkMobileBar      = document.getElementById('bkMobileBar');
+function safeText(value, fallback = '-') {
+  if (value === null || value === undefined || value === '') return fallback;
+  if (typeof value === 'string' || typeof value === 'number') return String(value);
+  if (Array.isArray(value)) return value.map((item) => safeText(item, '')).filter(Boolean).join(', ') || fallback;
+  if (typeof value === 'object') return value.label || value.name || value.title || value.city || value.address || fallback;
+  return fallback;
+}
 
-const bkId             = document.getElementById('bkId');
-const bkService        = document.getElementById('bkService');
-const bkDate           = document.getElementById('bkDate');
-const bkTime           = document.getElementById('bkTime');
-const bkStatusBadge    = document.getElementById('bkStatusBadge');
-const bkStatusText     = document.getElementById('bkStatusText');
+function isObjectId(value) {
+  return /^[a-f0-9]{24}$/i.test(String(value || ''));
+}
 
-const bkTimeline       = document.getElementById('bkTimeline');
+function getBookingId(bk = booking) {
+  const id = bk?._id || bk?.bookingId || bk?.id;
+  return isObjectId(id) ? String(id) : '';
+}
 
-const bkTechInitials   = document.getElementById('bkTechInitials');
-const bkTechName       = document.getElementById('bkTechName');
-const bkTechSpecialty  = document.getElementById('bkTechSpecialty');
-const bkTechRating     = document.getElementById('bkTechRating');
-const bkCallLink       = document.getElementById('bkCallLink');
+function getDisplayId(bk = booking) {
+  return safeText(bk?.reference || bk?.bookingRef || bk?._id || bk?.id, '-');
+}
 
-const bkCategory       = document.getElementById('bkCategory');
-const bkLocation       = document.getElementById('bkLocation');
-const bkScheduledDate  = document.getElementById('bkScheduledDate');
-const bkScheduledTime  = document.getElementById('bkScheduledTime');
-const bkDuration       = document.getElementById('bkDuration');
-const bkPaymentMethodDetail = document.getElementById('bkPaymentMethodDetail');
-
-const bkPin            = document.getElementById('bkPin');
-const bkPaySummaryMethod = document.getElementById('bkPaySummaryMethod');
-const bkPayAmount      = document.getElementById('bkPayAmount');
-const bkPayStatus      = document.getElementById('bkPayStatus');
-
-const bkBarInitials    = document.getElementById('bkBarInitials');
-const bkBarName        = document.getElementById('bkBarName');
-
-const bkCancelBtn      = document.getElementById('bkCancelBtn');
-const bkRescheduleBtn  = document.getElementById('bkRescheduleBtn');
-const bkReceiptBtn     = document.getElementById('bkReceiptBtn');
-
-const bkCancelDialog   = document.getElementById('bkCancelDialog');
-const bkDialogId       = document.getElementById('bkDialogId');
-const bkDialogKeep     = document.getElementById('bkDialogKeep');
-const bkDialogConfirm  = document.getElementById('bkDialogConfirm');
-
-const bkToastWrap      = document.getElementById('bkToastWrap');
-const bkCancelledBannerWrap = document.getElementById('bkCancelledBannerWrap');
-
-// ─── Map API status → display status ─────────────────────────────────────────
-function mapApiStatus(s) {
+function getStatus(bk = booking) {
+  const raw = String(bk?.rawStatus || bk?.status || 'pending').toLowerCase().replace(/\s+/g, '_');
   const map = {
-    pending:     'Booked',
-    accepted:    'Confirmed',
-    in_progress: 'In Progress',
-    completed:   'Complete',
-    cancelled:   'Cancelled',
-    rejected:    'Cancelled',
+    booked: 'pending',
+    confirmed: 'accepted',
+    complete: 'completed',
+    cancelled: 'cancelled',
   };
-  return map[s] || s || 'Booked';
+  return map[raw] || raw;
 }
 
-// ─── Map an API booking object → the shape renderPage expects ─────────────────
-function mapApiBooking(b) {
-  const workerName     = b.worker?.name || '';
-  const workerInitials = workerName
-    ? workerName.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
-    : 'T';
-
-  // Derive specialty from worker's categories/skills list
-  const workerSkills = b.worker?.categories || b.worker?.skills || [];
-  const workerSpecialty = Array.isArray(workerSkills) && workerSkills.length
-    ? workerSkills[0]
-    : (b.worker?.specialty || b.service?.category || '—');
-
-  return {
-    id:            b._id,
-    _id:           b._id,
-    service:       b.service?.title || b.serviceId || 'Service',
-    category:      b.service?.category || b.service?.title || '',
-    status:        mapApiStatus(b.status),
-    rawStatus:     b.status,
-    date:          b.scheduledDate
-      ? new Date(b.scheduledDate).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })
-      : '—',
-    scheduledDate: b.scheduledDate
-      ? new Date(b.scheduledDate).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })
-      : '—',
-    time:          b.scheduledTime || '—',
-    scheduledTime: b.scheduledTime || '—',
-    duration:      b.duration || '—',
-    location:      b.address || '—',
-    paymentMethod: b.paymentMethod === 'cash' ? 'Cash' : 'Online Payment',
-    paymentAmount: b.totalPrice != null
-      ? `EGP ${Number(b.totalPrice).toLocaleString('en-US')}`
-      : (b.amount != null ? `EGP ${(b.amount / 100).toFixed(2)}` : '—'),
-    paymentStatus: b.paymentStatus || 'Pending',
-    pin:           b.pin || '—',
-    technician: {
-      name:      workerName || '—',
-      initials:  workerInitials,
-      specialty: workerSpecialty,
-      rating:    b.worker?.averageRating != null ? Number(b.worker.averageRating).toFixed(1) : '—',
-      phone:     b.worker?.phone || '',
-    },
-  };
+function getWorker(bk = booking) {
+  return bk?.worker || bk?.technician || {};
 }
 
-// ─── Show skeleton while loading ──────────────────────────────────────────────
-function showSkeleton() {
-  bkEmptyState.style.display = 'none';
-  bkContent.style.display    = 'block';
-
-  const skeletonText = '—';
-  if (bkId)            bkId.textContent           = '…';
-  if (bkService)       bkService.textContent       = '…';
-  if (bkDate)          bkDate.textContent          = '…';
-  if (bkTime)          bkTime.textContent          = '…';
-  if (bkTechName)      bkTechName.textContent      = '…';
-  if (bkTechInitials)  bkTechInitials.textContent  = '…';
-  if (bkTechSpecialty) bkTechSpecialty.textContent = '…';
-  if (bkTechRating)    bkTechRating.textContent    = '…';
-  if (bkLocation)      bkLocation.textContent      = '…';
-  if (bkPayAmount)     bkPayAmount.textContent     = '…';
+function getWorkerName(bk = booking) {
+  const worker = getWorker(bk);
+  return safeText(worker.name || bk?.workerName || bk?.technicianName, 'Technician');
 }
 
-// ─── Show empty state when no booking is available ────────────────────────────
-function showEmptyState() {
-  bkContent.style.display    = 'none';
-  bkEmptyState.style.display = '';
-  // If empty state has a CTA link, ensure it navigates to the dashboard
-  const cta = bkEmptyState.querySelector('a, button[data-href]');
-  if (cta && !cta.href) cta.href = './customer-dashboard.html';
+function getWorkerPhone(bk = booking) {
+  const worker = getWorker(bk);
+  return safeText(worker.phone || bk?.workerPhone, '');
 }
 
-// ─── Date/Time Translation Helper ─────────────────────────────────────────────
-function translateDateTime(str) {
-  if (!str) return '—';
-  const lang = localStorage.getItem('servio_lang') || 'en';
-  if (lang !== 'ar') return str;
-
-  const monthsMap = {
-    'Jan': 'يناير', 'Feb': 'فبراير', 'Mar': 'مارس', 'Apr': 'أبريل',
-    'May': 'مايو', 'Jun': 'يونيو', 'Jul': 'يوليو', 'Aug': 'أغسطس',
-    'Sep': 'سبتمبر', 'Oct': 'أكتوبر', 'Nov': 'نوفمبر', 'Dec': 'ديسمبر',
-    'January': 'يناير', 'February': 'فبراير', 'March': 'مارس', 'April': 'أبريل',
-    'June': 'يونيو', 'July': 'يوليو', 'August': 'أغسطس',
-    'September': 'سبتمبر', 'October': 'أكتوبر', 'November': 'نوفمبر', 'December': 'ديسمبر',
-    'Sun': 'الأحد', 'Mon': 'الاثنين', 'Tue': 'الثلاثاء', 'Wed': 'الأربعاء',
-    'Thu': 'الخميس', 'Fri': 'الجمعة', 'Sat': 'السبت',
-  };
-  const ampmMap = { 'AM': 'صباحاً', 'PM': 'مساءً' };
-
-  let res = str;
-  Object.keys(monthsMap).forEach(k => { res = res.replace(new RegExp('\\b' + k + '\\b', 'g'), monthsMap[k]); });
-  Object.keys(ampmMap).forEach(k => { res = res.replace(new RegExp('\\b' + k + '\\b', 'g'), ampmMap[k]); });
-  return res;
+function getServiceName(bk = booking) {
+  return safeText(bk?.serviceName || bk?.service?.title || bk?.service || bk?.serviceCategory || bk?.category, 'Service');
 }
 
-// ─── Render ───────────────────────────────────────────────────────────────────
-function renderPage(bk) {
-  const t = (window.t || function(k){ return k; });
+function getCategory(bk = booking) {
+  return safeText(bk?.serviceCategory || bk?.service?.category || bk?.category || getServiceName(bk), 'Service');
+}
 
-  bkEmptyState.style.display = 'none';
-  bkContent.style.display    = 'block';
+function getAddress(bk = booking) {
+  return safeText(bk?.address || bk?.location || bk?.locationLabel, '-');
+}
 
-  // Header card
-  bkId.textContent = bk.id;
-  const svcKey = SERVICE_KEY_MAP[(bk.service || '').toLowerCase()];
-  if (svcKey) {
-    bkService.setAttribute('data-i18n', svcKey);
-    bkService.textContent = t(svcKey);
-  } else {
-    bkService.removeAttribute('data-i18n');
-    bkService.textContent = bk.service;
+function getDescription(bk = booking) {
+  return safeText(bk?.description, 'No customer notes were added.');
+}
+
+function getSpecialty(bk = booking) {
+  const worker = getWorker(bk);
+  const firstService = Array.isArray(worker.services) ? worker.services.map((item) => safeText(item, '')).filter(Boolean)[0] : '';
+  const firstSkill = Array.isArray(worker.skills) ? worker.skills.map((item) => safeText(item, '')).filter(Boolean)[0] : '';
+  const firstCategory = Array.isArray(worker.categories) ? worker.categories.map((item) => safeText(item, '')).filter(Boolean)[0] : '';
+  return firstService || firstSkill || firstCategory || safeText(worker.specialty || getCategory(bk), 'Verified professional');
+}
+
+function getWorkerLocation(bk = booking) {
+  const worker = getWorker(bk);
+  return safeText(worker.locationLabel || worker.serviceArea || worker.location || bk?.workerLocation, '');
+}
+
+function getRatingLabel(bk = booking) {
+  const worker = getWorker(bk);
+  const rating = worker.averageRating ?? worker.rating ?? bk?.workerRating;
+  const reviews = worker.totalReviews ?? worker.reviewCount ?? bk?.workerReviewCount;
+  if (Number.isFinite(Number(rating))) {
+    return reviews ? `${Number(rating).toFixed(1)} Â· ${reviews} reviews` : `${Number(rating).toFixed(1)} out of 5`;
   }
-  bkDate.textContent = translateDateTime(bk.date);
-  bkTime.textContent = translateDateTime(bk.time);
-
-  // Status badge
-  const statusKey = bk.status || 'Booked';
-  const statusCls = STATUS_CLASS[statusKey] || 'bk-status-badge--booked';
-  bkStatusBadge.className = `bk-status-badge ${statusCls}`;
-  const transKey = 'status_' + statusKey.toLowerCase().replace(/\s+/g, '_');
-  bkStatusText.setAttribute('data-i18n', transKey);
-  bkStatusText.textContent = t(transKey);
-
-  // Cancelled banner
-  if (statusKey === 'Cancelled') {
-    if (bkCancelledBannerWrap) bkCancelledBannerWrap.hidden = false;
-    bkCancelBtn.disabled = true;
-    bkCancelBtn.style.opacity = '0.45';
-    bkCancelBtn.style.pointerEvents = 'none';
-  } else {
-    if (bkCancelledBannerWrap) bkCancelledBannerWrap.hidden = true;
-    bkCancelBtn.disabled = false;
-    bkCancelBtn.style.opacity = '';
-    bkCancelBtn.style.pointerEvents = '';
-  }
-
-  // Timeline
-  renderTimeline(statusKey);
-
-  // Technician
-  const tech = bk.technician || {};
-  bkTechInitials.textContent = tech.initials || getInitials(tech.name || '');
-  bkTechName.textContent     = tech.name || '—';
-
-  // Use the actual specialty from the worker — not a hardcoded i18n key
-  const specialty = tech.specialty || '—';
-  bkTechSpecialty.removeAttribute('data-i18n');
-  bkTechSpecialty.textContent = specialty;
-
-  bkTechRating.textContent = tech.rating || '—';
-  if (tech.phone) bkCallLink.href = `tel:${tech.phone}`;
-  else bkCallLink.removeAttribute('href');
-
-  // Job details
-  const catStr = (bk.category || bk.service || '').toLowerCase().replace(/\s+/g, '_');
-  const catKey = 'home_cat_' + catStr;
-  const catTranslated = t(catKey);
-  if (catTranslated && catTranslated !== catKey) {
-    bkCategory.setAttribute('data-i18n', catKey);
-    bkCategory.textContent = catTranslated;
-  } else {
-    bkCategory.removeAttribute('data-i18n');
-    bkCategory.textContent = bk.category || bk.service || '—';
-  }
-
-  bkLocation.textContent      = bk.location || '—';
-  bkScheduledDate.textContent = translateDateTime(bk.scheduledDate || bk.date);
-  bkScheduledTime.textContent = translateDateTime(bk.scheduledTime || bk.time);
-  bkDuration.textContent      = bk.duration || '—';
-
-  const payMethKey = 'payment_' + (bk.paymentMethod || '').toLowerCase().replace(/\s+/g, '_');
-  const payMethTranslated = t(payMethKey);
-  if (payMethTranslated && payMethTranslated !== payMethKey) {
-    bkPaymentMethodDetail.setAttribute('data-i18n', payMethKey);
-    bkPaymentMethodDetail.textContent = payMethTranslated;
-  } else {
-    bkPaymentMethodDetail.removeAttribute('data-i18n');
-    bkPaymentMethodDetail.textContent = bk.paymentMethod || '—';
-  }
-
-  // PIN — space out digits for readability
-  const pin = bk.pin && bk.pin !== '—' ? String(bk.pin) : null;
-  bkPin.textContent = pin ? pin.split('').join(' ') : (t('bkd_pin_unavailable') || 'PIN not available');
-
-  // Payment summary
-  bkPaySummaryMethod.textContent = bkPaymentMethodDetail.textContent;
-  bkPayAmount.textContent = bk.paymentAmount || '—';
-  const payStatusKey = 'status_' + (bk.paymentStatus || 'pending').toLowerCase().replace(/\s+/g, '_');
-  bkPayStatus.textContent = t(payStatusKey) || bk.paymentStatus || 'Pending';
-
-  // Mobile bar
-  bkBarInitials.textContent = tech.initials || getInitials(tech.name || '');
-  bkBarName.textContent     = tech.name || '—';
-
-  // Dialog booking ID
-  if (bkDialogId) bkDialogId.textContent = bk.id;
-}
-
-function renderTimeline(currentStatus) {
-  const steps = getSteps();
-  const currentIndex = steps.findIndex(s => s.key === currentStatus);
-  const isCancelled = currentStatus === 'Cancelled';
-  const t = window.t || function(k){ return k; };
-
-  bkTimeline.innerHTML = '';
-  steps.forEach((step, i) => {
-    let state;
-    if (isCancelled) {
-      state = i < currentIndex ? 'done' : 'pending';
-    } else {
-      if (i < currentIndex)        state = 'done';
-      else if (i === currentIndex) state = 'active';
-      else                         state = 'pending';
-    }
-
-    const li = document.createElement('li');
-    li.className = `bk-timeline__step bk-timeline__step--${state}`;
-
-    let iconSvg;
-    if (state === 'done') {
-      iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>`;
-    } else if (state === 'active') {
-      iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>`;
-    } else {
-      iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/></svg>`;
-    }
-
-    const ariaLabel = state === 'done'   ? (t('bkd_step_state_done')   || 'Completed')
-                    : state === 'active' ? (t('bkd_step_state_active') || 'Current step')
-                    :                      (t('bkd_step_state_pending') || 'Pending');
-
-    li.innerHTML = `
-      <div class="bk-timeline__node" aria-label="${ariaLabel}">
-        ${iconSvg}
-      </div>
-      <div class="bk-timeline__content">
-        <span class="bk-timeline__label" data-i18n="${step.labelKey}">${step.label}</span>
-        <span class="bk-timeline__sub" data-i18n="${step.subKey}">${step.sub}</span>
-      </div>
-    `;
-    bkTimeline.appendChild(li);
-  });
+  return 'New technician';
 }
 
 function getInitials(name) {
-  return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+  return safeText(name, 'T')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase() || 'T';
 }
 
-// ─── Booking state (starts empty — always loaded from API) ────────────────────
-let booking = null;
+function getLocale() {
+  return document.documentElement.lang || localStorage.getItem('servio_lang') || 'en-US';
+}
 
-// ─── Main load logic ──────────────────────────────────────────────────────────
-const _bookingIdFromUrl = new URLSearchParams(window.location.search).get('id');
+function formatDate(value) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return safeText(value);
+  return date.toLocaleDateString(getLocale(), { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+}
 
-async function loadBooking() {
-  // 1. If URL has ?id= → fetch from API (authoritative)
-  if (_bookingIdFromUrl) {
-    showSkeleton();
-    try {
-      const b = await getBooking(_bookingIdFromUrl);
-      if (!b?._id) { showEmptyState(); return; }
-      booking = mapApiBooking(b);
-      renderPage(booking);
-      // Persist so back-navigation keeps the last viewed booking
-      try { localStorage.setItem('servio_active_booking', JSON.stringify(booking)); } catch (_) {}
-    } catch (err) {
-      // Try localStorage fallback
-      const cached = tryLoadFromStorage(_bookingIdFromUrl);
-      if (cached) { booking = cached; renderPage(booking); showToast(t_('bkd_toast_cached_data') || 'Showing cached data', 'info'); }
-      else showEmptyState();
-    }
-    return;
-  }
+function formatInputDate(value) {
+  const date = value ? new Date(value) : new Date();
+  if (Number.isNaN(date.getTime())) return '';
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
 
-  // Helper: a real MongoDB ObjectId is 24 hex characters
-  function isRealId(id) {
-    return typeof id === 'string' && /^[a-f0-9]{24}$/i.test(id);
-  }
+function formatTime(value) {
+  if (!value) return '-';
+  const raw = String(value);
+  const match = raw.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return safeText(value);
+  const date = new Date();
+  date.setHours(Number(match[1]), Number(match[2]), 0, 0);
+  return date.toLocaleTimeString(getLocale(), { hour: 'numeric', minute: '2-digit' });
+}
 
-  // 2. No URL param — look for a real booking ID in localStorage, then fetch from API
-  let candidateId = null;
+function getMoneyValue(bk = booking) {
+  return Number(bk?.totalPrice ?? bk?.rate ?? bk?.service?.basePrice ?? bk?.price ?? 0);
+}
 
+function formatMoney(value) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0) return '-';
+  return `${amount.toFixed(2)} EGP`;
+}
+
+function getPaymentMethod(bk = booking) {
+  return paymentMethodLabel(bk?.paymentMethod || bk?.payment || 'online', bk?.paymentMeta);
+}
+
+function normalizeBooking(apiBooking) {
+  if (!apiBooking) return null;
+  return {
+    ...(booking || {}),
+    ...apiBooking,
+    worker: apiBooking.worker || apiBooking.technician || booking?.worker,
+    technician: apiBooking.worker || apiBooking.technician || booking?.technician,
+    serviceName: apiBooking.serviceName || apiBooking.service?.title || booking?.serviceName,
+    serviceCategory: apiBooking.serviceCategory || apiBooking.service?.category || booking?.serviceCategory,
+    rate: apiBooking.totalPrice ?? apiBooking.rate ?? booking?.rate,
+  };
+}
+
+function readCachedBooking(targetId) {
   try {
     const raw = localStorage.getItem('servio_active_booking');
     if (raw) {
       const parsed = JSON.parse(raw);
-      const id = parsed?._id || parsed?.bookingId || parsed?.id;
-      if (isRealId(id)) candidateId = id;
-      // If only a fake S- id, wipe the stale entry so it never shows again
-      else if (parsed?.id) {
-        try { localStorage.removeItem('servio_active_booking'); } catch (_) {}
-      }
-    }
-  } catch (_) {}
-
-  if (!candidateId) {
-    // 3. Fall back to most-recent real booking in the list
-    try {
-      const rawList = localStorage.getItem('servio_bookings');
-      if (rawList) {
-        const list = JSON.parse(rawList);
-        if (Array.isArray(list)) {
-          const sorted = list
-            .filter(b => isRealId(b?._id || b?.bookingId || b?.id))
-            .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-          if (sorted.length > 0) {
-            candidateId = sorted[0]._id || sorted[0].bookingId || sorted[0].id;
-          }
-        }
-      }
-    } catch (_) {}
-  }
-
-  if (candidateId) {
-    showSkeleton();
-    try {
-      const b = await getBooking(candidateId);
-      if (!b?._id) { showEmptyState(); return; }
-      booking = mapApiBooking(b);
-      renderPage(booking);
-      try { localStorage.setItem('servio_active_booking', JSON.stringify(booking)); } catch (_) {}
-    } catch (_) {
-      showEmptyState();
-    }
-    return;
-  }
-
-  // 4. Nothing valid found → empty state
-  showEmptyState();
-}
-
-function t_(key) { return typeof window.t === 'function' ? window.t(key) : key; }
-
-function tryLoadFromStorage(id) {
-  try {
-    const raw = localStorage.getItem('servio_active_booking');
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed && (parsed._id === id || parsed.id === id)) return parsed;
-    }
-    const rawList = localStorage.getItem('servio_bookings');
-    if (rawList) {
-      const list = JSON.parse(rawList);
-      if (Array.isArray(list)) {
-        const found = list.find(b => b._id === id || b.id === id);
-        if (found) return found;
-      }
+      if (!targetId || parsed?._id === targetId || parsed?.id === targetId) return parsed;
     }
   } catch (_) {}
   return null;
 }
 
-loadBooking();
+function persistBooking(bk) {
+  try { localStorage.setItem('servio_active_booking', JSON.stringify(bk)); } catch (_) {}
+}
 
-// ─── Cancel dialog ────────────────────────────────────────────────────────────
-bkCancelBtn.addEventListener('click', () => {
-  if (!booking) return;
-  bkCancelDialog.hidden = false;
-  bkDialogKeep.focus();
-});
+function showEmptyState() {
+  stopPolling();
+  const content = $('bkContent');
+  const empty = $('bkEmptyState');
+  if (content) content.hidden = true;
+  if (empty) empty.hidden = false;
+  const bar = $('bkMobileBar');
+  if (bar) bar.hidden = true;
+}
 
-bkDialogKeep.addEventListener('click', () => {
-  bkCancelDialog.hidden = true;
-  bkCancelBtn.focus();
-});
+function showContent() {
+  const content = $('bkContent');
+  const empty = $('bkEmptyState');
+  if (content) content.hidden = false;
+  if (empty) empty.hidden = true;
+  const bar = $('bkMobileBar');
+  if (bar) bar.hidden = false;
+}
 
-bkDialogConfirm.addEventListener('click', async () => {
-  bkCancelDialog.hidden = true;
-  if (!booking) return;
+function showLoading() {
+  showContent();
+  ['bkId', 'bkService', 'bkDate', 'bkTime', 'bkStatusText', 'bkTechnicianName'].forEach((id) => setText(id, '...'));
+}
 
-  const prevStatus = booking.status;
-  booking.status = 'Cancelled';
+async function loadBooking() {
+  const idFromUrl = new URLSearchParams(window.location.search).get('id');
+  const cached = readCachedBooking(idFromUrl);
+  const candidateId = isObjectId(idFromUrl) ? idFromUrl : getBookingId(cached);
 
-  try { localStorage.setItem('servio_active_booking', JSON.stringify(booking)); } catch (_) {}
-
-  renderPage(booking);
-
-  const id = booking._id || booking.id;
-  if (id && !id.startsWith('S-')) {
-    try {
-      await cancelBooking(id);
-    } catch (err) {
-      // Revert on failure
-      booking.status = prevStatus;
-      try { localStorage.setItem('servio_active_booking', JSON.stringify(booking)); } catch (_) {}
-      renderPage(booking);
-      showToast(t_('bkd_toast_cancel_failed') || 'Could not cancel booking. Please try again.', 'danger');
-      return;
-    }
-  }
-
-  showToast(t_('bkd_toast_cancelled') || 'Booking cancelled.', 'danger');
-});
-
-// Close dialog on overlay click or Escape
-bkCancelDialog.addEventListener('click', (e) => {
-  if (e.target === bkCancelDialog) { bkCancelDialog.hidden = true; bkCancelBtn.focus(); }
-});
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !bkCancelDialog.hidden) { bkCancelDialog.hidden = true; bkCancelBtn.focus(); }
-});
-
-// ─── Reschedule functionality ──────────────────────────────────────────────
-const bkRescheduleDialog = document.getElementById('bkRescheduleDialog');
-const bkRsDialogCancel   = document.getElementById('bkRsDialogCancel');
-const bkRsDialogConfirm  = document.getElementById('bkRsDialogConfirm');
-const newBookingDate      = document.getElementById('newBookingDate');
-const newBookingSlot      = document.getElementById('newBookingSlot');
-
-bkRescheduleBtn.addEventListener('click', () => {
-  if (!booking || booking.status === 'Cancelled') {
-    showToast(t_('bkd_toast_no_reschedule') || 'Cannot reschedule a cancelled booking.', 'warning');
+  if (!candidateId && cached) {
+    booking = cached;
+    renderBooking();
     return;
   }
-  const today = new Date();
-  today.setDate(today.getDate() + 1);
-  const yyyy = today.getFullYear();
-  const mm   = String(today.getMonth() + 1).padStart(2, '0');
-  const dd   = String(today.getDate()).padStart(2, '0');
-  newBookingDate.value = `${yyyy}-${mm}-${dd}`;
-  newBookingDate.min   = `${yyyy}-${mm}-${dd}`;
-  bkRescheduleDialog.hidden = false;
-});
 
-bkRsDialogCancel.addEventListener('click', () => { bkRescheduleDialog.hidden = true; });
+  if (!candidateId) {
+    showEmptyState();
+    return;
+  }
 
-bkRsDialogConfirm.addEventListener('click', () => {
-  const dateVal = newBookingDate.value;
-  const slotVal = newBookingSlot.value;
-  if (!dateVal) { showToast(t_('bkd_toast_select_date') || 'Please select a date.', 'warning'); return; }
-
-  const d = new Date(dateVal);
-  const formattedDate = d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
-
-  booking.date          = formattedDate;
-  booking.scheduledDate = formattedDate;
-  booking.time          = slotVal.split(' – ')[0];
-  booking.scheduledTime = slotVal;
-
+  showLoading();
   try {
-    localStorage.setItem('servio_active_booking', JSON.stringify(booking));
-    const rawList = localStorage.getItem('servio_bookings');
-    if (rawList) {
-      const list = JSON.parse(rawList);
-      const idx = list.findIndex(b => b.id === booking.id || b._id === booking._id);
-      if (idx !== -1) { list[idx] = { ...list[idx], ...booking }; localStorage.setItem('servio_bookings', JSON.stringify(list)); }
+    const apiBooking = await getBooking(candidateId);
+    booking = normalizeBooking(apiBooking);
+    lastUpdatedAt = Date.now();
+    persistBooking(booking);
+    renderBooking();
+    startPolling();
+  } catch (err) {
+    if (cached) {
+      booking = cached;
+      renderBooking();
+      showToast('Showing cached booking details. Live refresh is unavailable.', 'info');
+      return;
     }
-  } catch (_) {}
+    showEmptyState();
+  }
+}
 
-  renderPage(booking);
-  bkRescheduleDialog.hidden = true;
-  showToast(t_('bkd_toast_rescheduled') || 'Booking rescheduled.', 'success');
-});
+function renderEscrowActions(booking) {
+  const bar = document.getElementById('bkEscrowActions');
+  if (!bar) return;
 
-bkRescheduleDialog.addEventListener('click', (e) => {
-  if (e.target === bkRescheduleDialog) bkRescheduleDialog.hidden = true;
-});
+  const status = booking?.status;
+  if (status === 'awaiting_customer_confirmation') {
+    bar.hidden = false;
+    bar.innerHTML = `
+      <button id="bkConfirmCompleteBtn" class="btn btn--primary">
+        ${window.t?.('bkd_confirm_complete') || 'Confirm Service Complete'}
+      </button>
+      <button id="bkReportIssueBtn" class="btn btn--ghost btn--danger">
+        ${window.t?.('bkd_report_issue') || 'Report an Issue'}
+      </button>
+    `;
 
-bkReceiptBtn.addEventListener('click', () => {
-  showToast(t_('bkd_toast_receipt') || 'Receipt functionality coming soon.', 'info');
-});
+    document.getElementById('bkConfirmCompleteBtn')?.addEventListener('click', async () => {
+      try {
+        await confirmCompletion(booking._id || booking.bookingId);
+        showToast('Confirmed! Awaiting admin review.', 'success');
+        await refreshBooking();
+      } catch (err) {
+        showToast(err?.response?.data?.message || 'Failed to confirm. Please try again.', 'error');
+      }
+    });
 
-// ─── Toast system ─────────────────────────────────────────────────────────────
-function showToast(message, type = 'info', duration = 3800) {
-  const icons = {
-    success: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
-    info:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
-    warning: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
-    danger:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
+    document.getElementById('bkReportIssueBtn')?.addEventListener('click', () => {
+      const reason = prompt('Please describe the issue (min 20 characters):');
+      if (!reason || reason.length < 20) {
+        showToast('Reason must be at least 20 characters.', 'error');
+        return;
+      }
+      openDispute({ bookingId: booking._id || booking.bookingId, reason })
+        .then(() => { showToast('Dispute submitted.', 'info'); return refreshBooking(); })
+        .catch(err => showToast(err?.response?.data?.message || 'Failed to open dispute.', 'error'));
+    });
+  } else {
+    bar.hidden = true;
+  }
+}
+
+function renderPaymentNote(booking) {
+  const note = document.getElementById('bkPaymentNote');
+  if (!note) return;
+
+  const status = booking?.status;
+  const payStatus = booking?.paymentStatus;
+  const method = String(booking?.paymentMethod || '').toLowerCase();
+
+  if (payStatus === 'failed' || payStatus === 'unpaid') {
+    note.textContent = 'Payment not yet processed. Use the retry button below to complete payment.';
+    const retryWrap = document.getElementById('bkRetryPayment');
+    if (retryWrap) retryWrap.hidden = false;
+    return;
+  }
+  if (status === 'pending_admin_review') {
+    note.textContent = method === 'cash'
+      ? (window.t?.('bkd_review_cash') || 'Completion under review — commission settlement will be processed after approval.')
+      : (window.t?.('bkd_review_online') || "Payment under review — we'll notify you once approved.");
+    return;
+  }
+  if (method === 'cash') {
+    note.textContent = 'Pay after arrival when the job details match. Avoid off-platform payment requests.';
+  } else if (status === 'pending') {
+    note.textContent = 'Card payment selected. No real charge will be made in this preview.';
+  } else {
+    note.textContent = 'Saved-card details are attached to this booking. Final price may change if approved parts or extra work are required.';
+  }
+}
+
+function attachRetryHandler(booking) {
+  const retryBtn = document.getElementById('bkRetryBtn');
+  if (!retryBtn) return;
+  retryBtn.addEventListener('click', async () => {
+    const total = booking.estimatedTotal || booking.totalPrice;
+    openCardPickerModal(total, async (paymentMeta) => {
+      try {
+        await holdPayment(booking._id || booking.bookingId, { savedCardId: paymentMeta.savedCardId });
+        showToast('Payment held successfully.', 'success');
+        await refreshBooking();
+      } catch (err) {
+        showToast(err?.response?.data?.message || 'Payment failed. Try another card.', 'error');
+      }
+    });
+  });
+}
+
+function renderBooking() {
+  if (!booking) {
+    showEmptyState();
+    return;
+  }
+
+  showContent();
+  const status = getStatus();
+  const ui = STATUS_UI[status] || STATUS_UI.pending;
+  const workerName = getWorkerName();
+  const phone = getWorkerPhone();
+  const date = formatDate(booking.scheduledDate || booking.date);
+  const time = formatTime(booking.scheduledTime || booking.time);
+  const totals = snapshotFeeFromBooking(booking);
+
+  setText('bkId', getDisplayId());
+  setText('bkService', getServiceName());
+  setText('bkDate', date);
+  setText('bkTime', time);
+  setText('bkStatusEyebrow', ui.eyebrow);
+  setText('bkStatusText', ui.label);
+  setText('bkHeroBody', ui.body);
+  setText('bkNextTitle', ui.nextTitle);
+  setText('bkNextBody', ui.nextBody);
+  setText('bkLastUpdated', formatLastUpdated());
+  setText('bkPolicyText', ui.policy);
+
+  const badge = $('bkStatusBadge');
+  if (badge) {
+    badge.className = `bk-status-badge bk-status-badge--${ui.badge}`;
+    badge.setAttribute('aria-label', `Booking status: ${ui.label}`);
+  }
+
+  renderTracker(status);
+  renderSummary(date, time, totals.estimatedTotal);
+  renderTechnician(workerName, phone);
+  renderPin(status);
+  renderPayment(totals.base, totals.feeAmount, totals.estimatedTotal, status, totals.feeRate);
+  renderActions(status);
+  renderTerminalBanner(status, ui);
+  renderEscrowActions(booking);
+  renderPaymentNote(booking);
+  attachRetryHandler(booking);
+}
+
+function renderSummary(date, time, total) {
+
+  setText('bkCategory', getCategory());
+  setText('bkLocation', getAddress());
+  setText('bkScheduledDate', date);
+  setText('bkScheduledTime', time);
+  setText('bkDuration', safeText(booking?.duration, 'Estimated 1 hour'));
+  setText('bkDescription', getDescription());
+}
+
+function renderTechnician(workerName, phone) {
+  const initials = getInitials(workerName);
+  const avatar = getWorker().profileImage || booking?.workerAvatar || '';
+  const avatarImg = $('bkTechAvatarImg');
+
+  setText('bkTechInitials', initials);
+  setText('bkBarInitials', initials);
+  setText('bkTechnicianName', workerName);
+  setText('bkBarName', workerName);
+  setText('bkTechSpecialty', [getSpecialty(), getWorkerLocation()].filter(Boolean).join(' Â· ') || 'Verified professional');
+  setText('bkTechRating', getRatingLabel());
+
+  if (avatarImg) {
+    avatarImg.hidden = !avatar;
+    if (avatar) {
+      avatarImg.src = avatar;
+      avatarImg.alt = workerName;
+    }
+  }
+
+  const callLinks = [$('bkCallLink'), $('bkSupportCall')].filter(Boolean);
+  callLinks.forEach((link) => {
+    if (phone && link.id === 'bkCallLink') {
+      link.href = `tel:${phone}`;
+      link.removeAttribute('aria-disabled');
+    } else if (link.id === 'bkCallLink') {
+      link.removeAttribute('href');
+      link.setAttribute('aria-disabled', 'true');
+    }
+  });
+}
+
+function renderTracker(status) {
+  const timeline = $('bkTimeline');
+  if (!timeline) return;
+  const current = TRACKER_STEPS.indexOf(status);
+  const terminal = ['cancelled', 'rejected', 'disputed'].includes(status);
+
+  timeline.replaceChildren();
+  TRACKER_STEPS.forEach((step, index) => {
+    const stepUi = STATUS_UI[step] || {};
+    const done = status === 'completed' || (!terminal && current > index);
+    const active = !terminal && current === index && status !== 'completed';
+    const state = done ? 'done' : active ? 'active' : 'pending';
+
+    const li = document.createElement('li');
+    li.className = `bk-timeline__step bk-timeline__step--${state}`;
+    li.innerHTML = `
+      <div class="bk-timeline__node" aria-label="${state === 'done' ? 'Completed' : active ? 'Current step' : 'Pending'}">
+        ${done ? checkIcon() : active ? activeIcon() : pendingIcon()}
+      </div>
+      <div class="bk-timeline__content">
+        <strong class="bk-timeline__label">${stepUi.label || step}</strong>
+        <span class="bk-timeline__sub">${stepUi.eyebrow || ''}</span>
+      </div>
+    `;
+    timeline.appendChild(li);
+  });
+}
+
+function renderPin(status) {
+  const pin = String(booking?.pin || '').replace(/\D/g, '').slice(0, 4);
+  const card = $('bkPinCard');
+  const action = $('bkRevealPinBtn');
+  const value = $('bkPinValue');
+  const help = $('bkPinHelp');
+  const label = $('bkPinState');
+  if (!card || !value || !help || !label) return;
+
+  card.classList.remove('is-ready', 'is-open', 'is-verified', 'is-disabled');
+  if (action) action.hidden = true;
+
+  if (status === 'arrived') {
+    card.classList.add(pinRevealed ? 'is-open' : 'is-ready');
+    value.textContent = pinRevealed && pin ? pin.split('').join(' ') : 'PIN ready';
+    help.textContent = pinRevealed
+      ? 'Share this PIN only after confirming the technician is at your door. Never send it by chat or phone.'
+      : 'Reveal the PIN only when the technician is physically with you.';
+    label.textContent = pinRevealed ? 'Revealed' : 'Ready';
+    if (action) action.hidden = pinRevealed || !pin;
+    return;
+  }
+
+  if (status === 'in_progress') {
+    card.classList.add('is-verified');
+    value.textContent = 'PIN verified';
+    help.textContent = 'The technician verified the PIN and the job clock has started.';
+    label.textContent = 'Verified';
+    return;
+  }
+
+  if (status === 'completed') {
+    card.classList.add('is-verified');
+    value.textContent = 'Verification complete';
+    help.textContent = 'The service is complete. The arrival PIN is no longer shown.';
+    label.textContent = 'Complete';
+    return;
+  }
+
+  if (['cancelled', 'rejected', 'disputed'].includes(status)) {
+    card.classList.add('is-disabled');
+    value.textContent = 'PIN unavailable';
+    help.textContent = 'Arrival verification is disabled for this booking state.';
+    label.textContent = 'Closed';
+    return;
+  }
+
+  value.textContent = 'PIN locked';
+  help.textContent = status === 'pending'
+    ? 'The PIN unlocks when your technician arrives. Do not share it by message or phone.'
+    : 'Keep this private. The PIN unlocks when the technician marks arrival.';
+  label.textContent = 'Locked';
+}
+
+function renderPayment(rate, fee, total, status, feeRate = 10) {
+  setText('bkPaySummaryMethod', getPaymentMethod());
+  setText('bkPayBase', formatFeeMoney(rate));
+  setText('bkPayFee', `${formatFeeMoney(fee)} (${feeRate}%)`);
+  setText('bkPayAmount', formatFeeMoney(total));
+  setText('bkPayStatus', paymentStatusText(status));
+  setText('bkPaymentMethodDetail', getPaymentMethod());
+
+  const note = $('bkPaymentNote');
+  if (note) {
+    if (String(booking?.paymentMethod || booking?.payment || '').toLowerCase().includes('cash')) {
+      note.textContent = 'Pay after arrival when the job details match. Avoid off-platform payment requests.';
+    } else if (status === 'pending') {
+      note.textContent = 'Card payment selected. No real charge will be made in this preview.';
+    } else {
+      note.textContent = 'Saved-card details are attached to this booking. Final price may change if approved parts or extra work are required.';
+    }
+  }
+}
+
+function paymentStatusText(status) {
+  const labels = {
+    unpaid:                  'Awaiting payment',
+    held:                    'Payment held in escrow',
+    released:                'Payment released',
+    refunded:                'Refunded',
+    failed:                  'Payment failed',
+    disputed:                'Disputed',
+    cash_pending_settlement: 'Cash — commission pending',
+    cash_settled:            'Cash settled',
+    not_required:            'No charge',
+    demo_pending:            'Awaiting payment',
+    cash_pending:            'Cash pending',
+    paid:                    'Paid',
+    pending:                 'Not charged yet',
+    completed:               'Receipt ready',
+    cancelled:               'No charge',
+    rejected:                'No charge',
   };
+  return labels[status] || 'Payment pending';
+}
 
+function renderActions(status) {
+  const cancelBtn = $('bkCancelBtn');
+  const rescheduleBtn = $('bkRescheduleBtn');
+  const primary = $('bkMobilePrimary');
+  const canCancel = CANCELLABLE_STATUSES.has(status);
+  const canReschedule = RESCHEDULABLE_STATUSES.has(status);
+
+  if (cancelBtn) {
+    cancelBtn.disabled = !canCancel;
+    cancelBtn.setAttribute('aria-disabled', String(!canCancel));
+  }
+  if (rescheduleBtn) {
+    rescheduleBtn.disabled = !canReschedule;
+    rescheduleBtn.setAttribute('aria-disabled', String(!canReschedule));
+  }
+
+  if (primary) {
+    primary.textContent = (STATUS_UI[status] || STATUS_UI.pending).primary;
+  }
+}
+
+function renderTerminalBanner(status, ui) {
+  const wrap = $('bkStateBanner');
+  if (!wrap) return;
+  const terminal = ['cancelled', 'rejected', 'disputed'].includes(status);
+  wrap.hidden = !terminal;
+  if (terminal) {
+    wrap.className = `bk-state-banner bk-state-banner--${ui.badge}`;
+    wrap.textContent = ui.body;
+  }
+}
+
+function checkIcon() {
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+}
+
+function activeIcon() {
+  return '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle></svg>';
+}
+
+function pendingIcon() {
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle></svg>';
+}
+
+function formatLastUpdated() {
+  const seconds = Math.max(0, Math.floor((Date.now() - lastUpdatedAt) / 1000));
+  if (seconds < 10) return 'Last updated just now';
+  if (seconds < 60) return `Last updated ${seconds}s ago`;
+  return `Last updated ${Math.floor(seconds / 60)} min ago`;
+}
+
+async function refreshBooking() {
+  const id = getBookingId();
+  if (!id) return;
+  try {
+    const apiBooking = await getBooking(id);
+    booking = normalizeBooking(apiBooking);
+    lastUpdatedAt = Date.now();
+    persistBooking(booking);
+    renderBooking();
+    if (FINAL_STATUSES.has(getStatus())) stopPolling();
+  } catch (_) {
+    stopPolling();
+    showToast('Live refresh paused. Reload to try again.', 'info');
+  }
+}
+
+function startPolling() {
+  stopPolling();
+  if (!getBookingId() || !ACTIVE_STATUSES.has(getStatus())) return;
+  pollTimer = setInterval(refreshBooking, POLL_MS);
+}
+
+function stopPolling() {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = null;
+}
+
+function openDialog(dialog) {
+  if (!dialog) return;
+  lastFocus = document.activeElement;
+  dialog.hidden = false;
+  const first = dialog.querySelector('button, input, select, a[href]');
+  first?.focus();
+}
+
+function closeDialog(dialog) {
+  if (!dialog) return;
+  dialog.hidden = true;
+  lastFocus?.focus?.();
+  lastFocus = null;
+}
+
+function setupDialog(dialog, closeIds = []) {
+  if (!dialog) return;
+  closeIds.forEach((id) => $(id)?.addEventListener('click', () => closeDialog(dialog)));
+  dialog.addEventListener('click', (event) => {
+    if (event.target === dialog) closeDialog(dialog);
+  });
+}
+
+function wireEvents() {
+  $('bkRevealPinBtn')?.addEventListener('click', () => {
+    pinRevealed = true;
+    renderPin(getStatus());
+  });
+
+  $('bkCopyRefBtn')?.addEventListener('click', async () => {
+    const ref = `Booking #${getDisplayId()}`;
+    try { await navigator.clipboard.writeText(ref); } catch (_) {}
+    showToast('Booking reference copied.', 'success');
+  });
+
+  $('bkCancelBtn')?.addEventListener('click', () => {
+    if (!CANCELLABLE_STATUSES.has(getStatus())) {
+      showToast('Contact support to cancel after technician confirmation.', 'info');
+      return;
+    }
+    setText('bkDialogId', getDisplayId());
+    openDialog($('bkCancelDialog'));
+  });
+
+  $('bkDialogConfirm')?.addEventListener('click', async () => {
+    const id = getBookingId();
+    if (!id) return;
+    try {
+      const reason = $('bkCancelReason')?.value || 'Other';
+      await cancelBooking(id, reason);
+      booking = { ...booking, status: 'cancelled', cancellationReason: reason };
+      persistBooking(booking);
+      lastUpdatedAt = Date.now();
+      closeDialog($('bkCancelDialog'));
+      renderBooking();
+      stopPolling();
+      showToast('Booking cancelled.', 'success');
+    } catch (err) {
+      closeDialog($('bkCancelDialog'));
+      showToast(err?.message || 'Could not cancel booking. Please try again.', 'error');
+    }
+  });
+
+  $('bkRescheduleBtn')?.addEventListener('click', () => {
+    if (!RESCHEDULABLE_STATUSES.has(getStatus())) {
+      showToast('Reschedule is available only before the technician is on the way.', 'info');
+      return;
+    }
+    const input = $('newBookingDate');
+    const slot = $('newBookingSlot');
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    if (input) {
+      input.min = formatInputDate(new Date());
+      input.max = formatInputDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000));
+      input.value = formatInputDate(booking?.scheduledDate || tomorrow);
+    }
+    if (slot) slot.value = normalizeSlotValue(booking?.scheduledTime) || '09:00';
+    openDialog($('bkRescheduleDialog'));
+  });
+
+  $('bkRsDialogConfirm')?.addEventListener('click', async () => {
+    const id = getBookingId();
+    const scheduledDate = $('newBookingDate')?.value;
+    const scheduledTime = $('newBookingSlot')?.value;
+    if (!id || !scheduledDate || !scheduledTime) {
+      showToast('Choose a valid date and time.', 'info');
+      return;
+    }
+    try {
+      const updated = await rescheduleBooking(id, { scheduledDate, scheduledTime });
+      booking = normalizeBooking(updated);
+      persistBooking(booking);
+      lastUpdatedAt = Date.now();
+      closeDialog($('bkRescheduleDialog'));
+      renderBooking();
+      showToast('Booking rescheduled.', 'success');
+    } catch (err) {
+      showToast(err?.message || 'Could not reschedule this booking.', 'error');
+    }
+  });
+
+  $('bkReceiptBtn')?.addEventListener('click', downloadReceipt);
+
+  $('bkMobilePrimary')?.addEventListener('click', () => {
+    const status = getStatus();
+    if (status === 'arrived') {
+      pinRevealed = true;
+      renderPin(status);
+      document.getElementById('bkPinCard')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else if (status === 'completed') {
+      downloadReceipt();
+    } else if (['cancelled', 'rejected'].includes(status)) {
+      window.location.href = './services-marketplace.html';
+    } else if (status === 'en_route') {
+      $('bkCallLink')?.click();
+    } else {
+      window.location.href = './messages.html';
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    closeDialog($('bkCancelDialog'));
+    closeDialog($('bkRescheduleDialog'));
+  });
+
+  setupDialog($('bkCancelDialog'), ['bkDialogKeep']);
+  setupDialog($('bkRescheduleDialog'), ['bkRsDialogCancel']);
+}
+
+function normalizeSlotValue(value) {
+  const match = String(value || '').match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return '';
+  return `${String(Number(match[1])).padStart(2, '0')}:${match[2]}`;
+}
+
+function downloadReceipt() {
+  if (!booking) return;
+  const totals = snapshotFeeFromBooking(booking);
+  const lines = [
+    'SERVIO Booking Receipt',
+    `Booking: ${getDisplayId()}`,
+    `Status: ${(STATUS_UI[getStatus()] || STATUS_UI.pending).label}`,
+    `Service: ${getServiceName()}`,
+    `Technician: ${getWorkerName()}`,
+    `Date: ${formatDate(booking.scheduledDate || booking.date)}`,
+    `Time: ${formatTime(booking.scheduledTime || booking.time)}`,
+    `Address: ${getAddress()}`,
+    `Customer notes: ${getDescription()}`,
+    '',
+    `Payment method: ${getPaymentMethod()}`,
+    `Payment status: ${booking.paymentMethod === 'cash' ? 'Cash pending' : 'Card preview - no real charge processed'}`,
+    `Base rate: ${formatFeeMoney(totals.base)}`,
+    `Platform fee (${totals.feeRate}%): ${formatFeeMoney(totals.feeAmount)}`,
+    `Estimated total: ${formatFeeMoney(totals.estimatedTotal)}`,
+    '',
+    'Final price may change if approved parts or extra work were required.',
+  ];
+  const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `servio-receipt-${getDisplayId().replace(/[^a-z0-9]+/gi, '-')}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  showToast('Receipt downloaded.', 'success');
+}
+
+function showToast(message, type = 'info') {
+  const wrap = $('bkToastWrap');
+  if (!wrap) return;
   const toast = document.createElement('div');
   toast.className = `bk-toast bk-toast--${type}`;
-  toast.innerHTML = `
-    <span class="bk-toast__icon" aria-hidden="true">${icons[type] || icons.info}</span>
-    <span class="bk-toast__text">${message}</span>
-  `;
-  bkToastWrap.appendChild(toast);
-
-  const remove = () => {
-    toast.classList.add('bk-toast--out');
-    toast.addEventListener('animationend', () => toast.remove(), { once: true });
-  };
-  setTimeout(remove, duration);
+  toast.textContent = message;
+  wrap.appendChild(toast);
+  setTimeout(() => {
+    toast.classList.add('is-hiding');
+    toast.addEventListener('transitionend', () => toast.remove(), { once: true });
+  }, 3200);
 }
+
+wireEvents();
+loadBooking();
+setInterval(() => {
+  if (booking) setText('bkLastUpdated', formatLastUpdated());
+}, 30000);
+
+// â”€â”€ Hero canvas visual effects â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+(function initBookingHeroCanvas() {
+  const canvas = document.getElementById('bk-hero-canvas');
+  if (!canvas) return;
+
+  const ctx = canvas.getContext('2d');
+  let animationFrameId;
+  let mousePos = { x: undefined, y: undefined };
+  let frame = 0;
+
+  const initCanvas = () => {
+    // Reset or initialize anything if needed when resized
+  };
+
+  const animateCanvas = () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    frame++;
+
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+    // Wave parameters for elegant flowing ribbons
+    const waves = [
+      { amplitude: 120, frequency: 0.0012, speed: 0.004, color: isDark ? 'rgba(203, 184, 145, 0.25)' : 'rgba(30, 27, 75, 0.25)', offset: 0 },
+      { amplitude: 160, frequency: 0.0008, speed: 0.003, color: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(154, 140, 115, 0.35)', offset: 150 },
+      { amplitude: 90, frequency: 0.0015, speed: 0.006, color: isDark ? 'rgba(203, 184, 145, 0.15)' : 'rgba(30, 27, 75, 0.15)', offset: 300 },
+      { amplitude: 200, frequency: 0.0006, speed: 0.002, color: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(154, 140, 115, 0.2)', offset: 450 }
+    ];
+
+    const centerY = canvas.height / 2;
+
+    // Draw each wave
+    waves.forEach((wave, index) => {
+      ctx.beginPath();
+
+      for (let x = 0; x <= canvas.width; x += 10) {
+        // Subtle mouse attraction/repulsion
+        let mouseInfluence = 0;
+        if (mousePos.x !== undefined) {
+          const dx = x - mousePos.x;
+          // Calculate approximate y for the wave at this x
+          const baseWaveY = centerY + Math.sin(x * wave.frequency + frame * wave.speed + wave.offset) * wave.amplitude;
+          const dy = baseWaveY - mousePos.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist < 400) {
+            const force = (400 - dist) / 400;
+            // Push away or pull slightly based on index
+            mouseInfluence = force * 60 * (index % 2 === 0 ? 1 : -0.8);
+          }
+        }
+
+        const y = centerY + mouseInfluence + Math.sin(x * wave.frequency + frame * wave.speed + wave.offset) * wave.amplitude;
+
+        if (x === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          // Use quadratic curves for smoother lines
+          ctx.lineTo(x, y);
+        }
+      }
+
+      ctx.strokeStyle = wave.color;
+      ctx.lineWidth = isDark ? 1.5 : 2;
+
+      // Add subtle glow
+      ctx.shadowBlur = isDark ? 10 : 8;
+      ctx.shadowColor = wave.color;
+
+      ctx.stroke();
+      ctx.shadowBlur = 0; // Reset
+    });
+
+    animationFrameId = requestAnimationFrame(animateCanvas);
+  };
+
+  const resizeCanvas = () => {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+    initCanvas();
+  };
+
+  const handleCanvasMouseMove = (e) => {
+    const rect = canvas.getBoundingClientRect();
+    mousePos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  };
+
+  const handleCanvasMouseOut = () => {
+    mousePos = { x: undefined, y: undefined };
+  }
+
+  window.addEventListener('resize', resizeCanvas);
+  canvas.parentElement.addEventListener('mousemove', handleCanvasMouseMove);
+  canvas.parentElement.addEventListener('mouseleave', handleCanvasMouseOut);
+
+  resizeCanvas();
+  animateCanvas();
+})();
