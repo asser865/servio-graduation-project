@@ -78,7 +78,11 @@ const calculateFeeSnapshot = (baseAmount, platformFeeRate) => {
   };
 };
 
-const normalizePaymentMethod = (value) => (value === 'cash' ? 'cash' : 'online');
+const normalizePaymentMethod = (value) => {
+  const method = String(value || '').trim().toLowerCase();
+  if (['cash', 'card', 'online'].includes(method)) return method;
+  throw new ApiError(StatusCodes.BAD_REQUEST, 'Payment method must be cash, card, or online.');
+};
 
 const sanitizePaymentMeta = (paymentMeta = {}) => {
   const clean = {};
@@ -323,12 +327,6 @@ const createBooking = async (userId, data) => {
   return populated;
 };
 
-function normalizePaymentMethod(value) {
-  const method = String(value || '').trim().toLowerCase();
-  if (method === 'cash') return 'cash';
-  if (method === 'card' || method === 'online') return 'card';
-  throw new ApiError(StatusCodes.BAD_REQUEST, 'Payment method must be cash or card.');
-}
 
 async function resolvePaymentData(userId, paymentMethod, savedCardId) {
   if (paymentMethod === 'cash') {
