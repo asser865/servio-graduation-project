@@ -273,7 +273,6 @@ const createBooking = async (userId, data) => {
   }
 
   const platformSettings = await getPublicPlatformSettings();
-  const paymentMethod = normalizePaymentMethod(data.paymentMethod);
   if (paymentMethod === 'cash' && !platformSettings.cashPaymentsEnabled) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Cash payments are currently disabled.');
   }
