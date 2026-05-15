@@ -2,9 +2,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// Local UI states for the technician job workflow.
 ///
-/// [enRoute] and [arrived] are pure client states — no backend status change
-/// is triggered for those. [pending], [done], and [cancelled] are derived
-/// from the backend status and are never written to SharedPreferences.
+/// [enRoute] and [arrived] are mirrored to backend statuses, while
+/// [pending], [done], and [cancelled] are derived from the backend status and
+/// are never written to SharedPreferences.
 enum JobSection {
   /// Awaiting technician decision (backend: pending).
   pending,
@@ -12,10 +12,10 @@ enum JobSection {
   /// Job confirmed by technician; waiting to depart (backend: accepted).
   accepted,
 
-  /// Technician is travelling to the customer — local only.
+  /// Technician is travelling to the customer (backend: en_route).
   enRoute,
 
-  /// Technician has arrived; waiting for customer PIN — local only.
+  /// Technician has arrived; waiting for customer PIN (backend: arrived).
   arrived,
 
   /// Job active (backend: in_progress). Timer running.
@@ -24,7 +24,8 @@ enum JobSection {
   /// Technician tapped "Finish Job"; showing confirmation + notes.
   completeConfirm,
 
-  /// Job completed (backend: completed).
+  /// Worker submitted completion or job completed (backend:
+  /// awaiting_customer_confirmation, pending_admin_review, completed).
   done,
 
   /// Job cancelled or rejected.

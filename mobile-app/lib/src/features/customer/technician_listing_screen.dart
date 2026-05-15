@@ -74,6 +74,11 @@ class _TechnicianListingScreenState extends State<TechnicianListingScreen> {
         : category.isNotEmpty
             ? serviceCategoryLabel(category)
             : 'Technicians';
+    final selectedServiceName = widget.title?.trim().isNotEmpty == true
+        ? widget.title!.trim()
+        : category.isNotEmpty
+            ? listingTitle
+            : null;
 
     return Scaffold(
       body: SafeArea(
@@ -151,7 +156,13 @@ class _TechnicianListingScreenState extends State<TechnicianListingScreen> {
                             Navigator.of(context).push(
                               MaterialPageRoute<void>(
                                 builder: (_) => TechnicianProfileScreen(
-                                    technicianId: worker.id),
+                                  technicianId: worker.id,
+                                  selectedServiceId:
+                                      serviceId.isNotEmpty ? serviceId : null,
+                                  selectedServiceCategory:
+                                      category.isNotEmpty ? category : null,
+                                  selectedServiceName: selectedServiceName,
+                                ),
                               ),
                             );
                           },

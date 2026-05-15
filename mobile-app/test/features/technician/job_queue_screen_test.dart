@@ -228,6 +228,176 @@ void main() {
     expect(find.text('Electrical'), findsNothing);
   });
 
+  testWidgets('In Progress tab includes arrived jobs', (tester) async {
+    final client = await _buildClient(
+      _mockClient([
+        _booking(id: 'b1', status: 'arrived', serviceName: 'Sink Repair'),
+        _booking(id: 'b2', status: 'accepted', serviceName: 'Electrical'),
+      ]),
+    );
+
+    await tester.pumpWidget(_wrap(const JobQueueScreen(), client: client));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('In Progress'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sink Repair'), findsOneWidget);
+    expect(find.text('Arrived'), findsOneWidget);
+    expect(find.text('Electrical'), findsNothing);
+  });
+
+  testWidgets('Cancelled tab shows cancelled jobs as read-only history',
+      (tester) async {
+    final client = await _buildClient(
+      _mockClient([
+        _booking(
+          id: 'cancelled-job',
+          status: 'cancelled',
+          serviceName: 'Old Paint Job',
+        ),
+        _booking(id: 'pending-job', status: 'pending', serviceName: 'Tiling'),
+      ]),
+    );
+
+    await tester.pumpWidget(_wrap(const JobQueueScreen(), client: client));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Cancelled'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Old Paint Job'), findsOneWidget);
+    expect(find.text('Cancelled'), findsWidgets);
+    expect(find.text('Accept'), findsNothing);
+    expect(find.text('Decline'), findsNothing);
+    expect(find.text('View Details'), findsOneWidget);
+  });
+
+  testWidgets('Rejected tab shows rejected jobs as read-only history',
+      (tester) async {
+    final client = await _buildClient(
+      _mockClient([
+        _booking(
+          id: 'rejected-job',
+          status: 'rejected',
+          serviceName: 'Declined Plumbing',
+        ),
+        _booking(id: 'pending-job', status: 'pending', serviceName: 'Tiling'),
+      ]),
+    );
+
+    await tester.pumpWidget(_wrap(const JobQueueScreen(), client: client));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Rejected'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Declined Plumbing'), findsOneWidget);
+    expect(find.text('Rejected'), findsWidgets);
+    expect(find.text('Accept'), findsNothing);
+    expect(find.text('Decline'), findsNothing);
+    expect(find.text('View Details'), findsOneWidget);
+  });
+
+  testWidgets('Decline sends backend-supported rejected status',
+      (tester) async {
+    var currentStatus = 'pending';
+    String? patchedStatus;
+    final httpClient = MockClient((request) async {
+      if (request.url.path.contains('/bookings/worker')) {
+        return http.Response(
+          jsonEncode({
+            'success': true,
+            'message': 'ok',
+            'data': {
+              'bookings': [
+                _booking(
+                  id: 'decline-me',
+                  status: currentStatus,
+                  serviceName: 'Decline Me',
+                ),
+              ],
+              'pagination': {'total': 1, 'page': 1, 'pages': 1},
+            },
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      }
+      if (request.method == 'PATCH') {
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        patchedStatus = body['status'] as String?;
+        currentStatus = patchedStatus ?? currentStatus;
+        return http.Response(
+          jsonEncode({'success': true, 'message': 'ok', 'data': {}}),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      }
+      return http.Response('not found', 404);
+    });
+    final client = await _buildClient(httpClient);
+
+    await tester.pumpWidget(_wrap(const JobQueueScreen(), client: client));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Decline'));
+    await tester.pumpAndSettle();
+
+    expect(patchedStatus, 'rejected');
+    expect(find.text('Could not update job status. Please try again.'),
+        findsNothing);
+
+    expect(find.text('Decline Me'), findsOneWidget);
+    expect(find.text('Rejected'), findsWidgets);
+  });
+
+  testWidgets('queue tabs account for all dashboard-counted jobs',
+      (tester) async {
+    final bookings = <Map<String, dynamic>>[
+      _booking(id: 'b1', status: 'pending', serviceName: 'Pending 1'),
+      _booking(id: 'b2', status: 'pending', serviceName: 'Pending 2'),
+      _booking(id: 'b3', status: 'accepted', serviceName: 'Accepted 1'),
+      _booking(id: 'b4', status: 'accepted', serviceName: 'Accepted 2'),
+      _booking(id: 'b5', status: 'accepted', serviceName: 'Accepted 3'),
+      _booking(id: 'b6', status: 'accepted', serviceName: 'Accepted 4'),
+      _booking(id: 'b7', status: 'accepted', serviceName: 'Accepted 5'),
+      _booking(id: 'b8', status: 'arrived', serviceName: 'Arrived Job'),
+      _booking(id: 'b9', status: 'cancelled', serviceName: 'Cancelled Job'),
+    ];
+    final client = await _buildClient(_mockClient(bookings));
+
+    await tester.pumpWidget(_wrap(const JobQueueScreen(), client: client));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pending 1'), findsOneWidget);
+    expect(find.text('Pending 2'), findsOneWidget);
+
+    await tester.tap(find.text('Confirmed'));
+    await tester.pumpAndSettle();
+    expect(find.text('Accepted 1'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Accepted 5'),
+      120,
+      scrollable: find.byType(Scrollable),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Accepted 5'), findsOneWidget);
+
+    await tester.tap(find.text('In Progress'));
+    await tester.pumpAndSettle();
+    expect(find.text('Arrived Job'), findsOneWidget);
+
+    await tester.tap(find.text('Cancelled'));
+    await tester.pumpAndSettle();
+    expect(find.text('Cancelled Job'), findsOneWidget);
+  });
+
   testWidgets('shows only bookings assigned to logged-in worker',
       (tester) async {
     final client = await _buildClient(

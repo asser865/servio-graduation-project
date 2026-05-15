@@ -319,4 +319,79 @@ void main() {
     expect(find.textContaining('Karim'), findsNothing);
     expect(find.textContaining('Mona'), findsNothing);
   });
+
+  testWidgets('selected service survives listing to profile booking handoff',
+      (tester) async {
+    final worker = <String, dynamic>{
+      '_id': 'multi-service-worker',
+      'name': 'Multi Service Worker',
+      'profileImage': '',
+      'categories': <String>['painting', 'plumbing'],
+      'services': <Map<String, dynamic>>[
+        <String, dynamic>{
+          '_id': 'service-painting',
+          'title': 'Painting',
+          'category': 'painting',
+        },
+        <String, dynamic>{
+          '_id': plumbingServiceId,
+          'title': 'Plumbing',
+          'category': 'plumbing',
+        },
+      ],
+      'skills': <String>['painting', 'plumbing'],
+      'averageRating': 4.8,
+      'totalReviews': 12,
+      'locationLabel': 'Cairo',
+      'hourlyRate': 220,
+      'isVerified': true,
+      'isAvailable': true,
+    };
+    final httpClient = MockClient((request) async {
+      if (request.url.path == '/users/workers') {
+        expect(request.url.queryParameters['category'], 'plumbing');
+        return _json(<String, dynamic>{
+          'success': true,
+          'data': <String, dynamic>{
+            'workers': <Map<String, dynamic>>[worker],
+          },
+        });
+      }
+      if (request.url.path == '/users/workers/multi-service-worker') {
+        return _json(<String, dynamic>{
+          'success': true,
+          'data': <String, dynamic>{'worker': worker},
+        });
+      }
+      if (request.url.path == '/reviews/worker/multi-service-worker') {
+        return _json(<String, dynamic>{
+          'success': true,
+          'data': <Map<String, dynamic>>[],
+        });
+      }
+      return _json(<String, dynamic>{'message': 'not found'}, 404);
+    });
+
+    await tester.pumpWidget(
+      await _wrap(
+        const TechnicianListingScreen(
+          serviceId: plumbingServiceId,
+          category: 'plumbing',
+          title: 'Plumbing',
+        ),
+        httpClient: httpClient,
+      ),
+    );
+    await _pumpFrames(tester);
+
+    await tester.tap(find.text('View Profile'));
+    await _pumpFrames(tester);
+    await tester.tap(find.text('Book technician'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Confirm Your Booking'), findsOneWidget);
+    expect(find.text('Plumbing'), findsWidgets);
+    expect(find.text('Painting'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 }

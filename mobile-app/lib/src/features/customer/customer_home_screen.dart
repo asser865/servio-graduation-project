@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/models/booking_model.dart';
+import '../../core/models/service_category.dart';
 import '../../core/state/app_state.dart';
 import '../../core/state/notifications_provider.dart';
 import '../../core/state/workers_state.dart';
@@ -1844,6 +1845,7 @@ class _ProfessionalCardState extends State<_ProfessionalCard>
     final name = tech.name as String;
     final specialty =
         tech.skills.isNotEmpty ? tech.skills.first as String : 'Specialist';
+    final selectedCategory = normalizeServiceCategory(specialty);
 
     return GestureDetector(
       onTapDown: (_) => _controller.forward(),
@@ -1851,7 +1853,14 @@ class _ProfessionalCardState extends State<_ProfessionalCard>
         _controller.reverse();
         Navigator.of(context).push(
           MaterialPageRoute<void>(
-            builder: (_) => TechnicianProfileScreen(technicianId: tech.id),
+            builder: (_) => TechnicianProfileScreen(
+              technicianId: tech.id,
+              selectedServiceCategory:
+                  selectedCategory.isEmpty ? null : selectedCategory,
+              selectedServiceName: selectedCategory.isEmpty
+                  ? (specialty == 'Specialist' ? null : specialty)
+                  : serviceCategoryLabel(selectedCategory),
+            ),
           ),
         );
       },
