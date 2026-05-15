@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routes.room_analysis import router
+from room_finishing.routes.room_analysis import router as room_finishing_router
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -26,7 +26,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(router)
+app.include_router(room_finishing_router)
 
 
 @app.get("/")

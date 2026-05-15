@@ -1,7 +1,7 @@
 from fastapi import APIRouter, File, UploadFile, Form, HTTPException
 from fastapi.responses import JSONResponse
-from services.gemini_service import analyze_room
-from utils.image_utils import prepare_image, validate_image
+from room_finishing.services.gemini_service import analyze_room
+from room_finishing.utils.image_utils import prepare_image, validate_image
 import json
 
 router = APIRouter()
