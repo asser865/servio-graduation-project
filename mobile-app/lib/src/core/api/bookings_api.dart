@@ -103,6 +103,23 @@ class BookingsApi {
     });
   }
 
+  Future<void> confirmCompletion(String bookingId) async {
+    await _client.patch(
+      ApiEndpoints.bookingStatus(bookingId),
+      <String, dynamic>{'status': 'completed'},
+    );
+  }
+
+  Future<void> reportDispute(String bookingId, {String reason = ''}) async {
+    await _client.patch(
+      ApiEndpoints.bookingStatus(bookingId),
+      <String, dynamic>{
+        'status': 'disputed',
+        if (reason.trim().isNotEmpty) 'cancellationReason': reason.trim(),
+      },
+    );
+  }
+
   Future<BackendBooking> getBooking(String id) async {
     final data =
         _client.unwrapData(await _client.get(ApiEndpoints.bookingById(id)));

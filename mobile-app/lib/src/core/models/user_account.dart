@@ -47,6 +47,9 @@ class UserAccount {
     this.categories = const [],
     this.averageRating = 0.0,
     this.reviewCount = 0,
+    this.isVerified = false,
+    this.completedJobs = 0,
+    this.createdAt,
   });
 
   final String id;
@@ -69,6 +72,9 @@ class UserAccount {
   final List<String> categories;
   final double averageRating;
   final int reviewCount;
+  final bool isVerified;
+  final int completedJobs;
+  final DateTime? createdAt;
 
   String get initials {
     if (avatarInitials.isNotEmpty) return avatarInitials;
@@ -98,6 +104,9 @@ class UserAccount {
     List<String>? categories,
     double? averageRating,
     int? reviewCount,
+    bool? isVerified,
+    int? completedJobs,
+    DateTime? createdAt,
   }) =>
       UserAccount(
         id: id ?? this.id,
@@ -120,6 +129,9 @@ class UserAccount {
         categories: categories ?? this.categories,
         averageRating: averageRating ?? this.averageRating,
         reviewCount: reviewCount ?? this.reviewCount,
+        isVerified: isVerified ?? this.isVerified,
+        completedJobs: completedJobs ?? this.completedJobs,
+        createdAt: createdAt ?? this.createdAt,
       );
 
   Map<String, dynamic> toJson() => {
@@ -143,6 +155,9 @@ class UserAccount {
         'categories': categories,
         'averageRating': averageRating,
         'reviewCount': reviewCount,
+        'isVerified': isVerified,
+        'completedJobs': completedJobs,
+        'createdAt': createdAt?.toIso8601String(),
       };
 
   factory UserAccount.fromJson(Map<String, dynamic> json) => UserAccount(
@@ -171,6 +186,9 @@ class UserAccount {
             List<String>.from((json['categories'] as List<dynamic>?) ?? []),
         averageRating: ((json['averageRating'] as num?) ?? 0.0).toDouble(),
         reviewCount: ((json['reviewCount'] as num?) ?? 0).toInt(),
+        isVerified: (json['isVerified'] as bool?) ?? false,
+        completedJobs: ((json['completedJobs'] as num?) ?? 0).toInt(),
+        createdAt: DateTime.tryParse((json['createdAt'] as String?) ?? ''),
       );
 
   // Maps backend API response (uses _id, role: 'user'|'worker', nested address)
@@ -201,6 +219,9 @@ class UserAccount {
           List<String>.from((json['categories'] as List<dynamic>?) ?? []),
       averageRating: ((json['averageRating'] as num?) ?? 0.0).toDouble(),
       reviewCount: ((json['reviewCount'] as num?) ?? 0).toInt(),
+      isVerified: (json['isVerified'] as bool?) ?? false,
+      completedJobs: ((json['completedJobs'] as num?) ?? 0).toInt(),
+      createdAt: DateTime.tryParse((json['createdAt'] as String?) ?? ''),
     );
   }
 }

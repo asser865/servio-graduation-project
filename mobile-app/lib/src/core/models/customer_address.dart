@@ -6,6 +6,8 @@ class CustomerAddress {
     this.city = '',
     this.state = '',
     this.zipCode = '',
+    this.lat,
+    this.lng,
   });
 
   final String id;
@@ -14,6 +16,8 @@ class CustomerAddress {
   final String city;
   final String state;
   final String zipCode;
+  final double? lat;
+  final double? lng;
 
   String get displayLabel => label.trim().isEmpty ? 'Address' : label.trim();
 
@@ -39,6 +43,8 @@ class CustomerAddress {
         'city': city.trim(),
         'state': state.trim(),
         'zipCode': zipCode.trim(),
+        if (lat != null) 'lat': lat,
+        if (lng != null) 'lng': lng,
       };
 
   CustomerAddress copyWith({
@@ -48,6 +54,8 @@ class CustomerAddress {
     String? city,
     String? state,
     String? zipCode,
+    double? lat,
+    double? lng,
   }) {
     return CustomerAddress(
       id: id ?? this.id,
@@ -56,6 +64,8 @@ class CustomerAddress {
       city: city ?? this.city,
       state: state ?? this.state,
       zipCode: zipCode ?? this.zipCode,
+      lat: lat ?? this.lat,
+      lng: lng ?? this.lng,
     );
   }
 
@@ -67,6 +77,8 @@ class CustomerAddress {
       city: (json['city'] as String?) ?? '',
       state: (json['state'] as String?) ?? '',
       zipCode: (json['zipCode'] as String?) ?? '',
+      lat: json['lat'] != null ? (json['lat'] as num).toDouble() : null,
+      lng: json['lng'] != null ? (json['lng'] as num).toDouble() : null,
     );
   }
 }

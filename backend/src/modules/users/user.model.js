@@ -48,6 +48,8 @@ const userSchema = new mongoose.Schema(
         city:    { type: String, trim: true },
         state:   { type: String, trim: true },
         zipCode: { type: String, trim: true },
+        lat:     { type: Number, default: null, min: -90,  max: 90  },
+        lng:     { type: Number, default: null, min: -180, max: 180 },
       },
     ],
 

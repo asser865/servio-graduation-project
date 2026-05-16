@@ -1484,6 +1484,8 @@ String _homeStatusLabel(BookingStatus status) {
     BookingStatus.cancelled => 'Cancelled',
     BookingStatus.rejected => 'Rejected',
     BookingStatus.disputed => 'Disputed',
+    BookingStatus.awaitingCustomerConfirmation => 'Awaiting Confirmation',
+    BookingStatus.pendingAdminReview => 'Under Review',
   };
 }
 
@@ -1499,6 +1501,8 @@ ServioStatusChipType _homeChipType(BookingStatus status) {
     BookingStatus.cancelled => ServioStatusChipType.danger,
     BookingStatus.rejected => ServioStatusChipType.danger,
     BookingStatus.disputed => ServioStatusChipType.warning,
+    BookingStatus.awaitingCustomerConfirmation => ServioStatusChipType.warning,
+    BookingStatus.pendingAdminReview => ServioStatusChipType.warning,
   };
 }
 

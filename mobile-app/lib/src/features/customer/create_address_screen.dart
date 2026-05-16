@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/models/customer_address.dart';
+import '../../core/services/location_service.dart';
 import '../../core/state/customer_addresses_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
+import '../../shared/widgets/servio_map_widget.dart';
 
 class CreateAddressScreen extends StatefulWidget {
   const CreateAddressScreen({
@@ -29,6 +32,8 @@ class _CreateAddressScreenState extends State<CreateAddressScreen> {
   late final TextEditingController _zipCtrl;
 
   String? _submitError;
+  LatLng? _pickedLocation;
+  bool _loadingLocation = false;
 
   bool get _isEditing => widget.address != null;
 
@@ -41,6 +46,9 @@ class _CreateAddressScreenState extends State<CreateAddressScreen> {
     _cityCtrl = TextEditingController(text: address?.city ?? '');
     _stateCtrl = TextEditingController(text: address?.state ?? '');
     _zipCtrl = TextEditingController(text: address?.zipCode ?? '');
+    if (address != null && address.lat != null && address.lng != null) {
+      _pickedLocation = LatLng(address.lat!, address.lng!);
+    }
   }
 
   @override
@@ -66,6 +74,8 @@ class _CreateAddressScreenState extends State<CreateAddressScreen> {
             city: _cityCtrl.text,
             state: _stateCtrl.text,
             zipCode: _zipCtrl.text,
+            lat: _pickedLocation?.latitude,
+            lng: _pickedLocation?.longitude,
           )
         : await provider.addAddress(
             label: _labelCtrl.text,
@@ -73,6 +83,8 @@ class _CreateAddressScreenState extends State<CreateAddressScreen> {
             city: _cityCtrl.text,
             state: _stateCtrl.text,
             zipCode: _zipCtrl.text,
+            lat: _pickedLocation?.latitude,
+            lng: _pickedLocation?.longitude,
           );
 
     if (!mounted) return;
@@ -84,6 +96,17 @@ class _CreateAddressScreenState extends State<CreateAddressScreen> {
     setState(() {
       _submitError = provider.error ?? 'Failed to save address';
     });
+  }
+
+  Future<void> _fetchCurrentLocation() async {
+    setState(() => _loadingLocation = true);
+    final loc = await LocationService().getCurrentLocation();
+    if (mounted) {
+      setState(() {
+        _pickedLocation = loc;
+        _loadingLocation = false;
+      });
+    }
   }
 
   String? _requiredStreet(String? value) {
@@ -112,9 +135,11 @@ class _CreateAddressScreenState extends State<CreateAddressScreen> {
       ),
       body: Form(
         key: _formKey,
-        child: ListView(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(ServioSpacing.screenPadding),
-          children: <Widget>[
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
             ServioCard(
               radius: ServioRadius.lg,
               child: Row(
@@ -218,6 +243,49 @@ class _CreateAddressScreenState extends State<CreateAddressScreen> {
                 if (!saving) _saveAddress();
               },
             ),
+            const SizedBox(height: 16),
+            Text(
+              'Pin Location (Optional)',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 220,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: _pickedLocation == null
+                    ? Container(
+                        decoration: BoxDecoration(
+                          color: Colors.grey[200],
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Center(
+                          child: Text('Tap the map to pin your location'),
+                        ),
+                      )
+                    : ServioMapWidget(
+                        center: _pickedLocation!,
+                        interactive: true,
+                        markers: [buildPinMarker(_pickedLocation!)],
+                        onTap: (latLng) =>
+                            setState(() => _pickedLocation = latLng),
+                      ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: _loadingLocation ? null : _fetchCurrentLocation,
+              icon: _loadingLocation
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.my_location),
+              label: Text(
+                _loadingLocation ? 'Getting location...' : 'Use my location',
+              ),
+            ),
             if (_submitError != null) ...<Widget>[
               const SizedBox(height: 16),
               Container(
@@ -250,6 +318,7 @@ class _CreateAddressScreenState extends State<CreateAddressScreen> {
               ),
             ),
           ],
+          ),
         ),
       ),
     );

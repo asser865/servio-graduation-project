@@ -5,14 +5,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+
 import '../../core/api/api_client.dart';
 import '../../core/api/bookings_api.dart';
 import '../../core/models/backend_booking_model.dart';
 import '../../core/services/job_session_service.dart';
+import '../../core/services/location_service.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
+import '../../shared/widgets/servio_map_widget.dart';
 import '../messages/chat_screen.dart';
 
 /// Technician job details screen — implements the full booking lifecycle:
@@ -64,6 +69,10 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
 
   // Completion notes (Phase 5)
   final TextEditingController _notesCtrl = TextEditingController();
+
+  // Map (Phase 7)
+  LatLng? _customerLatLng;
+  bool _geocodingAddress = false;
 
   static const Duration _kTimeout = Duration(seconds: 12);
 
@@ -129,6 +138,7 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
         _error = null;
         _updating = false;
       });
+      _geocodeJobAddress();
       // Restore timer if we're in an active job section.
       if (section == JobSection.inProgress ||
           section == JobSection.completeConfirm) {
@@ -141,6 +151,23 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
         _error = 'Could not load job details. Please try again.';
         _loading = false;
         _updating = false;
+      });
+    }
+  }
+
+  Future<void> _geocodeJobAddress() async {
+    final job = _job;
+    if (job == null) return;
+    final street = job.addressStreet;
+    final city = job.addressCity;
+    if (street.isEmpty && city.isEmpty) return;
+
+    setState(() => _geocodingAddress = true);
+    final latLng = await LocationService().geocodeAddress('$street, $city');
+    if (mounted) {
+      setState(() {
+        _customerLatLng = latLng;
+        _geocodingAddress = false;
       });
     }
   }
@@ -873,7 +900,9 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
               ],
             ),
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 12),
+          _buildAddressMapPreview(),
+          const SizedBox(height: 20),
           _updating
               ? const Center(child: CircularProgressIndicator())
               : ServioPrimaryButton(
@@ -1289,6 +1318,38 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
                 child: const Text('Back to Queue'),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Helper: map preview (Phase 7) ─────────────────────────────────────────
+
+  /// Renders a 220 px non-interactive map snapshot centred on the geocoded
+  /// customer address.  Shows a loading indicator while geocoding is in
+  /// progress; returns [SizedBox.shrink] when no coords are available and
+  /// geocoding has finished.
+  Widget _buildAddressMapPreview() {
+    if (_geocodingAddress) {
+      return const SizedBox(
+        height: 220,
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    final pos = _customerLatLng;
+    if (pos == null) return const SizedBox.shrink();
+
+    return SizedBox(
+      height: 220,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(ServioRadius.lg),
+        child: ServioMapWidget(
+          center: pos,
+          zoom: 15,
+          interactive: false,
+          markers: <Marker>[
+            buildPinMarker(pos, color: Colors.blue),
           ],
         ),
       ),

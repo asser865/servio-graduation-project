@@ -45,5 +45,7 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Servio needs your location to help find nearby technicians and show your service address on the map.</string>
 </dict>
 </plist>
