@@ -9,6 +9,7 @@ enum BookingStatus {
   enRoute,
   arrived,
   inProgress,
+  awaitingCustomerConfirmation,
   completed,
   cancelled,
   rejected,
@@ -21,7 +22,8 @@ extension BookingStatusX on BookingStatus {
         BookingStatus.confirmed ||
         BookingStatus.enRoute ||
         BookingStatus.arrived ||
-        BookingStatus.inProgress =>
+        BookingStatus.inProgress ||
+        BookingStatus.awaitingCustomerConfirmation =>
           true,
         BookingStatus.completed ||
         BookingStatus.cancelled ||
@@ -184,6 +186,9 @@ BookingStatus _parseBookingStatus(String s) => switch (s.toLowerCase()) {
       'en_route' || 'enroute' => BookingStatus.enRoute,
       'arrived' => BookingStatus.arrived,
       'in_progress' || 'inprogress' => BookingStatus.inProgress,
+      'awaiting_customer_confirmation' ||
+      'awaitingcustomerconfirmation' =>
+        BookingStatus.awaitingCustomerConfirmation,
       'completed' || 'done' => BookingStatus.completed,
       'cancelled' || 'canceled' => BookingStatus.cancelled,
       'rejected' => BookingStatus.rejected,

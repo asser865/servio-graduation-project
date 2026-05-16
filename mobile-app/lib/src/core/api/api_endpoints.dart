@@ -50,6 +50,13 @@ class ApiEndpoints {
 
   static const String notify = '/notify';
 
+  // ── In-app notifications ─────────────────────────────────────────────────
+  static const String notifications = '/notifications';
+  static const String notificationsUnreadCount = '/notifications/unread-count';
+  static const String notificationsReadAll = '/notifications/read-all';
+  static String notificationMarkRead(String id) => '/notifications/$id/read';
+  static String notificationDelete(String id) => '/notifications/$id';
+
   static String paymentEarnings(String period) =>
       '/payments/earnings?period=$period';
 

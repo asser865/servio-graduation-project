@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/api/bookings_api.dart';
@@ -280,6 +281,8 @@ class _LiveBookingCard extends StatelessWidget {
         BookingStatus.enRoute => ServioStatusChipType.info,
         BookingStatus.arrived => ServioStatusChipType.info,
         BookingStatus.inProgress => ServioStatusChipType.info,
+        BookingStatus.awaitingCustomerConfirmation =>
+          ServioStatusChipType.warning,
         BookingStatus.completed => ServioStatusChipType.success,
         BookingStatus.cancelled => ServioStatusChipType.danger,
         BookingStatus.rejected => ServioStatusChipType.danger,
@@ -292,6 +295,7 @@ class _LiveBookingCard extends StatelessWidget {
         BookingStatus.enRoute => 'En Route',
         BookingStatus.arrived => 'Arrived',
         BookingStatus.inProgress => 'In Progress',
+        BookingStatus.awaitingCustomerConfirmation => 'Awaiting Your Confirmation',
         BookingStatus.completed => 'Completed',
         BookingStatus.cancelled => 'Cancelled',
         BookingStatus.rejected => 'Rejected',
@@ -386,26 +390,27 @@ class BookingDetailsScreen extends StatefulWidget {
 
 class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
   bool _cancelling = false;
+  bool _confirming = false;
 
-  Future<void> _cancelBooking() async {
-    if (_cancelling) return;
+  Future<void> _confirmCompletion() async {
+    if (_confirming) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Cancel Booking'),
+        title: const Text('Confirm Job Completion'),
         content: const Text(
-          'Are you sure you want to cancel this booking? This action cannot be undone.',
+          'By confirming, you acknowledge the job is done and release payment to the technician.\n\nThis action cannot be undone.',
         ),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Keep Booking'),
+            child: const Text('Not Yet'),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             child: Text(
-              'Yes, Cancel',
-              style: TextStyle(color: context.servio.danger),
+              'Yes, Confirm',
+              style: TextStyle(color: context.servio.accent),
             ),
           ),
         ],
@@ -413,11 +418,138 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
     );
     if (confirmed != true || !mounted) return;
 
-    setState(() => _cancelling = true);
+    setState(() => _confirming = true);
     final client = context.read<ApiClient>();
     try {
       await BookingsApi(client)
-          .updateStatus(widget.data.backendId, 'cancelled');
+          .updateStatus(widget.data.backendId, 'completed');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Job confirmed! Payment has been released. Thank you.'),
+        ),
+      );
+      _leaveDetails(context);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not confirm completion. Please try again.'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _confirming = false);
+    }
+  }
+
+  /// Shows a bottom sheet asking for a cancellation reason, then cancels
+  /// the booking with that reason sent to the backend.
+  Future<void> _cancelBooking() async {
+    if (_cancelling) return;
+
+    // ── Step 1: collect a reason ───────────────────────────────────────────
+    final reasons = <String>[
+      'Change of plans',
+      'Found another provider',
+      'Technician did not respond',
+      'Scheduled time is no longer suitable',
+      'Other',
+    ];
+    String selectedReason = reasons.first;
+
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(ServioRadius.xl)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheet) {
+            final servio = ctx.servio;
+            final theme = Theme.of(ctx);
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    // Handle
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 20),
+                        decoration: BoxDecoration(
+                          color: servio.border,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    Text('Cancel Booking',
+                        style: theme.textTheme.titleLarge
+                            ?.copyWith(fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Please tell us why you are cancelling.',
+                      style: theme.textTheme.bodyMedium
+                          ?.copyWith(color: servio.textSecondary),
+                    ),
+                    const SizedBox(height: 20),
+                    ...reasons.map((reason) => RadioListTile<String>(
+                          title: Text(reason),
+                          value: reason,
+                          groupValue: selectedReason,
+                          onChanged: (val) {
+                            if (val != null) setSheet(() => selectedReason = val);
+                          },
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                        )),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.of(ctx).pop(false),
+                            child: const Text('Keep Booking'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: servio.danger,
+                              foregroundColor: Colors.white,
+                            ),
+                            onPressed: () => Navigator.of(ctx).pop(true),
+                            child: const Text('Confirm Cancel'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    // ── Step 2: send cancellation with reason ──────────────────────────────
+    setState(() => _cancelling = true);
+    final client = context.read<ApiClient>();
+    try {
+      await BookingsApi(client).updateStatus(
+        widget.data.backendId,
+        'cancelled',
+        reason: selectedReason,
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Booking cancelled successfully.')),
@@ -543,46 +675,134 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              Container(
-                height: 160,
-                decoration: BoxDecoration(
-                  gradient: ServioGradients.warm,
-                  borderRadius: BorderRadius.circular(ServioRadius.lg),
-                ),
-                child: Center(
-                  child: Text(
-                    'Map Preview',
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(color: servio.accent),
+              // ── Map / Address deep link (HIGH-05) ─────────────────────────────
+              if (data.location.trim().isNotEmpty)
+                GestureDetector(
+                  onTap: () async {
+                    final query = Uri.encodeComponent(data.location.trim());
+                    final uri = Uri.parse(
+                        'https://www.google.com/maps/search/?api=1&query=$query');
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri,
+                          mode: LaunchMode.externalApplication);
+                    }
+                  },
+                  child: Container(
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: servio.backgroundSoft,
+                      borderRadius: BorderRadius.circular(ServioRadius.lg),
+                      border: Border.all(color: servio.border),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: <Widget>[
+                        Icon(Icons.location_on_outlined,
+                            color: servio.accent, size: 22),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            data.location.trim(),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodyMedium
+                                ?.copyWith(color: servio.accent),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(Icons.open_in_new_rounded,
+                            size: 16, color: servio.textSecondary),
+                      ],
+                    ),
                   ),
                 ),
-              ),
               const SizedBox(height: 20),
-              OutlinedButton(
-                onPressed: () {
-                  if (data.backendId.trim().isNotEmpty) {
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => WriteReviewScreen(
-                          technicianName: data.technicianName,
-                          jobSummary: data.serviceName,
-                          bookingId: data.backendId,
+              // Write a Review — only available once the job is completed.
+              if (data.statusCode == 'completed')
+                OutlinedButton(
+                  onPressed: () {
+                    if (data.backendId.trim().isNotEmpty) {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => WriteReviewScreen(
+                            technicianName: data.technicianName,
+                            jobSummary: data.serviceName,
+                            bookingId: data.backendId,
+                          ),
+                        ),
+                      );
+                      return;
+                    }
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Booking details are still loading. Please try again.',
                         ),
                       ),
                     );
-                    return;
-                  }
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Booking details are still loading. Please try again.',
+                  },
+                  child: const Text('Write a Review'),
+                ),
+              // ── Confirm Completion — awaiting customer confirmation ──
+              if (data.statusCode == 'awaiting_customer_confirmation') ...<Widget>[
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: ServioColors.tint(servio.accent),
+                    borderRadius: BorderRadius.circular(ServioRadius.md),
+                    border: Border.all(
+                        color: servio.accent.withValues(alpha: 0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      Row(
+                        children: <Widget>[
+                          Icon(Icons.check_circle_outline_rounded,
+                              color: servio.accent, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Job Complete — Please Confirm',
+                              style: theme.textTheme.titleSmall
+                                  ?.copyWith(color: servio.accent),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  );
-                },
-                child: const Text('Write a Review'),
-              ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Your technician has finished the job. '  
+                        'Confirm completion to release payment.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                            color: servio.textSecondary, height: 1.5),
+                      ),
+                      const SizedBox(height: 14),
+                      _confirming
+                          ? const Center(child: CircularProgressIndicator())
+                          : ElevatedButton.icon(
+                              onPressed: _confirmCompletion,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: servio.accent,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(ServioRadius.md),
+                                ),
+                              ),
+                              icon: const Icon(
+                                  Icons.verified_rounded, size: 18),
+                              label: const Text('Confirm Job Complete'),
+                            ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 6),
+              ],
               const SizedBox(height: 10),
               // Cancel is only available for pending bookings.
               if (data.statusCode == 'pending')
@@ -632,11 +852,36 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
       'confirmed' || 'accepted' => 1,
       'en_route' || 'arrived' => 2,
       'in_progress' => 3,
-      'completed' => 4,
+      'awaiting_customer_confirmation' => 4,
+      'completed' => 5,
       _ => -1,
     };
 
     if (level == -1) {
+      // ── Terminal / edge states ────────────────────────────────────────────────
+      final (terminalLabel, terminalMeta) = switch (data.statusCode) {
+        'cancelled' || 'canceled' => (
+          'Booking Cancelled',
+          'This booking was cancelled. You can re-book anytime.',
+        ),
+        'rejected' => (
+          'Booking Declined',
+          'The technician was unable to accept this booking.',
+        ),
+        'disputed' => (
+          'Under Review',
+          'This booking has been flagged for admin review. '
+              'Our team will reach out within 24–8 hours.',
+        ),
+        'pending_admin_review' => (
+          'Pending Admin Review',
+          'Our support team is reviewing this booking.',
+        ),
+        _ => (
+          data.statusLabel,
+          'This booking is currently ${data.statusLabel.toLowerCase()}.',
+        ),
+      };
       return <Widget>[
         _TimelineRow(
           label: 'Booking Placed',
@@ -644,10 +889,11 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
           meta: '${data.date} ${data.time.split('-').first.trim()}',
         ),
         _TimelineRow(
-          label: data.statusLabel,
+          label: terminalLabel,
           complete: false,
-          active: true,
-          meta: 'This booking was ${data.statusCode}.',
+          active: data.statusCode == 'disputed' ||
+              data.statusCode == 'pending_admin_review',
+          meta: terminalMeta,
         ),
       ];
     }
@@ -671,8 +917,8 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
       ),
       _TimelineRow(
         label: isCash ? 'Payment Method (Cash)' : 'Payment Authorized',
-        complete: isCash ? level >= 4 : level >= 0,
-        active: isCash ? level < 4 : false,
+        complete: isCash ? level >= 5 : level >= 0,
+        active: isCash ? level < 5 : false,
         meta: isCash
             ? 'Cash payment due upon completion'
             : 'Card payment confirmed via Escrow',
@@ -688,10 +934,18 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                 : 'Finished'),
       ),
       _TimelineRow(
+        label: 'Awaiting Your Confirmation',
+        complete: level >= 5,
+        active: level == 4,
+        meta: level == 4
+            ? 'Technician finished — please confirm to release payment'
+            : (level >= 5 ? 'Confirmed' : 'Upcoming'),
+      ),
+      _TimelineRow(
         label: 'Completed',
-        complete: level == 4,
+        complete: level == 5,
         active: false,
-        meta: level == 4 ? 'Job done' : 'Upcoming',
+        meta: level == 5 ? 'Job done' : 'Upcoming',
       ),
     ];
   }
@@ -861,6 +1115,8 @@ String _statusCodeFromStatus(BookingStatus status) => switch (status) {
       BookingStatus.enRoute => 'en_route',
       BookingStatus.arrived => 'arrived',
       BookingStatus.inProgress => 'in_progress',
+      BookingStatus.awaitingCustomerConfirmation =>
+        'awaiting_customer_confirmation',
       BookingStatus.completed => 'completed',
       BookingStatus.cancelled => 'cancelled',
       BookingStatus.rejected => 'rejected',
@@ -876,6 +1132,9 @@ ServioStatusChipType _chipTypeForStatusCode(String statusCode) {
     'in_progress' ||
     'inprogress' =>
       ServioStatusChipType.info,
+    'awaiting_customer_confirmation' ||
+    'awaitingcustomerconfirmation' =>
+      ServioStatusChipType.warning,
     'cancelled' || 'canceled' || 'rejected' => ServioStatusChipType.danger,
     'disputed' => ServioStatusChipType.warning,
     _ => ServioStatusChipType.warning,

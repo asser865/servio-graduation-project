@@ -236,13 +236,6 @@ class _ChatScreenState extends State<ChatScreen> {
                 color: theme.colorScheme.surface,
                 child: Row(
                   children: <Widget>[
-                    IconButton(
-                      onPressed: null,
-                      icon: Icon(
-                        Icons.attach_file_rounded,
-                        color: servio.textSecondary.withValues(alpha: 0.45),
-                      ),
-                    ),
                     Expanded(
                       child: TextField(
                         controller: _controller,
@@ -330,7 +323,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     return RefreshIndicator(
       key: const ValueKey<String>('messages'),
-      onRefresh: _load,
+      onRefresh: _poll,
       child: ListView.builder(
         controller: _scrollController,
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),

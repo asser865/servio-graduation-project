@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/api/api_client.dart';
@@ -235,7 +235,7 @@ class _SuccessBody extends StatefulWidget {
 class _SuccessBodyState extends State<_SuccessBody> {
   late String _payoutMethod;
   late String _payoutSchedule;
-  late TextEditingController _bankNameCtrl;
+  String? _selectedBank;
   late TextEditingController _accountHolderCtrl;
   late TextEditingController _accountNumberCtrl;
   late TextEditingController _walletNumberCtrl;
@@ -252,7 +252,9 @@ class _SuccessBodyState extends State<_SuccessBody> {
       _payoutSchedule = 'weekly';
     }
 
-    _bankNameCtrl = TextEditingController(text: widget.summary.bankName);
+    _selectedBank = _kBankNames.contains(widget.summary.bankName)
+        ? widget.summary.bankName
+        : null;
     _accountHolderCtrl =
         TextEditingController(text: widget.summary.accountHolder);
     _accountNumberCtrl =
@@ -261,9 +263,19 @@ class _SuccessBodyState extends State<_SuccessBody> {
         TextEditingController(text: widget.summary.walletNumber);
   }
 
+  static const List<String> _kBankNames = <String>[
+    'CIB',
+    'NBE — National Bank of Egypt',
+    'Banque Misr',
+    'QNB',
+    'HSBC Egypt',
+    'Alex Bank',
+    'Abu Dhabi Islamic Bank',
+    'Faisal Islamic Bank',
+  ];
+
   @override
   void dispose() {
-    _bankNameCtrl.dispose();
     _accountHolderCtrl.dispose();
     _accountNumberCtrl.dispose();
     _walletNumberCtrl.dispose();
@@ -282,7 +294,7 @@ class _SuccessBodyState extends State<_SuccessBody> {
         payoutMethod: _payoutMethod,
         payoutSchedule: _payoutSchedule,
         payoutDetails: {
-          'bankName': _bankNameCtrl.text.trim(),
+          'bankName': _selectedBank ?? '',
           'accountHolder': _accountHolderCtrl.text.trim(),
           'accountNumber': _accountNumberCtrl.text.trim(),
           'walletNumber': _walletNumberCtrl.text.trim(),
@@ -362,7 +374,8 @@ class _SuccessBodyState extends State<_SuccessBody> {
   Widget _buildDropdown({
     required String label,
     required String hint,
-    required TextEditingController controller,
+    required String? value,
+    required ValueChanged<String?> onChanged,
     required List<String> items,
   }) {
     final theme = Theme.of(context);
@@ -377,7 +390,7 @@ class _SuccessBodyState extends State<_SuccessBody> {
                   ?.copyWith(fontWeight: FontWeight.w600)),
           const SizedBox(height: 6),
           DropdownButtonFormField<String>(
-            value: items.contains(controller.text) ? controller.text : null,
+            value: value,
             hint: Text(hint,
                 style: theme.textTheme.bodyMedium
                     ?.copyWith(color: servio.textSecondary)),
@@ -404,9 +417,7 @@ class _SuccessBodyState extends State<_SuccessBody> {
             items: items
                 .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                 .toList(),
-            onChanged: (val) {
-              if (val != null) controller.text = val;
-            },
+            onChanged: onChanged,
           ),
         ],
       ),
@@ -594,17 +605,10 @@ class _SuccessBodyState extends State<_SuccessBody> {
                                       _buildDropdown(
                                           label: 'Bank Name',
                                           hint: 'Select bank...',
-                                          controller: _bankNameCtrl,
-                                          items: [
-                                            'CIB',
-                                            'NBE â€” National Bank of Egypt',
-                                            'Banque Misr',
-                                            'QNB',
-                                            'HSBC Egypt',
-                                            'Alex Bank',
-                                            'Abu Dhabi Islamic Bank',
-                                            'Faisal Islamic Bank'
-                                          ]),
+                                          value: _selectedBank,
+                                          onChanged: (val) => setState(
+                                              () => _selectedBank = val),
+                                          items: _kBankNames),
                                       _buildTextField(
                                         label: 'Account Holder Name',
                                         hint: 'Exactly as on your bank card',

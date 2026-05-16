@@ -22,6 +22,7 @@ class BackendBooking {
     required this.paymentCardLast4,
     required this.paymentCardType,
     required this.paymentCardLabel,
+    this.paymentStatus = 'unpaid',
     this.workerAvailability = const <AvailabilitySlot>[],
   });
 
@@ -45,6 +46,11 @@ class BackendBooking {
   final String paymentCardLast4;
   final String paymentCardType;
   final String paymentCardLabel;
+
+  /// Backend `paymentStatus` field. Values: unpaid | held | released |
+  /// refunded | failed | disputed | cash_pending_settlement | cash_settled.
+  final String paymentStatus;
+
   final List<AvailabilitySlot> workerAvailability;
 
   factory BackendBooking.fromJson(Map<String, dynamic> json) {
@@ -141,6 +147,7 @@ class BackendBooking {
       customerId: customerId,
       pin: (json['pin'] as String?) ?? '',
       paymentMethod: (json['paymentMethod'] as String?) ?? '',
+      paymentStatus: (json['paymentStatus'] as String?) ?? 'unpaid',
       paymentCardLast4: (paymentMeta['last4'] as String?) ??
           (savedCard['last4'] as String?) ??
           '',
@@ -176,6 +183,7 @@ class BackendBooking {
       customerId: customerId,
       pin: pin,
       paymentMethod: paymentMethod,
+      paymentStatus: paymentStatus,
       paymentCardLast4: paymentCardLast4,
       paymentCardType: paymentCardType,
       paymentCardLabel: paymentCardLabel,

@@ -23,7 +23,13 @@ class _EarningsScreenState extends State<EarningsScreen> {
   static const List<String> _periods = <String>[
     'This Week',
     'This Month',
-    'All Time'
+    'All Time',
+  ];
+
+  static const List<String> _periodApiParams = <String>[
+    'week',
+    'month',
+    'all',
   ];
 
   EarningsSummary? _summary;
@@ -47,8 +53,9 @@ class _EarningsScreenState extends State<EarningsScreen> {
       final client = context.read<ApiClient>();
       final session = context.read<SessionProvider>();
       final workerId = session.account?.id.trim() ?? '';
+      final period = _periodApiParams[_periodIndex];
 
-      final summaryFuture = PaymentsApi(client).getEarnings();
+      final summaryFuture = PaymentsApi(client).getEarnings(period: period);
       final bookingsFuture =
           BookingsApi(client).getWorkerBookings(workerId: workerId);
 
@@ -58,8 +65,18 @@ class _EarningsScreenState extends State<EarningsScreen> {
       _summary = results[0] as EarningsSummary;
 
       final jobs = results[1] as List<BackendBooking>;
+      // Filter to period window on the client side so the chart stays consistent
+      // with the summary figures shown above it.
+      final now = DateTime.now();
+      final periodStart = switch (_periodIndex) {
+        0 => now.subtract(const Duration(days: 7)),  // This Week
+        1 => DateTime(now.year, now.month, 1),        // This Month
+        _ => DateTime(2000),                          // All Time
+      };
       _recentJobs = jobs
-          .where((job) => ['completed', 'done'].contains(job.status))
+          .where((job) =>
+              ['completed', 'done'].contains(job.status) &&
+              !job.scheduledDate.isBefore(periodStart))
           .toList();
       _recentJobs.sort((a, b) => b.scheduledDate.compareTo(a.scheduledDate));
     } catch (_) {
@@ -70,6 +87,106 @@ class _EarningsScreenState extends State<EarningsScreen> {
       if (mounted) setState(() => _loading = false);
     }
   }
+
+  // ── Chart helpers ────────────────────────────────────────────────────────────
+
+  /// Builds the bar chart columns from real [_recentJobs] data.
+  ///
+  /// - Week  → 7 bars labelled Mon–Sun, showing the current ISO week.
+  /// - Month → last 8 bar-buckets (roughly weekly within the month).
+  /// - All   → the 6 most active months from the data set.
+  List<_BarData> _buildChartBars() {
+    if (_recentJobs.isEmpty) {
+      // Return flat zero bars as placeholder so the chart axis is visible.
+      return switch (_periodIndex) {
+        0 => _weekdayLabels()
+            .map((l) => _BarData(label: l, amount: 0, active: false))
+            .toList(),
+        1 => List<_BarData>.generate(
+            4,
+            (i) => _BarData(label: 'Wk ${i + 1}', amount: 0, active: false)),
+        _ => ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun']
+            .map((l) => _BarData(label: l, amount: 0, active: false))
+            .toList(),
+      };
+    }
+
+    switch (_periodIndex) {
+      // ── This Week ─────────────────────────────────────────────────────────
+      case 0:
+        final buckets = List<double>.filled(7, 0);
+        final today = DateTime.now();
+        // ISO weekday: Mon=1 … Sun=7 → index 0–6
+        final weekStart =
+            today.subtract(Duration(days: today.weekday - 1));
+        for (final job in _recentJobs) {
+          final diff = job.scheduledDate
+              .difference(DateTime(
+                  weekStart.year, weekStart.month, weekStart.day))
+              .inDays;
+          if (diff >= 0 && diff < 7) buckets[diff] += job.totalAmount;
+        }
+        final todayIdx = today.weekday - 1;
+        return List<_BarData>.generate(7, (i) {
+          return _BarData(
+            label: _weekdayLabels()[i],
+            amount: buckets[i],
+            active: buckets[i] > 0 || i == todayIdx,
+          );
+        });
+
+      // ── This Month ────────────────────────────────────────────────────────
+      case 1:
+        final now = DateTime.now();
+        final daysInMonth = DateUtils.getDaysInMonth(now.year, now.month);
+        final weeksCount = (daysInMonth / 7).ceil();
+        final buckets = List<double>.filled(weeksCount, 0);
+        for (final job in _recentJobs) {
+          final d = job.scheduledDate;
+          if (d.month == now.month && d.year == now.year) {
+            final weekIdx = ((d.day - 1) / 7).floor();
+            if (weekIdx < weeksCount) buckets[weekIdx] += job.totalAmount;
+          }
+        }
+        return List<_BarData>.generate(weeksCount, (i) {
+          return _BarData(
+            label: 'W${i + 1}',
+            amount: buckets[i],
+            active: buckets[i] > 0,
+          );
+        });
+
+      // ── All Time ──────────────────────────────────────────────────────────
+      default:
+        final monthMap = <String, double>{};
+        final monthOrder = <String>[];
+        for (final job in _recentJobs) {
+          final key =
+              '${_monthAbbr(job.scheduledDate.month)} ${job.scheduledDate.year}';
+          if (!monthMap.containsKey(key)) monthOrder.add(key);
+          monthMap[key] = (monthMap[key] ?? 0) + job.totalAmount;
+        }
+        // Show most recent 6 months, oldest first
+        final keys = monthOrder.reversed.take(6).toList().reversed.toList();
+        return keys
+            .map((k) => _BarData(
+                  label: k.split(' ').first, // e.g. 'Jan'
+                  amount: monthMap[k]!,
+                  active: monthMap[k]! > 0,
+                ))
+            .toList();
+    }
+  }
+
+  static List<String> _weekdayLabels() =>
+      const <String>['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+  static String _monthAbbr(int month) => const <String>[
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      ][month - 1];
+
+  // ── Withdraw bottom sheet ─────────────────────────────────────────────────
 
   void _showWithdrawComingSoon() {
     showModalBottomSheet<void>(
@@ -266,7 +383,11 @@ class _EarningsScreenState extends State<EarningsScreen> {
                 children: List<Widget>.generate(_periods.length, (int index) {
                   final active = index == _periodIndex;
                   return GestureDetector(
-                    onTap: () => setState(() => _periodIndex = index),
+                    onTap: () {
+                      if (_periodIndex == index) return;
+                      setState(() => _periodIndex = index);
+                      _fetchData();
+                    },
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 14, vertical: 10),
@@ -333,19 +454,35 @@ class _EarningsScreenState extends State<EarningsScreen> {
                 height: 180,
                 child: ServioCard(
                   radius: ServioRadius.lg,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: const <Widget>[
-                      _BarColumn(label: 'Mon', height: 54, active: false),
-                      _BarColumn(label: 'Tue', height: 82, active: true),
-                      _BarColumn(label: 'Wed', height: 66, active: true),
-                      _BarColumn(label: 'Thu', height: 110, active: true),
-                      _BarColumn(label: 'Fri', height: 94, active: true),
-                      _BarColumn(label: 'Sat', height: 70, active: false),
-                      _BarColumn(label: 'Sun', height: 120, active: true),
-                    ],
-                  ),
+                  child: _recentJobs.isEmpty
+                      ? Center(
+                          child: Text(
+                            'No earnings data for this period.',
+                            style: theme.textTheme.bodySmall
+                                ?.copyWith(color: servio.textSecondary),
+                          ),
+                        )
+                      : LayoutBuilder(
+                          builder: (context, constraints) {
+                            final bars = _buildChartBars();
+                            final maxAmt =
+                                bars.map((b) => b.amount).fold(0.0, (a, b) => a > b ? a : b);
+                            final maxBarH = constraints.maxHeight - 32.0;
+                            return Row(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: bars.map((bar) {
+                                final ratio = maxAmt > 0 ? bar.amount / maxAmt : 0.0;
+                                final barH = (ratio * maxBarH).clamp(8.0, maxBarH);
+                                return _BarColumn(
+                                  label: bar.label,
+                                  height: barH,
+                                  active: bar.active,
+                                );
+                              }).toList(),
+                            );
+                          },
+                        ),
                 ),
               ),
               const SizedBox(height: 24),
@@ -371,7 +508,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
                         service: job.serviceName,
                         customer: job.customerName,
                         amount: '${job.totalAmount.toStringAsFixed(0)} EGP',
-                        released: true, // simplified
+                        paymentStatus: job.paymentStatus,
                       ),
                     )),
               const SizedBox(height: 12),
@@ -384,6 +521,18 @@ class _EarningsScreenState extends State<EarningsScreen> {
       ),
     );
   }
+}
+
+/// Data model for one bar in the earnings chart.
+class _BarData {
+  const _BarData({
+    required this.label,
+    required this.amount,
+    required this.active,
+  });
+  final String label;
+  final double amount;
+  final bool active;
 }
 
 class _BarColumn extends StatelessWidget {
@@ -486,18 +635,40 @@ class _TransactionCard extends StatelessWidget {
     required this.service,
     required this.customer,
     required this.amount,
-    required this.released,
+    required this.paymentStatus,
   });
 
   final String date;
   final String service;
   final String customer;
   final String amount;
-  final bool released;
+
+  /// Backend paymentStatus value: released | cash_settled | held | unpaid | …
+  final String paymentStatus;
+
+  bool get _isReleased =>
+      paymentStatus == 'released' || paymentStatus == 'cash_settled';
+
+  bool get _isHeld => paymentStatus == 'held';
+
+  String get _badgeLabel => switch (paymentStatus) {
+        'released' || 'cash_settled' => 'Released',
+        'held' => 'Held',
+        'refunded' => 'Refunded',
+        'failed' => 'Failed',
+        'disputed' => 'Disputed',
+        'cash_pending_settlement' => 'Cash Pending',
+        _ => 'Pending',
+      };
 
   @override
   Widget build(BuildContext context) {
     final servio = context.servio;
+    final badgeColor = _isReleased
+        ? servio.success
+        : _isHeld
+            ? servio.info
+            : servio.warning;
 
     return ServioCard(
       child: Row(
@@ -538,14 +709,13 @@ class _TransactionCard extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: ServioColors.tint(
-                      released ? servio.success : servio.warning),
+                  color: ServioColors.tint(badgeColor),
                   borderRadius: BorderRadius.circular(ServioRadius.full),
                 ),
                 child: Text(
-                  released ? 'Released' : 'Pending',
+                  _badgeLabel,
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: released ? servio.success : servio.warning,
+                        color: badgeColor,
                       ),
                 ),
               ),
