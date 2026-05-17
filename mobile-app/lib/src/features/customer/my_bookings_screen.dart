@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -11,6 +13,7 @@ import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
+import '../../design_system/widgets/servio_skeleton.dart';
 import '../../design_system/widgets/servio_status_chip.dart';
 import '../booking/booking_flow_data.dart';
 import '../booking/booking_step_one_screen.dart';
@@ -34,12 +37,32 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
   List<BookingModel> _bookings = <BookingModel>[];
   bool _loading = true;
   String? _error;
+  Timer? _pollingTimer;
 
   @override
   void initState() {
     super.initState();
     _tabIndex = widget.initialTabIndex;
     WidgetsBinding.instance.addPostFrameCallback((_) => _fetchBookings());
+    _pollingTimer = Timer.periodic(const Duration(seconds: 20), (_) => _silentRefresh());
+  }
+
+  @override
+  void dispose() {
+    _pollingTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _silentRefresh() async {
+    try {
+      final client = context.read<ApiClient>();
+      final raw = await BookingsApi(client).getMyBookings();
+      if (mounted) {
+        setState(() {
+          _bookings = raw.map(BookingModel.fromBackend).toList();
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _fetchBookings() async {
@@ -136,7 +159,13 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
   }
 
   Widget _buildTabContent() {
-    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_loading) {
+      return ListView.separated(
+        itemCount: 4,
+        separatorBuilder: (_, __) => const SizedBox(height: 16),
+        itemBuilder: (_, __) => const ServioSkeleton(height: 140, radius: 16),
+      );
+    }
     if (_error != null) return Center(child: Text(_error!));
 
     switch (_tabIndex) {

@@ -116,7 +116,13 @@ class _BookingStepOneScreenState extends State<BookingStepOneScreen> {
                         shape: BoxShape.circle,
                         border: Border.all(color: servio.accent, width: 2),
                       ),
-                      child: const Center(child: Text('AN')),
+                      child: Center(
+                        child: Text(
+                          widget.data.technicianName.isNotEmpty
+                              ? widget.data.technicianName.trim()[0].toUpperCase()
+                              : '?',
+                        ),
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(

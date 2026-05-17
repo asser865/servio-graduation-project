@@ -351,12 +351,22 @@ class BookingsProvider extends ChangeNotifier {
   BookingsProvider(this._storage, this._api) {
     _loadCached();
     refresh();
+    _pollingTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+      _silentRefresh();
+    });
   }
 
   final StorageService _storage;
   final BookingsApi _api;
   final List<BookingModel> _bookings = <BookingModel>[];
   bool _loading = false;
+  Timer? _pollingTimer;
+
+  @override
+  void dispose() {
+    _pollingTimer?.cancel();
+    super.dispose();
+  }
 
   List<BookingModel> get all => List<BookingModel>.unmodifiable(_bookings);
   bool get isLoading => _loading;
@@ -386,6 +396,19 @@ class BookingsProvider extends ChangeNotifier {
     } finally {
       _loading = false;
       notifyListeners();
+    }
+  }
+
+  Future<void> _silentRefresh() async {
+    try {
+      final raw = await _api.getMyBookings();
+      _bookings
+        ..clear()
+        ..addAll(raw.map(BookingModel.fromBackend));
+      await _save();
+      notifyListeners();
+    } catch (_) {
+      // keep cached data on error
     }
   }
 

@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/api/bookings_api.dart';
@@ -841,34 +842,64 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text('Destination',
-                    style: Theme.of(context)
-                        .textTheme
-                        .labelMedium
-                        ?.copyWith(color: servio.textSecondary)),
-                const SizedBox(height: 8),
-                Text(
-                  job.customerName.isNotEmpty ? job.customerName : 'Customer',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  job.addressCity.isNotEmpty
-                      ? job.addressCity
-                      : 'Address on file',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(color: servio.textSecondary),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Scheduled: ${job.scheduledDate.day}/${job.scheduledDate.month}/${job.scheduledDate.year}'
-                  '${job.scheduledTime.isNotEmpty ? '  ·  ${job.scheduledTime}' : ''}',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: servio.textSecondary),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Destination',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelMedium
+                                  ?.copyWith(color: servio.textSecondary)),
+                          const SizedBox(height: 8),
+                          Text(
+                            job.customerName.isNotEmpty ? job.customerName : 'Customer',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            job.addressCity.isNotEmpty
+                                ? job.addressCity
+                                : 'Address on file',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(color: servio.textSecondary),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Scheduled: ${job.scheduledDate.day}/${job.scheduledDate.month}/${job.scheduledDate.year}'
+                            '${job.scheduledTime.isNotEmpty ? '  ·  ${job.scheduledTime}' : ''}',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(color: servio.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: servio.accent.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: IconButton(
+                        icon: Icon(Icons.directions_rounded, color: servio.accent),
+                        tooltip: 'Open in Maps',
+                        onPressed: () async {
+                          final query = Uri.encodeComponent(
+                              job.addressCity.isNotEmpty ? job.addressCity : 'Cairo, Egypt');
+                          final url = Uri.parse('https://www.google.com/maps/search/?api=1&query=$query');
+                          if (await canLaunchUrl(url)) {
+                            await launchUrl(url);
+                          }
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

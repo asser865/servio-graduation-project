@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:developer' as developer;
 
 import 'package:flutter/foundation.dart';
@@ -32,7 +33,11 @@ const String _kSnapshotKey = 'servio_booking_snapshot';
 /// the provider falls back to the previous booking-snapshot approach so the
 /// UI never shows a permanently broken state.
 class NotificationsProvider extends ChangeNotifier {
-  NotificationsProvider(this._storage, this._client);
+  NotificationsProvider(this._storage, this._client) {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+      _silentRefresh();
+    });
+  }
 
   final StorageService _storage;
   final ApiClient _client;
@@ -40,6 +45,13 @@ class NotificationsProvider extends ChangeNotifier {
   List<AppNotification> _notifications = <AppNotification>[];
   bool _loading = false;
   String? _error;
+  Timer? _pollingTimer;
+
+  @override
+  void dispose() {
+    _pollingTimer?.cancel();
+    super.dispose();
+  }
 
   // ── Public state ──────────────────────────────────────────────────────────
 
@@ -134,6 +146,58 @@ class NotificationsProvider extends ChangeNotifier {
       }
     } finally {
       _loading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _silentRefresh({UserRole role = UserRole.customer, String? workerId}) async {
+    try {
+      final data = _client.unwrapData(
+        await _client.get(ApiEndpoints.notifications),
+      );
+
+      final rawList = data['notifications'];
+      if (rawList is List) {
+        _notifications = rawList
+            .whereType<Map<String, dynamic>>()
+            .map(AppNotification.fromBackend)
+            .toList();
+      } else {
+        _notifications = <AppNotification>[];
+      }
+
+      _updateSnapshotFromNotifications();
+      _error = null;
+    } catch (primaryErr) {
+      try {
+        final bookingsApi = BookingsApi(_client);
+        final List<BackendBooking> bookings;
+
+        if (role == UserRole.technician && workerId != null) {
+          bookings = await bookingsApi.getWorkerBookings(workerId: workerId);
+        } else {
+          bookings = await bookingsApi.getMyBookings();
+        }
+
+        final snapshot = _loadSnapshot();
+        final isFirstLoad = snapshot.isEmpty;
+
+        final feed = <AppNotification>[];
+        for (final booking in bookings) {
+          final entry =
+              _toFallbackNotification(booking, snapshot, isFirstLoad);
+          if (entry != null) feed.add(entry);
+        }
+
+        feed.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        _saveSnapshot({for (final b in bookings) b.id: b.status});
+
+        _notifications = feed;
+        _error = null;
+      } catch (fallbackErr) {
+        // Silently fail on silent refresh
+      }
+    } finally {
       notifyListeners();
     }
   }

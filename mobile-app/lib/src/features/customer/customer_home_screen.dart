@@ -26,6 +26,7 @@ import 'technician_listing_screen.dart';
 import 'technician_profile_screen.dart';
 import '../shared/notifications_screen.dart';
 import '../shared/search_results_screen.dart';
+import '../booking/booking_flow_data.dart';
 
 class CustomerHomeScreen extends StatelessWidget {
   const CustomerHomeScreen({super.key});
@@ -1371,7 +1372,15 @@ class _FloatingBookingCard extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => BookingDetailsScreen(
+                          data: _flowDataFromBooking(booking),
+                        ),
+                      ),
+                    );
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: servio.accent,
                     foregroundColor: Colors.white,
@@ -1389,6 +1398,53 @@ class _FloatingBookingCard extends StatelessWidget {
       ),
     );
   }
+
+  BookingFlowData _flowDataFromBooking(BookingModel booking) {
+    return BookingFlowData(
+      backendId: booking.id,
+      serviceName: booking.serviceName,
+      serviceId: booking.serviceId,
+      category: booking.serviceCategory,
+      technicianName: booking.technicianName,
+      technicianId: booking.technicianId,
+      date: booking.date,
+      time: booking.time,
+      location: booking.location,
+      amount: booking.amount,
+      reference: booking.reference,
+      pin: booking.pin,
+      paymentMethod: booking.paymentMethod,
+      paymentMethodCode: booking.paymentMethod.toLowerCase().contains('card')
+          ? 'card'
+          : 'cash',
+      savedCardLabel: _cardLabelFor(booking),
+      savedCardLast4: booking.paymentCardLast4,
+      statusLabel: _homeStatusLabel(booking.status),
+      statusCode: _statusCodeFromStatus(booking.status),
+    );
+  }
+
+  String _cardLabelFor(BookingModel booking) {
+    if (booking.paymentCardLabel.isNotEmpty) return booking.paymentCardLabel;
+    if (booking.paymentCardLast4.isNotEmpty) {
+      return 'Card ending ${booking.paymentCardLast4}';
+    }
+    return '';
+  }
+
+  String _statusCodeFromStatus(BookingStatus status) => switch (status) {
+        BookingStatus.pending => 'pending',
+        BookingStatus.confirmed => 'confirmed',
+        BookingStatus.enRoute => 'en_route',
+        BookingStatus.arrived => 'arrived',
+        BookingStatus.inProgress => 'in_progress',
+        BookingStatus.awaitingCustomerConfirmation =>
+          'awaiting_customer_confirmation',
+        BookingStatus.completed => 'completed',
+        BookingStatus.cancelled => 'cancelled',
+        BookingStatus.rejected => 'rejected',
+        BookingStatus.disputed => 'disputed',
+      };
 }
 
 class _AnimatedBookingStatusChip extends StatefulWidget {
