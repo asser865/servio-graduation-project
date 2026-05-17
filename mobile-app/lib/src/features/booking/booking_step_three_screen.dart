@@ -602,6 +602,7 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
                               widget.data.technicianName
                                   .trim()
                                   .split(' ')
+                                  .where((w) => w.isNotEmpty)
                                   .take(2)
                                   .map((w) => w[0])
                                   .join()
@@ -1215,6 +1216,7 @@ BookingFlowData _confirmationDataFromBackend(
     savedCardLast4: booking.paymentCardLast4,
     statusCode: booking.status,
     statusLabel: _statusLabelFromBackend(booking.status),
+    createdAt: booking.createdAt,
   );
 }
 
@@ -1225,6 +1227,8 @@ String _statusLabelFromBackend(String status) {
     'en_route' || 'enroute' => 'En Route',
     'arrived' => 'Arrived',
     'in_progress' || 'inprogress' => 'In Progress',
+    'awaiting_customer_confirmation' => 'Awaiting Confirmation',
+    'pending_admin_review' => 'Under Review',
     'completed' || 'done' => 'Completed',
     'cancelled' || 'canceled' => 'Cancelled',
     'rejected' => 'Rejected',

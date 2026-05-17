@@ -61,6 +61,8 @@ class UsersApi {
     String city = '',
     String state = '',
     String zipCode = '',
+    double? lat,
+    double? lng,
   }) async {
     final response = await _client.post(
       ApiEndpoints.usersMeAddresses,
@@ -70,6 +72,8 @@ class UsersApi {
         'city': city.trim(),
         'state': state.trim(),
         'zipCode': zipCode.trim(),
+        if (lat != null) 'lat': lat,
+        if (lng != null) 'lng': lng,
       },
     );
     return CustomerAddress.fromBackend(_client.unwrapData(response));
@@ -82,6 +86,8 @@ class UsersApi {
     String city = '',
     String state = '',
     String zipCode = '',
+    double? lat,
+    double? lng,
   }) async {
     final response = await _client.patch(
       ApiEndpoints.usersMeAddress(id),
@@ -91,6 +97,8 @@ class UsersApi {
         'city': city.trim(),
         'state': state.trim(),
         'zipCode': zipCode.trim(),
+        if (lat != null) 'lat': lat,
+        if (lng != null) 'lng': lng,
       },
     );
     return CustomerAddress.fromBackend(_client.unwrapData(response));

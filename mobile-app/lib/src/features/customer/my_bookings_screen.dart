@@ -312,6 +312,7 @@ class _LiveBookingCard extends StatelessWidget {
         BookingStatus.inProgress => ServioStatusChipType.info,
         BookingStatus.awaitingCustomerConfirmation =>
           ServioStatusChipType.warning,
+        BookingStatus.pendingAdminReview => ServioStatusChipType.warning,
         BookingStatus.completed => ServioStatusChipType.success,
         BookingStatus.cancelled => ServioStatusChipType.danger,
         BookingStatus.rejected => ServioStatusChipType.danger,
@@ -324,7 +325,8 @@ class _LiveBookingCard extends StatelessWidget {
         BookingStatus.enRoute => 'En Route',
         BookingStatus.arrived => 'Arrived',
         BookingStatus.inProgress => 'In Progress',
-        BookingStatus.awaitingCustomerConfirmation => 'Awaiting Your Confirmation',
+        BookingStatus.awaitingCustomerConfirmation => 'Awaiting Confirmation',
+        BookingStatus.pendingAdminReview => 'Under Review',
         BookingStatus.completed => 'Completed',
         BookingStatus.cancelled => 'Cancelled',
         BookingStatus.rejected => 'Rejected',
@@ -1146,6 +1148,7 @@ String _statusCodeFromStatus(BookingStatus status) => switch (status) {
       BookingStatus.inProgress => 'in_progress',
       BookingStatus.awaitingCustomerConfirmation =>
         'awaiting_customer_confirmation',
+      BookingStatus.pendingAdminReview => 'pending_admin_review',
       BookingStatus.completed => 'completed',
       BookingStatus.cancelled => 'cancelled',
       BookingStatus.rejected => 'rejected',
@@ -1162,10 +1165,11 @@ ServioStatusChipType _chipTypeForStatusCode(String statusCode) {
     'inprogress' =>
       ServioStatusChipType.info,
     'awaiting_customer_confirmation' ||
-    'awaitingcustomerconfirmation' =>
+    'awaitingcustomerconfirmation' ||
+    'pending_admin_review' ||
+    'disputed' =>
       ServioStatusChipType.warning,
     'cancelled' || 'canceled' || 'rejected' => ServioStatusChipType.danger,
-    'disputed' => ServioStatusChipType.warning,
     _ => ServioStatusChipType.warning,
   };
 }

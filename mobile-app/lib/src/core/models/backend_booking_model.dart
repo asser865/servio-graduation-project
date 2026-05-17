@@ -23,6 +23,7 @@ class BackendBooking {
     required this.paymentCardType,
     required this.paymentCardLabel,
     this.paymentStatus = 'unpaid',
+    required this.createdAt,
     this.workerAvailability = const <AvailabilitySlot>[],
   });
 
@@ -51,6 +52,7 @@ class BackendBooking {
   /// refunded | failed | disputed | cash_pending_settlement | cash_settled.
   final String paymentStatus;
 
+  final DateTime createdAt;
   final List<AvailabilitySlot> workerAvailability;
 
   factory BackendBooking.fromJson(Map<String, dynamic> json) {
@@ -157,6 +159,8 @@ class BackendBooking {
       paymentCardLabel: (paymentMeta['label'] as String?) ??
           (savedCard['label'] as String?) ??
           '',
+      createdAt: DateTime.tryParse((json['createdAt'] as String?) ?? '') ??
+          DateTime.now(),
       workerAvailability: workerAvailability,
     );
   }
@@ -187,6 +191,7 @@ class BackendBooking {
       paymentCardLast4: paymentCardLast4,
       paymentCardType: paymentCardType,
       paymentCardLabel: paymentCardLabel,
+      createdAt: createdAt,
       workerAvailability: workerAvailability,
     );
   }

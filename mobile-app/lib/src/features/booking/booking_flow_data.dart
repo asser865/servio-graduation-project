@@ -29,6 +29,7 @@ class BookingFlowData {
     this.reference = '',
     this.amount = '0 EGP',
     this.pin = '',
+    this.createdAt,
   });
 
   final String serviceName;
@@ -58,6 +59,7 @@ class BookingFlowData {
   final String reference;
   final String amount;
   final String pin;
+  final DateTime? createdAt;
 
   BookingFlowData copyWith({
     String? serviceName,
@@ -87,6 +89,7 @@ class BookingFlowData {
     String? reference,
     String? amount,
     String? pin,
+    DateTime? createdAt,
   }) {
     return BookingFlowData(
       serviceName: serviceName ?? this.serviceName,
@@ -117,6 +120,7 @@ class BookingFlowData {
       reference: reference ?? this.reference,
       amount: amount ?? this.amount,
       pin: pin ?? this.pin,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 

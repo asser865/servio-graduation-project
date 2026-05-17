@@ -83,6 +83,8 @@ const addressValidation = [
   body('city').optional().trim().isLength({ max: 100 }).withMessage('City cannot exceed 100 characters'),
   body('state').optional().trim().isLength({ max: 100 }).withMessage('State cannot exceed 100 characters'),
   body('zipCode').optional().trim().isLength({ max: 30 }).withMessage('Zip code cannot exceed 30 characters'),
+  body('lat').optional({ nullable: true }).isFloat({ min: -90, max: 90 }).withMessage('Latitude must be between -90 and 90'),
+  body('lng').optional({ nullable: true }).isFloat({ min: -180, max: 180 }).withMessage('Longitude must be between -180 and 180'),
 ];
 
 router.post('/me/addresses', protect, validate(addressValidation), userController.addAddress);

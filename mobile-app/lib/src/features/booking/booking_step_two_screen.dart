@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/models/customer_address.dart';
 import '../../core/models/user_account.dart';
+import '../../core/services/location_service.dart';
 import '../../core/state/customer_addresses_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
+import '../../shared/widgets/servio_map_widget.dart';
 import '../customer/create_address_screen.dart';
 import 'booking_flow_data.dart';
 import 'booking_step_three_screen.dart';
@@ -30,6 +33,8 @@ class _BookingStepTwoScreenState extends State<BookingStepTwoScreen> {
   String _selectedSlot = '';
   String? _selectedAddressId;
   String? _addressError;
+  LatLng? _addressLatLng;
+  bool _geocoding = false;
 
   static const List<String> _fallbackSlots = <String>[
     '08:00',
@@ -143,6 +148,26 @@ class _BookingStepTwoScreenState extends State<BookingStepTwoScreen> {
       _selectedAddressId = saved.id;
       _addressError = null;
     });
+    await _onAddressSelected(saved);
+  }
+
+  Future<void> _onAddressSelected(CustomerAddress address) async {
+    if (address.lat != null && address.lng != null) {
+      setState(() => _addressLatLng = LatLng(address.lat!, address.lng!));
+      return;
+    }
+    setState(() {
+      _addressLatLng = null;
+      _geocoding = true;
+    });
+    final latLng = await LocationService()
+        .geocodeAddress('${address.street}, ${address.city}');
+    if (mounted) {
+      setState(() {
+        _addressLatLng = latLng;
+        _geocoding = false;
+      });
+    }
   }
 
   CustomerAddress? _selectedAddress(List<CustomerAddress> addresses) {
@@ -327,11 +352,35 @@ class _BookingStepTwoScreenState extends State<BookingStepTwoScreen> {
                 addressError: _addressError,
                 onRetry: () => context.read<CustomerAddressesProvider>().load(),
                 onAdd: _addAddress,
-                onSelect: (address) => setState(() {
-                  _selectedAddressId = address.id;
-                  _addressError = null;
-                }),
+                onSelect: (address) {
+                  setState(() {
+                    _selectedAddressId = address.id;
+                    _addressError = null;
+                  });
+                  _onAddressSelected(address);
+                },
               ),
+              if (_geocoding)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              if (_addressLatLng != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: SizedBox(
+                    height: 180,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: ServioMapWidget(
+                        center: _addressLatLng!,
+                        zoom: 15,
+                        interactive: false,
+                        markers: [buildPinMarker(_addressLatLng!)],
+                      ),
+                    ),
+                  ),
+                ),
               const SizedBox(height: 12),
               ServioPrimaryButton(
                 label: 'Continue',
