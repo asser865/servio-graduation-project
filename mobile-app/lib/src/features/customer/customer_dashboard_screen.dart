@@ -1640,7 +1640,6 @@ class _BookingProgressTracker extends StatelessWidget {
       BookingStatus.cancelled => 0,
       BookingStatus.rejected => 0,
       BookingStatus.disputed => 0,
-      BookingStatus.awaitingCustomerConfirmation => 4,
       BookingStatus.pendingAdminReview => 4,
     };
 
@@ -2301,7 +2300,6 @@ String _statusLabel(BookingStatus status) {
     BookingStatus.cancelled => 'Cancelled',
     BookingStatus.rejected => 'Rejected',
     BookingStatus.disputed => 'Disputed',
-    BookingStatus.awaitingCustomerConfirmation => 'Awaiting Confirmation',
     BookingStatus.pendingAdminReview => 'Under Review',
   };
 }
@@ -2318,7 +2316,6 @@ ServioStatusChipType _chipType(BookingStatus status) {
     BookingStatus.cancelled => ServioStatusChipType.danger,
     BookingStatus.rejected => ServioStatusChipType.danger,
     BookingStatus.disputed => ServioStatusChipType.warning,
-    BookingStatus.awaitingCustomerConfirmation => ServioStatusChipType.warning,
     BookingStatus.pendingAdminReview => ServioStatusChipType.warning,
   };
 }
@@ -2335,8 +2332,6 @@ String _statusCodeFromStatus(BookingStatus status) => switch (status) {
       BookingStatus.cancelled => 'cancelled',
       BookingStatus.rejected => 'rejected',
       BookingStatus.disputed => 'disputed',
-      BookingStatus.awaitingCustomerConfirmation =>
-        'awaiting_customer_confirmation',
       BookingStatus.pendingAdminReview => 'pending_admin_review',
     };
 
