@@ -35,7 +35,7 @@ class ApiEndpoints {
   static String workerBookedSlots(String workerId, String date) =>
       '/bookings/worker/$workerId/slots?date=$date';
 
-  static const String aiRecommend = '/ai/recommend';
+  static const String aiRecommend = '/mobile/ai/recommend';
 
   static const String reviews = '/reviews';
   static String workerReviews(String workerId) => '/reviews/worker/$workerId';
@@ -45,6 +45,8 @@ class ApiEndpoints {
   static const String unreadMessages = '/messages/unread';
   static const String messages = '/messages';
   static String messagesForConversation(String conversationId) =>
+      '/messages/conversations/$conversationId';
+  static String conversation(String conversationId) =>
       '/messages/conversations/$conversationId';
   static String messagesForBooking(String bookingId) => '/messages/$bookingId';
 

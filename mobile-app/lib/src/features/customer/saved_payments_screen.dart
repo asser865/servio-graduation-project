@@ -59,7 +59,12 @@ class _SavedPaymentsScreenState extends State<SavedPaymentsScreen>
 
   Future<void> _fetchCards() async {
     try {
-      if (mounted) setState(() { _loading = true; _error = null; });
+      if (mounted) {
+        setState(() {
+          _loading = true;
+          _error = null;
+        });
+      }
       final api = SavedCardsApi(context.read<ApiClient>());
       final cards = await api.getSavedCards();
       if (mounted) {
@@ -69,7 +74,12 @@ class _SavedPaymentsScreenState extends State<SavedPaymentsScreen>
         });
       }
     } catch (e) {
-      if (mounted) setState(() { _loading = false; _error = 'Failed to load cards.'; });
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = 'Failed to load cards.';
+        });
+      }
     }
   }
 
@@ -159,8 +169,10 @@ class _SavedPaymentsScreenState extends State<SavedPaymentsScreen>
                                     width: 72,
                                     height: 72,
                                     decoration: BoxDecoration(
-                                      color: servio.accent.withValues(alpha: 0.10),
-                                      borderRadius: BorderRadius.circular(ServioRadius.xl),
+                                      color:
+                                          servio.accent.withValues(alpha: 0.10),
+                                      borderRadius: BorderRadius.circular(
+                                          ServioRadius.xl),
                                     ),
                                     child: Icon(
                                       Icons.credit_card_rounded,
@@ -172,7 +184,8 @@ class _SavedPaymentsScreenState extends State<SavedPaymentsScreen>
                                   Text(
                                     'No saved payment methods yet',
                                     textAlign: TextAlign.center,
-                                    style: theme.textTheme.titleMedium?.copyWith(
+                                    style:
+                                        theme.textTheme.titleMedium?.copyWith(
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -182,7 +195,8 @@ class _SavedPaymentsScreenState extends State<SavedPaymentsScreen>
                                     child: Text(
                                       'Your saved cards and payment options will appear here.',
                                       textAlign: TextAlign.center,
-                                      style: theme.textTheme.bodyMedium?.copyWith(
+                                      style:
+                                          theme.textTheme.bodyMedium?.copyWith(
                                         color: servio.textSecondary,
                                         height: 1.5,
                                       ),
@@ -198,54 +212,78 @@ class _SavedPaymentsScreenState extends State<SavedPaymentsScreen>
                             Expanded(
                               child: ListView.separated(
                                 itemCount: _cards.length,
-                                separatorBuilder: (_, __) => const SizedBox(height: 16),
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(height: 16),
                                 itemBuilder: (context, index) {
                                   final card = _cards[index];
                                   return ServioCard(
                                     padding: const EdgeInsets.all(16),
                                     child: Row(
                                       children: [
-                                        Icon(_getCardIcon(card.cardType), size: 36, color: servio.accent),
+                                        Icon(_getCardIcon(card.cardType),
+                                            size: 36, color: servio.accent),
                                         const SizedBox(width: 16),
                                         Expanded(
                                           child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                             children: [
                                               Text(
                                                 '•••• •••• •••• ${card.last4}',
-                                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                                style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 16),
                                               ),
                                               const SizedBox(height: 4),
                                               Text(
                                                 'Exp ${card.expiry}',
-                                                style: TextStyle(color: servio.textSecondary, fontSize: 13),
+                                                style: TextStyle(
+                                                    color: servio.textSecondary,
+                                                    fontSize: 13),
                                               ),
                                             ],
                                           ),
                                         ),
                                         if (card.isDefault)
                                           Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 8, vertical: 4),
                                             decoration: BoxDecoration(
-                                              color: servio.accent.withValues(alpha: 0.1),
-                                              borderRadius: BorderRadius.circular(4),
-                                              border: Border.all(color: servio.accent.withValues(alpha: 0.3)),
+                                              color: servio.accent
+                                                  .withValues(alpha: 0.1),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                              border: Border.all(
+                                                  color: servio.accent
+                                                      .withValues(alpha: 0.3)),
                                             ),
-                                            child: Text('Default', style: TextStyle(color: servio.accent, fontSize: 10, fontWeight: FontWeight.bold)),
+                                            child: Text('Default',
+                                                style: TextStyle(
+                                                    color: servio.accent,
+                                                    fontSize: 10,
+                                                    fontWeight:
+                                                        FontWeight.bold)),
                                           )
                                         else
                                           TextButton(
-                                            onPressed: () => _setDefault(card.id),
+                                            onPressed: () =>
+                                                _setDefault(card.id),
                                             style: TextButton.styleFrom(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 8),
                                               minimumSize: Size.zero,
-                                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                              tapTargetSize:
+                                                  MaterialTapTargetSize
+                                                      .shrinkWrap,
                                             ),
-                                            child: const Text('Set Default', style: TextStyle(fontSize: 12)),
+                                            child: const Text('Set Default',
+                                                style: TextStyle(fontSize: 12)),
                                           ),
                                         const SizedBox(width: 8),
                                         IconButton(
-                                          icon: Icon(Icons.delete_outline, color: servio.danger),
+                                          icon: Icon(Icons.delete_outline,
+                                              color: servio.danger),
                                           onPressed: () => _deleteCard(card.id),
                                           padding: EdgeInsets.zero,
                                           constraints: const BoxConstraints(),
@@ -258,7 +296,8 @@ class _SavedPaymentsScreenState extends State<SavedPaymentsScreen>
                             ),
                           const SizedBox(height: 24),
                           if (_cards.isNotEmpty)
-                            _AddPaymentButton(servio: servio, onTap: _showAddCardModal),
+                            _AddPaymentButton(
+                                servio: servio, onTap: _showAddCardModal),
                           const SizedBox(height: 24),
                           // ── Info hint ───────────────────────────────────────
                           Row(
@@ -397,7 +436,7 @@ class _AddCardSheetState extends State<_AddCardSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return Container(
       decoration: BoxDecoration(
         color: theme.scaffoldBackgroundColor,
@@ -413,13 +452,16 @@ class _AddCardSheetState extends State<_AddCardSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Add Payment Method', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+          Text('Add Payment Method',
+              style: theme.textTheme.titleLarge
+                  ?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 24),
           TextField(
             controller: _numberController,
             keyboardType: TextInputType.number,
             maxLength: 19,
-            decoration: const InputDecoration(labelText: 'Card Number', counterText: ''),
+            decoration: const InputDecoration(
+                labelText: 'Card Number', counterText: ''),
             inputFormatters: [
               FilteringTextInputFormatter.digitsOnly,
               _CardNumberFormatter(),
@@ -433,7 +475,8 @@ class _AddCardSheetState extends State<_AddCardSheet> {
                   controller: _expiryController,
                   keyboardType: TextInputType.number,
                   maxLength: 7,
-                  decoration: const InputDecoration(labelText: 'Expiry (MM / YY)', counterText: ''),
+                  decoration: const InputDecoration(
+                      labelText: 'Expiry (MM / YY)', counterText: ''),
                   inputFormatters: [
                     FilteringTextInputFormatter.digitsOnly,
                     _ExpiryFormatter(),
@@ -446,7 +489,8 @@ class _AddCardSheetState extends State<_AddCardSheet> {
                   controller: _cvvController,
                   keyboardType: TextInputType.number,
                   maxLength: 4,
-                  decoration: const InputDecoration(labelText: 'CVV', counterText: ''),
+                  decoration:
+                      const InputDecoration(labelText: 'CVV', counterText: ''),
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   obscureText: true,
                 ),
@@ -466,7 +510,8 @@ class _AddCardSheetState extends State<_AddCardSheet> {
 
 class _CardNumberFormatter extends TextInputFormatter {
   @override
-  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue, TextEditingValue newValue) {
     var text = newValue.text;
     text = text.replaceAll(RegExp(r'\D'), '');
     var formatted = '';
@@ -485,7 +530,8 @@ class _CardNumberFormatter extends TextInputFormatter {
 
 class _ExpiryFormatter extends TextInputFormatter {
   @override
-  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue, TextEditingValue newValue) {
     var text = newValue.text;
     text = text.replaceAll(RegExp(r'\D'), '');
     var formatted = '';

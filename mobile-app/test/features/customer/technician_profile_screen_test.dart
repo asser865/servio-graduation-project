@@ -176,6 +176,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Technician'), findsWidgets);
+    expect(find.text('On request'), findsOneWidget);
     await _scrollTo(tester, find.text('No bio available.'));
     expect(find.text('No bio available.'), findsOneWidget);
 
@@ -184,7 +185,6 @@ void main() {
 
     await _scrollTo(tester, find.text('Rating not available'));
     expect(find.text('Rating not available'), findsOneWidget);
-    expect(find.text('Rate on request'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -276,11 +276,15 @@ void main() {
                 '_id': 'service-painting',
                 'title': 'Painting',
                 'category': 'painting',
+                'basePrice': 320,
+                'priceUnit': 'fixed',
               },
               <String, dynamic>{
                 '_id': 'service-plumbing',
                 'title': 'Plumbing',
                 'category': 'plumbing',
+                'basePrice': 180,
+                'priceUnit': 'per_hour',
               },
             ],
             categories: const <String>['painting', 'plumbing'],
@@ -295,6 +299,7 @@ void main() {
 
     expect(find.text('Confirm Your Booking'), findsOneWidget);
     expect(find.text('Plumbing'), findsWidgets);
+    expect(find.text('180 EGP/hr'), findsWidgets);
     expect(find.text('Painting'), findsNothing);
     expect(tester.takeException(), isNull);
   });

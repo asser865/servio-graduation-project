@@ -47,7 +47,8 @@ class _TechnicianDashboardScreenState extends State<TechnicianDashboardScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _fetchData());
-    _pollingTimer = Timer.periodic(const Duration(seconds: 20), (_) => _silentRefresh());
+    _pollingTimer =
+        Timer.periodic(const Duration(seconds: 20), (_) => _silentRefresh());
   }
 
   @override
@@ -60,10 +61,13 @@ class _TechnicianDashboardScreenState extends State<TechnicianDashboardScreen> {
     final client = context.read<ApiClient>();
     final session = context.read<SessionProvider>();
     final workerId = session.account?.id.trim() ?? '';
-    if (workerId.isEmpty || session.account?.role != UserRole.technician) return;
+    if (workerId.isEmpty || session.account?.role != UserRole.technician) {
+      return;
+    }
 
     try {
-      final bookingsFuture = BookingsApi(client).getWorkerBookings(workerId: workerId);
+      final bookingsFuture =
+          BookingsApi(client).getWorkerBookings(workerId: workerId);
       final earningsFuture = PaymentsApi(client).getEarnings();
 
       final results = await Future.wait([bookingsFuture, earningsFuture]);

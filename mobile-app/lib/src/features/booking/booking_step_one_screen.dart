@@ -119,7 +119,9 @@ class _BookingStepOneScreenState extends State<BookingStepOneScreen> {
                       child: Center(
                         child: Text(
                           widget.data.technicianName.isNotEmpty
-                              ? widget.data.technicianName.trim()[0].toUpperCase()
+                              ? widget.data.technicianName
+                                  .trim()[0]
+                                  .toUpperCase()
                               : '?',
                         ),
                       ),

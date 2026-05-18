@@ -316,6 +316,7 @@ class VerificationUploadCard extends StatelessWidget {
           onTap: onTap,
           child: ServioCard(
             radius: ServioRadius.lg,
+            padding: const EdgeInsets.all(12),
             borderColor: palette.color,
             backgroundColor:
                 effectiveStatus == VerificationDocumentStatus.pending
@@ -362,31 +363,50 @@ class VerificationUploadCard extends StatelessWidget {
                       ),
                     )
                   else
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: ServioColors.tint(palette.color),
-                        borderRadius: BorderRadius.circular(ServioRadius.full),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: <Widget>[
-                          Text(
-                            fileName!,
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: palette.color,
-                              fontWeight: FontWeight.w700,
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        return ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: constraints.maxWidth,
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: ServioColors.tint(palette.color),
+                              borderRadius:
+                                  BorderRadius.circular(ServioRadius.full),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: <Widget>[
+                                Flexible(
+                                  child: Text(
+                                    fileName!,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: palette.color,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                GestureDetector(
+                                  onTap: onRemove,
+                                  child: Icon(
+                                    Icons.close_rounded,
+                                    color: palette.color,
+                                    size: 14,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(width: 6),
-                          GestureDetector(
-                            onTap: onRemove,
-                            child: Icon(Icons.close_rounded,
-                                color: palette.color, size: 14),
-                          ),
-                        ],
-                      ),
+                        );
+                      },
                     ),
                 ],
               ),
@@ -397,6 +417,9 @@ class VerificationUploadCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             errorText!,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
             style: theme.textTheme.labelSmall?.copyWith(
               color: servio.danger,
               fontWeight: FontWeight.w600,

@@ -52,7 +52,7 @@ class _HomeBody extends StatefulWidget {
 }
 
 class _HomeBodyState extends State<_HomeBody>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late ScrollController _scrollController;
   late AnimationController _entranceController;
   late Animation<double> _entranceFade;
@@ -61,6 +61,7 @@ class _HomeBodyState extends State<_HomeBody>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _scrollController = ScrollController();
     _entranceController = AnimationController(
       vsync: this,
@@ -76,12 +77,22 @@ class _HomeBodyState extends State<_HomeBody>
     ).animate(CurvedAnimation(
         parent: _entranceController, curve: ServioMotion.spring));
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _entranceController.forward();
+      if (!mounted) return;
+      _entranceController.forward();
+      context.read<BookingsProvider>().refresh();
     });
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      context.read<BookingsProvider>().refresh();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _scrollController.dispose();
     _entranceController.dispose();
     super.dispose();
@@ -296,23 +307,51 @@ class _HomeBodyState extends State<_HomeBody>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
-                            // ── Booking card ─────────────────────────
-                            ServioAnimatedEntry(
-                              delay: const Duration(milliseconds: 80),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: ServioSpacing.screenPadding,
-                                ),
+                            // ── Booking card (active bookings only) ──
+                            AnimatedSize(
+                              duration: ServioMotion.bottomSheet,
+                              curve: ServioMotion.spring,
+                              alignment: Alignment.topCenter,
+                              child: AnimatedSwitcher(
+                                duration: ServioMotion.normal,
+                                switchInCurve: ServioMotion.spring,
+                                switchOutCurve: ServioMotion.standard,
+                                transitionBuilder:
+                                    (Widget child, Animation<double> anim) {
+                                  return FadeTransition(
+                                    opacity: anim,
+                                    child: SizeTransition(
+                                      sizeFactor: anim,
+                                      axisAlignment: -1,
+                                      child: child,
+                                    ),
+                                  );
+                                },
                                 child: recentBookings.isNotEmpty
-                                    ? _FloatingBookingCard(
-                                        booking: recentBookings.first,
-                                        locale: locale,
+                                    ? Padding(
+                                        key: ValueKey<String>(
+                                          'booking-${recentBookings.first.id}-${recentBookings.first.status.name}',
+                                        ),
+                                        padding: const EdgeInsets.only(
+                                          left: ServioSpacing.screenPadding,
+                                          right: ServioSpacing.screenPadding,
+                                          bottom: 28,
+                                        ),
+                                        child: ServioAnimatedEntry(
+                                          delay:
+                                              const Duration(milliseconds: 80),
+                                          child: _FloatingBookingCard(
+                                            booking: recentBookings.first,
+                                            locale: locale,
+                                          ),
+                                        ),
                                       )
-                                    : _FloatingEmptyBookingCard(locale: locale),
+                                    : const SizedBox(
+                                        key: ValueKey<String>('no-booking'),
+                                        width: double.infinity,
+                                      ),
                               ),
                             ),
-
-                            const SizedBox(height: 28),
 
                             // ── Services grid ─────────────────────────
                             ServioAnimatedEntry(
@@ -1559,95 +1598,6 @@ ServioStatusChipType _homeChipType(BookingStatus status) {
     BookingStatus.disputed => ServioStatusChipType.warning,
     BookingStatus.pendingAdminReview => ServioStatusChipType.warning,
   };
-}
-
-class _FloatingEmptyBookingCard extends StatelessWidget {
-  const _FloatingEmptyBookingCard({required this.locale});
-
-  final String locale;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final servio = context.servio;
-    final isDark = theme.brightness == Brightness.dark;
-
-    return ServioCard(
-      radius: ServioRadius.xl,
-      padding: const EdgeInsets.all(20),
-      child: Row(
-        children: <Widget>[
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              gradient: ServioGradients.warm,
-              borderRadius: BorderRadius.circular(ServioRadius.md),
-            ),
-            child: const Icon(
-              Icons.calendar_today_rounded,
-              color: ServioColors.deepBrown,
-              size: 23,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  locale == 'ar' ? 'لا توجد حجوزات نشطة' : 'No active bookings',
-                  style: theme.textTheme.titleMedium,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  locale == 'ar'
-                      ? 'احجز خدمتك الأولى الآن'
-                      : 'Book your first service today',
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: servio.textSecondary),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          GestureDetector(
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const ServicesMarketplaceScreen(),
-              ),
-            ),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                gradient:
-                    isDark ? ServioGradients.brandDark : ServioGradients.brand,
-                borderRadius: BorderRadius.circular(ServioRadius.full),
-                boxShadow: <BoxShadow>[
-                  BoxShadow(
-                    color: ServioColors.deepBrown.withValues(alpha: 0.25),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Text(
-                locale == 'ar' ? 'احجز' : 'Book Now',
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: isDark ? ServioColors.navyDark : Colors.white,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

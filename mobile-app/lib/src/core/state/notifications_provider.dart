@@ -129,8 +129,7 @@ class NotificationsProvider extends ChangeNotifier {
 
         final feed = <AppNotification>[];
         for (final booking in bookings) {
-          final entry =
-              _toFallbackNotification(booking, snapshot, isFirstLoad);
+          final entry = _toFallbackNotification(booking, snapshot, isFirstLoad);
           if (entry != null) feed.add(entry);
         }
 
@@ -150,7 +149,8 @@ class NotificationsProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _silentRefresh({UserRole role = UserRole.customer, String? workerId}) async {
+  Future<void> _silentRefresh(
+      {UserRole role = UserRole.customer, String? workerId}) async {
     try {
       final data = _client.unwrapData(
         await _client.get(ApiEndpoints.notifications),
@@ -184,8 +184,7 @@ class NotificationsProvider extends ChangeNotifier {
 
         final feed = <AppNotification>[];
         for (final booking in bookings) {
-          final entry =
-              _toFallbackNotification(booking, snapshot, isFirstLoad);
+          final entry = _toFallbackNotification(booking, snapshot, isFirstLoad);
           if (entry != null) feed.add(entry);
         }
 

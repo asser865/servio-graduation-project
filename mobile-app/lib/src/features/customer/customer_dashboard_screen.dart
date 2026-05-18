@@ -534,8 +534,6 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
               BookingStatus.rejected => 'rejected',
               BookingStatus.disputed => 'disputed',
               BookingStatus.pending => 'pending',
-              BookingStatus.awaitingCustomerConfirmation =>
-                'awaiting confirmation',
               BookingStatus.pendingAdminReview => 'under review',
             }}.'),
             duration: const Duration(seconds: 3),
@@ -828,7 +826,6 @@ class _HistorySection extends StatelessWidget {
     );
   }
 }
-
 
 class _DashboardSegmentedControl extends StatelessWidget {
   const _DashboardSegmentedControl({

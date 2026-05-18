@@ -7,9 +7,11 @@ import 'package:provider/provider.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/api/messages_api.dart';
+import '../../core/models/user_account.dart';
 import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
+import '../shared/report_problem_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({
@@ -43,11 +45,12 @@ class _ChatScreenState extends State<ChatScreen> {
   List<ApiMessage> _messages = <ApiMessage>[];
   bool _loading = true;
   bool _sending = false;
+  bool _deleting = false;
   bool _polling = false; // true during a background poll tick
   String? _error;
 
   Timer? _pollTimer;
-  static const Duration _kPollInterval = Duration(seconds: 5);
+  static const Duration _kPollInterval = Duration(seconds: 1);
 
   @override
   void initState() {
@@ -178,6 +181,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _messages = <ApiMessage>[..._messages, result.message];
         _error = null;
       });
+      context.read<MessagesProvider>().refresh(silent: true);
       _scrollToBottom();
     } on ApiException catch (error) {
       if (!mounted) return;
@@ -190,6 +194,78 @@ class _ChatScreenState extends State<ChatScreen> {
       _showError(message);
     } finally {
       if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  Future<void> _reportChat() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const ReportProblemScreen(),
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteChat() async {
+    final conversationId = _conversationId;
+    if (conversationId == null || conversationId.isEmpty || _deleting) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        final servio = dialogContext.servio;
+        return AlertDialog(
+          title: const Text('Delete chat?'),
+          content: const Text(
+            'This removes the conversation and all messages from the database.',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(backgroundColor: servio.danger),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              icon: const Icon(Icons.delete_outline_rounded),
+              label: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) return;
+    await _deleteChat(conversationId);
+  }
+
+  Future<void> _deleteChat(String conversationId) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
+    setState(() {
+      _deleting = true;
+      _error = null;
+    });
+
+    try {
+      await MessagesApi(context.read<ApiClient>()).deleteConversation(
+        conversationId,
+      );
+      if (!mounted) return;
+      _stopPolling();
+      context.read<MessagesProvider>().refresh(silent: true);
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Chat deleted.')),
+      );
+      navigator.maybePop();
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      _showError(error.message);
+    } catch (_) {
+      if (!mounted) return;
+      _showError('Failed to delete chat.');
+    } finally {
+      if (mounted) setState(() => _deleting = false);
     }
   }
 
@@ -214,6 +290,8 @@ class _ChatScreenState extends State<ChatScreen> {
     final servio = context.servio;
     final theme = Theme.of(context);
     final canSend = _controller.text.trim().isNotEmpty && !_sending;
+    final isCustomer =
+        context.watch<SessionProvider>().account?.role == UserRole.customer;
 
     return Scaffold(
       body: SafeArea(
@@ -222,6 +300,11 @@ class _ChatScreenState extends State<ChatScreen> {
             _ChatHeader(
               contactName: _contactName,
               isLive: _polling,
+              showActions: isCustomer,
+              canDelete: _conversationId != null && !_deleting,
+              isDeleting: _deleting,
+              onReport: _reportChat,
+              onDelete: _confirmDeleteChat,
             ),
             Expanded(
               child: AnimatedSwitcher(
@@ -346,11 +429,21 @@ class _ChatScreenState extends State<ChatScreen> {
 class _ChatHeader extends StatelessWidget {
   const _ChatHeader({
     required this.contactName,
+    required this.showActions,
+    required this.canDelete,
+    required this.isDeleting,
+    required this.onReport,
+    required this.onDelete,
     this.isLive = false,
   });
 
   final String contactName;
+  final bool showActions;
+  final bool canDelete;
+  final bool isDeleting;
   final bool isLive;
+  final VoidCallback onReport;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -426,7 +519,121 @@ class _ChatHeader extends StatelessWidget {
               ],
             ),
           ),
+          if (showActions) ...<Widget>[
+            const SizedBox(width: 8),
+            _ChatActionButton(
+              canDelete: canDelete,
+              isDeleting: isDeleting,
+              onReport: onReport,
+              onDelete: onDelete,
+            ),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+enum _ChatAction { report, delete }
+
+class _ChatActionButton extends StatelessWidget {
+  const _ChatActionButton({
+    required this.canDelete,
+    required this.isDeleting,
+    required this.onReport,
+    required this.onDelete,
+  });
+
+  final bool canDelete;
+  final bool isDeleting;
+  final VoidCallback onReport;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final servio = context.servio;
+
+    return PopupMenuButton<_ChatAction>(
+      enabled: !isDeleting,
+      tooltip: 'Chat actions',
+      offset: const Offset(0, 44),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(ServioRadius.md),
+      ),
+      onSelected: (action) {
+        switch (action) {
+          case _ChatAction.report:
+            onReport();
+            break;
+          case _ChatAction.delete:
+            onDelete();
+            break;
+        }
+      },
+      itemBuilder: (context) => <PopupMenuEntry<_ChatAction>>[
+        const PopupMenuItem<_ChatAction>(
+          value: _ChatAction.report,
+          child: Row(
+            children: <Widget>[
+              Icon(Icons.flag_outlined, size: 20),
+              SizedBox(width: 10),
+              Text('Report chat'),
+            ],
+          ),
+        ),
+        PopupMenuItem<_ChatAction>(
+          value: _ChatAction.delete,
+          enabled: canDelete,
+          child: Row(
+            children: <Widget>[
+              Icon(
+                Icons.delete_outline_rounded,
+                size: 20,
+                color: canDelete ? servio.danger : servio.textSecondary,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'Delete chat',
+                style: TextStyle(
+                  color: canDelete ? servio.danger : servio.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+      child: Semantics(
+        button: true,
+        label: 'Chat actions',
+        child: Container(
+          width: ServioSpacing.tapTarget,
+          height: ServioSpacing.tapTarget,
+          decoration: BoxDecoration(
+            color: ServioColors.tint(servio.warning),
+            shape: BoxShape.circle,
+            border: Border.all(color: servio.warning.withValues(alpha: 0.28)),
+          ),
+          alignment: Alignment.center,
+          child: AnimatedSwitcher(
+            duration: ServioMotion.micro,
+            child: isDeleting
+                ? SizedBox(
+                    key: const ValueKey<String>('deleting'),
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: servio.warning,
+                    ),
+                  )
+                : Icon(
+                    key: const ValueKey<String>('actions'),
+                    Icons.priority_high_rounded,
+                    color: servio.warning,
+                    size: 22,
+                  ),
+          ),
+        ),
       ),
     );
   }

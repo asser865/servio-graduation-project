@@ -10,6 +10,8 @@ import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_tab_shell.dart';
+import 'technician_shell.dart';
+import 'transaction_details_sheet.dart';
 
 // ── Period ────────────────────────────────────────────────────────────────────
 
@@ -406,7 +408,14 @@ class _EarningsScreenState extends State<EarningsScreen>
                     else
                       ..._filtered.take(15).map((job) => Padding(
                             padding: const EdgeInsets.only(bottom: 12),
-                            child: _TransactionCard(job: job),
+                            child: _TransactionCard(
+                              job: job,
+                              onTap: () => showTransactionDetailsSheet(
+                                context,
+                                job: job,
+                                onReportSubmitted: _fetchData,
+                              ),
+                            ),
                           )),
                   ],
                 ),
@@ -432,7 +441,61 @@ class _EarningsScreenState extends State<EarningsScreen>
   AppBar _appBar(BuildContext context) => AppBar(
         title: const Text('Earnings'),
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        leadingWidth: 64,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 12),
+          child: Center(
+            child: _BackIconButton(onTap: _openDashboard),
+          ),
+        ),
       );
+
+  void _openDashboard() {
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(builder: (_) => const TechnicianShell()),
+      (Route<dynamic> route) => false,
+    );
+  }
+}
+
+class _BackIconButton extends StatelessWidget {
+  const _BackIconButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+
+    return Semantics(
+      button: true,
+      label: 'Back to dashboard',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(ServioRadius.full),
+          child: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              shape: BoxShape.circle,
+              border: Border.all(color: servio.border),
+              boxShadow: ServioShadows.rest,
+            ),
+            alignment: Alignment.center,
+            child: Icon(
+              Icons.arrow_back_rounded,
+              size: 20,
+              color: servio.accent,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 // ── Fade + slide wrapper ──────────────────────────────────────────────────────
@@ -670,9 +733,10 @@ class _BarChart extends StatelessWidget {
 // ── Transaction card ──────────────────────────────────────────────────────────
 
 class _TransactionCard extends StatelessWidget {
-  const _TransactionCard({required this.job});
+  const _TransactionCard({required this.job, this.onTap});
 
   final BackendBooking job;
+  final VoidCallback? onTap;
 
   static ({String label, Color color, Color bg}) _statusBadge(
       String status, ServioThemeExtension servio) {
@@ -716,6 +780,7 @@ class _TransactionCard extends StatelessWidget {
     final net = job.totalAmount * 0.95;
 
     return ServioCard(
+      onTap: onTap,
       child: Row(
         children: <Widget>[
           Expanded(
