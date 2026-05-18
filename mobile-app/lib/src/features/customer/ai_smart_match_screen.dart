@@ -51,6 +51,20 @@ class _AiSmartMatchScreenState extends State<AiSmartMatchScreen> {
     });
   }
 
+  String _serviceCategory(String service) {
+    const map = <String, String>{
+      'Plumbing': 'plumbing',
+      'Electrical': 'electrical',
+      'A/C': 'hvac',
+      'Carpentry': 'carpentry',
+      'Cleaning': 'cleaning',
+      'Painting': 'painting',
+      'Appliance Repair': 'appliance',
+      'Handyman': 'handyman',
+    };
+    return map[service] ?? service.toLowerCase();
+  }
+
   Future<void> _analyze() async {
     final query = _controller.text.trim();
     if (query.isEmpty) return;
@@ -247,47 +261,125 @@ class _AiSmartMatchScreenState extends State<AiSmartMatchScreen> {
               ],
               if (_showResults && _recommendation != null) ...<Widget>[
                 const SizedBox(height: 32),
-                Text('Recommended Service',
-                    style: theme.textTheme.headlineMedium),
+                Text(
+                  _recommendation!.isMulti
+                      ? 'Required Services'
+                      : 'Recommended Service',
+                  style: theme.textTheme.headlineMedium,
+                ),
                 const SizedBox(height: 14),
-                ServioCard(
-                  radius: ServioRadius.lg,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Row(
-                        children: <Widget>[
-                          ServioStatusChip(
-                            label: _recommendation!.predictedCategory.isEmpty
-                                ? 'Recommended'
-                                : _recommendation!.predictedCategory,
-                          ),
-                          const SizedBox(width: 10),
-                          ServioStatusChip(
-                            label: _recommendation!.confidenceLabel,
-                            type: ServioStatusChipType.success,
+                if (_recommendation!.isMulti)
+                  ..._recommendation!.steps.map(
+                    (step) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: ServioCard(
+                        radius: ServioRadius.lg,
+                        child: Row(
+                          children: <Widget>[
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: <Widget>[
+                                  ServioStatusChip(label: step.service),
+                                  const SizedBox(height: 6),
+                                  Text(step.service,
+                                      style: theme.textTheme.titleMedium),
+                                ],
+                              ),
+                            ),
+                            ServioStatusChip(
+                              label: step.urgencyLabel,
+                              type: step.urgency == 'urgent'
+                                  ? ServioStatusChipType.danger
+                                  : ServioStatusChipType.success,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  ServioCard(
+                    radius: ServioRadius.lg,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Row(
+                          children: <Widget>[
+                            ServioStatusChip(
+                              label: _recommendation!.predictedCategory.isEmpty
+                                  ? 'Recommended'
+                                  : _recommendation!.predictedCategory,
+                            ),
+                            const SizedBox(width: 10),
+                            ServioStatusChip(
+                              label: _recommendation!.confidenceLabel,
+                              type: ServioStatusChipType.success,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          _recommendation!.serviceName.isEmpty
+                              ? 'Recommended service match'
+                              : _recommendation!.serviceName,
+                          style: theme.textTheme.titleMedium,
+                        ),
+                        if (_recommendation!.priceRange.isNotEmpty) ...<Widget>[
+                          const SizedBox(height: 6),
+                          Text(
+                            _recommendation!.priceRange,
+                            style: theme.textTheme.bodyMedium
+                                ?.copyWith(color: servio.accent),
                           ),
                         ],
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        _recommendation!.serviceName.isEmpty
-                            ? 'Recommended service match'
-                            : _recommendation!.serviceName,
-                        style: theme.textTheme.titleMedium,
-                      ),
-                      if (_recommendation!.priceRange.isNotEmpty) ...<Widget>[
-                        const SizedBox(height: 6),
-                        Text(
-                          _recommendation!.priceRange,
-                          style: theme.textTheme.bodyMedium
-                              ?.copyWith(color: servio.accent),
-                        ),
                       ],
-                    ],
+                    ),
                   ),
-                ),
                 const SizedBox(height: 24),
+                if (_recommendation!.isMulti) ...<Widget>[
+                  ..._recommendation!.steps.map((step) {
+                    final categoryKey = _serviceCategory(step.service);
+                    final workers = _recommendation!.recommendedWorkers
+                        .where((w) => w.categories.contains(categoryKey))
+                        .toList();
+                    if (workers.isEmpty) return const SizedBox.shrink();
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text('${step.service} Technicians',
+                            style: theme.textTheme.titleMedium),
+                        const SizedBox(height: 10),
+                        ...workers.map(
+                          (worker) => Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _MatchedTechnicianCard(
+                              name: worker.name.isEmpty
+                                  ? 'Technician'
+                                  : worker.name,
+                              match: worker.matchLabel,
+                              reason: worker.reason.isEmpty
+                                  ? 'Recommended by SERVIO AI for this request.'
+                                  : worker.reason,
+                              locationLabel: worker.locationLabel,
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => TechnicianProfileScreen(
+                                    technicianId:
+                                        worker.id.isEmpty ? null : worker.id,
+                                    selectedServiceCategory: categoryKey,
+                                    selectedServiceName: step.service,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                    );
+                  }),
+                ] else ...<Widget>[
                 Text('Top Matched Technicians',
                     style: theme.textTheme.titleMedium),
                 const SizedBox(height: 12),
@@ -307,6 +399,7 @@ class _AiSmartMatchScreenState extends State<AiSmartMatchScreen> {
                         reason: worker.reason.isEmpty
                             ? 'Recommended by SERVIO AI for this request.'
                             : worker.reason,
+                        locationLabel: worker.locationLabel,
                         onTap: () {
                           final recommendation = _recommendation!;
                           Navigator.of(context).push(
@@ -329,6 +422,7 @@ class _AiSmartMatchScreenState extends State<AiSmartMatchScreen> {
                       ),
                     ),
                   ),
+                ],
                 const SizedBox(height: 24),
                 ServioPrimaryButton(
                   label: 'Browse Matching Services',
@@ -366,12 +460,14 @@ class _MatchedTechnicianCard extends StatelessWidget {
     required this.match,
     required this.reason,
     required this.onTap,
+    this.locationLabel,
   });
 
   final String name;
   final String match;
   final String reason;
   final VoidCallback onTap;
+  final String? locationLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -418,6 +514,23 @@ class _MatchedTechnicianCard extends StatelessWidget {
                         .bodySmall
                         ?.copyWith(color: servio.textSecondary),
                   ),
+                  if (locationLabel != null && locationLabel!.isNotEmpty) ...<Widget>[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: <Widget>[
+                        Icon(Icons.location_on_outlined,
+                            size: 12, color: servio.textSecondary),
+                        const SizedBox(width: 2),
+                        Text(
+                          locationLabel!,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: servio.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),

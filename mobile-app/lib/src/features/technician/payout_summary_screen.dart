@@ -412,7 +412,7 @@ class _SuccessBodyState extends State<_SuccessBody> {
                   ?.copyWith(fontWeight: FontWeight.w600)),
           const SizedBox(height: 6),
           DropdownButtonFormField<String>(
-            value: value,
+            initialValue: value,
             hint: Text(hint,
                 style: theme.textTheme.bodyMedium
                     ?.copyWith(color: servio.textSecondary)),
