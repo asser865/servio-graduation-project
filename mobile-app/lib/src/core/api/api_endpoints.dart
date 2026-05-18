@@ -35,7 +35,7 @@ class ApiEndpoints {
   static String workerBookedSlots(String workerId, String date) =>
       '/bookings/worker/$workerId/slots?date=$date';
 
-  static const String aiRecommend = '/ai/recommend';
+  static const String aiRecommend = '/mobile/ai/recommend';
 
   static const String reviews = '/reviews';
   static String workerReviews(String workerId) => '/reviews/worker/$workerId';

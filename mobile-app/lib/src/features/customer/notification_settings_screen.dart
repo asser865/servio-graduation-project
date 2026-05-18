@@ -128,7 +128,7 @@ class _SwitchRow extends StatelessWidget {
         Switch(
           value: value,
           onChanged: onChanged,
-          activeColor: servio.accent,
+          activeThumbColor: servio.accent,
         ),
       ],
     );

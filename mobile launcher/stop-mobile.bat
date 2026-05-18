@@ -1,14 +1,21 @@
 @echo off
-title SERVIO Stop
+title SERVIO Mobile Stop
 color 0C
 echo.
 echo  ==========================================
-echo       SERVIO - Stopping All Services
+echo       SERVIO - Stopping Mobile Services
 echo  ==========================================
 echo.
 
-:: Kill by window title - /t kills child processes too (node, dart, flutter)
-echo  [1/2] Stopping Backend ...
+echo  [1/3] Stopping Mobile AI Service ...
+taskkill /fi "WINDOWTITLE eq SERVIO Mobile AI*" /t /f >nul 2>&1
+if %errorlevel%==0 (
+    echo         Done.
+) else (
+    echo         Not running.
+)
+
+echo  [2/3] Stopping Backend ...
 taskkill /fi "WINDOWTITLE eq SERVIO Backend*" /t /f >nul 2>&1
 if %errorlevel%==0 (
     echo         Done.
@@ -16,7 +23,7 @@ if %errorlevel%==0 (
     echo         Not running.
 )
 
-echo  [2/2] Stopping Flutter Mobile App ...
+echo  [3/3] Stopping Flutter Mobile App ...
 taskkill /fi "WINDOWTITLE eq SERVIO Mobile App" /t /f >nul 2>&1
 if %errorlevel%==0 (
     echo         Done.
@@ -25,6 +32,6 @@ if %errorlevel%==0 (
 )
 
 echo.
-echo  All SERVIO services stopped.
+echo  All mobile services stopped.
 echo.
 pause >nul

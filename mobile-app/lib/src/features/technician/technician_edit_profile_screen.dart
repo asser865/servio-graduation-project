@@ -327,7 +327,7 @@ class _TechnicianEditProfileScreenState
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _availabilityType,
+              initialValue: _availabilityType,
               decoration: const InputDecoration(
                 labelText: 'Availability',
                 prefixIcon: Icon(Icons.schedule_outlined),
