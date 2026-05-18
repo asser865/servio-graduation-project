@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/api/api_client.dart';
-import '../../core/api/api_exception.dart';
 import '../../core/api/messages_api.dart';
 import '../../core/models/user_account.dart';
 import '../../core/state/app_state.dart';
@@ -21,45 +19,46 @@ class MessagesScreen extends StatefulWidget {
   State<MessagesScreen> createState() => _MessagesScreenState();
 }
 
-class _MessagesScreenState extends State<MessagesScreen> {
+class _MessagesScreenState extends State<MessagesScreen>
+    with WidgetsBindingObserver {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
-  List<ApiConversation> _conversations = <ApiConversation>[];
-  bool _loading = true;
-  String? _error;
+  MessagesProvider? _messagesProvider;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _fetchConversations());
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _messagesProvider?.startAutoRefresh();
+    });
   }
 
-  Future<void> _fetchConversations() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final convs =
-          await MessagesApi(context.read<ApiClient>()).getConversations();
-      if (!mounted) return;
-      context.read<MessagesProvider>().setTotalUnread(
-            convs.fold<int>(0, (sum, conv) => sum + conv.unreadCount),
-          );
-      setState(() => _conversations = convs);
-    } on ApiException catch (error) {
-      if (!mounted) return;
-      setState(() => _error = error.message);
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _error = 'Unable to load messages.');
-    } finally {
-      if (mounted) setState(() => _loading = false);
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _messagesProvider ??= context.read<MessagesProvider>();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _messagesProvider?.startAutoRefresh();
+      return;
+    }
+
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _messagesProvider?.stopAutoRefresh();
     }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _messagesProvider?.stopAutoRefresh();
     _searchController.dispose();
     super.dispose();
   }
@@ -79,11 +78,13 @@ class _MessagesScreenState extends State<MessagesScreen> {
     final theme = Theme.of(context);
     final servio = context.servio;
     final session = context.watch<SessionProvider>();
+    final messagesProvider = context.watch<MessagesProvider>();
     final isTechnician = session.account?.role == UserRole.technician;
     final bottomInset = ServioTabShell.bottomOverlayInsetOf(context);
+    final conversations = messagesProvider.conversations;
     final filtered = _query.isEmpty
-        ? _conversations
-        : _conversations
+        ? conversations
+        : conversations
             .where((c) =>
                 c.contactName.toLowerCase().contains(_query.toLowerCase()) ||
                 c.lastMessage.toLowerCase().contains(_query.toLowerCase()))
@@ -159,7 +160,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
             Expanded(
               child: AnimatedSwitcher(
                 duration: ServioMotion.normal,
-                child: _body(filtered, bottomInset),
+                child: _body(filtered, bottomInset, messagesProvider),
               ),
             ),
             const SizedBox(height: 8),
@@ -169,18 +170,23 @@ class _MessagesScreenState extends State<MessagesScreen> {
     );
   }
 
-  Widget _body(List<ApiConversation> conversations, double bottomInset) {
-    if (_loading) {
+  Widget _body(
+    List<ApiConversation> conversations,
+    double bottomInset,
+    MessagesProvider messagesProvider,
+  ) {
+    if (messagesProvider.loading && messagesProvider.conversations.isEmpty) {
       return const Center(
         key: ValueKey<String>('loading'),
         child: CircularProgressIndicator(),
       );
     }
-    if (_error != null) {
+    if (messagesProvider.error != null &&
+        messagesProvider.conversations.isEmpty) {
       return _ErrorState(
         key: const ValueKey<String>('error'),
-        message: _error!,
-        onRetry: _fetchConversations,
+        message: messagesProvider.error!,
+        onRetry: () => messagesProvider.refresh(),
       );
     }
     if (conversations.isEmpty) {
@@ -188,7 +194,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
     }
     return RefreshIndicator(
       key: const ValueKey<String>('list'),
-      onRefresh: _fetchConversations,
+      onRefresh: () => messagesProvider.refresh(),
       child: ListView.separated(
         padding: EdgeInsets.fromLTRB(
           ServioSpacing.screenPadding,
@@ -205,6 +211,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
             child: _ConversationTile(
               conversation: conversation,
               onTap: () async {
+                final messagesProvider = context.read<MessagesProvider>();
                 await Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => ChatScreen(
@@ -213,7 +220,9 @@ class _MessagesScreenState extends State<MessagesScreen> {
                     ),
                   ),
                 );
-                if (mounted) _fetchConversations();
+                if (mounted) {
+                  messagesProvider.refresh(silent: true);
+                }
               },
             ),
           );
@@ -237,58 +246,76 @@ class _WorkspaceHeader extends StatelessWidget {
     final theme = Theme.of(context);
     final servio = context.servio;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    isTechnician ? 'MY CONVERSATIONS' : 'WORKSPACE',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: servio.textSecondary,
-                      letterSpacing: 0.8,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Messages',
-                    style: theme.textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
+        _BackIconButton(onTap: onDashboardTap),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                isTechnician ? 'MY CONVERSATIONS' : 'WORKSPACE',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: servio.textSecondary,
+                  letterSpacing: 0.8,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            const _SecureBadge(),
-          ],
+              const SizedBox(height: 2),
+              Text(
+                'Messages',
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 10),
-        Align(
-          alignment: AlignmentDirectional.centerEnd,
-          child: TextButton.icon(
-            onPressed: onDashboardTap,
-            icon: const Icon(Icons.arrow_back_rounded, size: 17),
-            label: Text(
-              isTechnician
-                  ? 'Back to Technician Dashboard'
-                  : 'Back to Dashboard',
-              overflow: TextOverflow.ellipsis,
+        const SizedBox(width: 12),
+        const _SecureBadge(),
+      ],
+    );
+  }
+}
+
+class _BackIconButton extends StatelessWidget {
+  const _BackIconButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+
+    return Semantics(
+      button: true,
+      label: 'Back to dashboard',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(ServioRadius.full),
+          child: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              shape: BoxShape.circle,
+              border: Border.all(color: servio.border),
+              boxShadow: ServioShadows.rest,
             ),
-            style: TextButton.styleFrom(
-              minimumSize: const Size(0, 40),
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            alignment: Alignment.center,
+            child: Icon(
+              Icons.arrow_back_rounded,
+              size: 20,
+              color: servio.accent,
             ),
           ),
         ),
-      ],
+      ),
     );
   }
 }
@@ -374,18 +401,18 @@ class _ConversationTileState extends State<_ConversationTile> {
             CircleAvatar(
               radius: 25,
               backgroundColor: servio.accent.withValues(alpha: 0.16),
-              backgroundImage: conversation.otherUser.avatar == null
+              foregroundImage: conversation.otherUser.avatar == null
                   ? null
                   : NetworkImage(conversation.otherUser.avatar!),
-              child: conversation.otherUser.avatar == null
-                  ? Text(
-                      conversation.contactInitials,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        color: servio.accent,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    )
-                  : null,
+              onForegroundImageError:
+                  conversation.otherUser.avatar == null ? null : (_, __) {},
+              child: Text(
+                conversation.contactInitials,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color: servio.accent,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
             const SizedBox(width: 14),
             Expanded(

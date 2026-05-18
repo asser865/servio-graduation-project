@@ -123,6 +123,24 @@ void main() {
     expect(find.text('Booking Confirmed!'), findsNothing);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('review step shows base price plus platform fee',
+      (tester) async {
+    await tester.pumpWidget(await _wrap(const BookingStepThreeScreen(
+      data: BookingFlowData(
+        serviceName: 'Custom Woodwork',
+        technicianName: 'Youssef Tarek',
+        specialty: 'Custom Woodwork',
+        amount: '200 EGP',
+      ),
+    )));
+    await tester.pumpAndSettle();
+
+    expect(find.text('200 EGP'), findsWidgets);
+    expect(find.text('10 EGP (5%)'), findsOneWidget);
+    expect(find.text('210 EGP'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 Future<Widget> _wrap(Widget child) async {

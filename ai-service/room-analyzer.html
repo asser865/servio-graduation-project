@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Servio — AI Room Finishing Planner</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', sans-serif; background: #f4f6fb; color: #1a1a2e; min-height: 100vh; }
+
+    header { background: #1a1a2e; color: #fff; padding: 20px 32px; display: flex; align-items: center; gap: 12px; }
+    header h1 { font-size: 1.4rem; font-weight: 600; }
+    header span { font-size: 0.8rem; background: #4a90e2; padding: 2px 8px; border-radius: 10px; }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 32px 16px; }
+
+    .card { background: #fff; border-radius: 12px; padding: 28px; box-shadow: 0 2px 12px rgba(0,0,0,.07); margin-bottom: 24px; }
+    .card h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 18px; color: #1a1a2e; }
+
+    .upload-zone { border: 2px dashed #c0cfe0; border-radius: 10px; padding: 36px; text-align: center; cursor: pointer; transition: border-color .2s; position: relative; }
+    .upload-zone:hover, .upload-zone.drag-over { border-color: #4a90e2; background: #f0f6ff; }
+    .upload-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    .upload-zone p { color: #666; margin-top: 8px; font-size: .9rem; }
+    #preview-img { max-width: 100%; max-height: 260px; border-radius: 8px; margin-top: 14px; display: none; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+
+    label { display: block; font-size: .82rem; font-weight: 600; color: #555; margin-bottom: 5px; }
+    input[type=number], select { width: 100%; padding: 10px 12px; border: 1.5px solid #dde3ec; border-radius: 8px; font-size: .95rem; outline: none; transition: border-color .2s; }
+    input[type=number]:focus, select:focus { border-color: #4a90e2; }
+
+    .btn { width: 100%; padding: 14px; background: #4a90e2; color: #fff; border: none; border-radius: 10px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: background .2s; }
+    .btn:hover:not(:disabled) { background: #357abd; }
+    .btn:disabled { background: #a0b8d8; cursor: not-allowed; }
+
+    .loading { text-align: center; padding: 32px; display: none; }
+    .spinner { width: 48px; height: 48px; border: 4px solid #e0e8f0; border-top-color: #4a90e2; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 16px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-msg { color: #4a90e2; font-weight: 600; }
+    .loading-sub { color: #888; font-size: .85rem; margin-top: 4px; }
+
+    .error-box { background: #fff0f0; border: 1.5px solid #f5a0a0; border-radius: 8px; padding: 14px 18px; color: #c0392b; margin-top: 16px; display: none; }
+
+    /* Results */
+    .results { display: none; }
+    .before-after { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 24px; }
+    .img-box { flex: 1; min-width: 260px; }
+    .img-box p { font-size: .78rem; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }
+    .img-box img { width: 100%; border-radius: 10px; object-fit: cover; max-height: 280px; }
+
+    .room-info { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+    .info-pill { background: #f0f6ff; border: 1px solid #c8ddf5; border-radius: 20px; padding: 5px 14px; font-size: .82rem; color: #2c5f9e; }
+
+    .plan-tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+    .plan-tab { padding: 10px 22px; border: 2px solid #dde3ec; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: .9rem; transition: all .2s; background: #fff; }
+    .plan-tab.active { border-color: #4a90e2; background: #4a90e2; color: #fff; }
+    .plan-tab:hover:not(.active) { border-color: #4a90e2; color: #4a90e2; }
+
+    .plan-totals { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+    .total-box { background: #f8fafc; border-radius: 10px; padding: 14px 16px; text-align: center; }
+    .total-box .val { font-size: 1.2rem; font-weight: 700; color: #1a1a2e; }
+    .total-box .lbl { font-size: .75rem; color: #888; margin-top: 3px; }
+
+    table { width: 100%; border-collapse: collapse; font-size: .88rem; margin-top: 12px; }
+    th { background: #f4f6fb; text-align: left; padding: 10px 12px; font-weight: 700; color: #444; border-bottom: 2px solid #e0e8f0; }
+    td { padding: 9px 12px; border-bottom: 1px solid #f0f0f0; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f8fafc; }
+
+    .rec-box { background: #f0f8f0; border: 1.5px solid #a0d8a0; border-radius: 8px; padding: 12px 16px; font-size: .88rem; color: #2e7d32; margin-top: 16px; }
+
+    @media (max-width: 600px) {
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+      .plan-totals { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Servio AI Room Finishing Planner</h1>
+  <span>Beta</span>
+</header>
+
+<div class="container">
+
+  <!-- Input form -->
+  <div class="card" id="form-card">
+    <h2>Upload Room Photo & Enter Dimensions</h2>
+
+    <div class="upload-zone" id="drop-zone">
+      <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp" />
+      <div id="upload-icon">📷</div>
+      <p id="upload-label">Click to upload or drag & drop a room photo (JPEG / PNG, max 10 MB)</p>
+      <img id="preview-img" alt="Room preview" />
+    </div>
+
+    <br />
+
+    <div class="grid-3" style="margin-bottom:14px">
+      <div>
+        <label>Length (m)</label>
+        <input type="number" id="length" placeholder="e.g. 5.0" min="1" max="50" step="0.1" />
+      </div>
+      <div>
+        <label>Width (m)</label>
+        <input type="number" id="width" placeholder="e.g. 4.0" min="1" max="50" step="0.1" />
+      </div>
+      <div>
+        <label>Height (m)</label>
+        <input type="number" id="height" placeholder="e.g. 2.8" min="2" max="6" step="0.1" />
+      </div>
+    </div>
+
+    <div class="grid-2" style="margin-bottom:20px">
+      <div>
+        <label>Budget (EGP)</label>
+        <input type="number" id="budget" placeholder="e.g. 60000" min="1000" step="1000" />
+      </div>
+      <div>
+        <label>Preferred Style</label>
+        <select id="style">
+          <option value="modern">Modern</option>
+          <option value="classic">Classic</option>
+          <option value="minimalist">Minimalist</option>
+          <option value="contemporary">Contemporary</option>
+          <option value="traditional">Traditional</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="btn" id="analyze-btn" onclick="analyze()">Generate Finishing Plan</button>
+    <div class="error-box" id="error-box"></div>
+  </div>
+
+  <!-- Loading -->
+  <div class="card loading" id="loading-card">
+    <div class="spinner"></div>
+    <div class="loading-msg" id="loading-msg">Analyzing your room...</div>
+    <div class="loading-sub">This takes 30–60 seconds. The AI is generating your finishing plan and room render.</div>
+  </div>
+
+  <!-- Results -->
+  <div class="results" id="results">
+
+    <div class="card">
+      <h2>Before / After</h2>
+      <div class="before-after">
+        <div class="img-box">
+          <p>Before — Your Room</p>
+          <img id="before-img" src="" alt="before" />
+        </div>
+        <div class="img-box">
+          <p>After — AI Render</p>
+          <img id="after-img" src="" alt="AI render" />
+        </div>
+      </div>
+      <div class="room-info" id="room-info"></div>
+    </div>
+
+    <div class="card">
+      <h2>Choose Your Finishing Plan</h2>
+      <div class="plan-tabs" id="plan-tabs"></div>
+      <div class="plan-totals" id="plan-totals"></div>
+
+      <h3 style="margin-bottom:8px;font-size:.95rem">Materials</h3>
+      <table id="materials-table">
+        <thead><tr><th>Item</th><th>Category</th><th>Qty</th><th>Unit</th><th>Unit Price</th><th>Total</th></tr></thead>
+        <tbody id="materials-body"></tbody>
+      </table>
+
+      <h3 style="margin:20px 0 8px;font-size:.95rem">Labor</h3>
+      <table id="labor-table">
+        <thead><tr><th>Trade</th><th>Description</th><th>Days</th><th>Rate/Day</th><th>Total</th></tr></thead>
+        <tbody id="labor-body"></tbody>
+      </table>
+
+      <div class="rec-box" id="rec-box"></div>
+    </div>
+
+    <button class="btn" onclick="reset()" style="max-width:300px">Analyze Another Room</button>
+  </div>
+
+</div>
+
+<script>
+  const AI_URL = 'http://localhost:8001';
+
+  const LOADING_MSGS = [
+    'Analyzing your room...',
+    'Calculating material quantities...',
+    'Generating your design render...',
+    'Almost done...'
+  ];
+
+  let selectedFile = null;
+  let resultData = null;
+  let activePlan = null;
+  let loadingTimer = null;
+
+  // ── File upload ──────────────────────────────────────────────────────────
+  const dropZone = document.getElementById('drop-zone');
+  const fileInput = document.getElementById('file-input');
+
+  fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    handleFile(e.dataTransfer.files[0]);
+  });
+
+  function handleFile(file) {
+    if (!file) return;
+    if (!file.type.match(/image\/(jpeg|jpg|png|webp)/)) {
+      showError('Use JPEG or PNG.');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      showError('File too large. Max 10 MB.');
+      return;
+    }
+    selectedFile = file;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = document.getElementById('preview-img');
+      img.src = e.target.result;
+      img.style.display = 'block';
+      document.getElementById('upload-label').textContent = file.name;
+    };
+    reader.readAsDataURL(file);
+    hideError();
+  }
+
+  // ── Analyze ──────────────────────────────────────────────────────────────
+  async function analyze() {
+    if (!selectedFile) { showError('Upload a room photo first.'); return; }
+    const length = parseFloat(document.getElementById('length').value);
+    const width  = parseFloat(document.getElementById('width').value);
+    const height = parseFloat(document.getElementById('height').value);
+    const budget = parseInt(document.getElementById('budget').value, 10);
+    const style  = document.getElementById('style').value;
+
+    if (!length || !width || !height || !budget) { showError('Fill in all dimensions and budget.'); return; }
+    if (length < 1 || length > 50) { showError('Length must be 1–50 m.'); return; }
+    if (width  < 1 || width  > 50) { showError('Width must be 1–50 m.'); return; }
+    if (height < 2 || height > 6)  { showError('Height must be 2–6 m.'); return; }
+    if (budget < 1000)              { showError('Budget must be at least EGP 1,000.'); return; }
+
+    hideError();
+    setLoading(true);
+
+    const fd = new FormData();
+    fd.append('image',      selectedFile);
+    fd.append('length_m',   length);
+    fd.append('width_m',    width);
+    fd.append('height_m',   height);
+    fd.append('budget_egp', budget);
+    fd.append('style',      style);
+
+    try {
+      const res  = await fetch(`${AI_URL}/ai/analyze-room`, { method: 'POST', body: fd });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.detail || 'Analysis failed.');
+      renderResults(json);
+    } catch (err) {
+      setLoading(false);
+      showError(err.message);
+    }
+  }
+
+  // ── Render results ───────────────────────────────────────────────────────
+  function renderResults(json) {
+    setLoading(false);
+    resultData = json.data;
+
+    // Before / after images
+    document.getElementById('before-img').src = URL.createObjectURL(selectedFile);
+    document.getElementById('after-img').src  = `data:image/jpeg;base64,${json.generated_room_image}`;
+
+    // Room info pills
+    const ra = resultData.room_analysis;
+    const infoEl = document.getElementById('room-info');
+    infoEl.innerHTML = [
+      `Room type: ${ra.room_type.replace('_', ' ')}`,
+      `Wall: ${ra.wall_condition.replace('_', ' ')}`,
+      `Ceiling: ~${ra.estimated_ceiling_height_m} m`,
+      ...(ra.detected_features || []).slice(0, 4)
+    ].map(t => `<span class="info-pill">${t}</span>`).join('');
+
+    // Plan tabs
+    activePlan = resultData.recommended_plan;
+    const tabsEl = document.getElementById('plan-tabs');
+    tabsEl.innerHTML = '';
+    resultData.finishing_plans.forEach(p => {
+      const btn = document.createElement('button');
+      btn.className = 'plan-tab' + (p.plan_name === activePlan ? ' active' : '');
+      btn.textContent = `${p.plan_name} — EGP ${p.total_cost_egp.toLocaleString()}`;
+      btn.onclick = () => selectPlan(p.plan_name);
+      tabsEl.appendChild(btn);
+    });
+
+    renderPlan(activePlan);
+    document.getElementById('results').style.display = 'block';
+    document.getElementById('form-card').style.display = 'none';
+    document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function selectPlan(name) {
+    activePlan = name;
+    document.querySelectorAll('.plan-tab').forEach((btn, i) => {
+      btn.classList.toggle('active', resultData.finishing_plans[i].plan_name === name);
+    });
+    renderPlan(name);
+  }
+
+  function renderPlan(name) {
+    const plan = resultData.finishing_plans.find(p => p.plan_name === name);
+    if (!plan) return;
+
+    // Totals
+    document.getElementById('plan-totals').innerHTML = `
+      <div class="total-box"><div class="val">EGP ${plan.total_cost_egp.toLocaleString()}</div><div class="lbl">Grand Total</div></div>
+      <div class="total-box"><div class="val">EGP ${plan.materials_subtotal_egp.toLocaleString()}</div><div class="lbl">Materials</div></div>
+      <div class="total-box"><div class="val">EGP ${plan.labor_subtotal_egp.toLocaleString()}</div><div class="lbl">Labor</div></div>
+      <div class="total-box"><div class="val">${plan.timeline_days} days</div><div class="lbl">Timeline</div></div>
+    `;
+
+    // Materials table
+    const mb = document.getElementById('materials-body');
+    mb.innerHTML = (plan.materials || []).map(m => `
+      <tr>
+        <td>${m.name}</td>
+        <td>${m.category}</td>
+        <td>${m.quantity}</td>
+        <td>${m.unit}</td>
+        <td>EGP ${(m.unit_price_egp || 0).toLocaleString()}</td>
+        <td><strong>EGP ${(m.total_egp || 0).toLocaleString()}</strong></td>
+      </tr>
+    `).join('');
+
+    // Labor table
+    const lb = document.getElementById('labor-body');
+    lb.innerHTML = (plan.labor || []).map(l => `
+      <tr>
+        <td>${l.trade}</td>
+        <td>${l.description || '—'}</td>
+        <td>${l.days}</td>
+        <td>EGP ${(l.daily_rate_egp || 0).toLocaleString()}</td>
+        <td><strong>EGP ${(l.total_egp || 0).toLocaleString()}</strong></td>
+      </tr>
+    `).join('');
+
+    // Recommendation
+    document.getElementById('rec-box').textContent =
+      `Recommended: ${resultData.recommended_plan} — ${resultData.recommendation_reason}`;
+  }
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+  function setLoading(on) {
+    document.getElementById('loading-card').style.display = on ? 'block' : 'none';
+    document.getElementById('analyze-btn').disabled = on;
+    if (on) {
+      let idx = 0;
+      document.getElementById('loading-msg').textContent = LOADING_MSGS[0];
+      loadingTimer = setInterval(() => {
+        idx = Math.min(idx + 1, LOADING_MSGS.length - 1);
+        document.getElementById('loading-msg').textContent = LOADING_MSGS[idx];
+      }, 8000);
+    } else {
+      clearInterval(loadingTimer);
+    }
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('error-box');
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+
+  function hideError() {
+    document.getElementById('error-box').style.display = 'none';
+  }
+
+  function reset() {
+    selectedFile = null;
+    resultData = null;
+    document.getElementById('results').style.display = 'none';
+    document.getElementById('form-card').style.display = 'block';
+    document.getElementById('preview-img').style.display = 'none';
+    document.getElementById('upload-label').textContent = 'Click to upload or drag & drop a room photo (JPEG / PNG, max 10 MB)';
+    document.getElementById('file-input').value = '';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+</script>
+</body>
+</html>

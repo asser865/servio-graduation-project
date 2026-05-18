@@ -4,9 +4,8 @@ const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
 const morgan = require('morgan');
-const path = require('path');
-const os = require('os');
 const { StatusCodes } = require('http-status-codes');
+const { resolveUploadRoot } = require('./config/uploadPath');
 
 // ── Route modules ─────────────────────────────────────────────────────────────
 const authRoutes      = require('./modules/auth/auth.routes');
@@ -27,9 +26,7 @@ const platformRoutes  = require('./modules/platform/platform.routes');
 const { notFound, errorHandler } = require('./middleware/error.middleware');
 
 const app = express();
-const uploadRoot = process.env.SERVIO_UPLOAD_DIR
-  ? path.resolve(process.env.SERVIO_UPLOAD_DIR)
-  : path.join(os.tmpdir(), 'servio-uploads');
+const uploadRoot = resolveUploadRoot();
 
 app.use(helmet());
 

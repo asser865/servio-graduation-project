@@ -71,17 +71,25 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
     }
     final workersProvider = context.read<WorkersProvider>();
     final client = context.read<ApiClient>();
+    final cached = workersProvider.findById(technicianId);
+    if (cached != null) {
+      setState(() {
+        _worker = cached;
+        _loading = false;
+      });
+    }
     try {
-      final cached = workersProvider.findById(technicianId);
-      if (cached != null) {
-        setState(() => _worker = cached);
-      } else {
-        final worker = await UsersApi(client).getWorkerById(technicianId);
-        if (mounted) setState(() => _worker = worker);
+      final worker = await UsersApi(client).getWorkerById(technicianId);
+      if (mounted) {
+        setState(() {
+          _worker = worker;
+          _loading = false;
+          _error = null;
+        });
       }
       if (!mounted) return;
     } catch (e) {
-      if (mounted) {
+      if (mounted && _worker == null) {
         setState(() =>
             _error = 'Unable to load technician profile. Please try again.');
       }
@@ -193,6 +201,7 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
       worker.categories.isNotEmpty ? worker.categories.first : null,
       worker.skills.isNotEmpty ? worker.skills.first : null,
     ]);
+    final bookingPriceService = selectedBackendService ?? primaryBackendService;
     final availabilityLabel =
         _availabilityLabel(worker.availabilityType, locale);
     final locationLabel = worker.locationLabel.isNotEmpty
@@ -210,13 +219,13 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
     final aboutText = worker.bio.trim().isNotEmpty
         ? worker.bio.trim()
         : _copy(locale, en: 'No bio available.', ar: 'لا توجد نبذة متاحة.');
-    final rateLabel = worker.hourlyRate > 0
-        ? _copy(
-            locale,
-            en: '${worker.hourlyRate} EGP/hr',
-            ar: '${worker.hourlyRate} جنيه/ساعة',
-          )
-        : _copy(locale, en: 'Rate on request', ar: 'السعر عند الطلب');
+    final bookingBaseAmount =
+        _bookingBaseAmount(bookingPriceService, worker.hourlyRate);
+    final bookingPriceLabel = _bookingPriceLabel(
+      bookingPriceService,
+      worker.hourlyRate,
+      locale,
+    );
 
     return Scaffold(
       body: Stack(
@@ -267,7 +276,7 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
                 ),
               ),
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 176),
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate(
                     <Widget>[
@@ -406,40 +415,18 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
               ),
             ],
           ),
-          Align(
-            alignment: Alignment.bottomCenter,
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
             child: SafeArea(
               top: false,
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surface,
-                  border: Border(
-                    top: BorderSide(
-                      color: servio.border.withValues(alpha: 0.7),
-                    ),
-                  ),
-                  boxShadow: theme.brightness == Brightness.dark
-                      ? ServioShadows.elevatedDark
-                      : ServioShadows.elevated,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: <Widget>[
-                        Text(
-                          rateLabel,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            color: servio.accent,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 14),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 520),
+                    child: Row(
                       children: <Widget>[
                         Expanded(
                           flex: 3,
@@ -457,7 +444,9 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
                                       category: selectedServiceCategory,
                                       serviceName: selectedServiceName,
                                       specialty: selectedServiceName,
-                                      hourlyRate: rateLabel,
+                                      priceLabel: bookingPriceLabel,
+                                      hourlyRate: bookingPriceLabel,
+                                      amount: _moneyLabel(bookingBaseAmount),
                                       technicianAvailability:
                                           worker.availability,
                                     ),
@@ -468,37 +457,35 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        Expanded(
-                          flex: 2,
-                          child: OutlinedButton.icon(
-                            onPressed: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                  builder: (_) => ChatScreen(
-                                    contactName: workerName,
-                                    workerId: worker.id,
+                        Tooltip(
+                          message: _copy(locale, en: 'Message', ar: 'مراسلة'),
+                          child: SizedBox(
+                            width: 52,
+                            height: 52,
+                            child: OutlinedButton(
+                              onPressed: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => ChatScreen(
+                                      contactName: workerName,
+                                      workerId: worker.id,
+                                    ),
                                   ),
-                                ),
-                              );
-                            },
-                            icon: const Icon(Icons.chat_bubble_outline_rounded),
-                            style: OutlinedButton.styleFrom(
-                              minimumSize: const Size.fromHeight(52),
-                              shape: RoundedRectangleBorder(
-                                borderRadius:
-                                    BorderRadius.circular(ServioRadius.full),
+                                );
+                              },
+                              child:
+                                  const Icon(Icons.chat_bubble_outline_rounded),
+                              style: OutlinedButton.styleFrom(
+                                fixedSize: const Size.square(52),
+                                padding: EdgeInsets.zero,
+                                shape: const CircleBorder(),
                               ),
-                            ),
-                            label: Text(
-                              _copy(locale, en: 'Message', ar: 'مراسلة'),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -1548,6 +1535,37 @@ String _firstNonEmpty(List<String?> values) {
     if (trimmed.isNotEmpty) return trimmed;
   }
   return '';
+}
+
+double _bookingBaseAmount(BackendWorkerService? service, int hourlyRate) {
+  final servicePrice = service?.basePrice ?? 0;
+  if (servicePrice > 0) return servicePrice;
+  if (hourlyRate > 0) return hourlyRate.toDouble();
+  return 0;
+}
+
+String _moneyLabel(double amount) => '${amount.round()} EGP';
+
+String _bookingPriceLabel(
+  BackendWorkerService? service,
+  int hourlyRate,
+  String locale,
+) {
+  final servicePrice = service?.basePrice ?? 0;
+  if (servicePrice > 0) {
+    final rounded = servicePrice.round();
+    return switch (service?.priceUnit) {
+      'per_hour' => _copy(locale, en: '$rounded EGP/hr', ar: '$rounded EGP/hr'),
+      'per_sqm' => _copy(locale, en: '$rounded EGP/m2', ar: '$rounded EGP/m2'),
+      _ => _copy(locale, en: '$rounded EGP', ar: '$rounded EGP'),
+    };
+  }
+
+  if (hourlyRate > 0) {
+    return _copy(locale, en: '$hourlyRate EGP/hr', ar: '$hourlyRate EGP/hr');
+  }
+
+  return _copy(locale, en: 'Rate on request', ar: 'Rate on request');
 }
 
 String _normalizeAvailabilityDay(String value) =>

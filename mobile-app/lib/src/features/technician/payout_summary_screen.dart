@@ -6,6 +6,7 @@ import '../../core/api/payments_api.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
+import '../../design_system/widgets/servio_primary_button.dart';
 
 /// Worker-only Payout Summary screen.
 ///
@@ -239,6 +240,7 @@ class _SuccessBodyState extends State<_SuccessBody> {
   late TextEditingController _accountHolderCtrl;
   late TextEditingController _accountNumberCtrl;
   late TextEditingController _walletNumberCtrl;
+  bool _isLocked = false;
 
   @override
   void initState() {
@@ -261,6 +263,21 @@ class _SuccessBodyState extends State<_SuccessBody> {
         TextEditingController(text: widget.summary.accountNumber);
     _walletNumberCtrl =
         TextEditingController(text: widget.summary.walletNumber);
+
+    _isLocked = _hasSavedConfig(widget.summary);
+  }
+
+  bool _hasSavedConfig(EarningsSummary s) {
+    final method = s.payoutMethod;
+    if (method == 'bank') {
+      return (s.bankName ?? '').trim().isNotEmpty &&
+          (s.accountHolder ?? '').trim().isNotEmpty &&
+          (s.accountNumber ?? '').trim().isNotEmpty;
+    }
+    if (['instapay', 'vodafone', 'orange'].contains(method)) {
+      return (s.walletNumber ?? '').trim().isNotEmpty;
+    }
+    return false;
   }
 
   static const List<String> _kBankNames = <String>[
@@ -302,9 +319,10 @@ class _SuccessBodyState extends State<_SuccessBody> {
       );
 
       if (!mounted) return;
+      setState(() => _isLocked = true);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Changes saved successfully!'),
+          content: const Text('Payout settings saved.'),
           backgroundColor: context.servio.success,
           behavior: SnackBarBehavior.floating,
         ),
@@ -321,6 +339,10 @@ class _SuccessBodyState extends State<_SuccessBody> {
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
+  }
+
+  void _handleEdit() {
+    setState(() => _isLocked = false);
   }
 
   Widget _buildTextField({
@@ -429,13 +451,18 @@ class _SuccessBodyState extends State<_SuccessBody> {
     final servio = context.servio;
     final theme = Theme.of(context);
 
-    return Column(
-      children: [
-        Expanded(
-          child: ListView(
-            padding: const EdgeInsets.all(ServioSpacing.screenPadding),
-            children: [
-              // â”€â”€ Wallet header card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    return Stack(
+      children: <Widget>[
+        ListView(
+          padding: EdgeInsets.fromLTRB(
+            ServioSpacing.screenPadding,
+            ServioSpacing.screenPadding,
+            ServioSpacing.screenPadding,
+            120 + bottomInset,
+          ),
+          children: [
+            // â”€â”€ Wallet header card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
               _StaggeredItem(
                 index: 0,
                 child: Container(
@@ -522,8 +549,52 @@ class _SuccessBodyState extends State<_SuccessBody> {
               ),
               const SizedBox(height: 24),
 
+              // â”€â”€ Saved-state banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+              AnimatedSize(
+                duration: ServioMotion.normal,
+                curve: ServioMotion.spring,
+                child: _isLocked
+                    ? Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: ServioColors.tint(servio.success),
+                            borderRadius:
+                                BorderRadius.circular(ServioRadius.md),
+                            border: Border.all(
+                              color: servio.success.withValues(alpha: 0.4),
+                            ),
+                          ),
+                          child: Row(
+                            children: <Widget>[
+                              Icon(Icons.check_circle_rounded,
+                                  size: 18, color: servio.success),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  'Payout settings saved. Tap Edit to change.',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: servio.success,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+
               // â”€â”€ Payout Method form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-              _StaggeredItem(
+              IgnorePointer(
+                ignoring: _isLocked,
+                child: AnimatedOpacity(
+                  duration: ServioMotion.normal,
+                  opacity: _isLocked ? 0.6 : 1,
+                  child: _StaggeredItem(
                 index: 2,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -649,10 +720,17 @@ class _SuccessBodyState extends State<_SuccessBody> {
                   ],
                 ),
               ),
+                ),
+              ),
               const SizedBox(height: 24),
 
               // â”€â”€ Payout Schedule card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-              _StaggeredItem(
+              IgnorePointer(
+                ignoring: _isLocked,
+                child: AnimatedOpacity(
+                  duration: ServioMotion.normal,
+                  opacity: _isLocked ? 0.6 : 1,
+                  child: _StaggeredItem(
                 index: 3,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -713,6 +791,8 @@ class _SuccessBodyState extends State<_SuccessBody> {
                   ],
                 ),
               ),
+                ),
+              ),
               const SizedBox(height: 24),
 
               // â”€â”€ Security hint â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -736,43 +816,36 @@ class _SuccessBodyState extends State<_SuccessBody> {
               const SizedBox(height: 32),
             ],
           ),
-        ),
-        Container(
-          padding: EdgeInsets.fromLTRB(
-            ServioSpacing.screenPadding,
-            16,
-            ServioSpacing.screenPadding,
-            MediaQuery.paddingOf(context).bottom + 16,
-          ),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
-            boxShadow: [
-              BoxShadow(
-                color: theme.shadowColor.withValues(alpha: 0.05),
-                blurRadius: 10,
-                offset: const Offset(0, -5),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                ServioSpacing.screenPadding,
+                10,
+                ServioSpacing.screenPadding,
+                12,
               ),
-            ],
-          ),
-          child: SizedBox(
-            width: double.infinity,
-            height: 54,
-            child: ElevatedButton(
-              onPressed: _isSaving ? null : _handleSave,
-              style: ElevatedButton.styleFrom(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(ServioRadius.md),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 520),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ServioPrimaryButton(
+                      label: _isLocked
+                          ? 'Edit Payout Settings'
+                          : (_isSaving ? 'Saving...' : 'Save Changes'),
+                      onPressed: _isLocked
+                          ? _handleEdit
+                          : (_isSaving ? null : _handleSave),
+                      isLoading: _isSaving,
+                    ),
+                  ),
                 ),
               ),
-              child: _isSaving
-                  ? const SizedBox(
-                      height: 24,
-                      width: 24,
-                      child: CircularProgressIndicator(strokeWidth: 2.5),
-                    )
-                  : const Text('Save Changes',
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             ),
           ),
         ),

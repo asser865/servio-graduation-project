@@ -331,9 +331,10 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
     final theme = Theme.of(context);
     final servio = context.servio;
     final statusCode = _data.statusCode.toLowerCase();
-    final total = _moneyValue(_data.amount);
-    final platformFee = (total * 0.05).round();
-    final baseRate = total - platformFee;
+    final baseRate = _moneyValue(_data.amount);
+    final platformFee = (baseRate * 0.05).round();
+    final estimatedTotal = baseRate + platformFee;
+    final estimatedTotalLabel = _moneyLabel(estimatedTotal);
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -513,7 +514,7 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
                     const Divider(height: 20),
                     _ConfirmDetailRow(
                       label: 'Total',
-                      value: _data.amount,
+                      value: estimatedTotalLabel,
                       isBold: true,
                       valueColor: servio.accent,
                     ),
@@ -634,7 +635,7 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
                         label: 'Platform Fee', value: '$platformFee EGP'),
                     _ConfirmDetailRow(
                       label: 'Est. Total',
-                      value: _data.amount,
+                      value: estimatedTotalLabel,
                       isBold: true,
                       valueColor: servio.accent,
                     ),
@@ -1482,6 +1483,8 @@ int _moneyValue(String value) {
   final numeric = value.replaceAll(RegExp(r'[^0-9]'), '');
   return int.tryParse(numeric) ?? 0;
 }
+
+String _moneyLabel(int value) => '$value EGP';
 
 String _labelForCode(String code) => switch (code.toLowerCase()) {
       'pending' => 'Pending',

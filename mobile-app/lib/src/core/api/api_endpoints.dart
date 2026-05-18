@@ -46,6 +46,8 @@ class ApiEndpoints {
   static const String messages = '/messages';
   static String messagesForConversation(String conversationId) =>
       '/messages/conversations/$conversationId';
+  static String conversation(String conversationId) =>
+      '/messages/conversations/$conversationId';
   static String messagesForBooking(String bookingId) => '/messages/$bookingId';
 
   static const String notify = '/notify';

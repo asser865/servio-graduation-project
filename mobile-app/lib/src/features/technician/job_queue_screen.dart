@@ -22,6 +22,7 @@ class JobQueueScreen extends StatefulWidget {
 
 class _JobQueueScreenState extends State<JobQueueScreen> {
   int _tabIndex = 0;
+  bool _historyExpanded = false;
   static const List<String> _tabs = <String>[
     'Pending',
     'Confirmed',
@@ -30,6 +31,8 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
     'Cancelled',
     'Rejected',
   ];
+  static const List<int> _primaryTabs = <int>[0, 1, 2];
+  static const List<int> _historyTabs = <int>[3, 4, 5];
 
   List<BackendBooking> _jobs = [];
   bool _loading = true;
@@ -202,66 +205,33 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
               child: LayoutBuilder(
                 builder: (BuildContext context, BoxConstraints constraints) {
                   const spacing = 6.0;
-                  final tabWidth = (constraints.maxWidth - spacing * 2) / 3;
+                  final tabWidth =
+                      (constraints.maxWidth - spacing * 2) / 3;
 
-                  return Wrap(
-                    spacing: spacing,
-                    runSpacing: spacing,
-                    children: List<Widget>.generate(_tabs.length, (int index) {
-                      final active = index == _tabIndex;
-                      final count = _jobsForTab(index).length.toString();
-                      final tabColor = _tabColor(index, servio);
+                  return Row(
+                    children: List<Widget>.generate(_primaryTabs.length,
+                        (int slot) {
+                      final int index = _primaryTabs[slot];
+                      final bool active = index == _tabIndex;
+                      final String count =
+                          _jobsForTab(index).length.toString();
+                      final Color tabColor = _tabColor(index, servio);
 
-                      return SizedBox(
-                        width: tabWidth,
-                        child: GestureDetector(
-                          onTap: () => setState(() => _tabIndex = index),
-                          child: AnimatedContainer(
-                            duration: ServioMotion.micro,
-                            curve: ServioMotion.curve,
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            decoration: BoxDecoration(
-                              color: active
-                                  ? Theme.of(context).colorScheme.surface
-                                  : Colors.transparent,
-                              borderRadius:
-                                  BorderRadius.circular(ServioRadius.full),
-                            ),
-                            child: Column(
-                              children: <Widget>[
-                                Text(
-                                  _tabs[index],
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .labelSmall
-                                      ?.copyWith(
-                                        color: active
-                                            ? servio.accent
-                                            : servio.textSecondary,
-                                      ),
-                                  textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 4),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: ServioColors.tint(tabColor),
-                                    borderRadius: BorderRadius.circular(
-                                        ServioRadius.full),
-                                  ),
-                                  child: Text(
-                                    count,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .labelSmall
-                                        ?.copyWith(color: tabColor),
-                                  ),
-                                ),
-                              ],
-                            ),
+                      return Padding(
+                        padding: EdgeInsets.only(
+                          right: slot == _primaryTabs.length - 1
+                              ? 0
+                              : spacing,
+                        ),
+                        child: SizedBox(
+                          width: tabWidth,
+                          child: _PrimaryTabChip(
+                            label: _tabs[index],
+                            count: count,
+                            tabColor: tabColor,
+                            active: active,
+                            onTap: () =>
+                                setState(() => _tabIndex = index),
                           ),
                         ),
                       );
@@ -270,7 +240,19 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
                 },
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 10),
+            _HistorySection(
+              tabs: _tabs,
+              historyTabs: _historyTabs,
+              activeIndex: _tabIndex,
+              expanded: _historyExpanded,
+              onToggle: () =>
+                  setState(() => _historyExpanded = !_historyExpanded),
+              onSelect: (int idx) => setState(() => _tabIndex = idx),
+              countFor: (int idx) => _jobsForTab(idx).length,
+              colorFor: (int idx) => _tabColor(idx, servio),
+            ),
+            const SizedBox(height: 14),
             Expanded(
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
@@ -559,3 +541,251 @@ bool _isAssignedToWorker(BackendBooking job, String workerId) {
 
 String _normalizedStatus(String status) =>
     status.trim().toLowerCase().replaceAll('-', '_');
+
+class _PrimaryTabChip extends StatelessWidget {
+  const _PrimaryTabChip({
+    required this.label,
+    required this.count,
+    required this.tabColor,
+    required this.active,
+    required this.onTap,
+  });
+
+  final String label;
+  final String count;
+  final Color tabColor;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: ServioMotion.micro,
+        curve: ServioMotion.curve,
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: active ? theme.colorScheme.surface : Colors.transparent,
+          borderRadius: BorderRadius.circular(ServioRadius.full),
+        ),
+        child: Column(
+          children: <Widget>[
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: active ? servio.accent : servio.textSecondary,
+                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 8,
+                vertical: 4,
+              ),
+              decoration: BoxDecoration(
+                color: ServioColors.tint(tabColor),
+                borderRadius: BorderRadius.circular(ServioRadius.full),
+              ),
+              child: Text(
+                count,
+                style: theme.textTheme.labelSmall?.copyWith(color: tabColor),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HistorySection extends StatelessWidget {
+  const _HistorySection({
+    required this.tabs,
+    required this.historyTabs,
+    required this.activeIndex,
+    required this.expanded,
+    required this.onToggle,
+    required this.onSelect,
+    required this.countFor,
+    required this.colorFor,
+  });
+
+  final List<String> tabs;
+  final List<int> historyTabs;
+  final int activeIndex;
+  final bool expanded;
+  final VoidCallback onToggle;
+  final ValueChanged<int> onSelect;
+  final int Function(int index) countFor;
+  final Color Function(int index) colorFor;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+    final int total = historyTabs.fold<int>(0, (int sum, int i) => sum + countFor(i));
+    final bool historyActive = historyTabs.contains(activeIndex);
+    final bool open = expanded || historyActive;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        InkWell(
+          onTap: onToggle,
+          borderRadius: BorderRadius.circular(ServioRadius.full),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+            child: Row(
+              children: <Widget>[
+                Icon(
+                  Icons.history_rounded,
+                  size: 16,
+                  color: servio.textSecondary,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'History',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: servio.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: ServioColors.tint(servio.textSecondary),
+                    borderRadius: BorderRadius.circular(ServioRadius.full),
+                  ),
+                  child: Text(
+                    '$total',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: servio.textSecondary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                AnimatedRotation(
+                  turns: open ? 0.5 : 0,
+                  duration: ServioMotion.normal,
+                  curve: ServioMotion.spring,
+                  child: Icon(
+                    Icons.expand_more_rounded,
+                    color: servio.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        AnimatedCrossFade(
+          firstChild: const SizedBox(width: double.infinity, height: 0),
+          secondChild: Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: <Widget>[
+                for (final int idx in historyTabs)
+                  _HistoryChip(
+                    label: tabs[idx],
+                    count: countFor(idx),
+                    color: colorFor(idx),
+                    active: idx == activeIndex,
+                    onTap: () => onSelect(idx),
+                  ),
+              ],
+            ),
+          ),
+          crossFadeState:
+              open ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+          duration: ServioMotion.normal,
+          sizeCurve: ServioMotion.spring,
+        ),
+      ],
+    );
+  }
+}
+
+class _HistoryChip extends StatelessWidget {
+  const _HistoryChip({
+    required this.label,
+    required this.count,
+    required this.color,
+    required this.active,
+    required this.onTap,
+  });
+
+  final String label;
+  final int count;
+  final Color color;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: ServioMotion.fast,
+        curve: ServioMotion.spring,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: active
+              ? ServioColors.tint(color)
+              : theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(ServioRadius.full),
+          border: Border.all(
+            color: active ? color : servio.border,
+            width: active ? 1.2 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Text(
+              label,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: active ? color : servio.textSecondary,
+                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 6,
+                vertical: 1,
+              ),
+              decoration: BoxDecoration(
+                color: ServioColors.tint(color),
+                borderRadius: BorderRadius.circular(ServioRadius.full),
+              ),
+              child: Text(
+                '$count',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

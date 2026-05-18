@@ -22,6 +22,7 @@ import '../marketing/terms_of_service_screen.dart';
 import '../shared/report_problem_screen.dart';
 import 'availability_manager_screen.dart';
 import 'technician_settings_screen.dart';
+import 'transaction_details_sheet.dart';
 import 'verification_upload_screen.dart';
 
 class TechnicianSettingsProfileScreen extends StatefulWidget {
@@ -786,6 +787,7 @@ class _PortfolioCard extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 10),
       child: ServioCard(
         radius: ServioRadius.lg,
+        onTap: () => showTransactionDetailsSheet(context, job: job),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[

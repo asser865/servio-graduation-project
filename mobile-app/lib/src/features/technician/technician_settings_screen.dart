@@ -10,6 +10,7 @@ import 'technician_edit_profile_screen.dart';
 import 'technician_notification_settings_screen.dart';
 import 'technician_security_screen.dart';
 import 'payout_summary_screen.dart';
+import 'service_area_screen.dart';
 
 class TechnicianSettingsScreen extends StatelessWidget {
   const TechnicianSettingsScreen({super.key});
@@ -55,11 +56,15 @@ class TechnicianSettingsScreen extends StatelessWidget {
                   ),
                 ),
                 _NavTile(
-                  icon: Icons.location_on_outlined,
+                  icon: Icons.map_outlined,
                   iconColor: servio.accent,
-                  label: 'My Addresses',
-                  subtitle: 'Saved home and work locations',
-                  onTap: () => _showPlaceholder(context, 'My Addresses'),
+                  label: 'Service Area',
+                  subtitle: 'Cities and neighborhoods you cover',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const ServiceAreaScreen(),
+                    ),
+                  ),
                 ),
                 _NavTile(
                   icon: Icons.account_balance_wallet_rounded,
@@ -171,21 +176,6 @@ class TechnicianSettingsScreen extends StatelessWidget {
     );
   }
 
-  void _showPlaceholder(BuildContext context, String feature) {
-    showDialog<void>(
-      context: context,
-      builder: (BuildContext ctx) => AlertDialog(
-        title: Text(feature),
-        content: Text('$feature is coming soon.'),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 // ── Section header ────────────────────────────────────────────────────────────

@@ -68,7 +68,7 @@ const getTechnicians = async (req, res) => {
   const [workers, total] = await Promise.all([
     User.find(filter)
       .select('name profileImage categories services skills averageRating totalReviews location locationLabel serviceArea coverageAreas hourlyRate isVerified availability')
-      .populate('services', 'title category')
+      .populate('services', 'title category basePrice priceUnit')
       .sort({ averageRating: -1 })
       .skip(skip)
       .limit(Number(limit)),

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import 'core/api/api_client.dart';
 import 'core/api/bookings_api.dart';
+import 'core/api/messages_api.dart';
 import 'core/api/token_storage.dart';
 import 'core/api/users_api.dart';
 import 'core/services/storage_service.dart';
@@ -56,7 +57,9 @@ class ServioApp extends StatelessWidget {
           ),
         ),
         ChangeNotifierProvider<MessagesProvider>(
-          create: (_) => MessagesProvider(),
+          create: (ctx) => MessagesProvider(
+            MessagesApi(ctx.read<ApiClient>()),
+          ),
         ),
         ChangeNotifierProvider<ServicesProvider>(
           create: (ctx) => ServicesProvider(ctx.read<ApiClient>()),
