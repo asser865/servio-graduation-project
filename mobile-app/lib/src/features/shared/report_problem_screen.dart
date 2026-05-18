@@ -305,7 +305,7 @@ class _ReportFormCard extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             DropdownButtonFormField<String>(
-              initialValue: selectedCategory,
+              value: selectedCategory,
               decoration: const InputDecoration(
                 labelText: 'Problem Category',
                 prefixIcon: Icon(Icons.category_outlined),

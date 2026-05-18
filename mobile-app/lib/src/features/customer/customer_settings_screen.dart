@@ -373,7 +373,7 @@ class _SwitchTile extends StatelessWidget {
             Switch(
               value: value,
               onChanged: onChanged,
-              activeThumbColor: servio.accent,
+              activeColor: servio.accent,
             ),
           ],
         ),

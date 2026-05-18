@@ -88,7 +88,8 @@ class AccountScreen extends StatelessWidget {
               await session.logout();
               if (ctx.mounted) {
                 Navigator.of(ctx).pushAndRemoveUntil(
-                  MaterialPageRoute<void>(builder: (_) => const AuthLandingScreen()),
+                  MaterialPageRoute<void>(
+                      builder: (_) => const AuthLandingScreen()),
                   (Route<dynamic> _) => false,
                 );
               }

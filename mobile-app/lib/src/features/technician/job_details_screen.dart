@@ -883,7 +883,9 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
                                   ?.copyWith(color: servio.textSecondary)),
                           const SizedBox(height: 8),
                           Text(
-                            job.customerName.isNotEmpty ? job.customerName : 'Customer',
+                            job.customerName.isNotEmpty
+                                ? job.customerName
+                                : 'Customer',
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
                           const SizedBox(height: 4),
@@ -914,12 +916,16 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
                         shape: BoxShape.circle,
                       ),
                       child: IconButton(
-                        icon: Icon(Icons.directions_rounded, color: servio.accent),
+                        icon: Icon(Icons.directions_rounded,
+                            color: servio.accent),
                         tooltip: 'Open in Maps',
                         onPressed: () async {
                           final query = Uri.encodeComponent(
-                              job.addressCity.isNotEmpty ? job.addressCity : 'Cairo, Egypt');
-                          final url = Uri.parse('https://www.google.com/maps/search/?api=1&query=$query');
+                              job.addressCity.isNotEmpty
+                                  ? job.addressCity
+                                  : 'Cairo, Egypt');
+                          final url = Uri.parse(
+                              'https://www.google.com/maps/search/?api=1&query=$query');
                           if (await canLaunchUrl(url)) {
                             await launchUrl(url);
                           }

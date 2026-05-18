@@ -457,7 +457,8 @@ class _GroupedServicesSliver extends StatelessWidget {
             padding: EdgeInsets.only(bottom: isLast ? 0 : 14),
             child: TweenAnimationBuilder<double>(
               tween: Tween<double>(begin: 0, end: 1),
-              duration: Duration(milliseconds: 320 + (index * 60).clamp(0, 360)),
+              duration:
+                  Duration(milliseconds: 320 + (index * 60).clamp(0, 360)),
               curve: ServioMotion.reveal,
               builder: (BuildContext ctx, double t, Widget? child) {
                 return Opacity(
@@ -472,9 +473,8 @@ class _GroupedServicesSliver extends StatelessWidget {
                 category: category,
                 services: items,
                 expanded: expanded,
-                onToggle: autoExpandAll
-                    ? null
-                    : () => onToggleCategory(category),
+                onToggle:
+                    autoExpandAll ? null : () => onToggleCategory(category),
                 onServiceTap: onServiceTap,
               ),
             ),
@@ -1001,8 +1001,8 @@ class _SmartMatchCtaState extends State<_SmartMatchCta>
                                   children: <Widget>[
                                     Text(
                                       'Smart Match',
-                                      style: theme.textTheme.titleSmall
-                                          ?.copyWith(
+                                      style:
+                                          theme.textTheme.titleSmall?.copyWith(
                                         color: Colors.white,
                                         fontWeight: FontWeight.w800,
                                         letterSpacing: 0.2,

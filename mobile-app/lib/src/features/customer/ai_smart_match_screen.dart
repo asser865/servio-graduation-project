@@ -380,48 +380,49 @@ class _AiSmartMatchScreenState extends State<AiSmartMatchScreen> {
                     );
                   }),
                 ] else ...<Widget>[
-                Text('Top Matched Technicians',
-                    style: theme.textTheme.titleMedium),
-                const SizedBox(height: 12),
-                if (_recommendation!.recommendedWorkers.isEmpty)
-                  Text(
-                    'No technician matches returned yet. Browse similar services to choose one.',
-                    style: theme.textTheme.bodyMedium
-                        ?.copyWith(color: servio.textSecondary),
-                  )
-                else
-                  ..._recommendation!.recommendedWorkers.map(
-                    (worker) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _MatchedTechnicianCard(
-                        name: worker.name.isEmpty ? 'Technician' : worker.name,
-                        match: worker.matchLabel,
-                        reason: worker.reason.isEmpty
-                            ? 'Recommended by SERVIO AI for this request.'
-                            : worker.reason,
-                        locationLabel: worker.locationLabel,
-                        onTap: () {
-                          final recommendation = _recommendation!;
-                          Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => TechnicianProfileScreen(
-                                technicianId:
-                                    worker.id.isEmpty ? null : worker.id,
-                                selectedServiceCategory:
-                                    recommendation.predictedCategory.isEmpty
-                                        ? null
-                                        : recommendation.predictedCategory,
-                                selectedServiceName:
-                                    recommendation.serviceName.isEmpty
-                                        ? null
-                                        : recommendation.serviceName,
+                  Text('Top Matched Technicians',
+                      style: theme.textTheme.titleMedium),
+                  const SizedBox(height: 12),
+                  if (_recommendation!.recommendedWorkers.isEmpty)
+                    Text(
+                      'No technician matches returned yet. Browse similar services to choose one.',
+                      style: theme.textTheme.bodyMedium
+                          ?.copyWith(color: servio.textSecondary),
+                    )
+                  else
+                    ..._recommendation!.recommendedWorkers.map(
+                      (worker) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _MatchedTechnicianCard(
+                          name:
+                              worker.name.isEmpty ? 'Technician' : worker.name,
+                          match: worker.matchLabel,
+                          reason: worker.reason.isEmpty
+                              ? 'Recommended by SERVIO AI for this request.'
+                              : worker.reason,
+                          locationLabel: worker.locationLabel,
+                          onTap: () {
+                            final recommendation = _recommendation!;
+                            Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => TechnicianProfileScreen(
+                                  technicianId:
+                                      worker.id.isEmpty ? null : worker.id,
+                                  selectedServiceCategory:
+                                      recommendation.predictedCategory.isEmpty
+                                          ? null
+                                          : recommendation.predictedCategory,
+                                  selectedServiceName:
+                                      recommendation.serviceName.isEmpty
+                                          ? null
+                                          : recommendation.serviceName,
+                                ),
                               ),
-                            ),
-                          );
-                        },
+                            );
+                          },
+                        ),
                       ),
                     ),
-                  ),
                 ],
                 const SizedBox(height: 24),
                 ServioPrimaryButton(
@@ -514,7 +515,8 @@ class _MatchedTechnicianCard extends StatelessWidget {
                         .bodySmall
                         ?.copyWith(color: servio.textSecondary),
                   ),
-                  if (locationLabel != null && locationLabel!.isNotEmpty) ...<Widget>[
+                  if (locationLabel != null &&
+                      locationLabel!.isNotEmpty) ...<Widget>[
                     const SizedBox(height: 4),
                     Row(
                       children: <Widget>[

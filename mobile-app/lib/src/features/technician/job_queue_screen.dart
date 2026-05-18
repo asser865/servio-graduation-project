@@ -205,23 +205,19 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
               child: LayoutBuilder(
                 builder: (BuildContext context, BoxConstraints constraints) {
                   const spacing = 6.0;
-                  final tabWidth =
-                      (constraints.maxWidth - spacing * 2) / 3;
+                  final tabWidth = (constraints.maxWidth - spacing * 2) / 3;
 
                   return Row(
-                    children: List<Widget>.generate(_primaryTabs.length,
-                        (int slot) {
+                    children:
+                        List<Widget>.generate(_primaryTabs.length, (int slot) {
                       final int index = _primaryTabs[slot];
                       final bool active = index == _tabIndex;
-                      final String count =
-                          _jobsForTab(index).length.toString();
+                      final String count = _jobsForTab(index).length.toString();
                       final Color tabColor = _tabColor(index, servio);
 
                       return Padding(
                         padding: EdgeInsets.only(
-                          right: slot == _primaryTabs.length - 1
-                              ? 0
-                              : spacing,
+                          right: slot == _primaryTabs.length - 1 ? 0 : spacing,
                         ),
                         child: SizedBox(
                           width: tabWidth,
@@ -230,8 +226,7 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
                             count: count,
                             tabColor: tabColor,
                             active: active,
-                            onTap: () =>
-                                setState(() => _tabIndex = index),
+                            onTap: () => setState(() => _tabIndex = index),
                           ),
                         ),
                       );
@@ -631,7 +626,8 @@ class _HistorySection extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
-    final int total = historyTabs.fold<int>(0, (int sum, int i) => sum + countFor(i));
+    final int total =
+        historyTabs.fold<int>(0, (int sum, int i) => sum + countFor(i));
     final bool historyActive = historyTabs.contains(activeIndex);
     final bool open = expanded || historyActive;
 
@@ -746,9 +742,7 @@ class _HistoryChip extends StatelessWidget {
         curve: ServioMotion.spring,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
-          color: active
-              ? ServioColors.tint(color)
-              : theme.colorScheme.surface,
+          color: active ? ServioColors.tint(color) : theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(ServioRadius.full),
           border: Border.all(
             color: active ? color : servio.border,

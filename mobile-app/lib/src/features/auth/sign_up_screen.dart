@@ -1167,7 +1167,7 @@ class _PricingStep extends StatelessWidget {
             SizedBox(
               width: 112,
               child: DropdownButtonFormField<String>(
-                initialValue: currency,
+                value: currency,
                 items: const <DropdownMenuItem<String>>[
                   DropdownMenuItem<String>(value: 'EGP', child: Text('EGP')),
                   DropdownMenuItem<String>(value: 'USD', child: Text('USD')),

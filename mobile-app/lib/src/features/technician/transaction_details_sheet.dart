@@ -306,8 +306,7 @@ class _TransactionDetailsSheetState extends State<TransactionDetailsSheet> {
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: servio.backgroundSoft,
-                          borderRadius:
-                              BorderRadius.circular(ServioRadius.lg),
+                          borderRadius: BorderRadius.circular(ServioRadius.lg),
                         ),
                         child: Column(
                           children: <Widget>[
@@ -319,13 +318,11 @@ class _TransactionDetailsSheetState extends State<TransactionDetailsSheet> {
                             const SizedBox(height: 8),
                             _AmountRow(
                               label: 'Platform fee (5%)',
-                              value:
-                                  '- ${platformFee.toStringAsFixed(0)} EGP',
+                              value: '- ${platformFee.toStringAsFixed(0)} EGP',
                               valueColor: servio.textSecondary,
                             ),
                             Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 10),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
                               child: Divider(
                                 color: servio.border,
                                 height: 1,
@@ -368,8 +365,7 @@ class _TransactionDetailsSheetState extends State<TransactionDetailsSheet> {
                           style: OutlinedButton.styleFrom(
                             foregroundColor: servio.danger,
                             side: BorderSide(color: servio.danger),
-                            padding:
-                                const EdgeInsets.symmetric(vertical: 14),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(
                               borderRadius:
                                   BorderRadius.circular(ServioRadius.md),
@@ -386,9 +382,7 @@ class _TransactionDetailsSheetState extends State<TransactionDetailsSheet> {
                                 )
                               : const Icon(Icons.flag_outlined),
                           label: Text(
-                            isDisputed
-                                ? 'Already Reported'
-                                : 'Report an Issue',
+                            isDisputed ? 'Already Reported' : 'Report an Issue',
                           ),
                         ),
                       ),

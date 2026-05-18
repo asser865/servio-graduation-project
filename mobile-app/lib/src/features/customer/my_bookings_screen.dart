@@ -44,7 +44,8 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     super.initState();
     _tabIndex = widget.initialTabIndex;
     WidgetsBinding.instance.addPostFrameCallback((_) => _fetchBookings());
-    _pollingTimer = Timer.periodic(const Duration(seconds: 20), (_) => _silentRefresh());
+    _pollingTimer =
+        Timer.periodic(const Duration(seconds: 20), (_) => _silentRefresh());
   }
 
   @override
@@ -534,7 +535,9 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                           value: reason,
                           groupValue: selectedReason,
                           onChanged: (val) {
-                            if (val != null) setSheet(() => selectedReason = val);
+                            if (val != null) {
+                              setSheet(() => selectedReason = val);
+                            }
                           },
                           contentPadding: EdgeInsets.zero,
                           dense: true,
@@ -776,15 +779,16 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                   child: const Text('Write a Review'),
                 ),
               // ── Confirm Completion — awaiting customer confirmation ──
-              if (data.statusCode == 'awaiting_customer_confirmation') ...<Widget>[
+              if (data.statusCode ==
+                  'awaiting_customer_confirmation') ...<Widget>[
                 const SizedBox(height: 4),
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: ServioColors.tint(servio.accent),
                     borderRadius: BorderRadius.circular(ServioRadius.md),
-                    border: Border.all(
-                        color: servio.accent.withValues(alpha: 0.3)),
+                    border:
+                        Border.all(color: servio.accent.withValues(alpha: 0.3)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -805,7 +809,7 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'Your technician has finished the job. '  
+                        'Your technician has finished the job. '
                         'Confirm completion to release payment.',
                         style: theme.textTheme.bodySmall?.copyWith(
                             color: servio.textSecondary, height: 1.5),
@@ -818,15 +822,15 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: servio.accent,
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                    vertical: 14),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 14),
                                 shape: RoundedRectangleBorder(
                                   borderRadius:
                                       BorderRadius.circular(ServioRadius.md),
                                 ),
                               ),
-                              icon: const Icon(
-                                  Icons.verified_rounded, size: 18),
+                              icon:
+                                  const Icon(Icons.verified_rounded, size: 18),
                               label: const Text('Confirm Job Complete'),
                             ),
                     ],
@@ -892,26 +896,26 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
       // ── Terminal / edge states ────────────────────────────────────────────────
       final (terminalLabel, terminalMeta) = switch (data.statusCode) {
         'cancelled' || 'canceled' => (
-          'Booking Cancelled',
-          'This booking was cancelled. You can re-book anytime.',
-        ),
+            'Booking Cancelled',
+            'This booking was cancelled. You can re-book anytime.',
+          ),
         'rejected' => (
-          'Booking Declined',
-          'The technician was unable to accept this booking.',
-        ),
+            'Booking Declined',
+            'The technician was unable to accept this booking.',
+          ),
         'disputed' => (
-          'Under Review',
-          'This booking has been flagged for admin review. '
-              'Our team will reach out within 24–8 hours.',
-        ),
+            'Under Review',
+            'This booking has been flagged for admin review. '
+                'Our team will reach out within 24–8 hours.',
+          ),
         'pending_admin_review' => (
-          'Pending Admin Review',
-          'Our support team is reviewing this booking.',
-        ),
+            'Pending Admin Review',
+            'Our support team is reviewing this booking.',
+          ),
         _ => (
-          data.statusLabel,
-          'This booking is currently ${data.statusLabel.toLowerCase()}.',
-        ),
+            data.statusLabel,
+            'This booking is currently ${data.statusLabel.toLowerCase()}.',
+          ),
       };
       return <Widget>[
         _TimelineRow(

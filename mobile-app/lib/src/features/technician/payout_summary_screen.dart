@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/api/api_client.dart';
@@ -412,7 +412,7 @@ class _SuccessBodyState extends State<_SuccessBody> {
                   ?.copyWith(fontWeight: FontWeight.w600)),
           const SizedBox(height: 6),
           DropdownButtonFormField<String>(
-            initialValue: value,
+            value: value,
             hint: Text(hint,
                 style: theme.textTheme.bodyMedium
                     ?.copyWith(color: servio.textSecondary)),
@@ -463,359 +463,359 @@ class _SuccessBodyState extends State<_SuccessBody> {
           ),
           children: [
             // â”€â”€ Wallet header card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-              _StaggeredItem(
-                index: 0,
-                child: Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    gradient: ServioGradients.brand,
-                    borderRadius: BorderRadius.circular(ServioRadius.xl),
-                    boxShadow: ServioShadows.rest,
+            _StaggeredItem(
+              index: 0,
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: ServioGradients.brand,
+                  borderRadius: BorderRadius.circular(ServioRadius.xl),
+                  boxShadow: ServioShadows.rest,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.18),
+                            borderRadius:
+                                BorderRadius.circular(ServioRadius.sm),
+                          ),
+                          child: const Icon(
+                            Icons.account_balance_wallet_rounded,
+                            size: 22,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Total Earned',
+                          style: theme.textTheme.labelLarge?.copyWith(
+                              color: Colors.white.withValues(alpha: 0.85)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    _CountUpText(
+                      value: widget.summary.totalEarnings,
+                      suffix: ' EGP',
+                      style: theme.textTheme.displaySmall?.copyWith(
+                          color: Colors.white, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 8),
+                    _CountUpText(
+                      value: widget.summary.pendingPayout,
+                      prefix: 'Pending: ',
+                      suffix: ' EGP',
+                      style: theme.textTheme.bodyMedium
+                          ?.copyWith(color: ServioColors.accentLight),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // â”€â”€ Metric cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            _StaggeredItem(
+              index: 1,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _MetricCard(
+                      icon: Icons.check_circle_outline_rounded,
+                      label: 'Completed Jobs',
+                      value: widget.summary.completedJobs.toDouble(),
+                      isCurrency: false,
+                      color: servio.success,
+                    ),
                   ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _MetricCard(
+                      icon: Icons.schedule_rounded,
+                      label: 'Pending Payout',
+                      value: widget.summary.pendingPayout,
+                      isCurrency: true,
+                      color: servio.warning,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // â”€â”€ Saved-state banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            AnimatedSize(
+              duration: ServioMotion.normal,
+              curve: ServioMotion.spring,
+              child: _isLocked
+                  ? Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: ServioColors.tint(servio.success),
+                          borderRadius: BorderRadius.circular(ServioRadius.md),
+                          border: Border.all(
+                            color: servio.success.withValues(alpha: 0.4),
+                          ),
+                        ),
+                        child: Row(
+                          children: <Widget>[
+                            Icon(Icons.check_circle_rounded,
+                                size: 18, color: servio.success),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Payout settings saved. Tap Edit to change.',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: servio.success,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
+
+            // â”€â”€ Payout Method form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            IgnorePointer(
+              ignoring: _isLocked,
+              child: AnimatedOpacity(
+                duration: ServioMotion.normal,
+                opacity: _isLocked ? 0.6 : 1,
+                child: _StaggeredItem(
+                  index: 2,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.18),
-                              borderRadius:
-                                  BorderRadius.circular(ServioRadius.sm),
-                            ),
-                            child: const Icon(
-                              Icons.account_balance_wallet_rounded,
-                              size: 22,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            'Total Earned',
-                            style: theme.textTheme.labelLarge?.copyWith(
-                                color: Colors.white.withValues(alpha: 0.85)),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      _CountUpText(
-                        value: widget.summary.totalEarnings,
-                        suffix: ' EGP',
-                        style: theme.textTheme.displaySmall?.copyWith(
-                            color: Colors.white, fontWeight: FontWeight.w700),
-                      ),
+                      const _SectionTitle(label: 'Payout Method'),
                       const SizedBox(height: 8),
-                      _CountUpText(
-                        value: widget.summary.pendingPayout,
-                        prefix: 'Pending: ',
-                        suffix: ' EGP',
-                        style: theme.textTheme.bodyMedium
-                            ?.copyWith(color: ServioColors.accentLight),
+                      ServioCard(
+                        radius: ServioRadius.lg,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Choose how you receive your earnings from completed jobs.',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                  color: servio.textSecondary, height: 1.5),
+                            ),
+                            const SizedBox(height: 16),
+                            _ScaleButton(
+                              onTap: () =>
+                                  setState(() => _payoutMethod = 'bank'),
+                              child: _PayoutMethodOption(
+                                icon: Icons.account_balance_rounded,
+                                label: 'Bank Transfer',
+                                selected: _payoutMethod == 'bank',
+                                servio: servio,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            _ScaleButton(
+                              onTap: () =>
+                                  setState(() => _payoutMethod = 'instapay'),
+                              child: _PayoutMethodOption(
+                                icon: Icons.flash_on_rounded,
+                                label: 'Instapay',
+                                selected: _payoutMethod == 'instapay',
+                                servio: servio,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            _ScaleButton(
+                              onTap: () =>
+                                  setState(() => _payoutMethod = 'vodafone'),
+                              child: _PayoutMethodOption(
+                                icon: Icons.phone_android_rounded,
+                                label: 'Vodafone Cash',
+                                selected: _payoutMethod == 'vodafone',
+                                servio: servio,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            _ScaleButton(
+                              onTap: () =>
+                                  setState(() => _payoutMethod = 'orange'),
+                              child: _PayoutMethodOption(
+                                icon: Icons.phone_android_rounded,
+                                label: 'Orange Cash',
+                                selected: _payoutMethod == 'orange',
+                                servio: servio,
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            const _SectionTitle(label: 'Account Details'),
+                            const SizedBox(height: 16),
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 300),
+                              transitionBuilder: (child, animation) {
+                                return SizeTransition(
+                                  sizeFactor: animation,
+                                  axisAlignment: -1,
+                                  child: FadeTransition(
+                                      opacity: animation, child: child),
+                                );
+                              },
+                              child: _payoutMethod == 'bank'
+                                  ? Column(
+                                      key: const ValueKey('bank_form'),
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        _buildDropdown(
+                                            label: 'Bank Name',
+                                            hint: 'Select bank...',
+                                            value: _selectedBank,
+                                            onChanged: (val) => setState(
+                                                () => _selectedBank = val),
+                                            items: _kBankNames),
+                                        _buildTextField(
+                                          label: 'Account Holder Name',
+                                          hint: 'Exactly as on your bank card',
+                                          controller: _accountHolderCtrl,
+                                        ),
+                                        _buildTextField(
+                                          label: 'Account Number / IBAN',
+                                          hint:
+                                              'EG00 0000 0000 0000 0000 0000 0000',
+                                          controller: _accountNumberCtrl,
+                                        ),
+                                      ],
+                                    )
+                                  : Column(
+                                      key: const ValueKey('wallet_form'),
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        _buildTextField(
+                                          label: 'Registered Mobile Number',
+                                          hint: '+20 100 000 0000',
+                                          controller: _walletNumberCtrl,
+                                          isNumeric: true,
+                                        ),
+                                        Text(
+                                          'Must match the number registered with your wallet provider.',
+                                          style: theme.textTheme.bodySmall
+                                              ?.copyWith(
+                                                  color: servio.textSecondary),
+                                        ),
+                                        const SizedBox(height: 16),
+                                      ],
+                                    ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
+            ),
+            const SizedBox(height: 24),
 
-              // â”€â”€ Metric cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-              _StaggeredItem(
-                index: 1,
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _MetricCard(
-                        icon: Icons.check_circle_outline_rounded,
-                        label: 'Completed Jobs',
-                        value: widget.summary.completedJobs.toDouble(),
-                        isCurrency: false,
-                        color: servio.success,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _MetricCard(
-                        icon: Icons.schedule_rounded,
-                        label: 'Pending Payout',
-                        value: widget.summary.pendingPayout,
-                        isCurrency: true,
-                        color: servio.warning,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // â”€â”€ Saved-state banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-              AnimatedSize(
+            // â”€â”€ Payout Schedule card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            IgnorePointer(
+              ignoring: _isLocked,
+              child: AnimatedOpacity(
                 duration: ServioMotion.normal,
-                curve: ServioMotion.spring,
-                child: _isLocked
-                    ? Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 12),
-                          decoration: BoxDecoration(
-                            color: ServioColors.tint(servio.success),
-                            borderRadius:
-                                BorderRadius.circular(ServioRadius.md),
-                            border: Border.all(
-                              color: servio.success.withValues(alpha: 0.4),
+                opacity: _isLocked ? 0.6 : 1,
+                child: _StaggeredItem(
+                  index: 3,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const _SectionTitle(label: 'Payout Schedule'),
+                      const SizedBox(height: 8),
+                      ServioCard(
+                        radius: ServioRadius.lg,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Choose how often you want your earnings transferred.',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                  color: servio.textSecondary, height: 1.5),
                             ),
-                          ),
-                          child: Row(
-                            children: <Widget>[
-                              Icon(Icons.check_circle_rounded,
-                                  size: 18, color: servio.success),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  'Payout settings saved. Tap Edit to change.',
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: servio.success,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
+                            const SizedBox(height: 16),
+                            _ScaleButton(
+                              onTap: () =>
+                                  setState(() => _payoutSchedule = 'weekly'),
+                              child: _ScheduleOption(
+                                label: 'Weekly',
+                                subtitle:
+                                    'Every Sunday â€” earnings from the past 7 days.',
+                                selected: _payoutSchedule == 'weekly',
+                                servio: servio,
                               ),
-                            ],
-                          ),
+                            ),
+                            const SizedBox(height: 10),
+                            _ScaleButton(
+                              onTap: () =>
+                                  setState(() => _payoutSchedule = 'monthly'),
+                              child: _ScheduleOption(
+                                label: 'Monthly',
+                                subtitle:
+                                    '1st of each month â€” previous month\'s earnings.',
+                                selected: _payoutSchedule == 'monthly',
+                                servio: servio,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            _ScaleButton(
+                              onTap: () =>
+                                  setState(() => _payoutSchedule = 'instant'),
+                              child: _ScheduleOption(
+                                label: 'Instant',
+                                subtitle:
+                                    'Request a payout at any time (small processing fee applies).',
+                                selected: _payoutSchedule == 'instant',
+                                servio: servio,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            // Form button moved to bottom
+                          ],
                         ),
-                      )
-                    : const SizedBox.shrink(),
-              ),
-
-              // â”€â”€ Payout Method form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-              IgnorePointer(
-                ignoring: _isLocked,
-                child: AnimatedOpacity(
-                  duration: ServioMotion.normal,
-                  opacity: _isLocked ? 0.6 : 1,
-                  child: _StaggeredItem(
-                index: 2,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const _SectionTitle(label: 'Payout Method'),
-                    const SizedBox(height: 8),
-                    ServioCard(
-                      radius: ServioRadius.lg,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Choose how you receive your earnings from completed jobs.',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                                color: servio.textSecondary, height: 1.5),
-                          ),
-                          const SizedBox(height: 16),
-                          _ScaleButton(
-                            onTap: () => setState(() => _payoutMethod = 'bank'),
-                            child: _PayoutMethodOption(
-                              icon: Icons.account_balance_rounded,
-                              label: 'Bank Transfer',
-                              selected: _payoutMethod == 'bank',
-                              servio: servio,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          _ScaleButton(
-                            onTap: () =>
-                                setState(() => _payoutMethod = 'instapay'),
-                            child: _PayoutMethodOption(
-                              icon: Icons.flash_on_rounded,
-                              label: 'Instapay',
-                              selected: _payoutMethod == 'instapay',
-                              servio: servio,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          _ScaleButton(
-                            onTap: () =>
-                                setState(() => _payoutMethod = 'vodafone'),
-                            child: _PayoutMethodOption(
-                              icon: Icons.phone_android_rounded,
-                              label: 'Vodafone Cash',
-                              selected: _payoutMethod == 'vodafone',
-                              servio: servio,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          _ScaleButton(
-                            onTap: () =>
-                                setState(() => _payoutMethod = 'orange'),
-                            child: _PayoutMethodOption(
-                              icon: Icons.phone_android_rounded,
-                              label: 'Orange Cash',
-                              selected: _payoutMethod == 'orange',
-                              servio: servio,
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          const _SectionTitle(label: 'Account Details'),
-                          const SizedBox(height: 16),
-                          AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 300),
-                            transitionBuilder: (child, animation) {
-                              return SizeTransition(
-                                sizeFactor: animation,
-                                axisAlignment: -1,
-                                child: FadeTransition(
-                                    opacity: animation, child: child),
-                              );
-                            },
-                            child: _payoutMethod == 'bank'
-                                ? Column(
-                                    key: const ValueKey('bank_form'),
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      _buildDropdown(
-                                          label: 'Bank Name',
-                                          hint: 'Select bank...',
-                                          value: _selectedBank,
-                                          onChanged: (val) => setState(
-                                              () => _selectedBank = val),
-                                          items: _kBankNames),
-                                      _buildTextField(
-                                        label: 'Account Holder Name',
-                                        hint: 'Exactly as on your bank card',
-                                        controller: _accountHolderCtrl,
-                                      ),
-                                      _buildTextField(
-                                        label: 'Account Number / IBAN',
-                                        hint:
-                                            'EG00 0000 0000 0000 0000 0000 0000',
-                                        controller: _accountNumberCtrl,
-                                      ),
-                                    ],
-                                  )
-                                : Column(
-                                    key: const ValueKey('wallet_form'),
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      _buildTextField(
-                                        label: 'Registered Mobile Number',
-                                        hint: '+20 100 000 0000',
-                                        controller: _walletNumberCtrl,
-                                        isNumeric: true,
-                                      ),
-                                      Text(
-                                        'Must match the number registered with your wallet provider.',
-                                        style: theme.textTheme.bodySmall
-                                            ?.copyWith(
-                                                color: servio.textSecondary),
-                                      ),
-                                      const SizedBox(height: 16),
-                                    ],
-                                  ),
-                          ),
-                        ],
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-                ),
-              ),
-              const SizedBox(height: 24),
+            ),
+            const SizedBox(height: 24),
 
-              // â”€â”€ Payout Schedule card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-              IgnorePointer(
-                ignoring: _isLocked,
-                child: AnimatedOpacity(
-                  duration: ServioMotion.normal,
-                  opacity: _isLocked ? 0.6 : 1,
-                  child: _StaggeredItem(
-                index: 3,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const _SectionTitle(label: 'Payout Schedule'),
-                    const SizedBox(height: 8),
-                    ServioCard(
-                      radius: ServioRadius.lg,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Choose how often you want your earnings transferred.',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                                color: servio.textSecondary, height: 1.5),
-                          ),
-                          const SizedBox(height: 16),
-                          _ScaleButton(
-                            onTap: () =>
-                                setState(() => _payoutSchedule = 'weekly'),
-                            child: _ScheduleOption(
-                              label: 'Weekly',
-                              subtitle:
-                                  'Every Sunday â€” earnings from the past 7 days.',
-                              selected: _payoutSchedule == 'weekly',
-                              servio: servio,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          _ScaleButton(
-                            onTap: () =>
-                                setState(() => _payoutSchedule = 'monthly'),
-                            child: _ScheduleOption(
-                              label: 'Monthly',
-                              subtitle:
-                                  '1st of each month â€” previous month\'s earnings.',
-                              selected: _payoutSchedule == 'monthly',
-                              servio: servio,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          _ScaleButton(
-                            onTap: () =>
-                                setState(() => _payoutSchedule = 'instant'),
-                            child: _ScheduleOption(
-                              label: 'Instant',
-                              subtitle:
-                                  'Request a payout at any time (small processing fee applies).',
-                              selected: _payoutSchedule == 'instant',
-                              servio: servio,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          // Form button moved to bottom
-                        ],
-                      ),
+            // â”€â”€ Security hint â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            _StaggeredItem(
+              index: 4,
+              child: Row(
+                children: [
+                  Icon(Icons.lock_outline_rounded,
+                      size: 16, color: servio.textSecondary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Your payout information is encrypted and secure.',
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: servio.textSecondary),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // â”€â”€ Security hint â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-              _StaggeredItem(
-                index: 4,
-                child: Row(
-                  children: [
-                    Icon(Icons.lock_outline_rounded,
-                        size: 16, color: servio.textSecondary),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Your payout information is encrypted and secure.',
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(color: servio.textSecondary),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 32),
-            ],
-          ),
+            ),
+            const SizedBox(height: 32),
+          ],
+        ),
         Positioned(
           left: 0,
           right: 0,

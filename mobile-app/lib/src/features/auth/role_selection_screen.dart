@@ -102,8 +102,8 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                   // ── Heading ──────────────────────────────────
                   _AnimatedSection(
                     controller: _entranceController,
-                    interval: const Interval(0.0, 0.55,
-                        curve: ServioMotion.spring),
+                    interval:
+                        const Interval(0.0, 0.55, curve: ServioMotion.spring),
                     fadeInterval: const Interval(0.0, 0.45),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -148,8 +148,8 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                       ],
                       isSelected: _selectedRole == AuthRole.customer,
                       isDark: isDark,
-                      onTap: () => setState(
-                          () => _selectedRole = AuthRole.customer),
+                      onTap: () =>
+                          setState(() => _selectedRole = AuthRole.customer),
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -170,8 +170,8 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                       badge: 'Most popular',
                       isSelected: _selectedRole == AuthRole.technician,
                       isDark: isDark,
-                      onTap: () => setState(
-                          () => _selectedRole = AuthRole.technician),
+                      onTap: () =>
+                          setState(() => _selectedRole = AuthRole.technician),
                     ),
                   ),
 
@@ -192,8 +192,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                             label: _selectedRole == null
                                 ? 'Choose a role'
                                 : 'Continue',
-                            onPressed:
-                                _selectedRole == null ? null : _continue,
+                            onPressed: _selectedRole == null ? null : _continue,
                           ),
                         ),
                         const SizedBox(height: 14),
@@ -254,8 +253,7 @@ class _AnimatedSection extends StatelessWidget {
         end: Offset.zero,
       ).animate(CurvedAnimation(parent: controller, curve: interval)),
       child: FadeTransition(
-        opacity:
-            CurvedAnimation(parent: controller, curve: fadeInterval),
+        opacity: CurvedAnimation(parent: controller, curve: fadeInterval),
         child: child,
       ),
     );
@@ -423,14 +421,11 @@ class _RoleCardState extends State<_RoleCard>
         : (selected ? ServioColors.accent : ServioColors.borderLight);
     final titleColor = isDark
         ? Colors.white.withValues(alpha: selected ? 1.0 : 0.80)
-        : (selected
-            ? ServioColors.deepBrown
-            : ServioColors.textPrimaryLight);
+        : (selected ? ServioColors.deepBrown : ServioColors.textPrimaryLight);
     final subtitleColor = isDark
         ? Colors.white.withValues(alpha: 0.45)
         : ServioColors.textSecondaryLight;
-    final checkColor =
-        isDark ? ServioColors.accentLight : ServioColors.accent;
+    final checkColor = isDark ? ServioColors.accentLight : ServioColors.accent;
 
     return GestureDetector(
       onTapDown: (_) => _pressCtrl.forward(),
@@ -688,8 +683,7 @@ class _BadgePill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        gradient:
-            isDark ? ServioGradients.brandDark : ServioGradients.accent,
+        gradient: isDark ? ServioGradients.brandDark : ServioGradients.accent,
         borderRadius: BorderRadius.circular(ServioRadius.full),
       ),
       child: Text(

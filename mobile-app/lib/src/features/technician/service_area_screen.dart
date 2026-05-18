@@ -131,18 +131,17 @@ class _ServiceAreaScreenState extends State<ServiceAreaScreen> {
                     const SizedBox(height: 14),
                     Text(
                       'Choose the cities and neighborhoods you serve so we match you to nearby jobs.',
-                      style: theme.textTheme.bodyMedium
-                          ?.copyWith(color: Colors.white.withValues(alpha: 0.9)),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.9)),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 20),
-
               if (_isLocked) ...<Widget>[
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   decoration: BoxDecoration(
                     color: ServioColors.tint(servio.success),
                     borderRadius: BorderRadius.circular(ServioRadius.md),
@@ -169,7 +168,6 @@ class _ServiceAreaScreenState extends State<ServiceAreaScreen> {
                 ),
                 const SizedBox(height: 16),
               ],
-
               ServioCard(
                 radius: ServioRadius.lg,
                 child: Column(

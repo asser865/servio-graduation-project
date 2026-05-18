@@ -124,8 +124,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('review step shows base price plus platform fee',
-      (tester) async {
+  testWidgets('review step shows base price plus platform fee', (tester) async {
     await tester.pumpWidget(await _wrap(const BookingStepThreeScreen(
       data: BookingFlowData(
         serviceName: 'Custom Woodwork',

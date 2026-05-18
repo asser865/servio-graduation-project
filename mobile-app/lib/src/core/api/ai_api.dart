@@ -30,10 +30,14 @@ class ServiceStep {
 
   String get urgencyLabel {
     switch (urgency) {
-      case 'urgent':    return 'Book First';
-      case 'same_day':  return 'Same Day';
-      case 'high':      return 'High Priority';
-      default:          return 'Schedule Later';
+      case 'urgent':
+        return 'Book First';
+      case 'same_day':
+        return 'Same Day';
+      case 'high':
+        return 'High Priority';
+      default:
+        return 'Schedule Later';
     }
   }
 

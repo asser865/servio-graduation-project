@@ -96,4 +96,3 @@ AppNotificationType _mapBackendType(String type) {
   }
   return AppNotificationType.system;
 }
-

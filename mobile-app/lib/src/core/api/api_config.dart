@@ -18,7 +18,9 @@ class ApiConfig {
     if (uri.host != '127.0.0.1' && uri.host != 'localhost') return trimmed;
 
     final backendUri = Uri.tryParse(baseUrl);
-    if (backendUri == null || !backendUri.hasScheme || !backendUri.hasAuthority) {
+    if (backendUri == null ||
+        !backendUri.hasScheme ||
+        !backendUri.hasAuthority) {
       return trimmed;
     }
 

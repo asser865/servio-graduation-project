@@ -473,13 +473,13 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
                                   ),
                                 );
                               },
-                              child:
-                                  const Icon(Icons.chat_bubble_outline_rounded),
                               style: OutlinedButton.styleFrom(
                                 fixedSize: const Size.square(52),
                                 padding: EdgeInsets.zero,
                                 shape: const CircleBorder(),
                               ),
+                              child:
+                                  const Icon(Icons.chat_bubble_outline_rounded),
                             ),
                           ),
                         ),
