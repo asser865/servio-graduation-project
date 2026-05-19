@@ -16,6 +16,7 @@ import '../../design_system/widgets/servio_section_heading.dart';
 import '../../design_system/widgets/servio_status_chip.dart';
 import '../../design_system/widgets/servio_tab_shell.dart';
 import 'ai_finishing_estimator_screen.dart';
+import 'ai_room_finisher_screen.dart';
 import 'ai_smart_match_screen.dart';
 import 'customer_profile_screen.dart';
 import 'my_addresses_screen.dart';
@@ -428,6 +429,21 @@ class _HomeBodyState extends State<_HomeBody>
                                         MaterialPageRoute<void>(
                                           builder: (_) =>
                                               const AiFinishingEstimatorScreen(),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    _HeroBannerCard(
+                                      badgeLabel: 'AI FINISH',
+                                      title: 'AI Room Finisher',
+                                      body:
+                                          'Upload a photo. Get a finishing plan + AI render.',
+                                      ctaLabel: 'Finish My Room',
+                                      icon: Icons.auto_fix_high_rounded,
+                                      onTap: () => Navigator.of(context).push(
+                                        MaterialPageRoute<void>(
+                                          builder: (_) =>
+                                              const AiRoomFinisherScreen(),
                                         ),
                                       ),
                                     ),

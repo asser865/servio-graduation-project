@@ -2,10 +2,47 @@ from google import genai
 from google.genai import types
 import json
 import os
+import time
 from dotenv import load_dotenv
 
 load_dotenv()
 _client = None
+
+# Fallback chain when upstream returns 503 UNAVAILABLE / 429 RESOURCE_EXHAUSTED.
+# First entry is the preferred model. Each later entry is tried with a short
+# backoff if the previous one is overloaded.
+GEMINI_MODELS = [
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-1.5-flash",
+]
+
+
+def _generate_with_fallback(image_bytes: bytes, user_prompt: str, system_prompt: str):
+    """Try each model in GEMINI_MODELS until one succeeds. Raises the last
+    exception if every model is unavailable."""
+    last_exc = None
+    for idx, model_name in enumerate(GEMINI_MODELS):
+        try:
+            return _get_client().models.generate_content(
+                model=model_name,
+                contents=[
+                    types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
+                    user_prompt,
+                ],
+                config=types.GenerateContentConfig(system_instruction=system_prompt),
+            )
+        except Exception as exc:
+            last_exc = exc
+            msg = str(exc).upper()
+            # Retry on transient upstream errors only — everything else
+            # propagates immediately so we don't mask real bugs.
+            if any(t in msg for t in ("UNAVAILABLE", "503", "RESOURCE_EXHAUSTED", "429", "OVERLOADED")):
+                if idx < len(GEMINI_MODELS) - 1:
+                    time.sleep(1.5 * (idx + 1))
+                    continue
+            raise
+    raise last_exc  # all models exhausted
 
 
 def _get_client():
@@ -133,16 +170,7 @@ Provide all 3 plans fully completed. Calculate all material quantities
 from the exact measurements above. Use 2024-2025 Egyptian market prices in EGP.
 """
 
-    response = _get_client().models.generate_content(
-        model="gemini-2.5-flash",
-        contents=[
-            types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
-            user_prompt,
-        ],
-        config=types.GenerateContentConfig(
-            system_instruction=SYSTEM_PROMPT,
-        ),
-    )
+    response = _generate_with_fallback(image_bytes, user_prompt, SYSTEM_PROMPT)
 
     raw_text = response.text.strip()
 

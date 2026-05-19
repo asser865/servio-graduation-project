@@ -8,6 +8,13 @@ import base64
 USE_GPU = torch.cuda.is_available()
 DTYPE   = torch.float16 if USE_GPU else torch.float32
 
+# CPU SD is ~3× slower per step and ~33% slower per pixel. Use fewer steps
+# and a smaller resolution on CPU to keep total render time under ~25s.
+# GPU keeps full quality (30 steps, 768×512).
+_DEFAULT_STEPS = 30 if USE_GPU else 15
+_DEFAULT_WIDTH  = 768 if USE_GPU else 512
+_DEFAULT_HEIGHT = 512
+
 print(f"Loading Stable Diffusion on {'GPU' if USE_GPU else 'CPU'}...")
 
 pipe = StableDiffusionImg2ImgPipeline.from_pretrained(
@@ -66,7 +73,7 @@ def generate_finished_room(
     room_analysis: dict,
     finishing_plan: dict,
     strength: float = 0.65,
-    steps: int = 30
+    steps: int = _DEFAULT_STEPS
 ) -> str:
     """
     Transform empty room photo into a finished room render.
@@ -76,7 +83,7 @@ def generate_finished_room(
     steps:    20 = fast testing | 30 = recommended | 50 = best quality
     """
     image = Image.open(io.BytesIO(room_image_bytes)).convert("RGB")
-    image = image.resize((768, 512))
+    image = image.resize((_DEFAULT_WIDTH, _DEFAULT_HEIGHT))
 
     prompt, negative_prompt = build_prompt(room_analysis, finishing_plan)
 

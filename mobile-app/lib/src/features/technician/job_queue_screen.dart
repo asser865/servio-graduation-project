@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -14,13 +16,19 @@ import '../../design_system/widgets/servio_status_chip.dart';
 import 'job_details_screen.dart';
 
 class JobQueueScreen extends StatefulWidget {
-  const JobQueueScreen({super.key});
+  const JobQueueScreen({
+    super.key,
+    this.autoRefreshInterval = const Duration(seconds: 20),
+  });
+
+  final Duration? autoRefreshInterval;
 
   @override
   State<JobQueueScreen> createState() => _JobQueueScreenState();
 }
 
-class _JobQueueScreenState extends State<JobQueueScreen> {
+class _JobQueueScreenState extends State<JobQueueScreen>
+    with WidgetsBindingObserver {
   int _tabIndex = 0;
   bool _historyExpanded = false;
   static const List<String> _tabs = <String>[
@@ -37,18 +45,80 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
   List<BackendBooking> _jobs = [];
   bool _loading = true;
   String? _error;
+  bool _loadedOnce = false;
+  bool? _pageActive;
+  Timer? _autoRefreshTimer;
+  Future<void>? _activeFetch;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _fetchJobs());
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_fetchJobs());
+    });
   }
 
-  Future<void> _fetchJobs() async {
-    setState(() {
-      _loading = true;
-      _error = null;
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final active = ServioTabShell.isPageActiveOf(context);
+    if (_pageActive == active) return;
+
+    final wasActive = _pageActive;
+    _pageActive = active;
+
+    if (active) {
+      _startAutoRefresh();
+      if (wasActive == false && _loadedOnce) {
+        unawaited(_fetchJobs(silent: true));
+      }
+    } else {
+      _stopAutoRefresh();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant JobQueueScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.autoRefreshInterval != oldWidget.autoRefreshInterval &&
+        _pageActive != false) {
+      _startAutoRefresh();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _pageActive != false) {
+      unawaited(_fetchJobs(silent: true));
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _stopAutoRefresh();
+    super.dispose();
+  }
+
+  Future<void> _fetchJobs({bool silent = false}) {
+    final activeFetch = _activeFetch;
+    if (activeFetch != null) return activeFetch;
+
+    final fetch = _fetchJobsNow(silent: silent);
+    _activeFetch = fetch.whenComplete(() {
+      _activeFetch = null;
     });
+    return _activeFetch!;
+  }
+
+  Future<void> _fetchJobsNow({required bool silent}) async {
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     final client = context.read<ApiClient>();
     final session = context.read<SessionProvider>();
     var workerId = session.account?.id.trim() ?? '';
@@ -57,20 +127,17 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
       final profileError = await session.loadCurrentWorkerProfile();
       if (!mounted) return;
       if (profileError != null) {
-        setState(() {
-          _error = profileError;
-          _loading = false;
-        });
+        _handleFetchError(profileError, silent: silent);
         return;
       }
       workerId = session.account?.id.trim() ?? '';
     }
 
     if (workerId.isEmpty || session.account?.role != UserRole.technician) {
-      setState(() {
-        _error = 'Log in as a technician to view assigned jobs.';
-        _loading = false;
-      });
+      _handleFetchError(
+        'Log in as a technician to view assigned jobs.',
+        silent: silent,
+      );
       return;
     }
 
@@ -84,15 +151,39 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
       setState(() {
         _jobs = assignedJobs;
         _tabIndex = _firstTabWithJobs(assignedJobs) ?? _tabIndex;
+        _error = null;
         _loading = false;
+        _loadedOnce = true;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _error = e.toString();
-        _loading = false;
-      });
+      _handleFetchError(e.toString(), silent: silent);
     }
+  }
+
+  void _handleFetchError(String message, {required bool silent}) {
+    if (silent && _loadedOnce) return;
+
+    setState(() {
+      _error = message;
+      _loading = false;
+    });
+  }
+
+  void _startAutoRefresh() {
+    _stopAutoRefresh();
+    final interval = widget.autoRefreshInterval;
+    if (interval == null) return;
+
+    _autoRefreshTimer = Timer.periodic(interval, (_) {
+      if (!mounted || _pageActive == false) return;
+      unawaited(_fetchJobs(silent: true));
+    });
+  }
+
+  void _stopAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = null;
   }
 
   List<BackendBooking> _jobsForTab(int tab) {
@@ -165,7 +256,7 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
       await BookingsApi(client).updateStatus(jobId, newStatus);
       // Silently refresh in the background to sync any server-side changes
       // (e.g. timestamps, populated fields) without blocking the UI.
-      if (mounted) await _fetchJobs();
+      if (mounted) await _fetchJobs(silent: true);
     } catch (_) {
       // ── Rollback on failure ───────────────────────────────────────────────
       if (!mounted) return;

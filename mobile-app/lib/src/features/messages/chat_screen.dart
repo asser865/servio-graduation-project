@@ -50,7 +50,7 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _error;
 
   Timer? _pollTimer;
-  static const Duration _kPollInterval = Duration(seconds: 1);
+  static const Duration _kPollInterval = Duration(seconds: 4);
 
   @override
   void initState() {

@@ -314,9 +314,10 @@ class ThemeProvider extends ChangeNotifier {
   ThemeMode get mode => _mode;
 
   Future<void> setMode(ThemeMode mode) async {
+    if (_mode == mode) return;
     _mode = mode;
-    await _storage.setString(_kKeyThemeMode, mode.name);
     notifyListeners();
+    await _storage.setString(_kKeyThemeMode, mode.name);
   }
 }
 
@@ -434,7 +435,7 @@ class BookingsProvider extends ChangeNotifier {
 class MessagesProvider extends ChangeNotifier {
   MessagesProvider(this._api);
 
-  static const Duration _pollInterval = Duration(seconds: 1);
+  static const Duration _pollInterval = Duration(seconds: 20);
 
   final MessagesApi _api;
   final List<ApiConversation> _conversations = <ApiConversation>[];
