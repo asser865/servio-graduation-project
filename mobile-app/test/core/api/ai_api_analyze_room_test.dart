@@ -45,7 +45,7 @@ void main() {
       style: 'modern',
     );
 
-    expect(capturedPath, '/ai/analyze-room');
+    expect(capturedPath, '/mobile/ai/analyze-room');
     expect(capturedMethod, 'POST');
     expect(capturedContentType, isNotNull);
     expect(capturedContentType!.startsWith('multipart/form-data'), isTrue);
