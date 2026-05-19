@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
+import 'core/api/ai_api.dart';
 import 'core/api/api_client.dart';
 import 'core/api/bookings_api.dart';
 import 'core/api/messages_api.dart';
@@ -10,6 +11,7 @@ import 'core/api/users_api.dart';
 import 'core/services/storage_service.dart';
 import 'core/state/app_state.dart';
 import 'core/state/customer_addresses_state.dart';
+import 'core/state/room_finishing_provider.dart';
 import 'core/state/services_state.dart';
 import 'core/state/notifications_provider.dart';
 import 'core/state/workers_state.dart';
@@ -72,6 +74,9 @@ class ServioApp extends StatelessWidget {
             storage,
             ctx.read<ApiClient>(),
           ),
+        ),
+        ChangeNotifierProvider<RoomFinishingProvider>(
+          create: (ctx) => RoomFinishingProvider(AiApi(ctx.read<ApiClient>())),
         ),
       ],
       child: const _AppView(),

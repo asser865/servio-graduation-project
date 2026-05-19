@@ -24,6 +24,8 @@ class _MessagesScreenState extends State<MessagesScreen>
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
   MessagesProvider? _messagesProvider;
+  bool _appInForeground = true;
+  bool _tabActive = true;
 
   @override
   void initState() {
@@ -31,7 +33,7 @@ class _MessagesScreenState extends State<MessagesScreen>
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _messagesProvider?.startAutoRefresh();
+      _syncAutoRefresh();
     });
   }
 
@@ -39,19 +41,35 @@ class _MessagesScreenState extends State<MessagesScreen>
   void didChangeDependencies() {
     super.didChangeDependencies();
     _messagesProvider ??= context.read<MessagesProvider>();
+    final nextTabActive = ServioTabShell.isPageActiveOf(context);
+    if (_tabActive == nextTabActive) return;
+    _tabActive = nextTabActive;
+    _syncAutoRefresh();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _messagesProvider?.startAutoRefresh();
+      _appInForeground = true;
+      _syncAutoRefresh();
       return;
     }
 
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
-      _messagesProvider?.stopAutoRefresh();
+      _appInForeground = false;
+      _syncAutoRefresh();
+    }
+  }
+
+  void _syncAutoRefresh() {
+    final provider = _messagesProvider;
+    if (provider == null) return;
+    if (_appInForeground && _tabActive) {
+      provider.startAutoRefresh();
+    } else {
+      provider.stopAutoRefresh();
     }
   }
 

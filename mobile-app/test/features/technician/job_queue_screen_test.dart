@@ -133,6 +133,18 @@ http.Client _mockClient(List<Map<String, dynamic>> bookings) => MockClient(
       },
     );
 
+Future<void> _selectQueueTab(WidgetTester tester, String label) async {
+  const historyTabs = <String>{'Completed', 'Cancelled', 'Rejected'};
+
+  if (historyTabs.contains(label)) {
+    await tester.tap(find.text('History'));
+    await tester.pumpAndSettle();
+  }
+
+  await tester.tap(find.text(label).last);
+  await tester.pumpAndSettle();
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -204,8 +216,7 @@ void main() {
     await tester.pump();
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Confirmed'));
-    await tester.pumpAndSettle();
+    await _selectQueueTab(tester, 'Confirmed');
 
     expect(find.text('Electrical'), findsOneWidget);
     expect(find.text('Painting'), findsNothing);
@@ -240,8 +251,7 @@ void main() {
     await tester.pump();
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('In Progress'));
-    await tester.pumpAndSettle();
+    await _selectQueueTab(tester, 'In Progress');
 
     expect(find.text('Sink Repair'), findsOneWidget);
     expect(find.text('Arrived'), findsOneWidget);
@@ -265,8 +275,7 @@ void main() {
     await tester.pump();
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Cancelled'));
-    await tester.pumpAndSettle();
+    await _selectQueueTab(tester, 'Cancelled');
 
     expect(find.text('Old Paint Job'), findsOneWidget);
     expect(find.text('Cancelled'), findsWidgets);
@@ -292,8 +301,7 @@ void main() {
     await tester.pump();
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Rejected'));
-    await tester.pumpAndSettle();
+    await _selectQueueTab(tester, 'Rejected');
 
     expect(find.text('Declined Plumbing'), findsOneWidget);
     expect(find.text('Rejected'), findsWidgets);
@@ -378,8 +386,7 @@ void main() {
     expect(find.text('Pending 1'), findsOneWidget);
     expect(find.text('Pending 2'), findsOneWidget);
 
-    await tester.tap(find.text('Confirmed'));
-    await tester.pumpAndSettle();
+    await _selectQueueTab(tester, 'Confirmed');
     expect(find.text('Accepted 1'), findsOneWidget);
     await tester.scrollUntilVisible(
       find.text('Accepted 5'),
@@ -389,12 +396,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Accepted 5'), findsOneWidget);
 
-    await tester.tap(find.text('In Progress'));
-    await tester.pumpAndSettle();
+    await _selectQueueTab(tester, 'In Progress');
     expect(find.text('Arrived Job'), findsOneWidget);
 
-    await tester.tap(find.text('Cancelled'));
-    await tester.pumpAndSettle();
+    await _selectQueueTab(tester, 'Cancelled');
     expect(find.text('Cancelled Job'), findsOneWidget);
   });
 
@@ -441,6 +446,64 @@ void main() {
 
     expect(capturedUri?.path, contains('/bookings/worker'));
     expect(capturedUri?.queryParameters['workerId'], equals('worker456'));
+  });
+
+  testWidgets('auto refresh shows newly requested pending jobs',
+      (tester) async {
+    var workerBookingsCalls = 0;
+    final httpClient = MockClient((request) async {
+      if (request.url.path.contains('/bookings/worker')) {
+        workerBookingsCalls += 1;
+        final bookings = workerBookingsCalls == 1
+            ? <Map<String, dynamic>>[]
+            : <Map<String, dynamic>>[
+                _booking(
+                  id: 'new-request',
+                  status: 'pending',
+                  serviceName: 'Fresh Request',
+                ),
+              ];
+        return http.Response(
+          jsonEncode({
+            'success': true,
+            'message': 'ok',
+            'data': {
+              'bookings': bookings,
+              'pagination': {
+                'total': bookings.length,
+                'page': 1,
+                'pages': 1,
+              },
+            },
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      }
+      return http.Response('not found', 404);
+    });
+    final client = await _buildClient(httpClient);
+
+    await tester.pumpWidget(
+      _wrap(
+        const JobQueueScreen(
+          autoRefreshInterval: Duration(milliseconds: 25),
+        ),
+        client: client,
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.textContaining('No jobs'), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 30));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Fresh Request'), findsOneWidget);
+    expect(workerBookingsCalls, greaterThanOrEqualTo(2));
   });
 
   testWidgets('shows empty state message when no jobs on current tab',

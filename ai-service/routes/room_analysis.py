@@ -13,12 +13,13 @@ MAX_FILE_SIZE  = 10 * 1024 * 1024  # 10 MB
 
 @router.post("/ai/analyze-room")
 async def analyze_room_endpoint(
-    image:      UploadFile = File(...),
-    length_m:   float      = Form(...),
-    width_m:    float      = Form(...),
-    height_m:   float      = Form(...),
-    budget_egp: int        = Form(...),
-    style:      str        = Form(default="modern")
+    image:          UploadFile = File(...),
+    length_m:       float      = Form(...),
+    width_m:        float      = Form(...),
+    height_m:       float      = Form(...),
+    budget_egp:     int        = Form(...),
+    style:          str        = Form(default="modern"),
+    include_render: bool       = Form(default=True),
 ):
     if image.content_type not in ALLOWED_TYPES:
         raise HTTPException(400, f"Unsupported file type. Use JPEG or PNG.")
@@ -52,22 +53,21 @@ async def analyze_room_endpoint(
             style_preference=style
         )
 
-        # Step 2: Stable Diffusion — generate visual render of finished room
-        sd_bytes = prepare_image_for_sd(image_bytes)
-
-        recommended_plan = next(
-            (p for p in result["finishing_plans"]
-             if p["plan_name"] == result["recommended_plan"]),
-            result["finishing_plans"][0]
-        )
-
-        generated_image_b64 = generate_finished_room(
-            room_image_bytes=sd_bytes,
-            room_analysis=result["room_analysis"],
-            finishing_plan=recommended_plan,
-            strength=0.65,
-            steps=30
-        )
+        # Step 2: Stable Diffusion — generate visual render (optional, ~20-45s on CPU)
+        generated_image_b64 = None
+        if include_render:
+            sd_bytes = prepare_image_for_sd(image_bytes)
+            recommended_plan = next(
+                (p for p in result["finishing_plans"]
+                 if p["plan_name"] == result["recommended_plan"]),
+                result["finishing_plans"][0]
+            )
+            generated_image_b64 = generate_finished_room(
+                room_image_bytes=sd_bytes,
+                room_analysis=result["room_analysis"],
+                finishing_plan=recommended_plan,
+                strength=0.65,
+            )
 
         return JSONResponse(content={
             "status": "success",

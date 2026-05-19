@@ -27,6 +27,13 @@ class ServioTabShell extends StatefulWidget {
         0;
   }
 
+  static bool isPageActiveOf(BuildContext context) {
+    return context
+            .dependOnInheritedWidgetOfExactType<_ServioTabPageScope>()
+            ?.active ??
+        true;
+  }
+
   @override
   State<ServioTabShell> createState() => _ServioTabShellState();
 }
@@ -71,7 +78,12 @@ class _ServioTabShellState extends State<ServioTabShell> {
               bottomOverlayInset: safeBottom + _navMarginBottom + _navHeight,
               child: IndexedStack(
                 index: _currentIndex,
-                children: widget.pages,
+                children: List<Widget>.generate(widget.pages.length, (index) {
+                  return _ServioTabPageScope(
+                    active: index == _currentIndex,
+                    child: widget.pages[index],
+                  );
+                }),
               ),
             ),
           ),
@@ -120,5 +132,19 @@ class _ServioTabShellScope extends InheritedWidget {
   @override
   bool updateShouldNotify(_ServioTabShellScope oldWidget) {
     return bottomOverlayInset != oldWidget.bottomOverlayInset;
+  }
+}
+
+class _ServioTabPageScope extends InheritedWidget {
+  const _ServioTabPageScope({
+    required this.active,
+    required super.child,
+  });
+
+  final bool active;
+
+  @override
+  bool updateShouldNotify(_ServioTabPageScope oldWidget) {
+    return active != oldWidget.active;
   }
 }

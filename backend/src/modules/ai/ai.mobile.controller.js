@@ -1,4 +1,5 @@
 const axios           = require('axios');
+const FormData        = require('form-data');
 const { StatusCodes } = require('http-status-codes');
 const ApiError        = require('../../utils/ApiError');
 const ApiResponse     = require('../../utils/ApiResponse');
@@ -184,4 +185,63 @@ const getMobileRecommendation = async (req, res) => {
   }
 };
 
-module.exports = { getMobileRecommendation };
+const analyzeMobileRoom = async (req, res) => {
+  if (!req.file) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Room image is required.');
+  }
+
+  const { length_m, width_m, height_m, budget_egp, style, include_render } = req.body;
+
+  if (!length_m || !width_m || !height_m || !budget_egp) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'length_m, width_m, height_m, and budget_egp are required.');
+  }
+
+  const mobileMainAiUrl = process.env.AI_MOBILE_MAIN_SERVICE_URL || 'http://localhost:8002';
+
+  try {
+    const form = new FormData();
+    form.append('image', req.file.buffer, {
+      filename: req.file.originalname,
+      contentType: req.file.mimetype,
+    });
+    form.append('length_m', length_m);
+    form.append('width_m', width_m);
+    form.append('height_m', height_m);
+    form.append('budget_egp', budget_egp);
+    form.append('style', style || 'modern');
+    if (include_render !== undefined) {
+      form.append('include_render', include_render);
+    }
+
+    const aiResponse = await axios.post(
+      `${mobileMainAiUrl}/ai/analyze-room`,
+      form,
+      {
+        headers: form.getHeaders(),
+        timeout: 180_000,
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
+      }
+    );
+
+    return ApiResponse.success(
+      res,
+      StatusCodes.OK,
+      'Room analysis completed successfully.',
+      aiResponse.data
+    );
+  } catch (error) {
+    if (error.code === 'ECONNABORTED') {
+      throw new ApiError(StatusCodes.GATEWAY_TIMEOUT, 'AI service timed out. Please try again later.');
+    }
+    if (error.response) {
+      throw new ApiError(
+        StatusCodes.BAD_GATEWAY,
+        `AI service error: ${error.response.data?.detail || error.response.data?.message || 'Unknown error'}`
+      );
+    }
+    throw new ApiError(StatusCodes.SERVICE_UNAVAILABLE, 'Mobile AI service is currently unavailable.');
+  }
+};
+
+module.exports = { getMobileRecommendation, analyzeMobileRoom };

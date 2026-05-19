@@ -22,17 +22,22 @@ void main() {
     SharedPreferences.setMockInitialValues(<String, Object>{});
   });
 
-  testWidgets('history tab displays active and completed bookings from backend',
+  testWidgets('active and history tabs display bookings from backend',
       (tester) async {
     await tester.pumpWidget(await _wrap(const MyBookingsScreen(
-      initialTabIndex: 1,
+      initialTabIndex: 0,
     )));
     await tester.pumpAndSettle();
 
     expect(find.text('Drain Cleaning'), findsOneWidget);
-    expect(find.text('Kitchen Painting'), findsOneWidget);
     expect(find.text('Pending'), findsOneWidget);
+
+    await tester.tap(find.text('History'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Kitchen Painting'), findsOneWidget);
     expect(find.text('Completed'), findsOneWidget);
+    expect(find.text('Drain Cleaning'), findsNothing);
   });
 
   testWidgets('re-book opens booking flow with previous service and technician',
@@ -60,7 +65,11 @@ void main() {
     await tester.tap(find.text('Re-book'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Continue'));
+    final continueButton = find.text('Continue');
+    await tester.ensureVisible(continueButton);
+    await tester.pumpAndSettle();
+
+    await tester.tap(continueButton);
     await tester.pumpAndSettle();
 
     expect(find.text('Pick a Date & Time'), findsOneWidget);

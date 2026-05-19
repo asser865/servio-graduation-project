@@ -249,7 +249,11 @@ const analyzeRoom = async (req, res) => {
       form,
       {
         headers: form.getHeaders(),
-        timeout: 30_000,
+        // Gemini call + Stable Diffusion render can each take 30–90s on CPU.
+        // Give upstream 3 minutes before declaring a gateway timeout.
+        timeout: 180_000,
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
       }
     );
 
