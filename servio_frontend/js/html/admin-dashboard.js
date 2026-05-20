@@ -6,7 +6,7 @@ import { showToast } from '../components/toast.js';
 import { getAllUsers, deleteUser, updateUserStatus, updatePassword, reviewWorker, approveWorkerCategory } from '../api/users.js';
 import { getServices, createService, updateService, deleteService as apiDeleteService } from '../api/services.js';
 import { getAllBookings } from '../api/bookings.js';
-import { getAuditLogs, deleteAuditLog, getAdminSettings, updateAdminSettings, getAnalytics } from '../api/admin.js';
+import { getAuditLogs, deleteAuditLog, deleteAllAuditLogs, deleteSelectedAuditLogs, getAdminSettings, updateAdminSettings, getAnalytics } from '../api/admin.js';
 import {
   getPendingApprovals,
   adminApprovePayment,
@@ -14,7 +14,16 @@ import {
   adminRefund,
   getCashDebts,
   markCashDebtPaid,
+  getDisputes,
+  resolveDispute,
+  reviewDispute,
 } from '../api/payments.js';
+import {
+  getAdminSupportIssues,
+  updateSupportIssueStatus,
+  resolveSupportIssue,
+  escalateSupportIssueToDispute,
+} from '../api/support.js';
 
 // Auth guard
 const session = JSON.parse(localStorage.getItem('servio_session') || 'null');
@@ -44,6 +53,10 @@ function _updateOverviewDate() {
 // Module-level bridges so loadAdminData() (defined outside initAdminDashboard) can call modal helpers
 let _openProfileModal, _openTechProfileModal;
 let _currentRejectWorkerId = '';
+let _adminDisputes = [];
+let _disputesLoadedOnce = false;
+let _adminSupportIssues = [];
+let _supportLoadedOnce = false;
 
 function getVerificationStatus(user) {
   return user?.verificationStatus || (user?.isVerified ? 'approved' : 'pending');
@@ -78,6 +91,11 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function formatMoney(value) {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? `${amount.toLocaleString()} EGP` : '-';
 }
 
 async function downloadRemoteFile(url, filename) {
@@ -154,6 +172,9 @@ function initAdminDashboard() {
       if (labelEl) {
         headerTitle.textContent = labelEl.textContent;
         headerTitle.setAttribute('data-i18n', labelEl.getAttribute('data-i18n'));
+      } else {
+        headerTitle.textContent = activeBtn.textContent.trim();
+        headerTitle.removeAttribute('data-i18n');
       }
     }
     // Persist tab state
@@ -171,12 +192,20 @@ function initAdminDashboard() {
   }
 
   navBtns.forEach(btn => {
-    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+    btn.addEventListener('click', () => {
+      switchTab(btn.dataset.tab);
+      if (btn.dataset.tab === 'disputes') renderDisputes().catch(err => console.error('Error loading disputes:', err));
+      if (btn.dataset.tab === 'support') renderSupportIssues().catch(err => console.error('Error loading support issues:', err));
+    });
   });
 
   // ── Quick action buttons (data-goto-tab) ──
   document.querySelectorAll('[data-goto-tab]').forEach(btn => {
-    btn.addEventListener('click', () => switchTab(btn.dataset.gotoTab));
+    btn.addEventListener('click', () => {
+      switchTab(btn.dataset.gotoTab);
+      if (btn.dataset.gotoTab === 'disputes') renderDisputes().catch(err => console.error('Error loading disputes:', err));
+      if (btn.dataset.gotoTab === 'support') renderSupportIssues().catch(err => console.error('Error loading support issues:', err));
+    });
   });
 
   // ── Users: combined search + status filter ─
@@ -1304,9 +1333,113 @@ function initAdminDashboard() {
     window.location.href = './login.html';
   });
 
-  // ── Export Report button ───────────────────────────────
-  document.getElementById('exportReportBtn')?.addEventListener('click', () => {
-    showToast(typeof window.t === 'function' ? window.t('toast_report_exported') : 'Report exported successfully', 'success');
+  // ── Reports Page Download Buttons ───────────────────────────────
+  document.querySelectorAll('.report-download-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const btnEl = e.currentTarget;
+      const card = btnEl.closest('.report-card');
+      const title = card?.querySelector('h3')?.textContent || 'Report';
+      
+      try {
+        btnEl.disabled = true;
+        const originalText = btnEl.innerHTML;
+        btnEl.innerHTML = '<span style="display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px;"></span> Downloading...';
+        
+        let fileContent = '';
+        let fileExt = 'csv';
+        let mimeType = 'text/csv';
+        
+        const formatSelect = card?.querySelector('select[aria-label="Format"], #auditReportFormat');
+        const format = formatSelect ? formatSelect.value : 'csv';
+        if (format === 'json') {
+           fileExt = 'json';
+           mimeType = 'application/json';
+        }
+        
+        // Fetch data based on card title
+        if (title.toLowerCase().includes('audit')) {
+           const daysSelect = document.getElementById('auditReportDateRange');
+           const days = daysSelect ? daysSelect.value : '';
+           const res = await getAuditLogs({ days: days === 'all' ? '' : days, limit: 10000 });
+           const logs = res.logs || (Array.isArray(res) ? res : []);
+           if (format === 'json') {
+             fileContent = JSON.stringify(logs, null, 2);
+           } else {
+             const rows = [['Timestamp', 'Actor', 'Type', 'Action', 'Target', 'IP Address', 'Status']];
+             logs.forEach(r => rows.push([
+               r.createdAt ? new Date(r.createdAt).toLocaleString('en-GB') : '—',
+               r.actor?.email || 'unknown', r.type || '—', r.action || '—', r.target || '—', r.ip || '—', r.status || '—'
+             ]));
+             fileContent = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+           }
+        } else if (title.toLowerCase().includes('users')) {
+           const res = await getAllUsers({ limit: 10000 }) || {};
+           const users = res.users || (Array.isArray(res) ? res : []);
+           const customers = users.filter(u => u.role !== 'admin' && u.role !== 'worker');
+           if (format === 'json') {
+             fileContent = JSON.stringify(customers, null, 2);
+           } else {
+             const rows = [['Name', 'Email', 'Role', 'Status', 'Joined Date']];
+             customers.forEach(u => rows.push([
+               u.name || '—', u.email || '—', u.role || '—', u.isActive ? 'Active' : 'Inactive', u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—'
+             ]));
+             fileContent = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+             fileExt = 'csv'; // fallback to csv
+           }
+        } else if (title.toLowerCase().includes('tech')) {
+           const res = await getAllUsers({ limit: 10000 }) || {};
+           const users = res.users || (Array.isArray(res) ? res : []);
+           const techs = users.filter(u => u.role === 'worker');
+           if (format === 'json') {
+             fileContent = JSON.stringify(techs, null, 2);
+           } else {
+             const rows = [['Name', 'Email', 'Verification', 'Rating', 'Joined Date']];
+             techs.forEach(u => rows.push([
+               u.name || '—', u.email || '—', u.verificationStatus || '—', u.rating || '0', u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—'
+             ]));
+             fileContent = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+             fileExt = 'csv';
+           }
+        } else if (title.toLowerCase().includes('bookings')) {
+           const res = await getAllBookings({ limit: 10000 }) || {};
+           const bookings = res.bookings || (Array.isArray(res) ? res : []);
+           if (format === 'json') {
+             fileContent = JSON.stringify(bookings, null, 2);
+           } else {
+             const rows = [['Booking ID', 'Customer', 'Service', 'Status', 'Total Price', 'Date']];
+             bookings.forEach(b => rows.push([
+               b._id || '—', b.customer?.name || '—', b.service?.title || '—', b.status || '—', b.totalPrice || '—', b.createdAt ? new Date(b.createdAt).toLocaleDateString() : '—'
+             ]));
+             fileContent = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+             fileExt = 'csv';
+           }
+        } else {
+           fileContent = "Report Data\nData export for this section is being processed.";
+           fileExt = 'csv';
+        }
+        
+        const blob = new Blob([fileContent], { type: mimeType });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href = url; 
+        const sanitizedTitle = title.toLowerCase().replace(/[^a-z0-9]/g, '-');
+        a.download = `${sanitizedTitle}-${new Date().toISOString().split('T')[0]}.${fileExt}`; 
+        document.body.appendChild(a); // Crucial for Firefox compatibility
+        a.click();
+        document.body.removeChild(a); // Clean up
+        URL.revokeObjectURL(url);
+        
+        showToast(title + ' downloaded successfully.', 'success');
+        btnEl.disabled = false;
+        btnEl.innerHTML = originalText;
+      } catch (err) {
+        console.error('Failed to export report:', err);
+        showToast('Failed to export ' + title, 'error');
+        btnEl.disabled = false;
+        btnEl.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                  <span data-i18n="admin_download">Download</span>`;
+      }
+    });
   });
 
   // ── Analytics Filters ────────────────────────────────────
@@ -1430,6 +1563,7 @@ function initAdminDashboard() {
     if (!logs.length) {
       tbody.innerHTML = '';
       if (emptyEl) emptyEl.hidden = false;
+      _updateAuditBulkBar();
       return;
     }
     if (emptyEl) emptyEl.hidden = true;
@@ -1438,7 +1572,13 @@ function initAdminDashboard() {
       const ts     = r.createdAt ? new Date(r.createdAt).toLocaleString('en-GB') : '—';
       const actor  = r.actor?.email || 'unknown';
       const icon   = r.status === 'ok' ? '✓' : r.status === 'warn' ? '⚠' : '✕';
-      return `<tr>
+      return `<tr data-audit-id="${r._id}">
+        <td class="audit-col-check">
+          <label class="audit-checkbox-wrap" aria-label="Select row">
+            <input type="checkbox" class="audit-checkbox audit-row-check" data-id="${r._id}" />
+            <span class="audit-checkmark"></span>
+          </label>
+        </td>
         <td class="audit-ts">${ts}</td>
         <td class="audit-actor">${actor}</td>
         <td class="audit-action"><span class="audit-type-pill">${_auditTypeLabel(r.type)}</span><br>${r.action}</td>
@@ -1451,6 +1591,12 @@ function initAdminDashboard() {
         <td><span class="audit-badge audit-badge--${r.status}">${icon} ${_auditStatusLabel(r.status)}</span></td>
       </tr>`;
     }).join('');
+
+    // Re-attach row-checkbox listeners
+    tbody.querySelectorAll('.audit-row-check').forEach(cb => {
+      cb.addEventListener('change', _updateAuditBulkBar);
+    });
+    _updateAuditBulkBar();
   }
 
   async function _loadAuditPage() {
@@ -1498,6 +1644,69 @@ function initAdminDashboard() {
 
   document.getElementById('auditPrevBtn')?.addEventListener('click', () => { _auditPage = Math.max(1, _auditPage - 1); _loadAuditPage(); });
   document.getElementById('auditNextBtn')?.addEventListener('click', () => { _auditPage = Math.min(_auditTotalPages, _auditPage + 1); _loadAuditPage(); });
+
+  // ── Audit: selection helpers ──────────────────────────────
+  function _getSelectedAuditIds() {
+    return [...document.querySelectorAll('.audit-row-check:checked')].map(cb => cb.dataset.id);
+  }
+
+  function _updateAuditBulkBar() {
+    const checked = _getSelectedAuditIds();
+    const bulkBar    = document.getElementById('auditBulkBar');
+    const countEl   = document.getElementById('auditSelectedCount');
+    const selectAll  = document.getElementById('auditSelectAll');
+    const allBoxes   = [...document.querySelectorAll('.audit-row-check')];
+
+    if (bulkBar)  bulkBar.hidden  = checked.length === 0;
+    if (countEl)  countEl.textContent = checked.length;
+    if (selectAll) {
+      selectAll.checked       = allBoxes.length > 0 && allBoxes.every(cb => cb.checked);
+      selectAll.indeterminate = checked.length > 0 && !selectAll.checked;
+    }
+  }
+
+  // Select-all checkbox
+  document.getElementById('auditSelectAll')?.addEventListener('change', e => {
+    document.querySelectorAll('.audit-row-check').forEach(cb => { cb.checked = e.target.checked; });
+    _updateAuditBulkBar();
+  });
+
+  // Delete Selected
+  document.getElementById('auditDeleteSelectedBtn')?.addEventListener('click', async () => {
+    const ids = _getSelectedAuditIds();
+    if (!ids.length) return;
+    const msg = `Delete ${ids.length} selected log entr${ids.length === 1 ? 'y' : 'ies'}? This cannot be undone.`;
+    if (!confirm(msg)) return;
+    try {
+      await deleteSelectedAuditLogs(ids);
+      showToast(`${ids.length} log entr${ids.length === 1 ? 'y' : 'ies'} deleted`, 'success');
+      _loadAuditPage();
+    } catch (err) {
+      console.error('Bulk delete failed:', err);
+      showToast(err.message || 'Failed to delete selected logs', 'error');
+    }
+  });
+
+  // Delete All
+  document.getElementById('auditDeleteAllBtn')?.addEventListener('click', async () => {
+    if (!confirm('Delete ALL audit log entries? This will permanently clear the entire log and cannot be undone.')) return;
+    try {
+      await deleteAllAuditLogs();
+      showToast('All audit logs cleared', 'success');
+      _loadAuditPage();
+    } catch (err) {
+      console.error('Delete all failed:', err);
+      showToast(err.message || 'Failed to clear logs', 'error');
+    }
+  });
+
+  // Clear selection
+  document.getElementById('auditClearSelectionBtn')?.addEventListener('click', () => {
+    document.querySelectorAll('.audit-row-check').forEach(cb => { cb.checked = false; });
+    const selectAll = document.getElementById('auditSelectAll');
+    if (selectAll) { selectAll.checked = false; selectAll.indeterminate = false; }
+    _updateAuditBulkBar();
+  });
 
   document.getElementById('auditLogBody')?.addEventListener('click', async (e) => {
     const delBtn = e.target.closest('[data-audit-delete]');
@@ -1559,6 +1768,15 @@ function initAdminDashboard() {
       });
     }
   });
+
+  document.getElementById('disputeStatusFilter')?.addEventListener('change', () => renderDisputes({ reuseCache: true }).catch(err => console.error('Error filtering disputes:', err)));
+  document.getElementById('disputeSearch')?.addEventListener('input', () => renderDisputes({ reuseCache: true }).catch(err => console.error('Error searching disputes:', err)));
+  document.getElementById('disputeRefreshBtn')?.addEventListener('click', () => renderDisputes({ force: true }).catch(err => console.error('Error refreshing disputes:', err)));
+  ['supportStatusFilter', 'supportPriorityFilter', 'supportTypeFilter'].forEach((id) => {
+    document.getElementById(id)?.addEventListener('change', () => renderSupportIssues({ force: true }).catch(err => console.error('Error filtering support issues:', err)));
+  });
+  document.getElementById('supportSearch')?.addEventListener('input', () => renderSupportIssues({ reuseCache: true }).catch(err => console.error('Error searching support issues:', err)));
+  document.getElementById('supportRefreshBtn')?.addEventListener('click', () => renderSupportIssues({ force: true }).catch(err => console.error('Error refreshing support issues:', err)));
 
   // Initial load
   _loadAuditPage();
@@ -1825,12 +2043,18 @@ async function loadAdminData() {
           const sc = { pending:'bk-badge--active', accepted:'bk-badge--active', en_route:'bk-badge--active', arrived:'bk-badge--active', in_progress:'bk-badge--active', completed:'bk-badge--completed', cancelled:'bk-badge--cancelled', disputed:'bk-badge--overdue' }[b.status] || '';
           const date = b.scheduledDate ? new Date(b.scheduledDate).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '—';
           return `<tr class="booking-row" data-status="${b.status}">
-            <td class="bk-cust">${b.user?.name || '—'}</td>
-            <td class="bk-tech">${b.worker?.name || '—'}</td>
+            <td><div style="font-weight:600;">${b.user?.name || '—'}</div></td>
+            <td><div style="color:var(--color-text-muted);">${b.worker?.name || '—'}</div></td>
             <td>${b.service?.title || b.serviceKey || '—'}</td>
-            <td>${date}</td>
+            <td>
+              <div style="font-weight:500; margin-bottom:2px;">${date}</div>
+              <div style="font-size:0.75rem; color:var(--color-text-light);">${b.scheduledDate ? new Date(b.scheduledDate).toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit'}) : '—'}</div>
+            </td>
             <td><span class="bk-badge ${sc}">${b.status}</span></td>
-            <td class="bk-amount">${b.totalPrice != null ? b.totalPrice + ' EGP' : '—'}</td>
+            <td style="text-transform: capitalize;">${b.paymentMethod || '—'}</td>
+            <td><span class="bk-pay-badge bk-pay--${(b.paymentStatus || 'pending').toLowerCase()}">${b.paymentStatus || 'pending'}</span></td>
+            <td class="bk-amount right-align">${b.totalPrice != null ? b.totalPrice + ' EGP' : '—'}</td>
+            <td><button class="bk-action-btn" data-action="view-booking" data-id="${b._id}">View</button></td>
           </tr>`;
         }).join('');
       }
@@ -1853,13 +2077,12 @@ async function loadAdminData() {
       _set('bk-stat-successrate', pct(bCompleted));
     }
 
-    _set('kpi-overview-disputes', bDisputed.toLocaleString());
-    _set('kpi-disputes-total', (bDisputed + bCompleted).toLocaleString());
-    _set('kpi-disputes-open', bDisputed.toLocaleString());
-    _set('kpi-disputes-review', '0');
-    _set('kpi-disputes-resolved', bCompleted.toLocaleString());
-    _set('disputeCount', bDisputed);
-    _set('qa-dispute-badge', bDisputed);
+    if (!_disputesLoadedOnce) {
+      renderDisputes().catch(err => console.error('Error loading disputes:', err));
+    }
+    if (!_supportLoadedOnce) {
+      renderSupportIssues().catch(err => console.error('Error loading support issues:', err));
+    }
 
     // Update pagination footer with actual count
     const bkInfoEl = document.getElementById('bookingPaginationInfo');
@@ -1977,6 +2200,440 @@ function bindAdminActions() {
 }
 
 // ── Payments Tab ──────────────────────────────
+
+function setAdminText(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = String(value);
+}
+
+function getDisputeBooking(dispute) {
+  return dispute?.booking && typeof dispute.booking === 'object' ? dispute.booking : {};
+}
+
+function getDisputeCustomer(dispute) {
+  const booking = getDisputeBooking(dispute);
+  return booking.user || dispute?.raisedBy || {};
+}
+
+function getDisputeWorker(dispute) {
+  return getDisputeBooking(dispute).worker || {};
+}
+
+function getDisputeService(dispute) {
+  const booking = getDisputeBooking(dispute);
+  return booking.service?.title || booking.serviceCategory || 'Service booking';
+}
+
+function formatDisputeStatusAdmin(status) {
+  return ({
+    open: 'Open',
+    reviewing: 'Reviewing',
+    resolved_refund: 'Resolved - refunded',
+    resolved_release: 'Resolved - released',
+  })[status] || 'Open';
+}
+
+function disputeStatusClass(status) {
+  return ({
+    open: 'admin-dispute-status--open',
+    reviewing: 'admin-dispute-status--reviewing',
+    resolved_refund: 'admin-dispute-status--resolved',
+    resolved_release: 'admin-dispute-status--resolved',
+  })[status] || 'admin-dispute-status--open';
+}
+
+function disputeMatchesSearch(dispute, query) {
+  if (!query) return true;
+  const booking = getDisputeBooking(dispute);
+  const customer = getDisputeCustomer(dispute);
+  const worker = getDisputeWorker(dispute);
+  const haystack = [
+    dispute?._id,
+    booking?._id,
+    customer?.name,
+    customer?.email,
+    worker?.name,
+    worker?.email,
+    getDisputeService(dispute),
+    dispute?.category,
+    dispute?.reason,
+    dispute?.status,
+  ].filter(Boolean).join(' ').toLowerCase();
+  return haystack.includes(query.toLowerCase());
+}
+
+async function fetchAdminDisputes() {
+  const first = await getDisputes({ limit: 100, page: 1 });
+  const disputes = [...(first?.disputes || [])];
+  const totalPages = Number(first?.pagination?.totalPages || 1);
+  if (totalPages > 1) {
+    const pages = [];
+    for (let page = 2; page <= totalPages; page += 1) {
+      pages.push(getDisputes({ limit: 100, page }));
+    }
+    const rest = await Promise.all(pages);
+    rest.forEach(result => disputes.push(...(result?.disputes || [])));
+  }
+  return disputes;
+}
+
+function updateDisputeKpis(disputes) {
+  const total = disputes.length;
+  const open = disputes.filter(d => d.status === 'open').length;
+  const reviewing = disputes.filter(d => d.status === 'reviewing').length;
+  const resolved = disputes.filter(d => String(d.status || '').startsWith('resolved_')).length;
+  setAdminText('kpi-overview-disputes', open + reviewing);
+  setAdminText('kpi-disputes-total', total.toLocaleString());
+  setAdminText('kpi-disputes-open', open.toLocaleString());
+  setAdminText('kpi-disputes-review', reviewing.toLocaleString());
+  setAdminText('kpi-disputes-resolved', resolved.toLocaleString());
+  setAdminText('disputeCount', open + reviewing);
+  setAdminText('qa-dispute-badge', open + reviewing);
+}
+
+async function renderDisputes(options = {}) {
+  const tbody = document.querySelector('#disputesTable tbody');
+  if (!tbody) return;
+
+  const shouldFetch = options.force || !options.reuseCache || !_disputesLoadedOnce;
+  if (shouldFetch) {
+    tbody.innerHTML = '<tr><td colspan="8" class="center-align" style="padding: 3rem; color: var(--color-text-muted);">Loading disputes...</td></tr>';
+    _adminDisputes = await fetchAdminDisputes();
+    _disputesLoadedOnce = true;
+  }
+
+  updateDisputeKpis(_adminDisputes);
+
+  const statusFilter = document.getElementById('disputeStatusFilter')?.value || '';
+  const searchQuery = String(document.getElementById('disputeSearch')?.value || '').trim();
+  const visible = _adminDisputes.filter(dispute => {
+    const statusOk = !statusFilter || dispute.status === statusFilter;
+    return statusOk && disputeMatchesSearch(dispute, searchQuery);
+  });
+
+  if (!visible.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="center-align" style="padding: 3rem; color: var(--color-text-muted);">No disputes match the current filters.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = visible.map(dispute => {
+    const booking = getDisputeBooking(dispute);
+    const customer = getDisputeCustomer(dispute);
+    const worker = getDisputeWorker(dispute);
+    const status = dispute.status || 'open';
+    const amount = booking.totalPrice ?? booking.estimatedTotal ?? dispute.payment?.amount;
+    const paymentLabel = booking.paymentMethod ? `${booking.paymentMethod} / ${booking.paymentStatus || 'pending'}` : (dispute.payment?.status || 'No payment');
+    const canReview = status === 'open';
+    const canResolve = status === 'open' || status === 'reviewing';
+    return `
+      <tr>
+        <td><strong>${escapeHtml(String(dispute._id || '').slice(-8) || '-')}</strong></td>
+        <td>
+          <div class="admin-dispute-booking">${escapeHtml(getDisputeService(dispute))}</div>
+          <small>${escapeHtml(formatMoney(amount))} - ${escapeHtml(paymentLabel)}</small>
+        </td>
+        <td>
+          <div>${escapeHtml(customer.name || '-')}</div>
+          <small>${escapeHtml(customer.email || '')}</small>
+        </td>
+        <td>
+          <div>${escapeHtml(worker.name || '-')}</div>
+          <small>${escapeHtml(worker.email || '')}</small>
+        </td>
+        <td>
+          <div class="admin-dispute-issue">${escapeHtml(dispute.category || 'other')}</div>
+          <small>${escapeHtml(dispute.reason || '').slice(0, 72)}${String(dispute.reason || '').length > 72 ? '...' : ''}</small>
+        </td>
+        <td><span class="admin-dispute-status ${disputeStatusClass(status)}">${escapeHtml(formatDisputeStatusAdmin(status))}</span></td>
+        <td>${escapeHtml(formatAdminDate(dispute.createdAt))}</td>
+        <td class="center-align">
+          <div class="admin-dispute-actions">
+            <button class="bk-action-btn bk-action-btn--xs" type="button" data-dispute-view="${escapeHtml(dispute._id)}">View</button>
+            ${canReview ? `<button class="bk-action-btn bk-action-btn--xs" type="button" data-dispute-review="${escapeHtml(dispute._id)}">Review</button>` : ''}
+            ${canResolve ? `<button class="bk-action-btn bk-action-btn--xs admin-dispute-actions__refund" type="button" data-dispute-resolve="refund" data-id="${escapeHtml(dispute._id)}">Refund</button>` : ''}
+            ${canResolve ? `<button class="bk-action-btn bk-action-btn--xs admin-dispute-actions__release" type="button" data-dispute-resolve="release" data-id="${escapeHtml(dispute._id)}">Release</button>` : ''}
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  bindDisputeActions();
+}
+
+function bindDisputeActions() {
+  document.querySelectorAll('[data-dispute-view]').forEach(btn => {
+    btn.onclick = () => openAdminDisputeModal(btn.dataset.disputeView);
+  });
+
+  document.querySelectorAll('[data-dispute-review]').forEach(btn => {
+    btn.onclick = async () => {
+      btn.disabled = true;
+      try {
+        await reviewDispute(btn.dataset.disputeReview);
+        showToast('Dispute marked as under review.', 'success');
+        await renderDisputes({ force: true });
+      } catch (err) {
+        showToast(err?.response?.data?.message || err?.data?.message || err.message || 'Failed to update dispute.', 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    };
+  });
+
+  document.querySelectorAll('[data-dispute-resolve]').forEach(btn => {
+    btn.onclick = async () => {
+      const decision = btn.dataset.disputeResolve;
+      const label = decision === 'refund' ? 'refund the customer' : 'release payment to the technician';
+      if (!confirm(`Resolve this dispute and ${label}?`)) return;
+      const resolution = prompt('Resolution note for both parties:');
+      if (!resolution || !resolution.trim()) return;
+      btn.disabled = true;
+      try {
+        await resolveDispute(btn.dataset.id, { decision, resolution: resolution.trim() });
+        showToast('Dispute resolved.', 'success');
+        await renderDisputes({ force: true });
+        loadAdminData();
+      } catch (err) {
+        showToast(err?.response?.data?.message || err?.data?.message || err.message || 'Failed to resolve dispute.', 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    };
+  });
+}
+
+function openAdminDisputeModal(disputeId) {
+  const dispute = _adminDisputes.find(item => item._id === disputeId);
+  const body = document.getElementById('adminDisputeBody');
+  if (!dispute || !body) return;
+
+  const booking = getDisputeBooking(dispute);
+  const customer = getDisputeCustomer(dispute);
+  const worker = getDisputeWorker(dispute);
+  const evidence = Array.isArray(dispute.evidence) ? dispute.evidence : [];
+  const amount = booking.totalPrice ?? booking.estimatedTotal ?? dispute.payment?.amount;
+
+  body.innerHTML = `
+    <div class="admin-dispute-detail">
+      <div class="admin-dispute-detail__summary">
+        <span class="admin-dispute-status ${disputeStatusClass(dispute.status)}">${escapeHtml(formatDisputeStatusAdmin(dispute.status))}</span>
+        <h4>${escapeHtml(getDisputeService(dispute))}</h4>
+        <p>${escapeHtml(dispute.reason || 'No reason provided.')}</p>
+      </div>
+      <div class="admin-dispute-detail__grid">
+        <div><span>Customer</span><strong>${escapeHtml(customer.name || '-')}</strong><small>${escapeHtml(customer.email || customer.phone || '')}</small></div>
+        <div><span>Technician</span><strong>${escapeHtml(worker.name || '-')}</strong><small>${escapeHtml(worker.email || worker.phone || '')}</small></div>
+        <div><span>Booking</span><strong>${escapeHtml(String(booking._id || dispute.booking || '-').slice(-10))}</strong><small>${escapeHtml(booking.status || '-')}</small></div>
+        <div><span>Payment</span><strong>${escapeHtml(formatMoney(amount))}</strong><small>${escapeHtml(`${booking.paymentMethod || '-'} / ${booking.paymentStatus || dispute.payment?.status || '-'}`)}</small></div>
+        <div><span>Category</span><strong>${escapeHtml(dispute.category || 'other')}</strong><small>${escapeHtml(formatAdminDate(dispute.createdAt))}</small></div>
+        <div><span>Resolution</span><strong>${escapeHtml(dispute.decision || 'Pending')}</strong><small>${escapeHtml(dispute.resolution || '')}</small></div>
+      </div>
+      <div class="admin-dispute-evidence">
+        <h4>Evidence</h4>
+        ${evidence.length ? evidence.map(file => {
+          const url = file.url || file.secureUrl || file.path || '';
+          const name = file.originalName || file.name || file.filename || 'Evidence file';
+          return url
+            ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHtml(url)}" alt="${escapeHtml(name)}"><span>${escapeHtml(name)}</span></a>`
+            : `<span class="admin-dispute-evidence__missing">${escapeHtml(name)}</span>`;
+        }).join('') : '<p>No evidence files uploaded.</p>'}
+      </div>
+    </div>
+  `;
+
+  if (_openProfileModal) {
+    _openProfileModal('adminDisputeModal');
+  } else {
+    document.getElementById('adminDisputeModal')?.removeAttribute('hidden');
+  }
+}
+
+function formatSupportIssueType(type) {
+  return ({
+    late: 'Late arrival',
+    no_show: 'No-show',
+    during_work_problem: 'During-work problem',
+    safety: 'Safety',
+    post_completion: 'Post-completion',
+    other: 'Other',
+  })[type] || 'Other';
+}
+
+function formatSupportIssueStatus(status) {
+  return ({
+    open: 'Open',
+    reviewing: 'Reviewing',
+    waiting_customer: 'Waiting customer',
+    waiting_worker: 'Waiting worker',
+    resolved: 'Resolved',
+    closed: 'Closed',
+  })[status] || 'Open';
+}
+
+function getSupportBooking(issue) {
+  return issue?.booking && typeof issue.booking === 'object' ? issue.booking : {};
+}
+
+function supportIssueMatchesSearch(issue, query) {
+  if (!query) return true;
+  const booking = getSupportBooking(issue);
+  const haystack = [
+    issue._id,
+    booking._id,
+    issue.customer?.name,
+    issue.customer?.email,
+    issue.worker?.name,
+    issue.worker?.email,
+    booking.service?.title,
+    booking.serviceCategory,
+    issue.type,
+    issue.description,
+    issue.status,
+    issue.priority,
+  ].filter(Boolean).join(' ').toLowerCase();
+  return haystack.includes(query.toLowerCase());
+}
+
+async function fetchAdminSupportIssues() {
+  const params = {
+    limit: 100,
+    status: document.getElementById('supportStatusFilter')?.value || '',
+    priority: document.getElementById('supportPriorityFilter')?.value || '',
+    type: document.getElementById('supportTypeFilter')?.value || '',
+  };
+  Object.keys(params).forEach(key => { if (!params[key]) delete params[key]; });
+  const result = await getAdminSupportIssues(params);
+  return result?.issues || [];
+}
+
+async function renderSupportIssues(options = {}) {
+  const tbody = document.querySelector('#supportIssuesTable tbody');
+  if (!tbody) return;
+
+  const shouldFetch = options.force || !options.reuseCache || !_supportLoadedOnce;
+  if (shouldFetch) {
+    tbody.innerHTML = '<tr><td colspan="8" class="center-align" style="padding: 3rem; color: var(--color-text-muted);">Loading support issues...</td></tr>';
+    _adminSupportIssues = await fetchAdminSupportIssues();
+    _supportLoadedOnce = true;
+  }
+
+  const openCount = _adminSupportIssues.filter(item => !['resolved', 'closed'].includes(item.status)).length;
+  const badge = document.getElementById('adminSupportBadge');
+  if (badge) {
+    badge.textContent = String(openCount);
+    badge.hidden = openCount === 0;
+  }
+
+  const query = String(document.getElementById('supportSearch')?.value || '').trim();
+  const visible = _adminSupportIssues.filter(issue => supportIssueMatchesSearch(issue, query));
+  if (!visible.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="center-align" style="padding: 3rem; color: var(--color-text-muted);">No support issues match the current filters.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = visible.map(issue => {
+    const booking = getSupportBooking(issue);
+    const service = booking.service?.title || booking.serviceCategory || 'Service booking';
+    const canAct = !['resolved', 'closed'].includes(issue.status);
+    return `
+      <tr class="admin-support-row admin-support-row--${escapeHtml(issue.priority || 'normal')}">
+        <td><strong>${escapeHtml(formatSupportIssueType(issue.type))}</strong><small>${escapeHtml(String(issue._id || '').slice(-8))}</small></td>
+        <td><div>${escapeHtml(service)}</div><small>${escapeHtml(booking.status || '-')}</small></td>
+        <td><div>${escapeHtml(issue.customer?.name || '-')}</div><small>${escapeHtml(issue.customer?.email || '')}</small></td>
+        <td><div>${escapeHtml(issue.worker?.name || '-')}</div><small>${escapeHtml(issue.worker?.email || '')}</small></td>
+        <td><span class="admin-support-priority admin-support-priority--${escapeHtml(issue.priority || 'normal')}">${escapeHtml(issue.priority || 'normal')}</span></td>
+        <td><span class="admin-dispute-status">${escapeHtml(formatSupportIssueStatus(issue.status))}</span></td>
+        <td>${escapeHtml(formatAdminDate(issue.createdAt))}</td>
+        <td class="center-align">
+          <div class="admin-dispute-actions">
+            <button class="bk-action-btn bk-action-btn--xs" type="button" data-support-view="${escapeHtml(issue._id)}">View</button>
+            ${canAct ? `<button class="bk-action-btn bk-action-btn--xs" type="button" data-support-status="reviewing" data-id="${escapeHtml(issue._id)}">Review</button>` : ''}
+            ${canAct ? `<button class="bk-action-btn bk-action-btn--xs" type="button" data-support-status="waiting_customer" data-id="${escapeHtml(issue._id)}">Ask Customer</button>` : ''}
+            ${canAct ? `<button class="bk-action-btn bk-action-btn--xs" type="button" data-support-status="waiting_worker" data-id="${escapeHtml(issue._id)}">Ask Tech</button>` : ''}
+            ${canAct ? `<button class="bk-action-btn bk-action-btn--xs admin-dispute-actions__release" type="button" data-support-resolve="${escapeHtml(issue._id)}">Resolve</button>` : ''}
+            ${canAct && booking.status === 'awaiting_customer_confirmation' ? `<button class="bk-action-btn bk-action-btn--xs admin-dispute-actions__refund" type="button" data-support-escalate="${escapeHtml(issue._id)}">Escalate</button>` : ''}
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  bindSupportIssueActions();
+}
+
+function bindSupportIssueActions() {
+  document.querySelectorAll('[data-support-view]').forEach(btn => {
+    btn.onclick = () => openAdminSupportModal(btn.dataset.supportView);
+  });
+  document.querySelectorAll('[data-support-status]').forEach(btn => {
+    btn.onclick = async () => {
+      try {
+        await updateSupportIssueStatus(btn.dataset.id, { status: btn.dataset.supportStatus });
+        showToast('Support issue updated.', 'success');
+        await renderSupportIssues({ force: true });
+      } catch (err) {
+        showToast(err?.data?.message || err.message || 'Failed to update support issue.', 'error');
+      }
+    };
+  });
+  document.querySelectorAll('[data-support-resolve]').forEach(btn => {
+    btn.onclick = async () => {
+      const resolution = prompt('Resolution note for this support issue:');
+      if (!resolution) return;
+      try {
+        await resolveSupportIssue(btn.dataset.supportResolve, { resolution });
+        showToast('Support issue resolved.', 'success');
+        await renderSupportIssues({ force: true });
+      } catch (err) {
+        showToast(err?.data?.message || err.message || 'Failed to resolve support issue.', 'error');
+      }
+    };
+  });
+  document.querySelectorAll('[data-support-escalate]').forEach(btn => {
+    btn.onclick = async () => {
+      if (!confirm('Escalate this support issue into a payment dispute?')) return;
+      try {
+        await escalateSupportIssueToDispute(btn.dataset.supportEscalate, {});
+        showToast('Support issue escalated to dispute.', 'success');
+        await Promise.all([renderSupportIssues({ force: true }), renderDisputes({ force: true })]);
+      } catch (err) {
+        showToast(err?.data?.message || err.message || 'Failed to escalate support issue.', 'error');
+      }
+    };
+  });
+}
+
+function openAdminSupportModal(issueId) {
+  const issue = _adminSupportIssues.find(item => item._id === issueId);
+  const body = document.getElementById('adminSupportBody');
+  if (!issue || !body) return;
+  const booking = getSupportBooking(issue);
+  const service = booking.service?.title || booking.serviceCategory || 'Service booking';
+  const evidence = Array.isArray(issue.evidence) ? issue.evidence : [];
+  body.innerHTML = `
+    <div class="admin-dispute-detail">
+      <div class="admin-dispute-detail__summary">
+        <span class="admin-support-priority admin-support-priority--${escapeHtml(issue.priority || 'normal')}">${escapeHtml(issue.priority || 'normal')} priority</span>
+        <h4>${escapeHtml(formatSupportIssueType(issue.type))} - ${escapeHtml(service)}</h4>
+        <p>${escapeHtml(issue.description || '')}</p>
+      </div>
+      <div class="admin-dispute-detail__grid">
+        <div><span>Customer</span><strong>${escapeHtml(issue.customer?.name || '-')}</strong><small>${escapeHtml(issue.customer?.email || '')}</small></div>
+        <div><span>Technician</span><strong>${escapeHtml(issue.worker?.name || '-')}</strong><small>${escapeHtml(issue.worker?.email || '')}</small></div>
+        <div><span>Status</span><strong>${escapeHtml(formatSupportIssueStatus(issue.status))}</strong><small>${escapeHtml(formatAdminDate(issue.createdAt))}</small></div>
+        <div><span>Booking</span><strong>${escapeHtml(String(booking._id || '-').slice(-10))}</strong><small>${escapeHtml(booking.status || '-')}</small></div>
+        <div><span>Admin notes</span><strong>${escapeHtml(issue.adminNotes || '-')}</strong></div>
+        <div><span>Resolution</span><strong>${escapeHtml(issue.resolution || 'Pending')}</strong></div>
+      </div>
+      <div class="admin-dispute-evidence">
+        <h4>Evidence</h4>
+        ${evidence.length ? evidence.map(url => `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHtml(url)}" alt="Support evidence"><span>${escapeHtml(url)}</span></a>`).join('') : '<p>No evidence files uploaded.</p>'}
+      </div>
+    </div>
+  `;
+  _openProfileModal?.('adminSupportModal');
+}
 
 async function renderPendingApprovals(filter = {}) {
   const container = document.getElementById('adminPendingApprovalsList');
@@ -2206,4 +2863,3 @@ document.getElementById('viewSiteAsCustomer')?.addEventListener('click', () => {
     }
   });
 })();
-

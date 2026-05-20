@@ -31,6 +31,8 @@ const statusValidation = [
   body('workerNotes').optional({ checkFalsy: true }).isString().trim().isLength({ max: 400 }).withMessage('Completion notes are too long'),
   body('workerCompletionImages').optional().isArray({ max: 4 }).withMessage('Too many completion images'),
   body('workerCompletionImages.*').optional({ checkFalsy: true }).isURL({ require_protocol: true }).withMessage('Completion image must be a valid URL'),
+  body('estimatedDurationMin').optional({ checkFalsy: true }).isInt({ min: 15, max: 480 })
+    .withMessage('Estimated duration must be 15–480 minutes'),
 ];
 
 const scheduleValidation = [

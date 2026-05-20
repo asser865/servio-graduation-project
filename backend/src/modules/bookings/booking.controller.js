@@ -73,10 +73,35 @@ const getWorkerBookedSlots = async (req, res) => {
     worker: workerId,
     scheduledDate: { $gte: start, $lte: end },
     status: { $in: ['pending', 'accepted', 'en_route', 'arrived', 'in_progress'] },
-  }).select('scheduledTime');
+  }).select('scheduledTime scheduledStart scheduledEnd estimatedFinishAt');
+
+  const blocked = new Set();
+
+  bookings.forEach(b => {
+    if (!b.scheduledTime) return;
+    blocked.add(b.scheduledTime);
+
+    if (b.scheduledStart && b.scheduledEnd) {
+      // If tech extended mid-job, estimatedFinishAt may exceed scheduledEnd — use whichever is later
+      const effectiveEnd = (b.estimatedFinishAt && b.estimatedFinishAt > b.scheduledEnd)
+        ? b.estimatedFinishAt
+        : b.scheduledEnd;
+      const windowMs   = effectiveEnd.getTime() - b.scheduledStart.getTime();
+      const startHour  = parseInt(b.scheduledTime, 10);
+      // Number of additional hours the window spills into (exact-hour boundary = not blocked)
+      const extraHours = windowMs % 3_600_000 === 0
+        ? windowMs / 3_600_000 - 1
+        : Math.floor(windowMs / 3_600_000);
+
+      for (let h = 1; h <= extraHours; h++) {
+        const hour = startHour + h;
+        if (hour < 24) blocked.add(`${String(hour).padStart(2, '0')}:00`);
+      }
+    }
+  });
 
   return ApiResponse.success(res, StatusCodes.OK, 'Booked slots retrieved.', {
-    bookedSlots: bookings.map(b => b.scheduledTime).filter(Boolean),
+    bookedSlots: Array.from(blocked),
   });
 };
 

@@ -180,6 +180,136 @@ function notifyReviewReceived(workerId, reviewerName, rating, bookingId) {
   );
 }
 
+async function notifyDisputeOpened(dispute) {
+  const booking = dispute.booking || {};
+  const bookingId = String(booking._id || dispute.booking || dispute.bookingId || '');
+  const customerId = booking.user?._id || booking.user || dispute.raisedBy;
+  const workerId = booking.worker?._id || booking.worker;
+  const url = `./booking-details.html?id=${bookingId}`;
+
+  if (workerId) {
+    createNotification(
+      workerId,
+      'dispute_opened',
+      'Dispute Opened',
+      'A customer opened a support case on one of your bookings. Keep job notes and evidence ready.',
+      bookingId,
+      url
+    );
+  }
+
+  try {
+    const User = require('../users/user.model');
+    const admins = await User.find({ role: 'admin', isActive: { $ne: false } }).select('_id');
+    admins.forEach((admin) => {
+      createNotification(
+        admin._id,
+        'dispute_opened',
+        'New Dispute',
+        'A customer opened a dispute that needs admin review.',
+        bookingId,
+        './admin-dashboard.html#disputes'
+      );
+    });
+  } catch (err) {
+    console.error('[notification] Failed to notify admins about dispute:', err.message);
+  }
+
+  if (customerId) {
+    createNotification(
+      customerId,
+      'dispute_opened',
+      'Support Case Opened',
+      'Your dispute is now with SERVIO support. We will update you after review.',
+      bookingId,
+      url
+    );
+  }
+}
+
+function notifyDisputeResolved(dispute) {
+  const booking = dispute.booking || {};
+  const bookingId = String(booking._id || dispute.booking || '');
+  const customerId = booking.user?._id || booking.user || dispute.raisedBy;
+  const workerId = booking.worker?._id || booking.worker;
+  const url = `./booking-details.html?id=${bookingId}`;
+  const result = dispute.decision === 'refund' ? 'A refund was issued.' : 'The booking was approved for release.';
+
+  if (customerId) {
+    createNotification(customerId, 'dispute_resolved', 'Dispute Resolved', result, bookingId, url);
+  }
+  if (workerId) {
+    createNotification(workerId, 'dispute_resolved', 'Dispute Resolved', result, bookingId, url);
+  }
+}
+
+async function notifySupportIssueOpened(issue) {
+  const booking = issue.booking || {};
+  const bookingId = String(booking._id || issue.booking || '');
+  const customerId = issue.customer?._id || issue.customer;
+  const workerId = issue.worker?._id || issue.worker || booking.worker;
+  const customerUrl = `./booking-details.html?id=${bookingId}`;
+
+  if (customerId) {
+    createNotification(
+      customerId,
+      'support_issue_opened',
+      'Support Case Opened',
+      'Your support case was received. SERVIO support will review it and update you.',
+      String(issue._id || bookingId),
+      './customer-dashboard.html#support'
+    );
+  }
+
+  if (workerId) {
+    createNotification(
+      workerId,
+      'support_issue_opened',
+      issue.priority === 'urgent' ? 'Urgent Support Case' : 'Support Case Opened',
+      'A customer reported an issue on one of your bookings. Keep job notes and evidence ready.',
+      bookingId,
+      customerUrl
+    );
+  }
+
+  try {
+    const User = require('../users/user.model');
+    const admins = await User.find({ role: 'admin', isActive: { $ne: false } }).select('_id');
+    admins.forEach((admin) => {
+      createNotification(
+        admin._id,
+        'support_issue_opened',
+        issue.priority === 'urgent' ? 'Urgent Support Issue' : 'New Support Issue',
+        'A customer opened a support issue that needs admin review.',
+        String(issue._id || bookingId),
+        './admin-dashboard.html#support'
+      );
+    });
+  } catch (err) {
+    console.error('[notification] Failed to notify admins about support issue:', err.message);
+  }
+}
+
+function notifySupportIssueUpdated(issue) {
+  const booking = issue.booking || {};
+  const bookingId = String(booking._id || issue.booking || '');
+  const customerId = issue.customer?._id || issue.customer;
+  const workerId = issue.worker?._id || issue.worker || booking.worker;
+  const body = `Support case status is now ${String(issue.status || 'updated').replace('_', ' ')}.`;
+  if (customerId) createNotification(customerId, 'support_issue_updated', 'Support Case Updated', body, String(issue._id || bookingId), './customer-dashboard.html#support');
+  if (workerId) createNotification(workerId, 'support_issue_updated', 'Support Case Updated', body, String(issue._id || bookingId), `./booking-details.html?id=${bookingId}`);
+}
+
+function notifySupportIssueResolved(issue) {
+  const booking = issue.booking || {};
+  const bookingId = String(booking._id || issue.booking || '');
+  const customerId = issue.customer?._id || issue.customer;
+  const workerId = issue.worker?._id || issue.worker || booking.worker;
+  const body = issue.resolution || 'The support case has been resolved.';
+  if (customerId) createNotification(customerId, 'support_issue_resolved', 'Support Case Resolved', body, String(issue._id || bookingId), './customer-dashboard.html#support');
+  if (workerId) createNotification(workerId, 'support_issue_resolved', 'Support Case Resolved', body, String(issue._id || bookingId), `./booking-details.html?id=${bookingId}`);
+}
+
 module.exports = {
   createNotification,
   notifyBookingCreated,
@@ -192,4 +322,9 @@ module.exports = {
   notifyAwaitingCustomerConfirmation,
   notifyPendingAdminReview,
   notifyReviewReceived,
+  notifyDisputeOpened,
+  notifyDisputeResolved,
+  notifySupportIssueOpened,
+  notifySupportIssueUpdated,
+  notifySupportIssueResolved,
 };

@@ -51,6 +51,21 @@ const userSchema = new mongoose.Schema(
       },
     ],
 
+    // Worker ObjectIds the user has favourited. Order preserved as last-added-first
+    // (favorite.service.js pushes to head). Soft cap enforced in service layer.
+    favorites: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+      default: [],
+    },
+
+    // IANA timezone used to convert scheduledTime (local HH:00) into a UTC instant
+    // for execution-window math. Defaults to platform-wide default.
+    timezone: {
+      type:    String,
+      trim:    true,
+      default: 'Africa/Cairo',
+    },
+
     // Never returned in queries by default — use .select('+password') explicitly
     password: {
       type:     String,
@@ -232,6 +247,22 @@ const userSchema = new mongoose.Schema(
       default: [],
     },
 
+    // Canonical slugs the worker explicitly selected (resolved from
+    // coverageAreas via locationsTaxonomy.resolveSlug).
+    coverageAreaSlugs: {
+      type:    [String],
+      default: [],
+    },
+
+    // Pre-computed match set: union of (slug ∪ ancestors ∪ descendants) for
+    // every coverage entry. Indexed so request-side lookup is a single
+    // array-contains query. See utils/locationsTaxonomy.expandCoverage.
+    coverageMatchSlugs: {
+      type:    [String],
+      default: [],
+      index:   true,
+    },
+
     // Specific skills (e.g. ['pipe repair', 'drain cleaning'])
     skills: {
       type:    [String],
@@ -306,6 +337,7 @@ userSchema.index({ services: 1 });
 // ── Availability index ────────────────────────────────────────────────────────
 // Allows fast filtering of available workers in listing + booking flows.
 userSchema.index({ isAvailable: 1, isActive: 1, isVerified: 1 });
+userSchema.index({ favorites: 1 });
 
 // ── Pre-save hook — password hashing ─────────────────────────────────────────
 // Only re-hash if the password field was actually modified (prevents double

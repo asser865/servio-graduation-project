@@ -6,6 +6,9 @@
 import { animate, stagger } from 'https://cdn.jsdelivr.net/npm/motion@12.38.0/+esm';
 import { getWorker } from '../api/users.js';
 import { getWorkerReviews } from '../api/reviews.js';
+import { createHeartToggle } from '../components/heart-toggle.js';
+import { listMyFavoriteIds } from '../api/favorites.js';
+import { renderBusyBadge } from '../components/busy-badge.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -516,6 +519,43 @@ document.addEventListener('DOMContentLoaded', async () => {
     render(worker, getLang());
     renderReviews(reviews, getLang());
     renderRatingBars(reviews);
+
+    // Attach heart-toggle to the hero card — top-right corner
+    try {
+      const favIds = await listMyFavoriteIds().catch(() => new Set());
+      const heart = createHeartToggle({
+        workerId: String(worker._id),
+        isFavorited: favIds.has(String(worker._id)),
+      });
+      heart.classList.add('tech-profile__heart');
+      const heroCard = document.querySelector('.profile-hero-card');
+      if (heroCard) heroCard.appendChild(heart);
+    } catch (_) { /* heart optional */ }
+
+    // Busy badge — insert after profile name element
+    const busyBadge = renderBusyBadge(worker.busyState);
+    if (busyBadge) {
+      const nameEl = document.querySelector('[data-profile-target="name"]') ||
+                     document.querySelector('.profile-name');
+      if (nameEl) nameEl.insertAdjacentElement('afterend', busyBadge);
+    }
+
+    // Disable Book Now buttons if worker is currently busy
+    if (worker.busyState?.isBusy) {
+      const busyTitle = `Busy — try again in ~${worker.busyState.remainingMin ?? 'a few'} min`;
+      [
+        document.getElementById('bookNowBtn'),
+        document.getElementById('bookServiceBtn'),
+        el('book-btn'),
+        document.querySelector('[data-book-btn]'),
+        document.querySelector('.profile-cta__btn'),
+      ].forEach(btn => {
+        if (btn) {
+          btn.setAttribute('disabled', 'true');
+          btn.setAttribute('title', busyTitle);
+        }
+      });
+    }
 
     document.addEventListener('langchange', e => {
       const lang = e.detail?.lang || getLang();

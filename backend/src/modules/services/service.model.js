@@ -55,6 +55,13 @@ const serviceSchema = new mongoose.Schema(
       min:      [0,    'Price cannot be negative'],
     },
 
+    estimatedDurationMin: {
+      type:    Number,
+      min:     [15, 'Duration cannot be less than 15 minutes'],
+      max:     [480, 'Duration cannot exceed 8 hours'],
+      default: 0, // 0 = use category fallback
+    },
+
     priceUnit: {
       type:     String,
       enum:     PRICE_UNITS,

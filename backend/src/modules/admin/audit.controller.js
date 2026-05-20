@@ -54,4 +54,20 @@ const deleteLog = async (req, res) => {
   return ApiResponse.success(res, StatusCodes.OK, 'Audit log entry deleted successfully.');
 };
 
-module.exports = { getLogs, deleteLog };
+// DELETE /api/v1/admin/audit — delete ALL logs
+const deleteAllLogs = async (req, res) => {
+  const result = await AuditLog.deleteMany({});
+  return ApiResponse.success(res, StatusCodes.OK, 'All audit logs deleted.', { deleted: result.deletedCount });
+};
+
+// DELETE /api/v1/admin/audit/bulk — delete a list of IDs
+const deleteSelectedLogs = async (req, res) => {
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return ApiResponse.error(res, StatusCodes.BAD_REQUEST, 'ids array is required.');
+  }
+  const result = await AuditLog.deleteMany({ _id: { $in: ids } });
+  return ApiResponse.success(res, StatusCodes.OK, 'Selected audit logs deleted.', { deleted: result.deletedCount });
+};
+
+module.exports = { getLogs, deleteLog, deleteAllLogs, deleteSelectedLogs };

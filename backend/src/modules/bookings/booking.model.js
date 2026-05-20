@@ -122,6 +122,73 @@ const bookingSchema = new mongoose.Schema(
       default: '',
     },
 
+    // Planned UTC instant for job start (scheduledDate + scheduledTime resolved via
+    // worker.timezone). Source of truth for overlap math.
+    scheduledStart: {
+      type: Date,
+      index: true,
+    },
+
+    // scheduledStart + estimatedDurationMin + travelBufferMin (snapshot at create/accept).
+    // Source of truth for the upper bound of the overlap window.
+    scheduledEnd: {
+      type: Date,
+      index: true,
+    },
+
+    // Snapshot at accept time — defends against retro-shifting if Service duration changes later.
+    estimatedDurationMin: {
+      type: Number,
+      min:  [15, 'Duration cannot be less than 15 minutes'],
+      max:  [480, 'Duration cannot exceed 8 hours'],
+    },
+
+    // Snapshot at create time, taken from Settings.travelBufferMin.
+    travelBufferMin: {
+      type:    Number,
+      min:     [0, 'Travel buffer cannot be negative'],
+      default: 30,
+    },
+
+    // Set when status transitions to in_progress (PIN entry).
+    actualStartedAt: {
+      type:    Date,
+      default: null,
+    },
+
+    // actualStartedAt + estimatedDurationMin, re-stamped on each extension.
+    estimatedFinishAt: {
+      type:    Date,
+      default: null,
+    },
+
+    // Count of auto-extensions applied (lazy, computed at read time).
+    extensionCount: {
+      type:    Number,
+      default: 0,
+      min:     0,
+    },
+
+    // Audit trail of each extension.
+    extensionLog: {
+      type: [
+        new mongoose.Schema(
+          {
+            at:       { type: Date,   required: true },
+            addedMin: { type: Number, required: true },
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
+    },
+
+    // Set when admin review is needed (e.g., stuck in_progress past 2× + buffer).
+    needsAdminReview: {
+      type:    Boolean,
+      default: false,
+    },
+
     // 4-digit PIN generated at booking creation — customer shows this to worker to start the job
     pin: {
       type:    String,
@@ -170,6 +237,30 @@ const bookingSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
     },
+
+    // Stamped when tech clicks "Mark Complete" → awaiting_customer_confirmation
+    actualCompletedAt: {
+      type:    Date,
+      default: null,
+    },
+
+    // Server-computed minutes from actualStartedAt → actualCompletedAt. Never editable.
+    actualBilledMin: {
+      type:    Number,
+      default: null,
+    },
+
+    // True when actualBilledMin exceeds category cap or anomaly threshold
+    flaggedForReview: {
+      type:    Boolean,
+      default: false,
+      index:   true,
+    },
+
+    flagReason: {
+      type:  String,
+      trim:  true,
+    },
   },
   { timestamps: true }
 );
@@ -178,11 +269,11 @@ const bookingSchema = new mongoose.Schema(
 bookingSchema.index({ user:   1, status: 1 });
 bookingSchema.index({ worker: 1, status: 1 });
 
-// Prevents double-booking at the DB level (application-layer findOne is not atomic)
-bookingSchema.index(
-  { worker: 1, scheduledDate: 1, scheduledTime: 1 },
-  { unique: true, partialFilterExpression: { status: { $in: ['pending', 'accepted', 'en_route', 'arrived', 'in_progress'] } } }
-);
+// New overlap-aware indexes. The old (worker, scheduledDate, scheduledTime) unique
+// partial index is dropped — overlap is now enforced in code via interval-intersect,
+// because slots are no longer fixed-hour buckets.
+bookingSchema.index({ worker: 1, status: 1, scheduledEnd: 1 });
+bookingSchema.index({ worker: 1, status: 1, scheduledStart: 1 });
 
 bookingSchema.index({ status: 1, paymentMethod: 1, customerConfirmedAt: -1 });
 

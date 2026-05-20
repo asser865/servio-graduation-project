@@ -217,26 +217,47 @@ describe('getWorkers — invalid category', () => {
 });
 
 describe('getWorkers — area filter', () => {
-  test('matches structured coverage areas first and preserves legacy fallbacks', async () => {
+  test('matches structured coverage slugs first and preserves legacy regex fallbacks', async () => {
     User.find = jest.fn().mockReturnValue(buildQuery([]));
     User.countDocuments = jest.fn().mockResolvedValue(0);
 
     const req = { query: { area: 'Maadi' } };
     await getWorkers(req, mockRes());
 
-    const expectedAreaFallback = expect.objectContaining({
+    // Slug-based clause is unshifted to the front; regex fallbacks remain.
+    const expectedArea = expect.objectContaining({
       $or: expect.arrayContaining([
+        expect.objectContaining({ coverageMatchSlugs: 'maadi' }),
         expect.objectContaining({ coverageAreas: expect.any(RegExp) }),
         expect.objectContaining({ serviceArea: expect.any(RegExp) }),
         expect.objectContaining({ locationLabel: expect.any(RegExp) }),
       ]),
     });
 
-    expect(User.find).toHaveBeenCalledWith(expectedAreaFallback);
-    expect(User.countDocuments).toHaveBeenCalledWith(expectedAreaFallback);
+    expect(User.find).toHaveBeenCalledWith(expectedArea);
+    expect(User.countDocuments).toHaveBeenCalledWith(expectedArea);
   });
 
-  test('keeps serviceId as the exact matching source when area is also provided', async () => {
+  test('resolves a district request to a worker covering the parent governorate', async () => {
+    // "Nasr City" is a district under "Cairo" — a worker whose coverage is
+    // "Cairo" stores `nasr-city` in `coverageMatchSlugs` via descendant expansion,
+    // so the request slug `nasr-city` should appear in the filter.
+    User.find = jest.fn().mockReturnValue(buildQuery([]));
+    User.countDocuments = jest.fn().mockResolvedValue(0);
+
+    const req = { query: { area: 'Nasr City' } };
+    await getWorkers(req, mockRes());
+
+    expect(User.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        $or: expect.arrayContaining([
+          expect.objectContaining({ coverageMatchSlugs: 'nasr-city' }),
+        ]),
+      })
+    );
+  });
+
+  test('combines serviceId and area filters with $and so neither overwrites the other', async () => {
     User.find = jest.fn().mockReturnValue(buildQuery([]));
     User.countDocuments = jest.fn().mockResolvedValue(0);
 
@@ -245,12 +266,20 @@ describe('getWorkers — area filter', () => {
 
     expect(User.find).toHaveBeenCalledWith(
       expect.objectContaining({
-        services: PLUMBING_ID,
-        $or: expect.any(Array),
+        $and: expect.arrayContaining([
+          expect.objectContaining({
+            $or: expect.arrayContaining([
+              { services: PLUMBING_ID },
+              { categories: { $in: ['plumbing'] } },
+            ]),
+          }),
+          expect.objectContaining({
+            $or: expect.arrayContaining([
+              expect.objectContaining({ coverageMatchSlugs: 'maadi' }),
+            ]),
+          }),
+        ]),
       })
-    );
-    expect(User.find).toHaveBeenCalledWith(
-      expect.not.objectContaining({ categories: expect.anything() })
     );
   });
 });

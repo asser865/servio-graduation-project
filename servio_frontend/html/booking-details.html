@@ -296,6 +296,79 @@
     <button class="btn btn--primary" type="button" id="bkMobilePrimary">Message Technician</button>
   </div>
 
+  <div class="bk-dialog-overlay" id="bkDisputeDialog" role="dialog" aria-modal="true" aria-labelledby="bkDisputeTitle" hidden>
+    <div class="bk-dialog bk-dialog--dispute">
+      <div class="bk-dialog__icon bk-dialog__icon--danger" aria-hidden="true">!</div>
+      <p class="bk-card__kicker">Support review</p>
+      <h2 id="bkDisputeTitle">Report a problem</h2>
+      <p class="bk-dialog__body">Tell SERVIO what went wrong. Your payment stays protected while support reviews the case.</p>
+
+      <form id="bkDisputeForm" class="bk-dispute-form">
+        <label class="bk-form-group" for="bkDisputeCategory">
+          <span class="bk-label">Issue type</span>
+          <select id="bkDisputeCategory" class="bk-input" required>
+            <option value="quality">Poor service quality</option>
+            <option value="incomplete">Work was not completed</option>
+            <option value="damage">Property damage</option>
+            <option value="pricing">Pricing or receipt problem</option>
+            <option value="safety">Safety concern</option>
+            <option value="no_show">Technician no-show</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+
+        <label class="bk-form-group" for="bkDisputeReason">
+          <span class="bk-label">What happened?</span>
+          <textarea id="bkDisputeReason" class="bk-input bk-input--textarea" rows="5" minlength="20" maxlength="1000" required placeholder="Describe the problem, what you expected, and any agreed details."></textarea>
+        </label>
+
+        <label class="bk-form-group" for="bkDisputeEvidence">
+          <span class="bk-label">Evidence photos</span>
+          <input id="bkDisputeEvidence" class="bk-input" type="file" accept="image/jpeg,image/png,image/webp" multiple />
+          <small class="bk-field-hint">Optional. Up to 6 JPG, PNG, or WebP images.</small>
+        </label>
+
+        <div class="bk-dispute-evidence" id="bkDisputeEvidenceList" hidden></div>
+        <p class="bk-form-error" id="bkDisputeError" role="alert" hidden></p>
+
+        <div class="bk-dialog__actions">
+          <button type="button" class="btn btn--outline" id="bkDisputeCancel">Cancel</button>
+          <button type="submit" class="btn btn--danger" id="bkDisputeSubmit">Open Dispute</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="bk-dialog-overlay" id="bkSupportIssueDialog" role="dialog" aria-modal="true" aria-labelledby="bkSupportIssueTitle" hidden>
+    <div class="bk-dialog bk-dialog--dispute">
+      <div class="bk-dialog__icon bk-dialog__icon--danger" aria-hidden="true">!</div>
+      <p class="bk-card__kicker">Support case</p>
+      <h2 id="bkSupportIssueTitle">Report a problem</h2>
+      <p class="bk-dialog__body">Tell SERVIO what happened. This creates a support case without freezing payment unless support escalates it.</p>
+      <form id="bkSupportIssueForm" class="bk-dispute-form">
+        <label class="bk-form-group" for="bkSupportIssueType">
+          <span class="bk-label">Issue type</span>
+          <select id="bkSupportIssueType" class="bk-input" required></select>
+        </label>
+        <label class="bk-form-group" for="bkSupportIssueDescription">
+          <span class="bk-label">What happened?</span>
+          <textarea id="bkSupportIssueDescription" class="bk-input bk-input--textarea" rows="5" minlength="20" maxlength="1000" required placeholder="Describe what happened and what support should review."></textarea>
+        </label>
+        <label class="bk-form-group" for="bkSupportIssueEvidence">
+          <span class="bk-label">Evidence photos</span>
+          <input id="bkSupportIssueEvidence" class="bk-input" type="file" accept="image/jpeg,image/png,image/webp" multiple />
+          <small class="bk-field-hint">Optional. Up to 6 JPG, PNG, or WebP images.</small>
+        </label>
+        <div class="bk-dispute-evidence" id="bkSupportIssueEvidenceList" hidden></div>
+        <p class="bk-form-error" id="bkSupportIssueError" role="alert" hidden></p>
+        <div class="bk-dialog__actions">
+          <button type="button" class="btn btn--outline" id="bkSupportIssueCancel">Cancel</button>
+          <button type="submit" class="btn btn--danger" id="bkSupportIssueSubmit">Submit Case</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div class="bk-dialog-overlay" id="bkCancelDialog" role="dialog" aria-modal="true" aria-labelledby="bkDialogTitle" hidden>
     <div class="bk-dialog">
       <div class="bk-dialog__icon bk-dialog__icon--danger" aria-hidden="true">!</div>
@@ -403,6 +476,75 @@
       </div>
     </div>
   </footer>
+
+  <!-- ══════════════════════════ CARD PICKER MODAL ══════════════════════════ -->
+  <div class="payment-modal-overlay" id="cardPickerOverlay" hidden aria-modal="true" role="dialog" aria-labelledby="cpTitle">
+    <div class="payment-modal" id="cardPickerModal">
+      <div class="pay-modal__header">
+        <div class="pay-modal__brand">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+          <span id="cpTitle">Card payment</span>
+        </div>
+        <button class="pay-modal__close" id="cpClose" aria-label="Close">✕</button>
+      </div>
+      <div class="pay-modal__amount" id="cpAmount">&nbsp;</div>
+      <p class="pay-modal__demo-note">No real charge will be made. This only attaches saved-card details to the booking request.</p>
+      <div id="cpListView">
+        <div id="cpCardList" style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;"></div>
+        <button class="btn btn--outline btn--sm" id="cpAddNewBtn" style="width:100%;margin-bottom:12px;">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:6px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add New Card
+        </button>
+        <div id="cpLimitMsg" style="display:none;text-align:center;font-size:13px;color:#aaa;padding:8px;border:1px solid #333;border-radius:8px;margin-bottom:12px;">
+          Card limit reached. Delete a card from Settings to add a new one.
+        </div>
+        <button class="btn btn--sm pay-modal__submit" id="cpConfirmBtn" disabled style="width:100%;">Pay Now</button>
+      </div>
+      <div id="cpAddView" hidden>
+        <button class="btn btn--ghost btn--sm" id="cpBackBtn" style="margin-bottom:14px;">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:4px"><polyline points="15 18 9 12 15 6"/></svg>
+          Back to saved cards
+        </button>
+        <div class="pay-modal__form" id="cpAddForm">
+          <div class="field">
+            <label for="cpCardHolder">Cardholder Name <span class="required">*</span></label>
+            <input type="text" id="cpCardHolder" placeholder="As it appears on your card" autocomplete="cc-name" />
+          </div>
+          <div class="field">
+            <label for="cpCardNumber">Card Number <span class="required">*</span></label>
+            <input type="text" id="cpCardNumber" placeholder="1234 5678 9012 3456" maxlength="19" inputmode="numeric" />
+          </div>
+          <div class="pay-modal__row">
+            <div class="field">
+              <label for="cpExpiry">Expiry <span class="required">*</span></label>
+              <input type="text" id="cpExpiry" placeholder="MM / YY" maxlength="7" inputmode="numeric" />
+            </div>
+            <div class="field">
+              <label for="cpCVV">CVV <span class="required">*</span></label>
+              <input type="text" id="cpCVV" placeholder="123" maxlength="4" inputmode="numeric" />
+            </div>
+          </div>
+          <div class="field">
+            <label for="cpLabel">Card Label <span style="color:#aaa;font-size:12px">(optional)</span></label>
+            <input type="text" id="cpLabel" placeholder="e.g. My Visa" maxlength="40" />
+          </div>
+          <div id="cpAddErrorMsg" class="pay-modal__error-msg" style="display:none;"></div>
+          <div class="pay-modal__security-note">Only the last 4 digits are stored. Full card number and CVV are never saved.</div>
+          <button class="btn btn--sm pay-modal__submit" id="cpSaveNewBtn" style="width:100%;">Save &amp; Use This Card</button>
+        </div>
+      </div>
+      <div class="pay-modal__processing" id="cpProcessing" hidden>
+        <div class="pay-processing-spinner"></div>
+        <p>Sending your booking request...</p>
+      </div>
+      <div class="pay-modal__success" id="cpSuccess" hidden>
+        <div class="pay-success-icon">✓</div>
+        <h3>Payment authorized</h3>
+        <p>Your booking is being held.</p>
+        <button class="btn btn--sm" id="cpContinueBtn">Continue</button>
+      </div>
+    </div>
+  </div>
 
   <script src="../js/lang.js"></script>
   <script type="module" src="../js/main.js"></script>

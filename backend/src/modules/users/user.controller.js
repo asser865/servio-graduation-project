@@ -16,6 +16,26 @@ const ApiError        = require('../../utils/ApiError');
 const ApiResponse     = require('../../utils/ApiResponse');
 const { logEvent }    = require('../admin/audit.service');
 const { dispatchAvailabilityMatches } = require('../notifications/notify.service');
+const { resolveSlug, expandCoverage } = require('../../utils/locationsTaxonomy');
+const { getWorkerBusyStateFromDB } = require('../bookings/availability.service');
+
+async function decorateWithBusyState(workers, currentUserId) {
+  const list = Array.isArray(workers) ? workers : [workers];
+  const states = await Promise.all(list.map(async (w) => {
+    try { return await getWorkerBusyStateFromDB(w._id); }
+    catch (_) {
+      return { isBusy: false, label: null, busyUntil: null, remainingMin: null,
+               isOverrunning: false, extensionCount: 0, extensionsApplied: 0, bookingId: null };
+    }
+  }));
+  const decorated = list.map((w, i) => {
+    const state = { ...states[i] };
+    if (!currentUserId || String(currentUserId) !== String(w._id)) state.bookingId = null;
+    const base = w.toObject ? w.toObject() : (typeof w === 'object' ? { ...w } : w);
+    return { ...base, busyState: state };
+  });
+  return Array.isArray(workers) ? decorated : decorated[0];
+}
 
 const WORKER_CATEGORY_VALUES = new Set([
   'plumbing',
@@ -143,13 +163,26 @@ const getWorkers = async (req, res) => {
 
   const normalizedArea = String(area || '').trim();
   if (normalizedArea) {
+    const areaSlug = resolveSlug(normalizedArea);
     const exactAreaRegex = new RegExp(`^${escapeRegExp(normalizedArea)}$`, 'i');
     const commaAreaRegex = new RegExp(`(^|,)\\s*${escapeRegExp(normalizedArea)}\\s*(,|$)`, 'i');
-    filter.$or = [
+    // Hierarchical match (preferred) — `coverageMatchSlugs` already contains
+    // the request slug if the worker's coverage is an ancestor, descendant, or
+    // exact match. Regex paths kept as fallback for legacy/unmigrated docs.
+    const orClauses = [
       { coverageAreas: exactAreaRegex },
       { serviceArea: commaAreaRegex },
       { locationLabel: commaAreaRegex },
     ];
+    if (areaSlug) orClauses.unshift({ coverageMatchSlugs: areaSlug });
+
+    if (filter.$or) {
+      // Combine category filter ($or) with area filter ($or) via $and so neither is overwritten.
+      filter.$and = [{ $or: filter.$or }, { $or: orClauses }];
+      delete filter.$or;
+    } else {
+      filter.$or = orClauses;
+    }
   }
 
   const skip = (Number(page) - 1) * Number(limit);
@@ -164,8 +197,9 @@ const getWorkers = async (req, res) => {
     User.countDocuments(filter),
   ]);
 
+  const decoratedWorkers = await decorateWithBusyState(workers, req.user?.id);
   return ApiResponse.success(res, StatusCodes.OK, 'Workers retrieved successfully.', {
-    workers,
+    workers: decoratedWorkers,
     pagination: { total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) },
   });
 };
@@ -194,7 +228,8 @@ const getWorkerProfile = async (req, res) => {
     .sort({ createdAt: -1 })
     .limit(10);
 
-  return ApiResponse.success(res, StatusCodes.OK, 'Worker profile retrieved.', { worker, reviews });
+  const decoratedWorker = await decorateWithBusyState(worker, req.user?.id);
+  return ApiResponse.success(res, StatusCodes.OK, 'Worker profile retrieved.', { worker: decoratedWorker, reviews });
 };
 
 // ── UPDATE OWN PROFILE (Authenticated) ───────────────────────────────────────
@@ -234,6 +269,9 @@ const updateProfile = async (req, res) => {
   });
   if (updates.coverageAreas !== undefined) {
     updates.coverageAreas = normalizeStringList(updates.coverageAreas);
+    const { slugs, matchSlugs } = expandCoverage(updates.coverageAreas);
+    updates.coverageAreaSlugs  = slugs;
+    updates.coverageMatchSlugs = matchSlugs;
   }
 
   // Only workers may update their service assignments
@@ -749,4 +787,5 @@ module.exports = {
   addAddress,
   updateAddress,
   deleteAddress,
+  decorateWithBusyState,
 };

@@ -11,6 +11,14 @@ export function deleteAuditLog(id) {
   return api.delete(`/admin/audit/${id}`);
 }
 
+export function deleteAllAuditLogs() {
+  return api.delete('/admin/audit');
+}
+
+export function deleteSelectedAuditLogs(ids) {
+  return api.delete('/admin/audit/bulk', { ids });
+}
+
 export const getAdminSettings = () => api.get('/admin/settings');
 export const updateAdminSettings = (data) => api.put('/admin/settings', data);
 export const getAnalytics = () => api.get('/users/analytics');

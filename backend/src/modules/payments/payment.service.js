@@ -42,7 +42,7 @@ class PaymentService {
     }
 
     // Lifecycle validation (never create/update Payment on these)
-    if (booking.paymentMethod !== 'online') {
+    if (!['card', 'online'].includes(booking.paymentMethod)) {
       throw new ApiError(StatusCodes.BAD_REQUEST, 'This booking does not use online payment.');
     }
     if (booking.status !== 'pending') {

@@ -5,6 +5,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 const { StatusCodes } = require('http-status-codes');
+const mongoose      = require('mongoose');
 const Booking        = require('./booking.model');
 const Service        = require('../services/service.model');
 const User           = require('../users/user.model');
@@ -12,6 +13,8 @@ const SavedCard      = require('../savedCards/savedCard.model');
 const Settings       = require('../admin/settings.model');
 const ApiError       = require('../../utils/ApiError');
 const notifSvc       = require('../notifications/notification.service');
+const { computeScheduledWindow } = require('./availability.service');
+const { resolveDurationMin }     = require('../services/duration-fallback');
 
 const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:5500/temp_repo/servio_frontend').replace(/\/$/, '');
 
@@ -59,11 +62,16 @@ const normalizePercentage = (value, fallback = DEFAULT_PLATFORM_FEE_RATE) => {
 
 const getPublicPlatformSettings = async () => {
   const query = Settings.findOne();
-  const selected = typeof query?.select === 'function' ? query.select('commissionRate cashPaymentsEnabled') : query;
+  const selected = typeof query?.select === 'function'
+    ? query.select('commissionRate cashPaymentsEnabled travelBufferMin')
+    : query;
   const settings = typeof selected?.lean === 'function' ? await selected.lean() : await selected;
   return {
-    commissionRate: normalizePercentage(settings?.commissionRate),
+    commissionRate:      normalizePercentage(settings?.commissionRate),
     cashPaymentsEnabled: settings?.cashPaymentsEnabled !== false,
+    travelBufferMin:     Number.isFinite(Number(settings?.travelBufferMin))
+                           ? Number(settings.travelBufferMin)
+                           : 30,
   };
 };
 
@@ -227,19 +235,6 @@ const createBooking = async (userId, data) => {
     throw new ApiError(StatusCodes.BAD_REQUEST, "Selected time is outside technician's working hours.");
   }
 
-  // 3g — Double-booking check (exact UTC midnight match eliminates timezone range ambiguity).
-  // All bookings created by this function store scheduledDate as bookingDateUTC (UTC midnight),
-  // so exact equality is safe and intentional — no range query needed.
-  const conflict = await Booking.findOne({
-    worker:        workerId,
-    scheduledDate: bookingDateUTC,
-    scheduledTime,
-    status:        { $in: ACTIVE_SLOT_STATUSES },
-  });
-  if (conflict) {
-    throw new ApiError(StatusCodes.CONFLICT, 'This time slot is already booked. Please select another.');
-  }
-
   // ── Service / category validation ──────────────────────────────────────────
   let service     = null;
   let bookingPrice = 0;
@@ -288,38 +283,97 @@ const createBooking = async (userId, data) => {
   }
 
   const feeSnapshot = calculateFeeSnapshot(bookingPrice, platformSettings.commissionRate);
+
+  // ── Interval-overlap conflict check ───────────────────────────────────────
+  const bufferMin = platformSettings.travelBufferMin ?? 30;
+  const durationMin = resolveDurationMin(
+    service || { category: resolvedCategory, estimatedDurationMin: 0 }
+  );
+  const { start: scheduledStart, end: scheduledEnd } = computeScheduledWindow({
+    scheduledDate,
+    scheduledTime,
+    timezone: worker.timezone || 'Africa/Cairo',
+    durationMin,
+    bufferMin,
+  });
   const paymentDeadline = paymentMethod === 'online'
     ? new Date(Date.now() + 30 * 60 * 1000)
     : undefined;
   const paymentData = await resolvePaymentData(userId, paymentMethod, savedCardId);
 
-  // Create booking — catch duplicate-key as race-condition safeguard
+  // ── Session-wrapped overlap check + create ───────────────────────────────
+  const session = await mongoose.startSession();
   let booking;
   try {
-    booking = await Booking.create({
-      user:            userId,
-      worker:          workerId,
-      service:         serviceId || undefined,
-      serviceCategory: resolvedCategory,
-      serviceName:     resolvedName,
-      scheduledDate:   bookingDateUTC,
-      scheduledTime,
-      address,
-      description,
-      images,
-      totalPrice:      bookingPrice,
-      paymentMethod:    paymentData.paymentMethod,
-      savedCard:        paymentData.savedCard,
-      paymentMeta:      paymentData.paymentMeta,
-      paymentStatus:    paymentMethod === 'cash' ? 'cash_pending_settlement' : 'unpaid',
-      paymentDeadline,
-      ...feeSnapshot,
-    });
+    session.startTransaction();
+
+    const enforceOverlap = process.env.OVERLAP_ENFORCEMENT_ENABLED !== 'false';
+    if (enforceOverlap) {
+      const overlapping = await Booking.findOne({
+        worker:         workerId,
+        status:         { $in: ACTIVE_SLOT_STATUSES },
+        scheduledStart: { $lt: scheduledEnd },
+        scheduledEnd:   { $gt: scheduledStart },
+      }).session(session);
+
+      if (overlapping) {
+        console.info(JSON.stringify({
+          event: 'bookings.overlap_rejected',
+          workerId: String(workerId),
+          requestedStart: scheduledStart.toISOString(),
+          requestedEnd:   scheduledEnd.toISOString(),
+          conflictingBookingId: String(overlapping._id),
+        }));
+        throw new ApiError(
+          StatusCodes.CONFLICT,
+          'This technician already has a job during the selected time. Please choose another slot.'
+        );
+      }
+    }
+
+    try {
+      const docs = await Booking.create([{
+        user:            userId,
+        worker:          workerId,
+        service:         serviceId || undefined,
+        serviceCategory: resolvedCategory,
+        serviceName:     resolvedName,
+        scheduledDate:   bookingDateUTC,
+        scheduledTime,
+        scheduledStart,
+        scheduledEnd,
+        estimatedDurationMin: durationMin,
+        travelBufferMin:      bufferMin,
+        address,
+        description,
+        images,
+        totalPrice:      bookingPrice,
+        paymentMethod:    paymentData.paymentMethod,
+        savedCard:        paymentData.savedCard,
+        paymentMeta:      paymentData.paymentMeta,
+        paymentStatus:    paymentMethod === 'cash' ? 'cash_pending_settlement' : 'unpaid',
+        paymentDeadline,
+        ...feeSnapshot,
+      }], { session });
+      booking = docs[0];
+    } catch (err) {
+      if (err && err.code === 11000) {
+        throw new ApiError(
+          StatusCodes.CONFLICT,
+          'This time slot is already booked. Please select another.'
+        );
+      }
+      throw err;
+    }
+
+    await session.commitTransaction();
   } catch (err) {
-    if (err.code === 11000) {
-      throw new ApiError(StatusCodes.CONFLICT, 'This time slot is already booked. Please select another.');
+    if (session.inTransaction()) {
+      await session.abortTransaction();
     }
     throw err;
+  } finally {
+    session.endSession();
   }
 
   const populated = await booking.populate(['user', 'worker', 'service', 'savedCard']);
@@ -419,9 +473,10 @@ const getWorkerBookings = async (workerId, { status, page = 1, limit = 10 }) => 
  * GET ALL BOOKINGS (Admin Only)
  * WHAT: Global view of every booking in the system.
  */
-const getAllBookings = async ({ status, page = 1, limit = 10 }) => {
+const getAllBookings = async ({ status, flagged, page = 1, limit = 10 }) => {
   const filter = {};
   if (status) filter.status = status;
+  if (flagged === 'true' || flagged === true) filter.flaggedForReview = true;
 
   const skip = (Number(page) - 1) * Number(limit);
 
@@ -475,6 +530,40 @@ const updateBookingStatus = async (bookingId, newStatus, actorId, actorRole, det
     throw new ApiError(StatusCodes.BAD_REQUEST, 'You can only cancel a booking that is still pending.');
   }
 
+  // ── Worker mid-job estimate update (no status transition) ────────────────
+  if (actorRole === 'worker' && newStatus === 'in_progress' && booking.status === 'in_progress' && details.estimatedDurationMin) {
+    const override = Number(details.estimatedDurationMin);
+    if (!Number.isFinite(override) || override < 15 || override > 480) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Estimated duration must be between 15 and 480 minutes.');
+    }
+    const bufferMin   = booking.travelBufferMin || 30;
+    // Anchor on whichever is LATER — early start should not shrink the customer's
+    // originally reserved window; late start must push the end out.
+    const anchorStart = booking.actualStartedAt && booking.actualStartedAt > booking.scheduledStart
+      ? booking.actualStartedAt
+      : booking.scheduledStart;
+    const newEnd      = new Date(anchorStart.getTime() + (override + bufferMin) * 60_000);
+    const collision = await Booking.findOne({
+      _id:            { $ne: booking._id },
+      worker:         booking.worker,
+      status:         { $in: ACTIVE_SLOT_STATUSES },
+      scheduledStart: { $lt: newEnd },
+      scheduledEnd:   { $gt: anchorStart },
+    });
+    if (collision) {
+      throw new ApiError(
+        StatusCodes.CONFLICT,
+        'The requested duration would overlap your next booking. Reduce or move it first.'
+      );
+    }
+    booking.estimatedDurationMin = override;
+    booking.scheduledEnd         = newEnd;
+    if (booking.actualStartedAt) {
+      booking.estimatedFinishAt = new Date(booking.actualStartedAt.getTime() + override * 60_000);
+    }
+    return booking.save();
+  }
+
   if (actorRole === 'worker') {
     const workerFlow = {
       pending: ['accepted', 'rejected'],
@@ -492,6 +581,33 @@ const updateBookingStatus = async (bookingId, newStatus, actorId, actorRole, det
     }
   }
 
+  // ── Worker accept-time duration override ─────────────────────────────────
+  if (actorRole === 'worker' && newStatus === 'accepted' && details.estimatedDurationMin) {
+    const override = Number(details.estimatedDurationMin);
+    if (!Number.isFinite(override) || override < 15 || override > 480) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Estimated duration must be between 15 and 480 minutes.');
+    }
+    const newEnd = new Date(
+      booking.scheduledStart.getTime() + (override + (booking.travelBufferMin || 30)) * 60_000
+    );
+    const collision = await Booking.findOne({
+      _id:            { $ne: booking._id },
+      worker:         booking.worker,
+      status:         { $in: ACTIVE_SLOT_STATUSES },
+      scheduledStart: { $lt: newEnd },
+      scheduledEnd:   { $gt: booking.scheduledStart },
+    });
+    if (collision) {
+      throw new ApiError(
+        StatusCodes.CONFLICT,
+        'The requested duration would overlap your next booking. Reduce or move it first.'
+      );
+    }
+    booking.estimatedDurationMin = override;
+    booking.scheduledEnd         = newEnd;
+    await booking.save();
+  }
+
   // Payment gate for online bookings (worker non-rejected transitions only)
   if (actorRole === 'worker' && newStatus !== 'rejected') {
     if (booking.paymentMethod === 'online') {
@@ -505,6 +621,50 @@ const updateBookingStatus = async (bookingId, newStatus, actorId, actorRole, det
         throw new ApiError(StatusCodes.PAYMENT_REQUIRED, 'Payment must be held before this booking can proceed.');
       }
     }
+  }
+
+  // ── Stamp execution timestamps on in_progress transition ─────────────────
+  if (newStatus === 'in_progress' && !booking.actualStartedAt) {
+    booking.actualStartedAt   = new Date();
+    booking.estimatedFinishAt = new Date(
+      booking.actualStartedAt.getTime() + (booking.estimatedDurationMin || 60) * 60_000
+    );
+    await booking.save();
+  }
+
+  // ── Stamp actualCompletedAt + compute actualBilledMin + anomaly check ─────
+  if (newStatus === 'awaiting_customer_confirmation' && !booking.actualCompletedAt) {
+    const completedAt = new Date();
+    booking.actualCompletedAt = completedAt;
+
+    if (booking.actualStartedAt) {
+      const billedMin = Math.round(
+        (completedAt.getTime() - booking.actualStartedAt.getTime()) / 60_000
+      );
+      booking.actualBilledMin = billedMin;
+
+      // Anomaly check against category cap and estimate multiplier
+      const settings = await getPublicPlatformSettings();
+      const category  = (booking.serviceCategory || '').toLowerCase();
+      const cap       = settings.categoryDurationCaps instanceof Map
+        ? settings.categoryDurationCaps.get(category)
+        : (settings.categoryDurationCaps?.[category]);
+      const multiplier = settings.anomalyMultiplier || 2;
+      const estimatedMin = booking.estimatedDurationMin || 60;
+
+      const exceedsCap       = cap && billedMin > cap;
+      const exceedsMultiplier = billedMin > estimatedMin * multiplier;
+
+      if (exceedsCap || exceedsMultiplier) {
+        booking.flaggedForReview = true;
+        booking.needsAdminReview = true;
+        booking.flagReason = exceedsCap
+          ? `Actual time ${billedMin}min exceeds category cap of ${cap}min for '${category}'`
+          : `Actual time ${billedMin}min is ${(billedMin / estimatedMin).toFixed(1)}× the estimate of ${estimatedMin}min`;
+      }
+    }
+
+    await booking.save();
   }
 
   const update = { status: newStatus };
@@ -569,30 +729,85 @@ const rescheduleBooking = async (bookingId, data, actorId, actorRole) => {
   const { bookingDateUTC, bookingDateStr, scheduledHour } = normalizeSchedule(data);
   assertWorkerAvailableForSchedule(worker, bookingDateUTC, bookingDateStr, scheduledHour);
 
-  const conflict = await Booking.findOne({
-    _id: { $ne: booking._id },
-    worker: booking.worker,
-    scheduledDate: bookingDateUTC,
+  const platformSettings = await getPublicPlatformSettings();
+  const bufferMin = platformSettings.travelBufferMin ?? 30;
+
+  // Look up service for duration; falls back to category default if not found.
+  let serviceDoc = null;
+  if (booking.service) {
+    serviceDoc = await Service.findById(booking.service);
+  }
+  const durationMin = (booking.estimatedDurationMin && booking.estimatedDurationMin > 0)
+    ? booking.estimatedDurationMin
+    : resolveDurationMin(serviceDoc || { category: booking.serviceCategory, estimatedDurationMin: 0 });
+
+  const { start: scheduledStart, end: scheduledEnd } = computeScheduledWindow({
+    scheduledDate: data.scheduledDate,
     scheduledTime: data.scheduledTime,
-    status: { $in: ACTIVE_SLOT_STATUSES },
+    timezone: worker.timezone || 'Africa/Cairo',
+    durationMin,
+    bufferMin,
   });
-  if (conflict) {
-    throw new ApiError(StatusCodes.CONFLICT, 'This time slot is already booked. Please select another.');
+
+  const session = await mongoose.startSession();
+  let updated;
+  try {
+    session.startTransaction();
+
+    const enforceOverlap = process.env.OVERLAP_ENFORCEMENT_ENABLED !== 'false';
+    if (enforceOverlap) {
+      const conflict = await Booking.findOne({
+        _id:            { $ne: booking._id },
+        worker:         booking.worker,
+        status:         { $in: ACTIVE_SLOT_STATUSES },
+        scheduledStart: { $lt: scheduledEnd },
+        scheduledEnd:   { $gt: scheduledStart },
+      }).session(session);
+
+      if (conflict) {
+        console.info(JSON.stringify({
+          event: 'bookings.overlap_rejected',
+          workerId: String(booking.worker),
+          requestedStart: scheduledStart.toISOString(),
+          requestedEnd:   scheduledEnd.toISOString(),
+          conflictingBookingId: String(conflict._id),
+        }));
+        throw new ApiError(
+          StatusCodes.CONFLICT,
+          'This technician already has a job during the selected time. Please choose another slot.'
+        );
+      }
+    }
+
+    updated = await Booking.findByIdAndUpdate(
+      booking._id,
+      {
+        scheduledDate: bookingDateUTC,
+        scheduledTime: data.scheduledTime,
+        scheduledStart,
+        scheduledEnd,
+        estimatedDurationMin: durationMin,
+        travelBufferMin: bufferMin,
+      },
+      { new: true, runValidators: true, session }
+    );
+
+    await session.commitTransaction();
+  } catch (err) {
+    if (session.inTransaction()) {
+      await session.abortTransaction();
+    }
+    throw err;
+  } finally {
+    session.endSession();
   }
 
-  const updated = await Booking.findByIdAndUpdate(
-    booking._id,
-    {
-      scheduledDate: bookingDateUTC,
-      scheduledTime: data.scheduledTime,
-    },
-    { new: true, runValidators: true }
-  )
+  const populated = await Booking.findById(updated._id)
     .populate('user', 'name email phone profileImage')
     .populate('worker', 'name email phone profileImage averageRating totalReviews location locationLabel serviceArea categories skills services isVerified')
     .populate('service', 'title basePrice category');
 
-  return updated;
+  return populated;
 };
 
 const getBookingById = async (bookingId, requestingUser) => {

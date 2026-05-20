@@ -10,6 +10,7 @@ const User           = require('../users/user.model');
 const Service        = require('../services/service.model');
 const ApiError       = require('../../utils/ApiError');
 const { sendPasswordResetEmail } = require('../../utils/email');
+const { expandCoverage }         = require('../../utils/locationsTaxonomy');
 
 /**
  * GENERATE JWT TOKEN
@@ -139,6 +140,7 @@ const registerUser = async (data) => {
   const normalizedCoverageAreas = Array.isArray(coverageAreas)
     ? [...new Set(coverageAreas.map(area => String(area || '').trim()).filter(Boolean))]
     : [];
+  const { slugs: coverageAreaSlugs, matchSlugs: coverageMatchSlugs } = expandCoverage(normalizedCoverageAreas);
   const initialServiceArea = serviceArea !== undefined ? serviceArea : locationLabel;
 
   // Validate submitted service IDs for workers
@@ -163,6 +165,8 @@ const registerUser = async (data) => {
     ...(locationLabel !== undefined && { locationLabel }),
     ...(initialServiceArea !== undefined && { serviceArea: initialServiceArea }),
     ...(normalizedCoverageAreas.length > 0 && { coverageAreas: normalizedCoverageAreas }),
+    ...(coverageAreaSlugs.length  > 0 && { coverageAreaSlugs }),
+    ...(coverageMatchSlugs.length > 0 && { coverageMatchSlugs }),
     ...(skills        !== undefined && { skills }),
     ...(categories.length > 0          && { categories }),
     ...(hourlyRate    !== undefined && { hourlyRate }),
