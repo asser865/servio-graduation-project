@@ -41,6 +41,8 @@ router.get('/booking/:bookingId', protect, authorize('user', 'worker', 'admin'),
 router.get('/earnings', protect, authorize('worker'), controller.getWorkerEarnings);
 router.post('/refund/:paymentId', protect, authorize('admin'), controller.adminRefund);
 router.post('/disputes', protect, authorize('user'), controller.openDispute);
+router.get('/disputes/my', protect, authorize('user'), controller.getMyDisputes);
+router.patch('/disputes/:id/review', protect, authorize('admin'), controller.markDisputeReviewing);
 router.patch('/disputes/:id/resolve', protect, authorize('admin'), controller.resolveDispute);
 router.get('/disputes', protect, authorize('admin'), controller.getDisputes);
 

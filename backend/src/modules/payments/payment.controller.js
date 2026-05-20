@@ -80,9 +80,9 @@ const adminRefund = async (req, res) => {
 };
 
 const openDispute = async (req, res) => {
-  const { bookingId, reason, evidence } = req.body;
+  const { bookingId, reason, evidence, category } = req.body;
   if (!bookingId || !reason) throw new ApiError(StatusCodes.BAD_REQUEST, 'bookingId and reason are required.');
-  const dispute = await disputeService.openDispute(bookingId, req.user.id, reason, evidence);
+  const dispute = await disputeService.openDispute(bookingId, req.user.id, reason, evidence, category);
   logEvent({ req, type: 'finance', action: 'Dispute opened', target: bookingId, status: 'warn' });
   return ApiResponse.success(res, StatusCodes.CREATED, 'Dispute opened successfully.', dispute);
 };
@@ -96,9 +96,21 @@ const resolveDispute = async (req, res) => {
   return ApiResponse.success(res, StatusCodes.OK, 'Dispute resolved.', dispute);
 };
 
+const markDisputeReviewing = async (req, res) => {
+  const { id } = req.params;
+  const dispute = await disputeService.markDisputeReviewing(id);
+  logEvent({ req, type: 'finance', action: 'Dispute marked reviewing', target: id });
+  return ApiResponse.success(res, StatusCodes.OK, 'Dispute marked as reviewing.', dispute);
+};
+
 const getDisputes = async (req, res) => {
   const result = await disputeService.getDisputesByAdmin(req.query);
   return ApiResponse.success(res, StatusCodes.OK, 'Disputes retrieved.', result);
+};
+
+const getMyDisputes = async (req, res) => {
+  const result = await disputeService.getDisputesForCustomer(req.user.id, req.query);
+  return ApiResponse.success(res, StatusCodes.OK, 'Your disputes retrieved.', result);
 };
 
 const updatePayoutSettings = async (req, res) => {
@@ -130,6 +142,8 @@ module.exports = {
   adminRefund,
   openDispute,
   resolveDispute,
+  markDisputeReviewing,
   getDisputes,
+  getMyDisputes,
   updatePayoutSettings,
 };

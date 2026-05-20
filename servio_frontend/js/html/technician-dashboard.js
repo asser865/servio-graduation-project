@@ -11,6 +11,7 @@ import { getWorkerReviews } from '../api/reviews.js';
 import { getServices } from '../api/services.js';
 import { getMyDebts } from '../api/payments.js';
 import { getNotifications as apiGetTechNotifs, markOneRead as apiMarkTechNotifRead, markAllRead as apiMarkTechAllRead } from '../api/notifications.js';
+import { getHierarchy as getLocationHierarchy, resolveSlug as resolveLocationSlug, labelForSlug as locationLabel, getDescendants as locationDescendants } from '../data/locations.js';
 
 const TAB_KEY = 'servio_activeTab_technician';
 
@@ -20,27 +21,12 @@ const DAYS_KEYS = ['avail_day_mon','avail_day_tue','avail_day_wed','avail_day_th
 const SKILLS_KEYS = ['skill_plumbing','skill_electrical','skill_hvac','skill_painting','skill_carpentry',
   'skill_cleaning','skill_roofing','skill_flooring','skill_appliance','skill_landscaping','skill_general'];
 
+// Legacy flat list — superseded by the hierarchical picker built from the
+// shared locations taxonomy. Kept as a tiny safety net for environments where
+// the data module fails to load.
 const DEFAULT_COVERAGE_AREAS = [
-  'Maadi',
-  'Heliopolis',
-  'Nasr City',
-  'Zamalek',
-  'New Cairo',
-  '6th of October',
-  'Dokki',
-  'Giza',
-  'Shubra',
-  'Ain Shams',
-  'Mohandessin',
-  'Sheikh Zayed',
-  'Mokattam',
-  'Madinaty',
-  'Rehab',
-  'Garden City',
-  'Downtown Cairo',
-  'Abbasiya',
-  'Haram',
-  'Faisal',
+  'Cairo', 'Giza', 'Alexandria', 'Maadi', 'Heliopolis', 'Nasr City',
+  'New Cairo', '6th of October', 'Sheikh Zayed', 'Mohandessin', 'Dokki',
 ];
 
 function normalizeAreaList(items) {
@@ -80,43 +66,143 @@ function updateCoverageSummary(summaryEl, areas) {
     : 'No coverage areas selected.';
 }
 
+// Hierarchical picker: governorate → districts. Selecting a governorate is
+// shorthand for covering every district inside it — the backend's
+// `coverageMatchSlugs` expansion handles the matching, but we keep the UI
+// explicit so technicians see exactly what they accept.
 function renderCoverageEditor({ container, searchInput, summaryEl, selectedAreas = [], customInput }) {
   if (!container) return;
   const selectedList = normalizeAreaList(selectedAreas.length ? selectedAreas : (container.__selectedCoverageAreas || []));
   container.__selectedCoverageAreas = selectedList;
-  const selected = new Set(selectedList.map(area => area.toLowerCase()));
+  container.__coverageSearchInput   = searchInput || container.__coverageSearchInput || null;
+
+  // Map any current selections to their canonical slugs so a governorate-level
+  // selection is recognised even if it was stored as "Cairo" instead of the
+  // slug "cairo-gov".
+  const selectedSlugs = new Set(
+    selectedList.map(resolveLocationSlug).filter(Boolean)
+  );
   const query = String(searchInput?.value || '').trim().toLowerCase();
-  const allAreas = normalizeAreaList([...DEFAULT_COVERAGE_AREAS, ...selectedList]);
-  const visibleAreas = allAreas.filter(area => !query || area.toLowerCase().includes(query));
+
+  let hierarchy = [];
+  try { hierarchy = getLocationHierarchy(); } catch { hierarchy = []; }
 
   container.innerHTML = '';
-  visibleAreas.forEach(area => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'skill-tag coverage-chip';
-    btn.dataset.area = area;
-    btn.setAttribute('aria-pressed', String(selected.has(area.toLowerCase())));
-    btn.textContent = area;
-    btn.addEventListener('click', () => {
-      const pressed = btn.getAttribute('aria-pressed') === 'true';
-      btn.setAttribute('aria-pressed', String(!pressed));
-      container.__selectedCoverageAreas = pressed
-        ? normalizeAreaList(container.__selectedCoverageAreas || []).filter(item => item.toLowerCase() !== area.toLowerCase())
-        : normalizeAreaList([...(container.__selectedCoverageAreas || []), area]);
-      const merged = normalizeAreaList([
-        ...(container.__selectedCoverageAreas || []),
-        ...(customInput ? normalizeAreaList(customInput.value) : []),
-      ]);
-      updateCoverageSummary(summaryEl, merged);
+
+  if (!hierarchy.length) {
+    // Hard fallback to the legacy flat list if the taxonomy module is unavailable.
+    DEFAULT_COVERAGE_AREAS.forEach((area) => {
+      const btn = buildChip(area, selectedList.includes(area), () =>
+        toggleSelection(container, summaryEl, customInput, area));
+      container.appendChild(btn);
     });
-    container.appendChild(btn);
+    updateCoverageSummary(summaryEl, normalizeAreaList([
+      ...(container.__selectedCoverageAreas || []),
+      ...(customInput ? normalizeAreaList(customInput.value) : []),
+    ]));
+    return;
+  }
+
+  hierarchy.forEach((gov) => {
+    const govMatches = !query || gov.name.toLowerCase().includes(query);
+    const visibleDistricts = gov.districts.filter((d) =>
+      govMatches || d.name.toLowerCase().includes(query)
+    );
+    if (!govMatches && !visibleDistricts.length) return;
+
+    const group = document.createElement('div');
+    group.className = 'coverage-group';
+
+    const header = document.createElement('div');
+    header.className = 'coverage-group__header';
+
+    const govSelected = selectedSlugs.has(gov.slug);
+    const govChip = buildChip(`${gov.name} (all)`, govSelected, () => {
+      // Selecting a governorate clears its districts to keep the list tidy —
+      // the slug-expansion on the backend already implies coverage of all of them.
+      const next = govSelected
+        ? (container.__selectedCoverageAreas || []).filter((a) => resolveLocationSlug(a) !== gov.slug)
+        : [
+            ...(container.__selectedCoverageAreas || []).filter((a) => {
+              const slug = resolveLocationSlug(a);
+              return !slug || !locationDescendants(gov.slug).includes(slug);
+            }),
+            gov.name,
+          ];
+      commitSelection(container, summaryEl, customInput, next);
+    });
+    govChip.classList.add('coverage-chip--gov');
+    header.appendChild(govChip);
+    group.appendChild(header);
+
+    const districtRow = document.createElement('div');
+    districtRow.className = 'coverage-group__districts';
+
+    visibleDistricts.forEach((d) => {
+      const isSelected = selectedSlugs.has(d.slug);
+      // If the parent governorate is already selected, the district is implicitly
+      // covered — show it as pressed + disabled to make this obvious.
+      const implicit = govSelected;
+      const chip = buildChip(d.name, isSelected || implicit, () => {
+        if (implicit) return; // governorate already covers it
+        const next = isSelected
+          ? (container.__selectedCoverageAreas || []).filter((a) => resolveLocationSlug(a) !== d.slug)
+          : [...(container.__selectedCoverageAreas || []), d.name];
+        commitSelection(container, summaryEl, customInput, next);
+      });
+      if (implicit) {
+        chip.classList.add('coverage-chip--implicit');
+        chip.setAttribute('aria-disabled', 'true');
+        chip.title = `Covered by ${gov.name}`;
+      }
+      districtRow.appendChild(chip);
+    });
+
+    if (visibleDistricts.length) group.appendChild(districtRow);
+    container.appendChild(group);
   });
 
-  const current = normalizeAreaList([
+  updateCoverageSummary(summaryEl, normalizeAreaList([
+    ...(container.__selectedCoverageAreas || []),
+    ...(customInput ? normalizeAreaList(customInput.value) : []),
+  ]));
+}
+
+function buildChip(label, pressed, onClick) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'skill-tag coverage-chip';
+  btn.dataset.area = label;
+  btn.setAttribute('aria-pressed', String(pressed));
+  btn.textContent = label;
+  btn.addEventListener('click', onClick);
+  return btn;
+}
+
+function commitSelection(container, summaryEl, customInput, nextList) {
+  container.__selectedCoverageAreas = normalizeAreaList(nextList);
+  const merged = normalizeAreaList([
     ...(container.__selectedCoverageAreas || []),
     ...(customInput ? normalizeAreaList(customInput.value) : []),
   ]);
-  updateCoverageSummary(summaryEl, current);
+  updateCoverageSummary(summaryEl, merged);
+  // Re-render so the implicit-coverage chips update when a governorate toggles.
+  renderCoverageEditor({
+    container,
+    searchInput: container.__coverageSearchInput,
+    summaryEl,
+    selectedAreas: container.__selectedCoverageAreas,
+    customInput,
+  });
+}
+
+function toggleSelection(container, summaryEl, customInput, area) {
+  const pressed = (container.__selectedCoverageAreas || [])
+    .some((a) => a.toLowerCase() === area.toLowerCase());
+  const next = pressed
+    ? (container.__selectedCoverageAreas || []).filter((a) => a.toLowerCase() !== area.toLowerCase())
+    : [...(container.__selectedCoverageAreas || []), area];
+  commitSelection(container, summaryEl, customInput, next);
 }
 
 // Tab label map for topbar title (keys resolved via t() at render time)
@@ -155,6 +241,55 @@ function updateTopbarBadge(count) {
   if (!badge) return;
   badge.hidden = count === 0;
   badge.textContent = count > 9 ? '9+' : String(count);
+}
+
+/* ── Sidebar nav indicators (unseen counts per tab) ─────── */
+const NAV_SEEN_KEY = 'servio_nav_seen_v1';
+function getNavSeen() {
+  try { return JSON.parse(localStorage.getItem(NAV_SEEN_KEY) || '{}'); } catch { return {}; }
+}
+function setNavSeen(map) {
+  try { localStorage.setItem(NAV_SEEN_KEY, JSON.stringify(map)); } catch {}
+}
+function setNavBadge(tabId, count) {
+  const el = document.querySelector(`[data-nav-badge="${tabId}"]`);
+  if (!el) return;
+  if (count > 0) {
+    el.hidden = false;
+    el.textContent = count > 9 ? '9+' : String(count);
+  } else {
+    el.hidden = true;
+  }
+}
+function setNavDot(tabId, show) {
+  const el = document.querySelector(`[data-nav-dot="${tabId}"]`);
+  if (!el) return;
+  el.hidden = !show;
+}
+function updateSidebarIndicators(bookings) {
+  const seen = getNavSeen();
+  const list = Array.isArray(bookings) ? bookings : [];
+
+  // Job Queue: pending bookings awaiting acceptance
+  const pendingCount = list.filter(b => b.status === 'pending').length;
+  setNavBadge('job-queue', pendingCount);
+
+  // Earnings: completed bookings since user last viewed earnings tab
+  const lastSeenEarnings = seen.earnings || 0;
+  const newCompleted = list.filter(b => {
+    if (b.status !== 'completed') return false;
+    const t = new Date(b.completedAt || b.updatedAt || b.scheduledDate).getTime();
+    return t > lastSeenEarnings;
+  }).length;
+  setNavDot('earnings', newCompleted > 0);
+}
+function markTabSeen(tabId) {
+  const seen = getNavSeen();
+  seen[tabId] = Date.now();
+  setNavSeen(seen);
+  // Clear that tab's indicator immediately
+  setNavBadge(tabId, 0);
+  setNavDot(tabId, false);
 }
 
 /* ── Topbar avatar ──────────────────────────────────────── */
@@ -204,6 +339,7 @@ function initTabs() {
       if (active) revealAll(p);
     });
     sessionStorage.setItem(TAB_KEY, id);
+    markTabSeen(id);
     // Update topbar title
     const labelKey = TAB_LABEL_KEYS[id];
     const el = document.getElementById('dash-topbar-title');
@@ -500,6 +636,8 @@ async function populateStats() {
     bookings = res?.bookings || [];
     totalCount = res?.pagination?.total ?? bookings.length;
   } catch (_) {}
+
+  updateSidebarIndicators(bookings);
 
   const now = new Date();
   const thisMonth = now.getMonth();
@@ -929,7 +1067,7 @@ function initCategories(savedSkills) {
   });
 }
 
-async function initJobQueue() {
+async function initJobQueue(restoreTab = null) {
   const container = document.getElementById('job-queue-list');
   if (!container) return;
 
@@ -949,6 +1087,7 @@ async function initJobQueue() {
     const res = await getWorkerBookings({ limit: 50 });
     // Backend returns { bookings: [...], pagination: {...} }
     bookings = Array.isArray(res) ? res : (res?.bookings || []);
+    updateSidebarIndicators(bookings);
   } catch (err) {
     showMsg('Failed to load jobs. Please refresh.', '#dc2626');
     console.error('[Job Queue] API error:', err);
@@ -961,12 +1100,12 @@ async function initJobQueue() {
   }
 
   const pending    = bookings.filter(b => b.status === 'pending');
-  const ongoing    = bookings.filter(b => ['accepted','en_route','arrived','in_progress'].includes(b.status));
+  const ongoing    = bookings.filter(b => ['accepted','en_route','arrived','in_progress','awaiting_customer_confirmation'].includes(b.status));
   const done       = bookings.filter(b => b.status === 'completed');
   const cancelled  = bookings.filter(b => ['cancelled','rejected'].includes(b.status));
 
-  // Default tab: show active if exists, else pending, else done
-  const defaultTab = ongoing.length ? 'active' : pending.length ? 'pending' : 'done';
+  // Default tab: preserve caller's active sub-tab, else show active > pending > done
+  const defaultTab = restoreTab || (ongoing.length ? 'active' : pending.length ? 'pending' : 'done');
 
   function badgeHtml(n) {
     return n > 0 ? `<span class="jq-tab-badge">${n}</span>` : '';
@@ -1075,6 +1214,128 @@ function closeJobModal() {
   document.body.style.overflow = '';
 }
 
+/* ── Duration-override modal (shown before accepting a job) ──────────────── */
+const DURATION_PRESETS = [30, 60, 90, 120, 180, 240];
+
+function openAcceptModal({ defaultDurationMin, onConfirm, jobContext = {} }) {
+  const { service = '', notes = '' } = jobContext;
+  const presetsHtml = DURATION_PRESETS.map(m => {
+    const label = m < 60 ? `${m}m` : m % 60 === 0 ? `${m/60}h` : `${Math.floor(m/60)}h${m%60}m`;
+    return `<button type="button" class="accept-modal__preset${m === defaultDurationMin ? ' is-active' : ''}" data-preset="${m}">${label}</button>`;
+  }).join('');
+
+  const wrap = document.createElement('div');
+  wrap.className = 'modal-backdrop';
+  wrap.innerHTML = `
+    <div class="modal accept-modal">
+      <div class="accept-modal__header">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+        <h3>Accept Job</h3>
+      </div>
+      ${service ? `<div class="accept-modal__service">${service}</div>` : ''}
+      ${notes ? `<div class="accept-modal__notes"><span>Customer note:</span> ${notes}</div>` : ''}
+      <div class="accept-modal__duration-label">
+        How long do you estimate this will take?
+        <span class="accept-modal__duration-hint">You can update this on-site</span>
+      </div>
+      <div class="accept-modal__presets">${presetsHtml}</div>
+      <div class="accept-modal__custom-row">
+        <label for="accept-duration">Custom (min)</label>
+        <input type="number" id="accept-duration" min="15" max="480" step="15" value="${defaultDurationMin}" placeholder="e.g. 90">
+      </div>
+      <div class="modal__actions">
+        <button class="btn btn--ghost" data-action="cancel">Cancel</button>
+        <button class="btn btn--accent accept-modal__confirm-btn" data-action="confirm">
+          <svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="4,10 8,14 16,6"/></svg>
+          Confirm &amp; Accept
+        </button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(wrap);
+
+  const input = wrap.querySelector('#accept-duration');
+
+  wrap.querySelectorAll('.accept-modal__preset').forEach(btn => {
+    btn.addEventListener('click', () => {
+      wrap.querySelectorAll('.accept-modal__preset').forEach(b => b.classList.remove('is-active'));
+      btn.classList.add('is-active');
+      input.value = btn.dataset.preset;
+    });
+  });
+
+  input.addEventListener('input', () => {
+    wrap.querySelectorAll('.accept-modal__preset').forEach(b => b.classList.remove('is-active'));
+  });
+
+  wrap.querySelector('[data-action="cancel"]').addEventListener('click', () => wrap.remove());
+  wrap.querySelector('[data-action="confirm"]').addEventListener('click', () => {
+    const val = Number(input.value);
+    if (!Number.isFinite(val) || val < 15 || val > 480) {
+      input.style.borderColor = '#ef4444';
+      input.focus();
+      return;
+    }
+    wrap.remove();
+    onConfirm(val);
+  });
+
+  setTimeout(() => input.focus(), 50);
+}
+
+/* ── Update estimate modal (usable after accepting, any active state) ─────── */
+function openUpdateEstimateModal({ currentMin, onConfirm }) {
+  const presetsHtml = DURATION_PRESETS.map(m => {
+    const label = m < 60 ? `${m}m` : m % 60 === 0 ? `${m/60}h` : `${Math.floor(m/60)}h${m%60}m`;
+    return `<button type="button" class="accept-modal__preset${m === currentMin ? ' is-active' : ''}" data-preset="${m}">${label}</button>`;
+  }).join('');
+
+  const wrap = document.createElement('div');
+  wrap.className = 'modal-backdrop';
+  wrap.innerHTML = `
+    <div class="modal accept-modal">
+      <div class="accept-modal__header">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <h3>Update Duration Estimate</h3>
+      </div>
+      <p style="font-size:0.88rem;color:var(--color-text-secondary,#aaa);margin:0">Revise your estimate based on what you've found on-site. The customer will be notified.</p>
+      <div class="accept-modal__presets">${presetsHtml}</div>
+      <div class="accept-modal__custom-row">
+        <label for="update-duration">Custom (min)</label>
+        <input type="number" id="update-duration" min="15" max="480" step="15" value="${currentMin || 60}" placeholder="e.g. 90">
+      </div>
+      <div class="modal__actions">
+        <button class="btn btn--ghost" data-action="cancel">Cancel</button>
+        <button class="btn btn--accent" data-action="confirm">Update Estimate</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(wrap);
+
+  const input = wrap.querySelector('#update-duration');
+  wrap.querySelectorAll('.accept-modal__preset').forEach(btn => {
+    btn.addEventListener('click', () => {
+      wrap.querySelectorAll('.accept-modal__preset').forEach(b => b.classList.remove('is-active'));
+      btn.classList.add('is-active');
+      input.value = btn.dataset.preset;
+    });
+  });
+  input.addEventListener('input', () => {
+    wrap.querySelectorAll('.accept-modal__preset').forEach(b => b.classList.remove('is-active'));
+  });
+  wrap.querySelector('[data-action="cancel"]').addEventListener('click', () => wrap.remove());
+  wrap.querySelector('[data-action="confirm"]').addEventListener('click', () => {
+    const val = Number(input.value);
+    if (!Number.isFinite(val) || val < 15 || val > 480) {
+      input.style.borderColor = '#ef4444';
+      input.focus();
+      return;
+    }
+    wrap.remove();
+    onConfirm(val);
+  });
+}
+
 /* ── Progress Stepper ────────────────────────────────────────────────────── */
 function buildStepperHtml(localState) {
   const steps = ['Accepted', 'En Route', 'Arrived', 'Working', 'Done'];
@@ -1142,6 +1403,7 @@ function buildJobCard(b, _t) {
     en_route:    { label:'En Route',           dot:'blue'   },
     arrived:     { label:'Arrived',            dot:'amber'  },
     in_progress: { label:'In Progress',        dot:'purple' },
+    awaiting_customer_confirmation: { label:'Awaiting Customer', dot:'amber' },
     completed:   { label:'Completed',          dot:'green'  },
     cancelled:   { label:'Cancelled',          dot:'grey'   },
     rejected:    { label:'Declined',           dot:'grey'   },
@@ -1170,7 +1432,7 @@ function buildJobCard(b, _t) {
       </div>`;
   } else if (['accepted','en_route','arrived','in_progress'].includes(b.status)) {
     flowHtml = `
-      <div class="jq-flow" data-booking-id="${id}" data-pin="${pin}" data-customer="${customer}" data-address="${address}">
+      <div class="jq-flow" data-booking-id="${id}" data-pin="${pin}" data-customer="${customer}" data-address="${address}" data-estimated-duration-min="${b.estimatedDurationMin || 60}">
         <div class="jq-section" data-section="accepted">
           <div class="jq-accepted-action-bar">
             <div class="jq-nav-info">
@@ -1253,6 +1515,10 @@ function buildJobCard(b, _t) {
                   <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                   Message Customer
                 </a>
+                <button class="jq-timer-chat-btn" data-flow-action="update-estimate" style="border-color:rgba(166,110,88,0.4);color:var(--color-accent,#D9A28B);">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  Update Estimate
+                </button>
               </div>
             </div>
           </div>
@@ -1288,6 +1554,22 @@ function buildJobCard(b, _t) {
           </div>
         </div>
       </div>`;
+  } else if (b.status === 'awaiting_customer_confirmation') {
+    const workerNotesText = escapeHtml(b.workerNotes || '');
+    const proofImg = (Array.isArray(b.workerCompletionImages) && b.workerCompletionImages[0]) || '';
+    flowHtml = `
+      <div class="jq-done-banner">
+        <div class="jq-done-icon">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="4,12 9,17 20,6"/></svg>
+        </div>
+        <div class="jq-done-info">
+          <p class="jq-done-label">Awaiting Customer Confirmation</p>
+          <p class="jq-done-sub">${customer}</p>
+        </div>
+        <div class="jq-done-earnings">${price}</div>
+      </div>
+      ${workerNotesText ? `<div class="jq-done-notes"><div class="jq-notes-label">Work done:</div><p>${workerNotesText}</p></div>` : ''}
+      ${proofImg ? `<div class="jq-done-image"><img src="${proofImg}" alt="Completed work photo"></div>` : ''}`;
   } else if (b.status === 'completed') {
     flowHtml = `
       <div class="jq-premium-completion">
@@ -1582,55 +1864,61 @@ function wireArrivalFlows(container) {
         if (secs <= 0) { clearInterval(cdInterval); closeJobModal(); }
       }, 1000);
 
-      document.getElementById('modal-accept-btn')?.addEventListener('click', async () => {
+      document.getElementById('modal-accept-btn')?.addEventListener('click', () => {
         clearInterval(cdInterval);
-        const btn = document.getElementById('modal-accept-btn');
-        if (btn) { btn.disabled = true; btn.textContent = 'Accepting…'; }
-        try {
-          await updateBookingStatus(bookingId, 'accepted');
-          closeJobModal();
-          const card = flow.closest('.jq-premium-card');
-          if (card) {
-            card.classList.add('jq-premium-card--accepted');
-            const statusEl = card.querySelector('.jq-premium-status');
-            if (statusEl) {
-              statusEl.innerHTML = `<span class="status-dot"></span><span>Accepted</span>`;
-              statusEl.className = 'jq-premium-status jq-status--blue';
+        closeJobModal();
+        openAcceptModal({
+          defaultDurationMin: 60,
+          jobContext: {
+            service: flow.dataset.service || '',
+            notes:   flow.dataset.notes   || '',
+          },
+          onConfirm: async (durationMin) => {
+            try {
+              await updateBookingStatus(bookingId, 'accepted', { estimatedDurationMin: durationMin });
+              const card = flow.closest('.jq-premium-card');
+              if (card) {
+                card.classList.add('jq-premium-card--accepted');
+                const statusEl = card.querySelector('.jq-premium-status');
+                if (statusEl) {
+                  statusEl.innerHTML = `<span class="status-dot"></span><span>Accepted</span>`;
+                  statusEl.className = 'jq-premium-status jq-status--blue';
+                }
+                if (!document.getElementById(`stepper-${bookingId}`)) {
+                  const sw = document.createElement('div');
+                  sw.className = 'jq-premium-stepper-wrap';
+                  sw.id = `stepper-${bookingId}`;
+                  sw.innerHTML = buildStepperHtml('accepted');
+                  card.querySelector('.jq-premium-card__body')?.before(sw);
+                }
+                const cardBody = card.querySelector('.jq-premium-card__body');
+                if (cardBody && !cardBody.classList.contains('jq-premium-card__body--hidden')) {
+                  cardBody.classList.add('jq-premium-card__body--hidden');
+                }
+                if (card && !card.querySelector('.jq-identity-bar')) {
+                  const iBar = document.createElement('div');
+                  iBar.className = 'jq-identity-bar';
+                  iBar.innerHTML = `
+                  <div class="jq-identity-bar__info">
+                    <div class="jq-identity-bar__name">${flow.dataset.customer || '—'}</div>
+                    <div class="jq-identity-bar__sub">${flow.dataset.service || ''} · ${flow.dataset.address || ''}</div>
+                  </div>
+                  <div class="jq-identity-bar__payout">
+                    <div class="jq-identity-bar__amount">${flow.dataset.price || '—'}</div>
+                    <div class="jq-identity-bar__label">PAYOUT</div>
+                  </div>`;
+                  const sw = card.querySelector('.jq-premium-stepper-wrap');
+                  if (sw) sw.before(iBar);
+                  else cardBody.before(iBar);
+                }
+              }
+              showSection('accepted');
+              showToast('Job accepted! Head to the customer location.', 'success');
+            } catch (err) {
+              showToast(err?.message || 'Failed to accept job.', 'error');
             }
-            if (!document.getElementById(`stepper-${bookingId}`)) {
-              const sw = document.createElement('div');
-              sw.className = 'jq-premium-stepper-wrap';
-              sw.id = `stepper-${bookingId}`;
-              sw.innerHTML = buildStepperHtml('accepted');
-              card.querySelector('.jq-premium-card__body')?.before(sw);
-            }
-            const cardBody = card.querySelector('.jq-premium-card__body');
-            if (cardBody && !cardBody.classList.contains('jq-premium-card__body--hidden')) {
-              cardBody.classList.add('jq-premium-card__body--hidden');
-            }
-            if (card && !card.querySelector('.jq-identity-bar')) {
-              const iBar = document.createElement('div');
-              iBar.className = 'jq-identity-bar';
-              iBar.innerHTML = `
-              <div class="jq-identity-bar__info">
-                <div class="jq-identity-bar__name">${flow.dataset.customer || '—'}</div>
-                <div class="jq-identity-bar__sub">${flow.dataset.service || ''} · ${flow.dataset.address || ''}</div>
-              </div>
-              <div class="jq-identity-bar__payout">
-                <div class="jq-identity-bar__amount">${flow.dataset.price || '—'}</div>
-                <div class="jq-identity-bar__label">PAYOUT</div>
-              </div>`;
-              const sw = card.querySelector('.jq-premium-stepper-wrap');
-              if (sw) sw.before(iBar);
-              else cardBody.before(iBar);
-            }
-          }
-          showSection('accepted');
-          showToast('Job accepted! Head to the customer location.', 'success');
-        } catch (err) {
-          closeJobModal();
-          showToast(err?.message || 'Failed to accept job.', 'error');
-        }
+          },
+        });
       });
 
       document.getElementById('modal-pass-btn')?.addEventListener('click', () => {
@@ -1768,6 +2056,26 @@ function wireArrivalFlows(container) {
           btn.disabled = false; btn.textContent = 'Verify & Start Job';
           showToast(err?.message || 'Failed to start job.', 'error');
         }
+        return;
+      }
+
+      if (action === 'update-estimate') {
+        const currentMin = Number(flow.dataset.estimatedDurationMin) || 60;
+        openUpdateEstimateModal({
+          currentMin,
+          onConfirm: async (newMin) => {
+            try {
+              await updateBookingStatus(bookingId, 'in_progress', { estimatedDurationMin: newMin });
+              flow.dataset.estimatedDurationMin = String(newMin);
+              const h = Math.floor(newMin / 60);
+              const m = newMin % 60;
+              const label = h > 0 ? (m > 0 ? `${h}h ${m}m` : `${h}h`) : `${m}m`;
+              showToast(`Estimate updated to ${label}`, 'success');
+            } catch (err) {
+              showToast(err?.message || 'Failed to update estimate.', 'error');
+            }
+          },
+        });
         return;
       }
 
@@ -3306,6 +3614,27 @@ async function initDashboard() {
     populateStats(),
     initJobQueue(),
   ]);
+
+  // Poll every 15s — sidebar indicators + job queue if currently visible
+  let _jqPolling = false;
+  setInterval(async () => {
+    try {
+      const res = await getWorkerBookings({ limit: 200 });
+      const bookings = res?.bookings || (Array.isArray(res) ? res : []);
+      updateSidebarIndicators(bookings);
+    } catch (_) {}
+
+    const activePanel = document.querySelector('[data-panel].is-active');
+    if (activePanel?.dataset.panel !== 'job-queue') return;
+    if (_jqPolling) return;
+    _jqPolling = true;
+    try {
+      const activeStab = document.querySelector('#jq-tab-bar .stab-btn--active')?.dataset.stab;
+      const restoreTab = activeStab?.replace('jq-', '') || null;
+      await initJobQueue(restoreTab);
+    } catch (_) {}
+    finally { _jqPolling = false; }
+  }, 15_000);
 }
 
 initDashboard().catch(err => console.error('[Dashboard init error]', err));

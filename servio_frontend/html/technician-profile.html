@@ -9,6 +9,8 @@
   <script src="../js/theme-init.js"></script>
   <script src="../js/lang-init.js"></script>
   <link rel="stylesheet" href="../css/main.css" />
+  <link rel="stylesheet" href="../css/components/heart-toggle.css" />
+  <link rel="stylesheet" href="../css/components/busy-badge.css" />
 </head>
 <body>
   <div class="scroll-progress" data-scroll-progress aria-hidden="true"></div>
@@ -80,67 +82,82 @@
   </header>
 
   <main id="main" class="profile-page">
-    <!-- HERO COVER -->
-    <div class="profile-cover">
-      <img class="profile-cover__img" data-profile-target="cover-img" src="" alt="" />
-    </div>
 
-    <!-- PROFILE HEADER -->
-    <section class="container profile-header-section" data-reveal>
-      <div class="profile-header">
-        <div class="profile-avatar-wrapper">
-          <img class="profile-avatar" data-profile-target="avatar" src="" alt="" />
-          <div class="profile-badge--verified" title="Identity Verified">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-              <polyline points="9 12 11 14 15 10" stroke="#fff" stroke-width="3" />
-            </svg>
+    <!-- COMPACT HERO CARD -->
+    <section class="container profile-hero-section" data-reveal>
+      <div class="profile-hero-card">
+        <div class="profile-hero-card__bg" aria-hidden="true"></div>
+
+        <div class="profile-hero-card__main">
+          <div class="profile-avatar-wrapper">
+            <img class="profile-avatar" data-profile-target="avatar" src="" alt="" />
+            <div class="profile-badge--verified" title="Identity Verified">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                <polyline points="9 12 11 14 15 10" stroke="#fff" stroke-width="3" />
+              </svg>
+            </div>
+          </div>
+
+          <div class="profile-hero-card__identity">
+            <div class="profile-hero-card__name-row">
+              <h1 class="profile-name" data-profile-target="name"></h1>
+              <span class="profile-verified-pill" title="Verified Professional">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  <polyline points="9 12 11 14 15 10" />
+                </svg>
+                <span data-i18n="prof_verified">Verified</span>
+              </span>
+            </div>
+            <div class="profile-title" data-profile-target="title"></div>
+
+            <div class="profile-meta">
+              <div class="profile-meta__item">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                </svg>
+                <span data-profile-target="location"></span>
+              </div>
+              <span class="profile-meta__sep" aria-hidden="true">·</span>
+              <div class="profile-meta__item">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="#F59E0B">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                </svg>
+                <span class="profile-rating__score" data-profile-target="rating"></span>
+                <span data-profile-target="review-meta"></span>
+              </div>
+              <span class="profile-meta__sep" aria-hidden="true">·</span>
+              <div class="profile-meta__item profile-meta__item--available">
+                <span class="avail-dot-pulse"></span>
+                <span data-i18n="prof_available_today">Available Today</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="profile-hero-card__actions profile-actions">
+            <a class="btn" href="./booking.html" id="bookServiceBtn" data-i18n="prof_book_btn">Book Service Request</a>
+            <a class="btn btn--outline" href="./messages.html" data-i18n="prof_message_btn">Message</a>
           </div>
         </div>
 
-        <h1 class="profile-name" data-profile-target="name"></h1>
-        <div class="profile-title" data-profile-target="title"></div>
-
-        <div class="profile-meta">
-          <div class="profile-meta__item profile-meta__item--highlight">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-            </svg>
-            <span data-profile-target="location"></span>
+        <div class="profile-hero-card__stats">
+          <div class="stat-block">
+            <div class="stat-block__value" data-profile-target="flat-rate"></div>
+            <div class="stat-block__label" data-i18n="prof_stat_flat_rate">Flat Rate Minimum</div>
           </div>
-          <div class="profile-meta__item">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-            </svg>
-            <span class="profile-rating__score" data-profile-target="rating"></span> <span data-profile-target="review-meta"></span>
+          <div class="stat-block">
+            <div class="stat-block__value" data-profile-target="years-exp"></div>
+            <div class="stat-block__label" data-i18n="prof_stat_years">Years Exp.</div>
           </div>
-        </div>
-
-        <div class="profile-actions">
-          <a class="btn" href="./booking.html" id="bookServiceBtn" data-i18n="prof_book_btn">Book Service Request</a>
-          <a class="btn btn--outline" href="./messages.html" data-i18n="prof_message_btn">Message</a>
-        </div>
-      </div>
-    </section>
-
-    <!-- CORE STATS -->
-    <section class="container profile-stats-section" data-reveal="scale" data-reveal-delay="100">
-      <div class="profile-stats">
-        <div class="stat-block">
-          <div class="stat-block__value" data-profile-target="flat-rate"></div>
-          <div class="stat-block__label" data-i18n="prof_stat_flat_rate">Flat Rate Minimum</div>
-        </div>
-        <div class="stat-block">
-          <div class="stat-block__value" data-profile-target="years-exp"></div>
-          <div class="stat-block__label" data-i18n="prof_stat_years">Years Exp.</div>
-        </div>
-        <div class="stat-block">
-          <div class="stat-block__value" data-profile-target="response-time"></div>
-          <div class="stat-block__label" data-i18n="prof_stat_response">Response Time</div>
-        </div>
-        <div class="stat-block">
-          <div class="stat-block__value" data-profile-target="job-success"></div>
-          <div class="stat-block__label" data-i18n="prof_stat_success">Job Success</div>
+          <div class="stat-block">
+            <div class="stat-block__value" data-profile-target="response-time"></div>
+            <div class="stat-block__label" data-i18n="prof_stat_response">Response Time</div>
+          </div>
+          <div class="stat-block">
+            <div class="stat-block__value" data-profile-target="job-success"></div>
+            <div class="stat-block__label" data-i18n="prof_stat_success">Job Success</div>
+          </div>
         </div>
       </div>
     </section>

@@ -1,0 +1,23 @@
+import { api } from './client.js';
+
+export const createSupportIssue = (body) =>
+  api.post('/support/issues', body);
+
+export const getMySupportIssues = (params = {}) => {
+  const qs = new URLSearchParams(params).toString();
+  return api.get(`/support/issues/my${qs ? '?' + qs : ''}`);
+};
+
+export const getAdminSupportIssues = (params = {}) => {
+  const qs = new URLSearchParams(params).toString();
+  return api.get(`/support/issues/admin${qs ? '?' + qs : ''}`);
+};
+
+export const updateSupportIssueStatus = (id, body) =>
+  api.patch(`/support/issues/${id}/status`, body);
+
+export const resolveSupportIssue = (id, body) =>
+  api.patch(`/support/issues/${id}/resolve`, body);
+
+export const escalateSupportIssueToDispute = (id, body = {}) =>
+  api.patch(`/support/issues/${id}/escalate-dispute`, body);

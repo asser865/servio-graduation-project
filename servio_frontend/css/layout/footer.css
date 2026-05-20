@@ -19,7 +19,6 @@
   filter: blur(120px);
   z-index: 0;
   pointer-events: none;
-  animation: orb-float 12s ease-in-out infinite alternate;
 }
 
 .site-footer::before {
@@ -46,10 +45,19 @@
 }
 
 [data-theme="dark"] .site-footer {
-  background: linear-gradient(-45deg, #382a19, #231a0f, #382a19, #473620);
-  background-size: 400% 400%;
-  color: #ffffff;
-  border-color: rgba(255,255,255,0.1);
+  background: linear-gradient(135deg,
+    #0d0b09 0%,
+    #1a1410 35%,
+    #251a12 65%,
+    #0d0b09 100%);
+  background-size: 300% 300%;
+  color: #f0e6d8;
+  border: 1px solid rgba(254, 193, 149, 0.1);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+          backdrop-filter: blur(40px) saturate(180%);
+  box-shadow:
+    inset 0 1px 0 rgba(254, 193, 149, 0.08),
+    0 20px 40px rgba(0, 0, 0, 0.5);
 }
 
 [data-theme="dark"] .site-footer::before {
@@ -321,15 +329,21 @@
 
 /* Entrance Animations on Load/Scroll */
 .site-footer {
-  color: var(--color-text);
+  color: #f0e6d8;
   overflow: hidden;
   padding: 32px 0 16px;
   margin: 40px 20px 20px;
-  border: 1px solid var(--color-border);
+  border: 1px solid rgba(254, 193, 149, 0.1);
   border-radius: 24px;
-  box-shadow: 0 10px 30px -10px rgba(0,0,0,0.08);
-  background-size: 400% 400%;
-  background: linear-gradient(-45deg, var(--color-bg-soft), #e8e0d5, var(--color-bg-soft), var(--color-neutral));
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+  background-size: 300% 300%;
+  background: linear-gradient(135deg,
+    #14110e 0%,
+    #1f1813 35%,
+    #2a1f17 65%,
+    #14110e 100%);
+  -webkit-backdrop-filter: blur(30px) saturate(150%);
+          backdrop-filter: blur(30px) saturate(150%);
   position: relative;
   animation: footer-reveal 0.8s ease-out forwards;
 }
@@ -361,4 +375,35 @@
   }
 }
 
-/* . */
+/* Force light text on dark gradient footer (applies in both themes) */
+.site-footer .footer__brand-text,
+.site-footer .footer__title,
+.site-footer .footer__link,
+.site-footer .footer__address,
+.site-footer .footer__address p {
+  color: #f0e6d8;
+}
+
+.site-footer .footer__desc,
+.site-footer .footer__fineprint,
+.site-footer .footer__small-link {
+  color: rgba(240, 230, 216, 0.7);
+}
+
+.site-footer .footer__link:hover,
+.site-footer .footer__small-link:hover {
+  color: #fec195;
+}
+
+.site-footer .footer__input {
+  color: #f0e6d8;
+  border-color: rgba(254, 193, 149, 0.25);
+}
+
+.site-footer .footer__input::placeholder {
+  color: rgba(240, 230, 216, 0.45);
+}
+
+.site-footer .footer__input:focus {
+  border-color: #fec195;
+}

@@ -1,6 +1,8 @@
 import { smartMatch } from '../api/ai.js';
 import { getMe, addAddress } from '../api/users.js';
 import { getSession } from '../api/client.js';
+import { getSpeechProvider } from '../features/speech-to-text.js';
+import { showToast } from '../components/toast.js';
 
 const SERVICE_META = {
   Plumbing: { icon: 'droplet', category: 'plumbing', title: 'Plumbing specialist' },
@@ -127,21 +129,6 @@ function renderLocationPill(state, address) {
     </div>`;
   }
 
-  if (state === 'save-form') {
-    return `<div class="location-pill location-pill--save-form">
-      ${pin}
-      <div class="location-pill__save-row">
-        <label class="location-pill__label-text" for="pill-city-input">City/Area</label>
-        <input class="location-pill__input" id="pill-city-input" type="text"
-          value="${escapeAttr(address || '')}" placeholder="e.g. Heliopolis" aria-label="City or area" />
-      </div>
-      <div class="location-pill__save-row">
-        <button class="location-pill__save-account" id="location-pill-confirm-save" type="button">Save</button>
-        <button class="location-pill__change" id="location-pill-cancel-save" type="button">Cancel</button>
-      </div>
-    </div>`;
-  }
-
   // guest — no saved address
   return `<div class="location-pill location-pill--guest">
     ${pin}
@@ -170,6 +157,7 @@ function initLocationPill(composerEl) {
   const wrapper = document.createElement('div');
   wrapper.id = 'location-pill-wrapper';
   wrapper.innerHTML = renderLocationPill('loading', null);
+  // Integrate pill INSIDE composer as top chip row
   composerEl.insertBefore(wrapper, composerEl.firstChild);
 
   // Live-sync currentLocation with input value
@@ -203,42 +191,156 @@ function initLocationPill(composerEl) {
     }
 
     if (e.target.closest('#location-pill-save-account')) {
-      wrapper.innerHTML = renderLocationPill('save-form', currentLocationCity || currentLocation);
-      document.getElementById('pill-city-input')?.focus();
-      return;
-    }
-
-    if (e.target.closest('#location-pill-confirm-save')) {
-      const cityInput = document.getElementById('pill-city-input');
-      const cityValue = cityInput?.value.trim();
-      if (!cityValue) return;
-
-      const btn = e.target.closest('#location-pill-confirm-save');
-      btn.disabled = true;
-      btn.textContent = 'Saving…';
-
-      addAddress({ label: 'Smart Match Area', city: cityValue })
-        .then((saved) => {
+      openAddressModal({
+        prefillCity: currentLocationCity || currentLocation,
+        onSaved: (saved) => {
+          const display = [saved.street, saved.state, saved.city].filter(Boolean).join(', ') || saved.city;
           const newId = String(saved?._id || saved?.id || '');
           if (newId) sessionStorage.setItem('servio_smart_match_address_id', newId);
           sessionStorage.removeItem('servio_smart_match_location');
-          currentLocation = cityValue;
-          currentLocationCity = cityValue;
-          wrapper.innerHTML = renderLocationPill('resolved', cityValue);
-        })
-        .catch(() => {
-          btn.disabled = false;
-          btn.textContent = 'Save';
-        });
+          currentLocation = display;
+          currentLocationCity = saved.state || saved.city;
+          wrapper.innerHTML = renderLocationPill('resolved', display);
+        },
+      });
       return;
-    }
-
-    if (e.target.closest('#location-pill-cancel-save')) {
-      wrapper.innerHTML = renderLocationPill('resolved-local', currentLocation);
     }
   });
 
   return wrapper;
+}
+
+function initVoiceInput({ textarea, btnSubmit }) {
+  const voiceBtn = document.getElementById('ai-voice-btn');
+  if (!voiceBtn) return;
+
+  const provider = getSpeechProvider();
+
+  if (!provider.isSupported()) {
+    voiceBtn.hidden = true;
+    return;
+  }
+
+  let baseText = '';
+  let lastLang = 'ar-SA';                 // default lang for single-click toggle
+  let programmaticWrite = false;          // suppress our own writes from edit detection
+  const CLICK_WINDOW_MS = 320;            // window to accumulate 1/2/3 clicks
+  let clickCount = 0;
+  let clickTimer = null;
+
+  // Badge inside button shows which lang will be used on next start.
+  let badge = voiceBtn.querySelector('.ai-composer__voice-lang');
+  if (!badge) {
+    badge = document.createElement('span');
+    badge.className = 'ai-composer__voice-lang';
+    badge.setAttribute('aria-hidden', 'true');
+    voiceBtn.appendChild(badge);
+  }
+
+  function setBadge(tag) {
+    badge.textContent = tag === 'ar-SA' ? 'ع' : 'EN';
+  }
+  setBadge(lastLang);
+
+  function setRecording(on) {
+    voiceBtn.classList.toggle('is-recording', on);
+    voiceBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  }
+
+  function syncSubmitState() {
+    btnSubmit.disabled = textarea.value.trim().length === 0;
+  }
+
+  function writeTextarea(value) {
+    programmaticWrite = true;
+    textarea.value = value;
+    programmaticWrite = false;
+  }
+
+  // User edits during recording (e.g. erasing) must move baseText to the new value,
+  // otherwise the next speech callback restores the old text.
+  textarea.addEventListener('input', () => {
+    if (programmaticWrite) return;
+    if (!provider.isActive()) return;
+    baseText = textarea.value;
+    if (baseText && !baseText.endsWith(' ') && !baseText.endsWith('\n')) baseText += ' ';
+  });
+
+  function startWith(lang) {
+    lastLang = lang;
+    setBadge(lang);
+    baseText = textarea.value;
+    if (baseText && !baseText.endsWith(' ') && !baseText.endsWith('\n')) baseText += ' ';
+
+    console.debug('[voice] starting recognition with lang =', lang);
+
+    provider.start({
+      lang,
+      onStart: () => setRecording(true),
+      onEnd: () => setRecording(false),
+      onFinal: (text) => {
+        baseText = (baseText + text).replace(/\s+/g, ' ');
+        if (!baseText.endsWith(' ')) baseText += ' ';
+        writeTextarea(baseText);
+        syncSubmitState();
+      },
+      onInterim: (text) => {
+        writeTextarea(baseText + text);
+        syncSubmitState();
+      },
+      onError: (code) => {
+        setRecording(false);
+        const messages = {
+          denied: 'Microphone permission denied. Enable it in browser settings.',
+          'no-mic': 'No microphone found.',
+          'no-speech': '',
+          network: 'Speech service unreachable. Check your connection.',
+          unknown: 'Voice input failed. Try again.',
+        };
+        const msg = messages[code];
+        if (msg) showToast(msg, 'error');
+      },
+    });
+  }
+
+  function setLang(lang) {
+    lastLang = lang;
+    setBadge(lang);
+    if (provider.isActive()) provider.stop();
+    showToast(lang === 'ar-SA' ? 'Voice: Arabic' : 'Voice: English', 'info');
+  }
+
+  function dispatchGesture(count) {
+    if (count === 1) {
+      // Toggle recording with current lang.
+      if (provider.isActive()) provider.stop();
+      else startWith(lastLang);
+      return;
+    }
+    if (count === 2) {
+      setLang('ar-SA');
+      return;
+    }
+    if (count >= 3) {
+      setLang('en-US');
+      return;
+    }
+  }
+
+  voiceBtn.addEventListener('click', () => {
+    clickCount += 1;
+    if (clickTimer) clearTimeout(clickTimer);
+    clickTimer = setTimeout(() => {
+      const n = clickCount;
+      clickCount = 0;
+      clickTimer = null;
+      dispatchGesture(n);
+    }, CLICK_WINDOW_MS);
+  });
+
+  document.addEventListener('langchange', () => {
+    if (provider.isActive()) provider.stop();
+  });
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -249,6 +351,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const resultsArea    = document.getElementById('ai-results');
   const divider        = document.getElementById('ai-processing-divider');
   setupHeroCanvas();
+  setupScrollReveal();
 
   if (!composerEl || !textarea || !btnSubmit || !processingArea || !resultsArea || !divider) return;
 
@@ -266,6 +369,8 @@ document.addEventListener('DOMContentLoaded', () => {
   textarea.addEventListener('input', () => {
     btnSubmit.disabled = textarea.value.trim().length === 0;
   });
+
+  initVoiceInput({ textarea, btnSubmit });
 
   resultsArea.addEventListener('click', (event) => {
     if (event.target.closest('#change-smart-location')) {
@@ -308,6 +413,38 @@ document.addEventListener('DOMContentLoaded', () => {
       );
       const stage1Cta = resultsArea.querySelector('.bento-stage__nav-end');
       stage1Cta?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+
+    const fillTime = event.target.closest('[data-smart-fill-time]');
+    if (fillTime) {
+      const value = fillTime.getAttribute('data-smart-fill-time') || '';
+      augmentAndResubmit({ textarea, btnSubmit, processingArea, resultsArea, divider }, value);
+      return;
+    }
+
+    const fillBudget = event.target.closest('[data-smart-fill-budget]');
+    if (fillBudget) {
+      const value = fillBudget.getAttribute('data-smart-fill-budget') || '';
+      augmentAndResubmit({ textarea, btnSubmit, processingArea, resultsArea, divider }, value);
+      return;
+    }
+
+    const addAddrBtn = event.target.closest('[data-smart-add-address]');
+    if (addAddrBtn) {
+      openAddressModal({
+        prefillCity: currentLocationCity || '',
+        onSaved: (saved) => {
+          const display = [saved.street, saved.state, saved.city].filter(Boolean).join(', ');
+          currentLocation = display;
+          currentLocationCity = saved.state || saved.city;
+          if (saved._id) sessionStorage.setItem('servio_smart_match_address_id', saved._id);
+          try { showToast('Address saved.', 'success'); } catch { /* noop */ }
+          if (lastSmartMatchRender?.prompt) {
+            augmentAndResubmit({ textarea, btnSubmit, processingArea, resultsArea, divider }, '');
+          }
+        },
+      });
       return;
     }
 
@@ -369,6 +506,174 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
+function openAddressModal({ prefillCity = '', onSaved } = {}) {
+  // If a modal already exists, focus it instead of duplicating.
+  const existing = document.querySelector('.address-modal');
+  if (existing) {
+    existing.querySelector('#addr-modal-street')?.focus();
+    return;
+  }
+
+  if (!localStorage.getItem('servio_token')) {
+    // Not logged in — fall back to inline session override flow
+    window.location.href = './login.html?redirect=' + encodeURIComponent(window.location.pathname);
+    return;
+  }
+
+  const overlay = document.createElement('div');
+  overlay.className = 'address-modal';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-labelledby', 'addr-modal-title');
+
+  overlay.innerHTML = `
+    <div class="address-modal__card">
+      <button type="button" class="address-modal__close" id="addr-modal-close" aria-label="Close">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+      <header class="address-modal__header">
+        <div class="address-modal__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        </div>
+        <div class="address-modal__heading">
+          <h2 class="address-modal__title" id="addr-modal-title" data-i18n="sm_addr_modal_title">Save your address</h2>
+          <p class="address-modal__subtitle" data-i18n="sm_addr_modal_subtitle">Add a complete address to your profile so future bookings autofill instantly.</p>
+        </div>
+      </header>
+
+      <form class="address-modal__form" id="addr-modal-form" novalidate>
+        <div class="address-modal__row address-modal__row--single">
+          <div class="address-modal__field">
+            <label class="address-modal__label" for="addr-modal-label" data-i18n="sm_addr_modal_label">Label</label>
+            <input class="address-modal__input" id="addr-modal-label" type="text"
+              placeholder="e.g. Home, Work" data-i18n-placeholder="sm_addr_modal_label_ph"
+              autocomplete="off" />
+          </div>
+        </div>
+        <div class="address-modal__row address-modal__row--single">
+          <div class="address-modal__field">
+            <label class="address-modal__label" for="addr-modal-street" data-i18n="sm_addr_modal_street">Street address</label>
+            <input class="address-modal__input" id="addr-modal-street" type="text"
+              placeholder="Street, building, apartment" data-i18n-placeholder="sm_addr_modal_street_ph"
+              autocomplete="street-address" required />
+          </div>
+        </div>
+        <div class="address-modal__row">
+          <div class="address-modal__field">
+            <label class="address-modal__label" for="addr-modal-district" data-i18n="sm_addr_modal_district">District / Area</label>
+            <input class="address-modal__input" id="addr-modal-district" type="text"
+              placeholder="e.g. Maadi" data-i18n-placeholder="sm_addr_modal_district_ph"
+              autocomplete="address-level3" />
+          </div>
+          <div class="address-modal__field">
+            <label class="address-modal__label" for="addr-modal-city" data-i18n="sm_addr_modal_city">City</label>
+            <input class="address-modal__input" id="addr-modal-city" type="text"
+              value="${escapeAttr(prefillCity || '')}"
+              placeholder="e.g. Cairo" data-i18n-placeholder="sm_addr_modal_city_ph"
+              autocomplete="address-level2" required />
+          </div>
+        </div>
+        <p class="address-modal__error" id="addr-modal-error" role="alert"></p>
+        <div class="address-modal__footer">
+          <button type="button" class="address-modal__btn address-modal__btn--cancel" id="addr-modal-cancel" data-i18n="sm_addr_modal_cancel">Cancel</button>
+          <button type="submit" class="address-modal__btn address-modal__btn--save" id="addr-modal-save" data-i18n="sm_addr_modal_save">Save to profile</button>
+        </div>
+      </form>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  document.body.style.overflow = 'hidden';
+
+  // Re-run i18n applier if available
+  if (typeof window.applyI18n === 'function') window.applyI18n(overlay);
+
+  const close = () => {
+    overlay.remove();
+    document.body.style.overflow = '';
+    document.removeEventListener('keydown', onKey);
+  };
+
+  const onKey = (ev) => {
+    if (ev.key === 'Escape') close();
+  };
+  document.addEventListener('keydown', onKey);
+
+  overlay.addEventListener('click', (ev) => {
+    if (ev.target === overlay) close();
+  });
+  overlay.querySelector('#addr-modal-close').addEventListener('click', close);
+  overlay.querySelector('#addr-modal-cancel').addEventListener('click', close);
+
+  // Focus first empty field
+  setTimeout(() => {
+    overlay.querySelector('#addr-modal-street')?.focus();
+  }, 80);
+
+  const form = overlay.querySelector('#addr-modal-form');
+  const errorEl = overlay.querySelector('#addr-modal-error');
+  const saveBtn = overlay.querySelector('#addr-modal-save');
+
+  form.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    errorEl.textContent = '';
+
+    const labelVal = overlay.querySelector('#addr-modal-label').value.trim();
+    const streetVal = overlay.querySelector('#addr-modal-street').value.trim();
+    const districtVal = overlay.querySelector('#addr-modal-district').value.trim();
+    const cityVal = overlay.querySelector('#addr-modal-city').value.trim();
+
+    if (!streetVal || !cityVal) {
+      errorEl.textContent = i18nText('sm_addr_modal_required', 'Street and city are required.');
+      return;
+    }
+
+    const payload = {
+      label: labelVal || 'Smart Match',
+      street: streetVal,
+      city: cityVal,
+    };
+    if (districtVal) payload.state = districtVal;
+
+    const originalLabel = saveBtn.textContent;
+    saveBtn.disabled = true;
+    saveBtn.textContent = i18nText('sm_addr_modal_saving', 'Saving…');
+
+    addAddress(payload)
+      .then((saved) => {
+        // Refresh local cache so customer-dashboard reflects new address immediately
+        if (Array.isArray(window.__servio_user_addresses)) {
+          window.__servio_user_addresses.push(saved);
+        }
+        if (typeof onSaved === 'function') {
+          onSaved({
+            _id: saved?._id || saved?.id,
+            label: payload.label,
+            street: payload.street,
+            state: payload.state || '',
+            city: payload.city,
+          });
+        }
+        close();
+      })
+      .catch(() => {
+        errorEl.textContent = i18nText('sm_addr_modal_error', 'Could not save address. Please try again.');
+        saveBtn.disabled = false;
+        saveBtn.textContent = originalLabel;
+      });
+  });
+}
+
+function i18nText(key, fallback) {
+  try {
+    const dict = window.__servioI18n || window.I18N || null;
+    if (dict && typeof dict[key] === 'string') return dict[key];
+  } catch { /* noop */ }
+  const el = document.querySelector(`[data-i18n="${key}"]`);
+  if (el && el.textContent) return el.textContent;
+  return fallback;
+}
+
 function resetState({ textarea, btnSubmit, processingArea, resultsArea, divider }) {
   lastSmartMatchRender = null;
   processingArea.innerHTML = '';
@@ -378,6 +683,33 @@ function resetState({ textarea, btnSubmit, processingArea, resultsArea, divider 
   resultsArea.innerHTML = '';
   btnSubmit.disabled = true;
   textarea.disabled = true;
+}
+
+async function augmentAndResubmit({ textarea, btnSubmit, processingArea, resultsArea, divider }, append) {
+  const base = (lastSmartMatchRender?.prompt || textarea.value || '').trim();
+  if (!base && !append) return;
+  const joined = append ? (base ? `${base}, ${append}` : append) : base;
+  textarea.value = joined;
+  resetState({ textarea, btnSubmit, processingArea, resultsArea, divider });
+  try {
+    await showProcessingSteps(processingArea, [
+      'Updating with your selection...',
+      'Re-matching technicians...',
+    ]);
+    const data = await smartMatch({ prompt: joined, location: currentLocation || undefined });
+    await generateProcessingLog(processingArea, 'Updated.', true);
+    renderSmartMatch(data, resultsArea, joined);
+  } catch (err) {
+    console.error('Smart Match Error:', err);
+    renderError(resultsArea, err);
+  } finally {
+    processingArea.hidden = true;
+    divider.hidden = true;
+    textarea.disabled = false;
+    btnSubmit.disabled = false;
+    resultsArea.hidden = false;
+    resultsArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 }
 
 async function showProcessingSteps(processingArea, steps) {
@@ -439,7 +771,10 @@ function renderSmartMatch(data, resultsArea, prompt, selectedServiceOverride = n
     <section class="bento-stage" data-bstage="2" aria-label="Choose technician">
       ${renderBentoTechHeader(service, effectiveExtracted, selectedMatches.length)}
       ${selectedMatches.length
-        ? renderBentoTechHero(selectedMatches[0], service) + renderBentoTechAlternatives(selectedMatches.slice(1), service)
+        ? `<div class="bento-tech-board${selectedMatches.length > 1 ? '' : ' is-single'}">
+            ${renderBentoTechHero(selectedMatches[0], service)}
+            ${selectedMatches.length > 1 ? renderBentoTechAlternatives(selectedMatches.slice(1), service) : ''}
+          </div>`
         : renderNoTechsState(effectiveExtracted, service)}
       ${renderBentoStageBack()}
     </section>
@@ -508,7 +843,11 @@ function renderBentoHero(data, confidence, scenario, steps, extracted) {
   const chipBits = [];
   if (extracted.location) chipBits.push(`<span class="bento-hero__chip">📍 ${escapeHtml(formatLocation(extracted.location))}</span>`);
   if (extracted.budget) chipBits.push(`<span class="bento-hero__chip">💰 ${escapeHtml(String(extracted.budget))}</span>`);
-  if (extracted.time_range || extracted.time) chipBits.push(`<span class="bento-hero__chip">🕐 ${escapeHtml(String(extracted.time_range || extracted.time))}</span>`);
+  if (extracted.time_range || extracted.time) {
+    const rawTime = String(extracted.time_range || extracted.time);
+    const dateTail = extracted.time_range_display ? ` · ${extracted.time_range_display}` : '';
+    chipBits.push(`<span class="bento-hero__chip">🕐 ${escapeHtml(rawTime + dateTail)}</span>`);
+  }
 
   const circ = 2 * Math.PI * 28;
   const offset = circ - (circ * conf) / 100;
@@ -628,8 +967,27 @@ function renderBentoPlanCard(step, selectedService, idx, total) {
   `;
 }
 
+function formatEarliestArrival(extracted, selectedMatches) {
+  const unavailable = selectedMatches[0]?.isAvailable === false;
+  const bucket = extracted?.time_range_bucket;
+  const display = extracted?.time_range_display;
+  const iso = extracted?.time_range_iso;
+  const raw = extracted?.time_range;
+
+  if (bucket === 'asap') return unavailable ? 'Within 24 hours' : 'ASAP';
+  if (bucket === 'tonight') return 'Tonight';
+  if (bucket === 'today') return unavailable ? 'Within 24 hours' : 'Today';
+  if (bucket === 'tomorrow') return 'Tomorrow';
+  if (bucket === 'weekend' && display) return `Weekend · ${display}`;
+  if (bucket === 'flexible') return 'Flexible';
+  if (display) return display;
+  if (iso) return iso;
+  if (raw) return String(raw);
+  return unavailable ? 'Within 24 hours' : 'Today';
+}
+
 function renderBentoInsightStrip(data, extracted, selectedMatches) {
-  const earliest = selectedMatches[0]?.isAvailable === false ? 'Within 24 hours' : 'Today';
+  const earliest = formatEarliestArrival(extracted, selectedMatches);
   const budgetFit = extracted.budget ? `Within your ${escapeHtml(String(extracted.budget))} budget` : 'Quote on site';
   const area = extracted.location
     ? `${selectedMatches.length} verified in ${escapeHtml(formatLocation(extracted.location))}`
@@ -658,18 +1016,88 @@ function renderBentoInsightStrip(data, extracted, selectedMatches) {
 function renderBentoAdvisoryMissing(data, extracted) {
   const advisory = data.advisory_missing_fields || [];
   if (!advisory.length) return '';
-  const chips = [];
-  if (advisory.includes('location') && !extracted.location) chips.push('📍 Add location for closer matches');
-  if (advisory.includes('budget')) chips.push('💰 Budget: technician will quote on site');
-  if (advisory.includes('time_range')) chips.push('🕐 Time: flexible — confirm with technician');
-  if (!chips.length) return '';
+  const suggestions = data.prompt_suggestions || {};
+  const followUps = data.field_follow_ups || {};
+
+  const rows = [];
+
+  if (advisory.includes('time_range')) {
+    const chips = Array.isArray(suggestions.time_range) ? suggestions.time_range : [];
+    rows.push(renderMissingFieldRow({
+      field: 'time_range',
+      icon: '🕐',
+      label: 'When should we come?',
+      hint: followUps.time_range || 'Pick a time or keep it flexible.',
+      currentValue: extracted.time_range_is_default ? null : extracted.time_range,
+      defaultLabel: extracted.time_range_is_default ? extracted.time_range : null,
+      chips: chips.map((c) => ({ label: c, action: 'fill-time', value: c })),
+    }));
+  }
+
+  if (advisory.includes('budget')) {
+    const chips = Array.isArray(suggestions.budget) ? suggestions.budget : [];
+    const estimate = extracted.budget_estimate;
+    rows.push(renderMissingFieldRow({
+      field: 'budget',
+      icon: '💰',
+      label: 'Budget',
+      hint: followUps.budget || (estimate ? `Typical: ${estimate}. Pick a range or skip — quote on site.` : 'Pick a range or skip — quote on site.'),
+      currentValue: extracted.budget_is_default ? null : extracted.budget,
+      defaultLabel: estimate ? `Est. ${estimate}` : null,
+      chips: chips.map((c) => ({ label: c, action: 'fill-budget', value: c })),
+    }));
+  }
+
+  if (advisory.includes('location') && !extracted.location) {
+    rows.push(renderMissingFieldRow({
+      field: 'location',
+      icon: '📍',
+      label: 'Address',
+      hint: followUps.location || 'Add your address so we can match technicians near you.',
+      currentValue: null,
+      defaultLabel: null,
+      chips: [{ label: '+ Add address', action: 'add-address', value: '', primary: true }],
+    }));
+  }
+
+  if (!rows.length) return '';
+
   return `
-    <aside class="bento-advisory" aria-label="Optional details">
-      <span class="bento-advisory__eyebrow">Optional — helps find closer matches</span>
-      <div class="bento-advisory__chips">
-        ${chips.map((c) => `<span class="bento-advisory__chip">${escapeHtml(c)}</span>`).join('')}
+    <aside class="bento-advisory bento-advisory--missing" aria-label="Complete your request">
+      <header class="bento-advisory__header">
+        <span class="bento-advisory__eyebrow">Make it more accurate</span>
+        <p class="bento-advisory__lede">Pick any that fit — we'll match closer technicians. Skip to keep smart defaults.</p>
+      </header>
+      <div class="bento-advisory__rows">
+        ${rows.join('')}
       </div>
     </aside>
+  `;
+}
+
+function renderMissingFieldRow({ field, icon, label, hint, currentValue, defaultLabel, chips }) {
+  const statusHtml = currentValue
+    ? `<span class="bento-advisory__status is-set">✓ ${escapeHtml(String(currentValue))}</span>`
+    : defaultLabel
+      ? `<span class="bento-advisory__status is-default">${escapeHtml(String(defaultLabel))}</span>`
+      : '';
+  const chipsHtml = chips.map((c) => {
+    const cls = c.primary ? 'bento-advisory__chip bento-advisory__chip--primary' : 'bento-advisory__chip bento-advisory__chip--action';
+    const dataAttr = `data-smart-${escapeAttr(c.action)}="${escapeAttr(c.value)}"`;
+    return `<button type="button" class="${cls}" ${dataAttr}>${escapeHtml(c.label)}</button>`;
+  }).join('');
+  return `
+    <div class="bento-advisory__row" data-field="${escapeAttr(field)}">
+      <div class="bento-advisory__row-head">
+        <span class="bento-advisory__icon" aria-hidden="true">${icon}</span>
+        <div class="bento-advisory__row-text">
+          <strong class="bento-advisory__row-label">${escapeHtml(label)}</strong>
+          <span class="bento-advisory__row-hint">${escapeHtml(hint)}</span>
+        </div>
+        ${statusHtml}
+      </div>
+      ${chipsHtml ? `<div class="bento-advisory__chips">${chipsHtml}</div>` : ''}
+    </div>
   `;
 }
 
@@ -772,7 +1200,10 @@ function renderBentoAltRow(worker, selectedService) {
         <span class="bento-alt__meta">${escapeHtml(formatLocation(worker.locationLabel || worker.area || 'Cairo'))} · ${escapeHtml(rateLabel(worker))}</span>
       </div>
       <span class="bento-alt__rating">${rating.toFixed(1)} ★</span>
-      <a class="bento-alt__book" href="${bookHref}">Book</a>
+      <div class="bento-alt__actions">
+        <a class="bento-alt__book" href="${bookHref}">Book</a>
+        <a class="bento-alt__profile" href="${profileHref}">View profile</a>
+      </div>
     </li>
   `;
 }
@@ -915,14 +1346,58 @@ function generateProcessingLog(processingArea, text, isFinal) {
   });
 }
 
+function setupScrollReveal() {
+  if (!('IntersectionObserver' in window)) {
+    document.querySelectorAll('[data-reveal]').forEach((el) => el.classList.add('is-revealed'));
+    return;
+  }
+
+  const io = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('is-revealed');
+        io.unobserve(entry.target);
+      }
+    }
+  }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
+
+  const observeAll = (root) => {
+    const targets = (root || document).querySelectorAll('[data-reveal]:not(.is-revealed)');
+    targets.forEach((el) => io.observe(el));
+  };
+
+  observeAll(document);
+
+  // Catch dynamically-injected elements (results / processing).
+  const mo = new MutationObserver((mutations) => {
+    for (const m of mutations) {
+      for (const node of m.addedNodes) {
+        if (node.nodeType !== 1) continue;
+        if (node.matches && node.matches('[data-reveal]:not(.is-revealed)')) io.observe(node);
+        if (node.querySelectorAll) observeAll(node);
+      }
+    }
+  });
+  mo.observe(document.body, { childList: true, subtree: true });
+}
+
 function setupHeroCanvas() {
   const canvas = document.getElementById('hero-ai-canvas');
   if (!canvas) return;
 
-  const ctx = canvas.getContext('2d');
+  const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const ctx = canvas.getContext('2d', { alpha: true });
   const points = [];
   const gridSize = 45;
   let mousePos = { x: undefined, y: undefined };
+  let dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+  let logicalWidth = 0;
+  let logicalHeight = 0;
+  let rafId = 0;
+  let running = false;
+  let visible = true;
+  let pageVisible = !document.hidden;
 
   class Point {
     constructor(x, y) {
@@ -962,8 +1437,8 @@ function setupHeroCanvas() {
 
   const initCanvas = () => {
     points.length = 0;
-    const cols = Math.ceil(canvas.width / gridSize);
-    const rows = Math.ceil(canvas.height / gridSize);
+    const cols = Math.ceil(logicalWidth / gridSize);
+    const rows = Math.ceil(logicalHeight / gridSize);
     for (let i = 0; i <= cols; i++) {
       for (let j = 0; j <= rows; j++) {
         points.push(new Point(i * gridSize, j * gridSize));
@@ -971,68 +1446,183 @@ function setupHeroCanvas() {
     }
   };
 
-  const animateCanvas = () => {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const cols = Math.ceil(canvas.width / gridSize);
-    const rows = Math.ceil(canvas.height / gridSize);
+  let cachedTheme = document.documentElement.getAttribute('data-theme');
+  let cachedGradient = null;
+  let cachedBaseWidth = 1.2;
 
-    points.forEach((p) => p.update());
-
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-
+  const rebuildGradient = () => {
+    const isDark = cachedTheme === 'dark';
+    cachedGradient = ctx.createLinearGradient(0, 0, logicalWidth, logicalHeight);
     if (isDark) {
-      gradient.addColorStop(0, 'rgba(219, 203, 180, 0.25)');
-      gradient.addColorStop(1, 'rgba(100, 100, 100, 0.1)');
+      cachedGradient.addColorStop(0, 'rgba(219, 203, 180, 0.25)');
+      cachedGradient.addColorStop(1, 'rgba(100, 100, 100, 0.1)');
     } else {
-      gradient.addColorStop(0, 'rgba(30, 27, 75, 0.25)');
-      gradient.addColorStop(1, 'rgba(154, 140, 115, 0.45)');
+      cachedGradient.addColorStop(0, 'rgba(30, 27, 75, 0.25)');
+      cachedGradient.addColorStop(1, 'rgba(154, 140, 115, 0.45)');
     }
-    ctx.strokeStyle = gradient;
+    cachedBaseWidth = isDark ? 1 : 1.2;
+  };
+
+  const themeObserver = new MutationObserver(() => {
+    const next = document.documentElement.getAttribute('data-theme');
+    if (next !== cachedTheme) {
+      cachedTheme = next;
+      rebuildGradient();
+    }
+  });
+  themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+  const buckets = new Map();
+
+  const drawFrame = () => {
+    ctx.clearRect(0, 0, logicalWidth, logicalHeight);
+    const cols = Math.ceil(logicalWidth / gridSize);
+    const rows = Math.ceil(logicalHeight / gridSize);
+
+    let maxZ = 0;
+    for (let k = 0; k < points.length; k++) {
+      points[k].update();
+      const az = points[k].z;
+      if (az > maxZ) maxZ = az;
+      else if (-az > maxZ) maxZ = -az;
+    }
+
+    ctx.strokeStyle = cachedGradient;
+    const baseWidth = cachedBaseWidth;
+
+    if (maxZ < 0.25) {
+      ctx.lineWidth = baseWidth;
+      ctx.beginPath();
+      for (let i = 0; i < cols; i++) {
+        for (let j = 0; j < rows; j++) {
+          const p1 = points[i * (rows + 1) + j];
+          const p2 = points[i * (rows + 1) + (j + 1)];
+          const p3 = points[(i + 1) * (rows + 1) + j];
+          if (p1 && p2) {
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+          }
+          if (p1 && p3) {
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p3.x, p3.y);
+          }
+        }
+      }
+      ctx.stroke();
+      return;
+    }
+
+    buckets.forEach((seg) => { seg.length = 0; });
 
     for (let i = 0; i < cols; i++) {
       for (let j = 0; j < rows; j++) {
         const p1 = points[i * (rows + 1) + j];
         const p2 = points[i * (rows + 1) + (j + 1)];
         const p3 = points[(i + 1) * (rows + 1) + j];
-
-        if (p1 && p2) {
-          ctx.beginPath();
-          ctx.moveTo(p1.x, p1.y);
-          ctx.lineTo(p2.x, p2.y);
-          ctx.lineWidth = (isDark ? 1 : 1.2) + p1.z / 12;
-          ctx.stroke();
-        }
-
-        if (p1 && p3) {
-          ctx.beginPath();
-          ctx.moveTo(p1.x, p1.y);
-          ctx.lineTo(p3.x, p3.y);
-          ctx.lineWidth = (isDark ? 1 : 1.2) + p1.z / 12;
-          ctx.stroke();
-        }
+        if (!p1) continue;
+        const lw = baseWidth + p1.z / 12;
+        const key = Math.round(lw * 4) / 4;
+        let seg = buckets.get(key);
+        if (!seg) { seg = []; buckets.set(key, seg); }
+        if (p2) { seg.push(p1.x, p1.y, p2.x, p2.y); }
+        if (p3) { seg.push(p1.x, p1.y, p3.x, p3.y); }
       }
     }
-    requestAnimationFrame(animateCanvas);
+    buckets.forEach((coords, lw) => {
+      if (coords.length === 0) return;
+      ctx.lineWidth = lw;
+      ctx.beginPath();
+      for (let k = 0; k < coords.length; k += 4) {
+        ctx.moveTo(coords[k], coords[k + 1]);
+        ctx.lineTo(coords[k + 2], coords[k + 3]);
+      }
+      ctx.stroke();
+    });
   };
+
+  const tick = () => {
+    if (!running) return;
+    drawFrame();
+    rafId = requestAnimationFrame(tick);
+  };
+
+  const start = () => {
+    if (running || !visible || !pageVisible) return;
+    running = true;
+    rafId = requestAnimationFrame(tick);
+  };
+
+  const stop = () => {
+    running = false;
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = 0;
+  };
+
+  let cachedCanvasRect = null;
 
   const resizeCanvas = () => {
     const rect = canvas.parentElement.getBoundingClientRect();
-    canvas.width = rect.width;
-    canvas.height = rect.height;
+    logicalWidth = rect.width;
+    logicalHeight = rect.height;
+    canvas.width = Math.round(logicalWidth * dpr);
+    canvas.height = Math.round(logicalHeight * dpr);
+    canvas.style.width = logicalWidth + 'px';
+    canvas.style.height = logicalHeight + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     initCanvas();
+    rebuildGradient();
+    cachedCanvasRect = canvas.getBoundingClientRect();
   };
 
+  let resizeRaf = 0;
+  const scheduleResize = () => {
+    if (resizeRaf) return;
+    resizeRaf = requestAnimationFrame(() => {
+      resizeRaf = 0;
+      resizeCanvas();
+    });
+  };
+
+  let pendingMouse = null;
+  let mouseRaf = 0;
   canvas.parentElement.addEventListener('mousemove', (e) => {
-    const rect = canvas.getBoundingClientRect();
-    mousePos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-  });
+    pendingMouse = { clientX: e.clientX, clientY: e.clientY };
+    if (mouseRaf) return;
+    mouseRaf = requestAnimationFrame(() => {
+      mouseRaf = 0;
+      if (!pendingMouse) return;
+      const rect = cachedCanvasRect || canvas.getBoundingClientRect();
+      mousePos = { x: pendingMouse.clientX - rect.left, y: pendingMouse.clientY - rect.top };
+      pendingMouse = null;
+    });
+  }, { passive: true });
 
   canvas.parentElement.addEventListener('mouseleave', () => {
     mousePos = { x: undefined, y: undefined };
+    pendingMouse = null;
+  }, { passive: true });
+
+  const refreshRectOnScroll = () => { cachedCanvasRect = canvas.getBoundingClientRect(); };
+  window.addEventListener('scroll', refreshRectOnScroll, { passive: true });
+  window.addEventListener('resize', scheduleResize, { passive: true });
+  document.addEventListener('visibilitychange', () => {
+    pageVisible = !document.hidden;
+    if (pageVisible) start(); else stop();
   });
 
-  window.addEventListener('resize', resizeCanvas);
+  if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver((entries) => {
+      visible = entries[0].isIntersecting;
+      if (visible) start(); else stop();
+    }, { rootMargin: '0px' });
+    io.observe(canvas);
+  }
+
   resizeCanvas();
-  animateCanvas();
+  if (reducedMotion) {
+    drawFrame();
+    return;
+  }
+  start();
 }
+

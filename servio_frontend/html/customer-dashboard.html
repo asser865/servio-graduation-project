@@ -30,7 +30,9 @@
         });
       })();
     </script>
-    <link rel="stylesheet" href="../css/main.css" />
+    <link rel="stylesheet" href="../css/main.css?v=2" />
+    <link rel="stylesheet" href="../css/components/heart-toggle.css" />
+    <link rel="stylesheet" href="../css/components/busy-badge.css" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
@@ -137,6 +139,18 @@
         </svg>
         </span>
         <span class="dash-nav__label" data-i18n="cust_nav_history">History</span>
+      </button>
+    </li>
+    <li role="none">
+      <button class="dash-nav__btn" role="tab" aria-selected="false"
+              aria-controls="panel-support" id="tab-support" data-tab="support" title="Support">
+        <span class="dash-nav__icon-slot" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4"/><path d="M12 16h.01"/>
+        </svg>
+        </span>
+        <span class="dash-nav__label">Support</span>
+        <span class="nav-badge nav-badge--red" id="supportCasesBadge">0</span>
       </button>
     </li>
     <li role="none">
@@ -453,14 +467,50 @@
   </div>
 
   <nav class="stab-bar" role="tablist" aria-label="Booking sections" id="bookings-stab-bar">
+    <button class="stab-btn" role="tab" aria-selected="false" aria-controls="stab-bookings-action" data-stab="bookings-action">Action Needed <span class="stab-btn__badge" id="bookingsActionBadge" hidden>0</span></button>
     <button class="stab-btn stab-btn--active" role="tab" aria-selected="true" aria-controls="stab-bookings-active" data-stab="bookings-active">Active</button>
     <button class="stab-btn" role="tab" aria-selected="false" aria-controls="stab-bookings-pending" data-stab="bookings-pending">Pending</button>
   </nav>
 
+  <div class="stab-pane" id="stab-bookings-action" role="tabpanel" hidden>
+    <div class="bookings-loading-state">Loading…</div>
+  </div>
   <div class="stab-pane stab-pane--active" id="stab-bookings-active" role="tabpanel">
     <div class="bookings-loading-state">Loading your bookings…</div>
   </div>
   <div class="stab-pane" id="stab-bookings-pending" role="tabpanel" hidden></div>
+</section>
+
+        <section class="dash-panel" id="panel-support" role="tabpanel" aria-labelledby="tab-support" data-panel="support" hidden>
+  <div class="dash-panel__header">
+    <h1 class="dash-panel__title">Support Cases</h1>
+    <p class="dash-panel__subtitle">Track operational issues, payment disputes, and resolved support cases.</p>
+  </div>
+
+  <div class="support-summary-grid">
+    <article class="support-summary-card">
+      <span>Open issues</span>
+      <strong id="supportOpenIssuesCount">0</strong>
+    </article>
+    <article class="support-summary-card">
+      <span>Open disputes</span>
+      <strong id="supportOpenDisputesCount">0</strong>
+    </article>
+    <article class="support-summary-card">
+      <span>Resolved cases</span>
+      <strong id="supportResolvedCount">0</strong>
+    </article>
+  </div>
+
+  <nav class="stab-bar support-stab-bar" role="tablist" aria-label="Support case sections">
+    <button class="stab-btn stab-btn--active" role="tab" aria-selected="true" data-support-filter="active">Active</button>
+    <button class="stab-btn" role="tab" aria-selected="false" data-support-filter="disputes">Disputes</button>
+    <button class="stab-btn" role="tab" aria-selected="false" data-support-filter="resolved">Resolved</button>
+  </nav>
+
+  <div class="support-cases-list" id="supportCasesList">
+    <p class="support-cases-empty">Loading support cases...</p>
+  </div>
 </section>
 
         <!-- History panel -->
@@ -486,56 +536,58 @@
     </div>
   </div>
 
-  <div class="history-status-tabs reveal" id="historyStatusTabs" role="tablist" aria-label="History status filters">
-    <button class="history-status-tab is-active" type="button" role="tab" aria-selected="true" data-history-status-tab="all">
-      <span data-i18n="cust_hist_tab_all">All</span>
-      <strong data-history-status-count="all">0</strong>
-    </button>
-    <button class="history-status-tab" type="button" role="tab" aria-selected="false" data-history-status-tab="completed">
-      <span data-i18n="cust_hist_tab_completed">Completed</span>
-      <strong data-history-status-count="completed">0</strong>
-    </button>
-    <button class="history-status-tab" type="button" role="tab" aria-selected="false" data-history-status-tab="needs-review">
-      <span data-i18n="cust_hist_tab_needs_review">Needs Review</span>
-      <strong data-history-status-count="needs-review">0</strong>
-    </button>
-    <button class="history-status-tab" type="button" role="tab" aria-selected="false" data-history-status-tab="reviewed">
-      <span data-i18n="cust_hist_tab_reviewed">Reviewed</span>
-      <strong data-history-status-count="reviewed">0</strong>
-    </button>
-    <button class="history-status-tab" type="button" role="tab" aria-selected="false" data-history-status-tab="cancelled">
-      <span data-i18n="cust_hist_tab_canceled">Canceled</span>
-      <strong data-history-status-count="cancelled">0</strong>
-    </button>
-  </div>
+  <!-- History Controls -->
+  <div class="history-control-bar reveal">
+    <div class="history-filters">
+      <select id="histFilterCategory" data-hist-filter="category">
+        <option value="" data-i18n="cust_filter_all_cats">All Categories</option>
+        <option value="Plumbing" data-i18n="cust_cat_plumbing">Plumbing</option>
+        <option value="HVAC" data-i18n="cust_cat_hvac">HVAC</option>
+        <option value="Carpentry" data-i18n="cust_cat_carpentry">Carpentry</option>
+        <option value="Painting" data-i18n="cust_cat_painting">Painting</option>
+        <option value="Cleaning" data-i18n="cust_cat_cleaning">Cleaning</option>
+      </select>
+      <select id="histFilterDate" data-hist-filter="date">
+        <option value="" data-i18n="cust_filter_all_time">All Time</option>
+        <option value="30" data-i18n="cust_filter_30d">Last 30 Days</option>
+        <option value="90" data-i18n="cust_filter_3m">Last 3 Months</option>
+        <option value="365" data-i18n="cust_filter_1y">Last Year</option>
+      </select>
+      <select id="histFilterPayment" data-hist-filter="payment">
+        <option value="" data-i18n="cust_filter_all_payments">All Payments</option>
+        <option value="Credit Card" data-i18n="cust_pay_card">Credit Card</option>
+        <option value="Cash" data-i18n="cust_pay_cash">Cash</option>
+      </select>
+      <select id="histFilterRating" data-hist-filter="rating">
+        <option value="" data-i18n="cust_filter_all_ratings">All Ratings</option>
+        <option value="5" data-i18n="cust_rating_5">5 Stars</option>
+        <option value="4" data-i18n="cust_rating_4">4 Stars & Above</option>
+      </select>
+      <button id="clearHistFilters" class="btn btn--sm btn--outline" data-i18n="cust_clear_filters">Clear</button>
+    </div>
 
-  <!-- History Filters -->
-  <div class="history-filters reveal">
-    <select id="histFilterCategory" data-hist-filter="category">
-      <option value="" data-i18n="cust_filter_all_cats">All Categories</option>
-      <option value="Plumbing" data-i18n="cust_cat_plumbing">Plumbing</option>
-      <option value="HVAC" data-i18n="cust_cat_hvac">HVAC</option>
-      <option value="Carpentry" data-i18n="cust_cat_carpentry">Carpentry</option>
-      <option value="Painting" data-i18n="cust_cat_painting">Painting</option>
-      <option value="Cleaning" data-i18n="cust_cat_cleaning">Cleaning</option>
-    </select>
-    <select id="histFilterDate" data-hist-filter="date">
-      <option value="" data-i18n="cust_filter_all_time">All Time</option>
-      <option value="30" data-i18n="cust_filter_30d">Last 30 Days</option>
-      <option value="90" data-i18n="cust_filter_3m">Last 3 Months</option>
-      <option value="365" data-i18n="cust_filter_1y">Last Year</option>
-    </select>
-    <select id="histFilterPayment" data-hist-filter="payment">
-      <option value="" data-i18n="cust_filter_all_payments">All Payments</option>
-      <option value="Credit Card" data-i18n="cust_pay_card">Credit Card</option>
-      <option value="Cash" data-i18n="cust_pay_cash">Cash</option>
-    </select>
-    <select id="histFilterRating" data-hist-filter="rating">
-      <option value="" data-i18n="cust_filter_all_ratings">All Ratings</option>
-      <option value="5" data-i18n="cust_rating_5">5 Stars</option>
-      <option value="4" data-i18n="cust_rating_4">4 Stars & Above</option>
-    </select>
-    <button id="clearHistFilters" class="btn btn--sm btn--outline" data-i18n="cust_clear_filters">Clear</button>
+    <div class="history-status-tabs" id="historyStatusTabs" role="tablist" aria-label="History status filters">
+      <button class="history-status-tab is-active" type="button" role="tab" aria-selected="true" data-history-status-tab="all">
+        <span data-i18n="cust_hist_tab_all">All</span>
+        <strong data-history-status-count="all">0</strong>
+      </button>
+      <button class="history-status-tab" type="button" role="tab" aria-selected="false" data-history-status-tab="completed">
+        <span data-i18n="cust_hist_tab_completed">Completed</span>
+        <strong data-history-status-count="completed">0</strong>
+      </button>
+      <button class="history-status-tab" type="button" role="tab" aria-selected="false" data-history-status-tab="needs-review">
+        <span data-i18n="cust_hist_tab_needs_review">Needs Review</span>
+        <strong data-history-status-count="needs-review">0</strong>
+      </button>
+      <button class="history-status-tab" type="button" role="tab" aria-selected="false" data-history-status-tab="reviewed">
+        <span data-i18n="cust_hist_tab_reviewed">Reviewed</span>
+        <strong data-history-status-count="reviewed">0</strong>
+      </button>
+      <button class="history-status-tab" type="button" role="tab" aria-selected="false" data-history-status-tab="cancelled">
+        <span data-i18n="cust_hist_tab_canceled">Canceled</span>
+        <strong data-history-status-count="cancelled">0</strong>
+      </button>
+    </div>
   </div>
 
   <div class="history-card-items-list" id="historyListRoot" data-reveal>
@@ -547,60 +599,44 @@
 
         <!-- Favourites panel -->
         <section class="dash-panel" id="panel-favourites" role="tabpanel" aria-labelledby="tab-favourites" data-panel="favourites" hidden>
-
   <div class="dash-panel__header">
     <h1 class="dash-panel__title" data-i18n="cust_nav_favourites">Favourites</h1>
     <p class="dash-panel__subtitle" data-i18n="cust_fav_sub">Technicians you've saved for quick booking.</p>
+    <span class="fav-count-badge"><strong id="fav-count">0</strong> saved</span>
   </div>
 
-  <div class="fav-card-v2" data-reveal>
-    <div class="fav-card-v2__avatar">OT</div>
-    <div class="fav-card-v2__body">
-      <h3 class="fav-card-v2__name">Omar Tarek</h3>
-      <div class="fav-card-v2__meta">
-        <span class="fav-card-v2__rating">★ 4.9</span>
-        <span class="fav-card-v2__specialty" data-i18n="tech_role_master_plumber">Master Plumber</span>
-        <span class="fav-card-v2__jobs-count" style="font-size:0.72rem;color:var(--color-text-light);">47 jobs</span>
-      </div>
-    </div>
-    <div class="fav-card-v2__actions">
-      <a class="btn btn--sm" href="./booking.html" data-i18n="cust_book_now">Book Now</a>
-      <button class="btn btn--sm btn--ghost" type="button" data-i18n="cust_remove">Remove</button>
-    </div>
+  <div class="fav-toolbar">
+    <input type="search" id="fav-search" class="fav-toolbar__search" placeholder="Search by name…">
+    <select id="fav-category" class="fav-toolbar__select">
+      <option value="">All categories</option>
+      <option value="plumbing">Plumbing</option>
+      <option value="electrical">Electrical</option>
+      <option value="hvac">HVAC</option>
+      <option value="carpentry">Carpentry</option>
+      <option value="appliance">Appliance</option>
+      <option value="cleaning">Cleaning</option>
+      <option value="painting">Painting</option>
+    </select>
+    <select id="fav-rating" class="fav-toolbar__select">
+      <option value="">Any rating</option>
+      <option value="4">4★ and up</option>
+      <option value="4.5">4.5★ and up</option>
+    </select>
+    <label class="fav-toolbar__check">
+      <input type="checkbox" id="fav-available-now"> Available now
+    </label>
+    <select id="fav-sort" class="fav-toolbar__select">
+      <option value="recent">Recently added</option>
+      <option value="rating">Top rated</option>
+      <option value="name">Name A–Z</option>
+    </select>
   </div>
 
-  <div class="fav-card-v2" data-reveal>
-    <div class="fav-card-v2__avatar">KS</div>
-    <div class="fav-card-v2__body">
-      <h3 class="fav-card-v2__name">Khaled Samir</h3>
-      <div class="fav-card-v2__meta">
-        <span class="fav-card-v2__rating">★ 4.7</span>
-        <span class="fav-card-v2__specialty" data-i18n="tech_role_electrician">Electrician</span>
-        <span class="fav-card-v2__jobs-count" style="font-size:0.72rem;color:var(--color-text-light);">31 jobs</span>
-      </div>
-    </div>
-    <div class="fav-card-v2__actions">
-      <a class="btn btn--sm" href="./booking.html" data-i18n="cust_book_now">Book Now</a>
-      <button class="btn btn--sm btn--ghost" type="button" data-i18n="cust_remove">Remove</button>
-    </div>
+  <div id="fav-list" class="fav-grid" aria-live="polite"></div>
+  <div id="fav-empty" class="fav-empty" hidden>
+    <p>No favourites yet — tap the heart on a technician card to save them here.</p>
   </div>
-
-  <div class="fav-card-v2" data-reveal>
-    <div class="fav-card-v2__avatar">YA</div>
-    <div class="fav-card-v2__body">
-      <h3 class="fav-card-v2__name">Youssef Ali</h3>
-      <div class="fav-card-v2__meta">
-        <span class="fav-card-v2__rating">★ 4.8</span>
-        <span class="fav-card-v2__specialty" data-i18n="tech_role_painter">Painter</span>
-        <span class="fav-card-v2__jobs-count" style="font-size:0.72rem;color:var(--color-text-light);">22 jobs</span>
-      </div>
-    </div>
-    <div class="fav-card-v2__actions">
-      <a class="btn btn--sm" href="./booking.html" data-i18n="cust_book_now">Book Now</a>
-      <button class="btn btn--sm btn--ghost" type="button" data-i18n="cust_remove">Remove</button>
-    </div>
-  </div>
-
+  <div id="fav-pagination" class="fav-pagination"></div>
 </section>
 
         <!-- Notifications panel -->
@@ -1716,6 +1752,37 @@
   </script>
 
     <!-- ── Deactivate Account modal ────────────────────────── -->
+    <div class="modal-overlay support-issue-modal" id="supportIssueModal" hidden role="dialog" aria-modal="true" aria-labelledby="supportIssueTitle">
+      <div class="modal-box support-issue-modal__box">
+        <div class="modal-box__header">
+          <h3 id="supportIssueTitle">Report a problem</h3>
+          <button type="button" class="modal-close" id="supportIssueClose" aria-label="Close">&times;</button>
+        </div>
+        <form id="supportIssueForm" class="support-issue-form">
+          <input type="hidden" id="supportIssueBookingId">
+          <label class="form-group" for="supportIssueType">
+            <span>Issue type</span>
+            <select id="supportIssueType" class="form-input" required></select>
+          </label>
+          <label class="form-group" for="supportIssueDescription">
+            <span>Details</span>
+            <textarea id="supportIssueDescription" class="form-input support-issue-form__textarea" minlength="20" maxlength="1000" rows="5" required placeholder="Describe what happened and what support should review."></textarea>
+          </label>
+          <label class="form-group" for="supportIssueEvidence">
+            <span>Evidence</span>
+            <input id="supportIssueEvidence" class="form-input" type="file" accept="image/jpeg,image/png,image/webp" multiple>
+            <small>Optional. Upload up to 6 images.</small>
+          </label>
+          <div class="support-issue-evidence" id="supportIssueEvidenceList" hidden></div>
+          <p class="support-issue-error" id="supportIssueError" role="alert" hidden></p>
+          <div class="modal-box__footer support-issue-form__actions">
+            <button type="button" class="btn btn--outline" id="supportIssueCancel">Cancel</button>
+            <button type="submit" class="btn btn--danger" id="supportIssueSubmit">Submit Case</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <!-- Change Email modal -->
     <div class="modal-overlay acct-modal" id="modal-change-email" hidden role="dialog" aria-modal="true" aria-labelledby="modal-change-email-title">
       <div class="modal-box acct-modal__box">

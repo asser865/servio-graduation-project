@@ -45,7 +45,15 @@ export const openDispute = (body) =>
 export const resolveDispute = (id, body) =>
   api.patch(`/payments/disputes/${id}/resolve`, body);
 
+export const reviewDispute = (id) =>
+  api.patch(`/payments/disputes/${id}/review`, {});
+
 export const getDisputes = (params = {}) => {
   const qs = new URLSearchParams(params).toString();
   return api.get(`/payments/disputes${qs ? '?' + qs : ''}`);
+};
+
+export const getMyDisputes = (params = {}) => {
+  const qs = new URLSearchParams(params).toString();
+  return api.get(`/payments/disputes/my${qs ? '?' + qs : ''}`);
 };

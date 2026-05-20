@@ -10,8 +10,12 @@ import { uploadPublicFile } from '../api/uploads.js';
 import { getMyBookings, cancelBooking } from '../api/bookings.js';
 import { getMyReviews, createReview } from '../api/reviews.js';
 import { getSavedCards, addSavedCard, deleteSavedCard, setDefaultCard } from '../api/savedCards.js';
+import { confirmCompletion, getMyDisputes } from '../api/payments.js';
+import { createSupportIssue, getMySupportIssues } from '../api/support.js';
 import { snapshotFeeFromBooking, formatMoney as formatFeeMoney, paymentMethodLabel } from '../utils/fee.js';
 import { getNotifications as apiGetNotifications, markOneRead as apiMarkOneRead, markAllRead as apiMarkAllRead, clearAll as apiClearAll, deleteOne as apiDeleteOne } from '../api/notifications.js';
+import { listFavorites, removeFavorite } from '../api/favorites.js';
+import { renderBusyBadge } from '../components/busy-badge.js';
 
 const STAR_SVG = (fill = '#F59E0B', size = 14) =>
   `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="${fill}" stroke="${fill}" stroke-width="0"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
@@ -22,6 +26,10 @@ const EMPTY_STAR_SVG = (size = 14) =>
 const TAB_KEY = 'servio_activeTab_customer';
 let _bookingSnapshotBuilt = false;
 let _historyLoaded = false;
+let _supportCasesLoaded = false;
+let _supportCasesCache = { issues: [], disputes: [] };
+let _supportFilter = 'active';
+let _supportIssueContext = null;
 
 // Holds the uploaded avatar URL between file-select and form-save
 let _pendingPhotoUrl = null;
@@ -285,6 +293,8 @@ function initTabs() {
         if (root) root.innerHTML = '<div class="history-error-state"><p>Failed to load history. Please refresh.</p></div>';
       });
     }
+    if (tab.dataset.tab === 'favourites') loadFavorites().catch(err => console.error('[Favourites]', err));
+    if (tab.dataset.tab === 'support') loadSupportCases().catch(err => console.error('[Support]', err));
   }));
   document.querySelectorAll('.dash-mobile-tab').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -297,12 +307,30 @@ function initTabs() {
           if (root) root.innerHTML = '<div class="history-error-state"><p>Failed to load history. Please refresh.</p></div>';
         });
       }
+      if (btn.dataset.mobileTab === 'favourites') loadFavorites().catch(err => console.error('[Favourites]', err));
+      if (btn.dataset.mobileTab === 'support') loadSupportCases().catch(err => console.error('[Support]', err));
     });
   });
 
   // data-tab-link buttons (Quick Actions → Bookings, Favourites, etc.)
   document.querySelectorAll('[data-tab-link]').forEach(btn => {
-    btn.addEventListener('click', () => showTab(btn.dataset.tabLink));
+    btn.addEventListener('click', () => {
+      showTab(btn.dataset.tabLink);
+      if (btn.dataset.tabLink === 'favourites') loadFavorites().catch(err => console.error('[Favourites]', err));
+      if (btn.dataset.tabLink === 'support') loadSupportCases().catch(err => console.error('[Support]', err));
+    });
+  });
+
+  document.querySelectorAll('[data-support-filter]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      _supportFilter = btn.dataset.supportFilter || 'active';
+      document.querySelectorAll('[data-support-filter]').forEach(item => {
+        const active = item === btn;
+        item.classList.toggle('stab-btn--active', active);
+        item.setAttribute('aria-selected', String(active));
+      });
+      renderSupportCases();
+    });
   });
 
   // Cancel booking with contextual confirmation
@@ -513,6 +541,7 @@ async function loadBookingsData() {
     }
 
     renderBookingsTab(bookings);
+    loadSupportCases().catch(err => console.error('[Disputes]', err));
     populateStats(bookings);
     _restoreSubTab(activePane);
   } catch (err) {
@@ -600,15 +629,62 @@ async function loadHistoryData() {
     });
   });
 
+  root.querySelectorAll('[data-support-issue]').forEach(btn => {
+    btn.addEventListener('click', () => openSupportIssueModal(btn.dataset.supportIssue, btn.dataset.supportMode || 'post'));
+  });
+
+  root.querySelectorAll('[data-confirm-completion]').forEach(btn => {
+    btn.addEventListener('click', () => confirmHistoryCompletion(btn));
+  });
+
+  root.querySelectorAll('[data-low-rating-report]').forEach(btn => {
+    btn.addEventListener('click', () => openSupportIssueModal(btn.dataset.lowRatingReport, 'post'));
+  });
+
+  root.querySelectorAll('[data-tab-link]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      showTab(btn.dataset.tabLink);
+      if (btn.dataset.tabLink === 'support') loadSupportCases().catch(err => console.error('[Support]', err));
+    });
+  });
+
   // Wire rating submit buttons
   root.querySelectorAll('[data-submit-review]').forEach(btn => {
     const rateBlock = btn.closest('[data-rate-block]');
     if (!rateBlock) return;
     rateBlock.querySelectorAll('input[type="radio"]').forEach(radio => {
-      radio.addEventListener('change', () => { btn.disabled = false; });
+      radio.addEventListener('change', () => {
+        btn.disabled = false;
+        const prompt = rateBlock.querySelector('[data-low-rating-prompt]');
+        const selected = parseInt(radio.value, 10);
+        if (prompt) prompt.hidden = !(selected > 0 && selected <= 3);
+      });
     });
     btn.addEventListener('click', () => submitReview(btn));
   });
+}
+
+async function confirmHistoryCompletion(btn) {
+  const bookingId = btn?.dataset?.confirmCompletion;
+  if (!bookingId) return;
+
+  btn.disabled = true;
+  const originalText = btn.textContent;
+  btn.textContent = 'Confirming...';
+
+  try {
+    await confirmCompletion(bookingId);
+    showToast('Service confirmed. Admin review is now pending.', 'success');
+    await Promise.all([
+      loadHistoryData(),
+      loadBookingsData(),
+      loadSupportCases().catch(() => null),
+    ]);
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = originalText || 'Confirm Complete';
+    showToast(err?.response?.data?.message || err?.data?.message || err.message || 'Failed to confirm completion.', 'error');
+  }
 }
 
 function buildHistoryCard(b, review) {
@@ -622,10 +698,16 @@ function buildHistoryCard(b, review) {
   const priceRaw     = totals.estimatedTotal ? formatFeeMoney(totals.estimatedTotal) : '—';
   const paymentMethod = paymentMethodLabel(b.paymentMethod || b.payment, b.paymentMeta);
   const ref          = `#${(b._id || '').slice(-6).toUpperCase()}`;
-  const isCompleted  = b.status === 'completed';
-  const isCancelled  = b.status === 'cancelled' || b.status === 'rejected';
+  const status = b.status || '';
+  const isNeedsCustomerReview = status === 'awaiting_customer_confirmation';
+  const isPendingAdminReview = status === 'pending_admin_review';
+  const isDisputed = status === 'disputed';
+  const isCompleted  = status === 'completed';
+  const isCancelled  = status === 'cancelled' || status === 'rejected';
   const rating       = review?.rating ?? 0;
   const comment      = review?.comment || '';
+  const completedAt = new Date(b.updatedAt || b.customerConfirmedAt || b.scheduledDate || 0).getTime();
+  const canReportCompleted = isCompleted && completedAt && (Date.now() - completedAt <= 48 * 60 * 60 * 1000);
 
   // Service icon — inline SVGs matching the services marketplace page
   const CAT_ICON_SVG = {
@@ -650,10 +732,17 @@ function buildHistoryCard(b, review) {
   // Rating section markup
   let ratingSection = '';
   if (isCompleted && rating) {
+    const lowRatingFollowup = rating <= 3 && canReportCompleted
+      ? `<div class="history-v2__low-rating-prompt history-v2__low-rating-prompt--submitted">
+          <span>Problem with this technician?</span>
+          <button type="button" data-low-rating-report="${b._id}">Report problem</button>
+        </div>`
+      : '';
     ratingSection = `
       <div class="history-v2__comment-block">
         <div class="history-v2__rating-stars" aria-label="${rating} out of 5 stars">${staticStars}</div>
         ${comment ? `<p class="history-v2__comment-text">"${comment}"</p>` : ''}
+        ${lowRatingFollowup}
       </div>`;
   } else if (isCompleted && !rating) {
     // Interactive rating widget — CSS-only star picker (RTL trick: reversed flex + sibling combinator)
@@ -670,6 +759,11 @@ function buildHistoryCard(b, review) {
               </label>`).join('')}
           </div>
           <textarea class="history-v2__comment-input" placeholder="Share your experience (optional)" rows="2" maxlength="1000"></textarea>
+          ${canReportCompleted ? `
+            <div class="history-v2__low-rating-prompt" data-low-rating-prompt hidden>
+              <span>Is there a problem with this technician?</span>
+              <button type="button" data-low-rating-report="${b._id}">Report problem</button>
+            </div>` : ''}
           <button class="history-v2__submit-btn" data-submit-review data-booking-id="${b._id}" disabled>Submit Review</button>
         </div>
       </div>`;
@@ -679,6 +773,17 @@ function buildHistoryCard(b, review) {
   const payIcon = String(b.paymentMethod || b.payment).toLowerCase() === 'cash'
     ? `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M22 10H2"/></svg>`
     : `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>`;
+  const completedSupportHTML = canReportCompleted
+    ? `<button class="btn btn--sm btn--outline" type="button" data-support-issue="${b._id}" data-support-mode="post">Report problem</button>`
+    : '';
+  const customerReviewActionsHTML = isNeedsCustomerReview
+    ? `
+      <button class="btn btn--sm history-v2__confirm-btn" type="button" data-confirm-completion="${b._id}">Confirm Complete</button>
+      <a class="btn btn--sm history-v2__dispute-btn" href="./booking-details.html?id=${b._id}&action=dispute">Open Dispute</a>`
+    : '';
+  const adminReviewActionHTML = isPendingAdminReview
+    ? `<button class="btn btn--sm btn--outline" type="button" data-tab-link="support">View Support</button>`
+    : '';
 
   const el = document.createElement('article');
   el.className = 'history-card-v2';
@@ -687,8 +792,11 @@ function buildHistoryCard(b, review) {
   el.dataset.date     = b.scheduledDate || '';
   el.dataset.rating   = String(rating);
   el.dataset.cat      = catKey || 'default';
-  el.dataset.status   = isCancelled ? 'cancelled' : (isCompleted ? 'completed' : b.status || '');
-  el.dataset.reviewState = isCompleted ? (rating ? 'reviewed' : 'needs-review') : '';
+  el.dataset.status   = isCancelled ? 'cancelled' : status;
+  el.dataset.canPostSupport = canReportCompleted ? 'true' : 'false';
+  el.dataset.reviewState = isNeedsCustomerReview || (isCompleted && !rating)
+    ? 'needs-review'
+    : (isCompleted && rating ? 'reviewed' : '');
 
   el.innerHTML = `
     <div class="history-v2__top-row">
@@ -699,6 +807,9 @@ function buildHistoryCard(b, review) {
             <h4 class="history-v2__title">${title}</h4>
             <small class="history-v2__id">${ref}</small>
             ${isCancelled ? `<span class="history-v2__status-badge badge-cancelled">Canceled</span>` : ''}
+            ${isNeedsCustomerReview ? `<span class="history-v2__status-badge history-v2__status-badge--needs-review">Needs Review</span>` : ''}
+            ${isPendingAdminReview ? `<span class="history-v2__status-badge history-v2__status-badge--admin-review">Admin Review</span>` : ''}
+            ${isDisputed ? `<span class="history-v2__status-badge history-v2__status-badge--disputed">Disputed</span>` : ''}
             ${isCompleted && !isCancelled ? `<span class="history-v2__status-badge badge-completed">Completed</span>` : ''}
           </div>
           <p class="history-v2__provider">
@@ -722,6 +833,9 @@ function buildHistoryCard(b, review) {
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
           View Invoice
         </button>
+        ${customerReviewActionsHTML}
+        ${completedSupportHTML}
+        ${adminReviewActionHTML}
       </div>
     </div>
     ${ratingSection ? `<div class="history-v2__review-section">${ratingSection}</div>` : ''}
@@ -771,12 +885,22 @@ async function submitReview(btn) {
     const staticStars = Array.from({ length: 5 }, (_, i) =>
       i < rating ? STAR_SVG('var(--color-accent)', 22) : EMPTY_STAR_SVG(22)
     ).join('');
+    const lowRatingFollowup = rating <= 3 && card.dataset.canPostSupport === 'true'
+      ? `<div class="history-v2__low-rating-prompt history-v2__low-rating-prompt--submitted">
+          <span>Problem with this technician?</span>
+          <button type="button" data-low-rating-report="${bookingId}">Report problem</button>
+        </div>`
+      : '';
 
     rateBlock.outerHTML = `
       <div class="history-v2__comment-block">
         <div class="history-v2__rating-stars" aria-label="${rating} out of 5 stars">${staticStars}</div>
         ${comment ? `<p class="history-v2__comment-text">"${comment}"</p>` : ''}
+        ${lowRatingFollowup}
       </div>`;
+    card.querySelector('[data-low-rating-report]')?.addEventListener('click', (event) => {
+      openSupportIssueModal(event.currentTarget.dataset.lowRatingReport, 'post');
+    });
 
     card.dataset.rating = String(rating);
     card.dataset.reviewState = 'reviewed';
@@ -797,10 +921,14 @@ async function submitReview(btn) {
 function renderBookingsTab(bookings) {
   const STATUS_TO_PANE = {
     accepted: 'stab-bookings-active', en_route: 'stab-bookings-active', arrived: 'stab-bookings-active', in_progress: 'stab-bookings-active',
+    awaiting_customer_confirmation: 'stab-bookings-action',
+    pending_admin_review: 'stab-bookings-action',
+    disputed: 'stab-bookings-action',
     pending: 'stab-bookings-pending',
   };
-  const paneIds = ['stab-bookings-active', 'stab-bookings-pending'];
+  const paneIds = ['stab-bookings-action', 'stab-bookings-active', 'stab-bookings-pending'];
   const EMPTY = {
+    'stab-bookings-action': 'Nothing needs your attention right now.',
     'stab-bookings-active': 'No active bookings.',
     'stab-bookings-pending': 'No pending bookings.',
   };
@@ -848,6 +976,21 @@ function renderBookingsTab(bookings) {
       revealAll(pane);
     }
   });
+
+  const actionPane = panes['stab-bookings-action'];
+  const actionCount = actionPane ? actionPane.querySelectorAll('.booking-card').length : 0;
+  const badge = document.getElementById('bookingsActionBadge');
+  if (badge) {
+    badge.textContent = actionCount;
+    badge.hidden = actionCount === 0;
+  }
+  const actionTabBtn = document.querySelector('#bookings-stab-bar [data-stab="bookings-action"]');
+  if (actionTabBtn) actionTabBtn.classList.toggle('stab-btn--alert', actionCount > 0);
+
+  if (actionCount > 0 && !window._bookingsAutoTabSwitched) {
+    window._bookingsAutoTabSwitched = true;
+    _restoreSubTab('bookings-action');
+  }
 }
 
 function getServiceIconSVG(category) {
@@ -872,6 +1015,7 @@ function buildBookingCard(b) {
 
   const STATUS_FILTER = {
     pending: 'pending', accepted: 'confirmed', en_route: 'confirmed', arrived: 'confirmed', in_progress: 'confirmed',
+    awaiting_customer_confirmation: 'confirmed', pending_admin_review: 'confirmed', disputed: 'confirmed',
     completed: 'completed', cancelled: 'cancelled', rejected: 'cancelled'
   };
   const BADGE_CONFIG = {
@@ -880,17 +1024,23 @@ function buildBookingCard(b) {
     en_route:    { label: 'En Route',    style: 'background:rgba(59,130,246,0.1);color:#60a5fa;border-color:rgba(59,130,246,0.35)' },
     arrived:     { label: 'Arrived',     style: 'background:rgba(234,179,8,0.1);color:#eab308;border-color:#eab308' },
     in_progress: { label: 'In Progress', style: 'background:rgba(180,160,50,0.1);color:#eab308;border-color:#eab308' },
+    awaiting_customer_confirmation: { label: 'Needs Review', style: 'background:rgba(234,179,8,0.1);color:#eab308;border-color:#eab308' },
+    pending_admin_review: { label: 'Under Review', style: 'background:rgba(59,130,246,0.1);color:#60a5fa;border-color:rgba(59,130,246,0.35)' },
+    disputed:    { label: 'Disputed',    style: 'background:rgba(239,68,68,0.12);color:#ef4444;border-color:rgba(239,68,68,0.35)' },
     completed:   { label: 'Completed',   style: 'background:rgba(34,197,94,0.1);color:#22c55e;border-color:rgba(34,197,94,0.3)' },
     cancelled:   { label: 'Cancelled',   style: 'background:rgba(156,163,175,0.1);color:#9ca3af;border-color:rgba(156,163,175,0.3)' },
     rejected:    { label: 'Declined',    style: 'background:rgba(156,163,175,0.1);color:#9ca3af;border-color:rgba(156,163,175,0.3)' }
   };
   const STEPPER_CONFIG = {
     pending:     { done: 0, active: 0, fill: '0%' },
-    accepted:    { done: 1, active: 1, fill: '25%' },
-    en_route:    { done: 2, active: 2, fill: '50%' },
-    arrived:     { done: 3, active: 3, fill: '75%' },
-    in_progress: { done: 3, active: 3, fill: '75%' },
-    completed:   { done: 4, active: -1, fill: '100%' }
+    accepted:    { done: 1, active: 1, fill: '20%' },
+    en_route:    { done: 2, active: 2, fill: '40%' },
+    arrived:     { done: 3, active: 3, fill: '60%' },
+    in_progress: { done: 4, active: -1, fill: '70%', live: true },
+    awaiting_customer_confirmation: { done: 5, active: 5, fill: '100%' },
+    pending_admin_review: { done: 5, active: 5, fill: '100%' },
+    disputed:    { done: 5, active: 5, fill: '100%' },
+    completed:   { done: 6, active: -1, fill: '100%' }
   };
 
   const status = b.status || 'pending';
@@ -932,6 +1082,7 @@ function buildBookingCard(b) {
   const pinStr = b.pin ? String(b.pin).replace(/\D/g, '').slice(0, 4) : '';
   const canRevealPin = status === 'arrived' && pinStr.length === 4;
   const isPinVerified = ['in_progress', 'completed'].includes(status);
+  const hidePinBlock = ['awaiting_customer_confirmation', 'pending_admin_review', 'disputed', 'completed', 'cancelled', 'rejected'].includes(status);
   const pinHTML = canRevealPin
     ? pinStr.split('').map(d => `<span class="pin-code__digit">${d}</span>`).join('')
     : isPinVerified
@@ -940,7 +1091,7 @@ function buildBookingCard(b) {
 
   // Stepper
   const checkSVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="20 6 9 17 4 12"/></svg>`;
-  const STEP_LABELS = ['Booked', 'Confirmed', 'En Route', 'Completed'];
+  const STEP_LABELS = ['Booked', 'Confirmed', 'En Route', 'Arrived', 'Service Done', 'Confirmed by You'];
   let stepperHTML;
   if (!stepperCfg) {
     stepperHTML = `<div class="booking-card__progress-wrap"><p style="color:var(--color-text-muted,#9ca3af);font-size:0.8rem;font-weight:600;padding:8px 0;margin:0;">Booking ${badge.label}</p></div>`;
@@ -951,7 +1102,8 @@ function buildBookingCard(b) {
       const cls = `tracking-step${isDone ? ' is-done' : isActive ? ' is-active' : ''}`;
       return `<div class="${cls}"><div class="step-marker">${isDone ? checkSVG : ''}</div><span class="step-label">${lbl}</span></div>`;
     }).join('');
-    stepperHTML = `<div class="booking-card__progress-wrap"><div class="tracking-status"><div class="tracking-track"><div class="tracking-track-fill" style="width:${stepperCfg.fill}"></div></div><div class="tracking-steps">${stepsHTML}</div></div></div>`;
+    const liveClass = stepperCfg.live ? ' is-live' : '';
+    stepperHTML = `<div class="booking-card__progress-wrap"><div class="tracking-status${liveClass}"><div class="tracking-track"><div class="tracking-track-fill" style="width:${stepperCfg.fill}"></div></div><div class="tracking-steps">${stepsHTML}</div></div></div>`;
   }
 
   // Cancel button
@@ -961,12 +1113,62 @@ function buildBookingCard(b) {
     const cancelLabel = status === 'pending' ? 'Withdraw Request' : 'Cancel Booking';
     cancelHTML = `<button class="btn btn--cancel" type="button" data-cancel-booking="${b._id}" data-cancel-type="${cancelType}">${cancelLabel}</button>`;
   }
+  const supportActionHTML = ['accepted', 'en_route'].includes(status)
+    ? `<button class="btn btn--issue" type="button" data-support-issue="${b._id}" data-support-mode="prework">Report late / no-show</button>`
+    : ['arrived', 'in_progress'].includes(status)
+      ? `<button class="btn btn--issue" type="button" data-support-issue="${b._id}" data-support-mode="during">Report problem</button>`
+      : '';
+  const confirmActionHTML = status === 'awaiting_customer_confirmation'
+    ? `<button class="btn btn--primary btn--confirm" type="button" data-confirm-completion="${b._id}">Confirm Job Done</button>`
+    : '';
+
+  const completionAt = b.workerCompletedAt || b.actualCompletedAt || b.updatedAt;
+  const timeAgo = (() => {
+    if (!completionAt) return '';
+    const diff = Date.now() - new Date(completionAt).getTime();
+    if (!Number.isFinite(diff) || diff < 0) return '';
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  })();
+
+  const actionHintHTML = status === 'awaiting_customer_confirmation'
+    ? `<div class="booking-card__action-hint booking-card__action-hint--review">
+         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+         <span>Technician marked job done${timeAgo ? ` ${timeAgo}` : ''}. Confirm to release payment, or open a dispute.</span>
+       </div>`
+    : status === 'disputed'
+      ? `<div class="booking-card__action-hint booking-card__action-hint--disputed">
+           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+           <span>Admin is reviewing this dispute. Avg response within 24h.</span>
+         </div>`
+      : status === 'pending_admin_review'
+        ? `<div class="booking-card__action-hint booking-card__action-hint--admin">
+             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+             <span>Under admin review. We'll update you shortly.</span>
+           </div>`
+        : '';
+  const disputeActionHTML = status === 'awaiting_customer_confirmation'
+    ? `<a class="btn btn--issue" href="./booking-details.html?id=${b._id}&action=dispute">Open Dispute</a>`
+    : status === 'pending_admin_review'
+      ? `<button class="btn btn--issue" type="button" data-tab-link="support">View Support</button>`
+      : status === 'disputed'
+        ? `<button class="btn btn--issue" type="button" data-tab-link="support">View Dispute</button>`
+        : '';
 
   // Invoice panel
   const invoiceHTML = !isCancelled ? `<div class="booking-card__invoice-panel"><div class="invoice-content"><p class="invoice-content__title">Invoice ${bookingRef}</p><div class="invoice-table"><div class="invoice-table__row"><span>${title}</span><span>${formatFeeMoney(totals.base)}</span></div><div class="invoice-table__row"><span>Service Date</span><span>${formattedDate}</span></div><div class="invoice-table__row"><span>Platform Fee (${totals.feeRate}%)</span><span>${formatFeeMoney(totals.feeAmount)}</span></div><div class="invoice-table__row is-total"><span>Total</span><span>${formatFeeMoney(totals.estimatedTotal)}</span></div></div><div class="booking-card__invoice-footer"><p>Payment Method: <strong>${paymentMethod}</strong></p></div></div></div>` : '';
 
+  const isActionNeeded = ['awaiting_customer_confirmation', 'disputed', 'pending_admin_review'].includes(status);
+  const cardClasses = ['booking-card'];
+  if (isActionNeeded) cardClasses.push('booking-card--action-needed');
+  if (status === 'disputed') cardClasses.push('booking-card--disputed');
+
   const div = document.createElement('div');
-  div.className = 'booking-card';
+  div.className = cardClasses.join(' ');
   div.dataset.bookingId = b._id;
   div.dataset.bookingCard = '';
   div.dataset.bookingStatus = filterStatus;
@@ -992,7 +1194,8 @@ function buildBookingCard(b) {
           </div>
           <span class="booking-card__status-badge"${badge.style ? ` style="${badge.style}"` : ''}>${badge.label}</span>
         </div>
-        <div class="booking-card__grid">
+        ${actionHintHTML}
+        <div class="booking-card__grid${isActionNeeded ? ' booking-card__grid--compact' : ''}">
           <div class="booking-grid-box">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
             <div><span class="booking-grid-box__label">Service Date</span><span class="booking-grid-box__value">${formattedDate}</span></div>
@@ -1006,13 +1209,13 @@ function buildBookingCard(b) {
             <div><span class="booking-grid-box__label">Service Address</span><span class="booking-grid-box__value">${b.address || '—'}</span></div>
           </div>
         </div>
-        ${stepperHTML}
+        ${isActionNeeded ? '' : stepperHTML}
       </div>
       <div class="booking-card__sidebar">
-        <div class="sidebar-box">
+        ${hidePinBlock ? '' : `<div class="sidebar-box">
           <div class="sidebar-box__header">Arrival PIN</div>
           <div class="pin-code">${pinHTML}</div>
-        </div>
+        </div>`}
         <div class="sidebar-box sidebar-box--amount">
           <div class="sidebar-box__header">Amount</div>
           <div class="price-display">
@@ -1024,6 +1227,9 @@ function buildBookingCard(b) {
           <a class="btn btn--view-details" href="./booking-details.html?id=${b._id}">View Details</a>
           ${!isCancelled ? `<button class="btn btn--invoice" type="button" data-invoice-toggle>View Invoice</button>` : ''}
           ${!isCancelled ? `<a class="btn btn--chat" href="./messages.html?booking=${b._id}">Chat</a>` : ''}
+          ${supportActionHTML}
+          ${confirmActionHTML}
+          ${disputeActionHTML}
           ${cancelHTML}
         </div>
       </div>
@@ -1032,11 +1238,255 @@ function buildBookingCard(b) {
   return div;
 }
 
+async function loadSupportCases() {
+  const root = document.getElementById('supportCasesList');
+  if (!root) return;
+
+  if (!_supportCasesLoaded) {
+    root.innerHTML = '<p class="support-cases-empty">Loading support cases...</p>';
+  }
+
+  const [issueResult, disputeResult] = await Promise.all([
+    getMySupportIssues({ limit: 50 }),
+    getMyDisputes({ limit: 50 }),
+  ]);
+  const disputes = disputeResult?.disputes || [];
+  const issues = issueResult?.issues || [];
+  _supportCasesCache = { issues, disputes };
+  _supportCasesLoaded = true;
+  renderSupportCases();
+}
+
+function formatDisputeStatus(status) {
+  return ({
+    open: 'Open',
+    reviewing: 'Reviewing',
+    resolved_refund: 'Resolved - refunded',
+    resolved_release: 'Resolved - released',
+  })[status] || 'Open';
+}
+
+function renderSupportCases() {
+  const root = document.getElementById('supportCasesList');
+  if (!root) return;
+
+  const { issues, disputes } = _supportCasesCache;
+  const openIssues = issues.filter(item => !['resolved', 'closed'].includes(item.status));
+  const openDisputes = disputes.filter(item => ['open', 'reviewing'].includes(item.status));
+  const resolvedIssues = issues.filter(item => ['resolved', 'closed'].includes(item.status));
+  const resolvedDisputes = disputes.filter(item => String(item.status || '').startsWith('resolved_'));
+  const openCount = openIssues.length + openDisputes.length;
+
+  setText('supportOpenIssuesCount', openIssues.length);
+  setText('supportOpenDisputesCount', openDisputes.length);
+  setText('supportResolvedCount', resolvedIssues.length + resolvedDisputes.length);
+  setText('supportCasesBadge', openCount);
+
+  const cards = [];
+  if (_supportFilter === 'active') {
+    cards.push(...openIssues.map(item => buildSupportCaseCard(item, 'issue')));
+  } else if (_supportFilter === 'disputes') {
+    cards.push(...disputes.map(item => buildSupportCaseCard(item, 'dispute')));
+  } else {
+    cards.push(...resolvedIssues.map(item => buildSupportCaseCard(item, 'issue')));
+    cards.push(...resolvedDisputes.map(item => buildSupportCaseCard(item, 'dispute')));
+  }
+
+  root.innerHTML = cards.length
+    ? cards.join('')
+    : '<p class="support-cases-empty">No support cases match this view.</p>';
+}
+
+function buildSupportCaseCard(item, kind) {
+  const booking = item.booking || {};
+  const service = booking.service?.title || booking.serviceCategory || 'Service booking';
+  const worker = item.worker?.name || booking.worker?.name || 'Technician';
+  const opened = item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '-';
+  const bookingId = booking._id || item.booking || '';
+  const evidenceCount = Array.isArray(item.evidence) ? item.evidence.length : 0;
+  const isDispute = kind === 'dispute';
+  const status = isDispute ? formatDisputeStatus(item.status) : formatSupportStatus(item.status);
+  const label = isDispute ? `Dispute - ${status}` : status;
+  const reason = isDispute ? item.reason : item.description;
+  const type = isDispute ? (item.category || 'other') : formatSupportType(item.type);
+
+  return `
+    <article class="support-case-card support-case-card--${escapeHtml(item.status)} support-case-card--${isDispute ? 'dispute' : 'issue'} support-case-card--priority-${escapeHtml(item.priority || 'normal')}">
+      <div class="support-case-card__main">
+        <span class="support-case-card__status">${escapeHtml(label)}</span>
+        <h3>${escapeHtml(service)}</h3>
+        <p>${escapeHtml(worker)} - Opened ${escapeHtml(opened)}</p>
+        <p class="support-case-card__reason">${escapeHtml(reason)}</p>
+        ${item.resolution ? `<p class="support-case-card__resolution">${escapeHtml(item.resolution)}</p>` : ''}
+      </div>
+      <div class="support-case-card__meta">
+        <span>${escapeHtml(type)}</span>
+        ${!isDispute ? `<span>${escapeHtml(item.priority || 'normal')} priority</span>` : ''}
+        <span>${evidenceCount} file${evidenceCount === 1 ? '' : 's'}</span>
+        ${bookingId ? `<a href="./booking-details.html?id=${bookingId}">View booking</a>` : ''}
+      </div>
+    </article>
+  `;
+}
+
+function formatSupportStatus(status) {
+  return ({
+    open: 'Open',
+    reviewing: 'Reviewing',
+    waiting_customer: 'Waiting for you',
+    waiting_worker: 'Waiting for technician',
+    resolved: 'Resolved',
+    closed: 'Closed',
+  })[status] || 'Open';
+}
+
+function formatSupportType(type) {
+  return ({
+    late: 'Late arrival',
+    no_show: 'No-show',
+    during_work_problem: 'During-work problem',
+    safety: 'Safety concern',
+    post_completion: 'Post-completion issue',
+    other: 'Other',
+  })[type] || 'Other';
+}
+
+function setText(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = String(value);
+}
+
+function supportIssueOptions(mode) {
+  if (mode === 'prework') {
+    return [
+      ['late', 'Technician is late'],
+      ['no_show', 'Technician did not show up'],
+      ['other', 'Other scheduling issue'],
+    ];
+  }
+  if (mode === 'post') {
+    return [
+      ['post_completion', 'Problem after completion'],
+      ['other', 'Other completed-service issue'],
+    ];
+  }
+  return [
+    ['during_work_problem', 'Problem during work'],
+    ['safety', 'Safety concern'],
+    ['other', 'Other work issue'],
+  ];
+}
+
+function openSupportIssueModal(bookingId, mode = 'other') {
+  _supportIssueContext = { bookingId, mode };
+  const modal = document.getElementById('supportIssueModal');
+  const form = document.getElementById('supportIssueForm');
+  const type = document.getElementById('supportIssueType');
+  const title = document.getElementById('supportIssueTitle');
+  const evidenceList = document.getElementById('supportIssueEvidenceList');
+  if (!modal || !form || !type) return;
+
+  form.reset();
+  document.getElementById('supportIssueBookingId').value = bookingId;
+  document.getElementById('supportIssueError').hidden = true;
+  if (evidenceList) {
+    evidenceList.hidden = true;
+    evidenceList.innerHTML = '';
+  }
+  type.innerHTML = supportIssueOptions(mode)
+    .map(([value, label]) => `<option value="${value}">${label}</option>`)
+    .join('');
+  if (title) {
+    title.textContent = mode === 'prework'
+      ? 'Report late / no-show'
+      : 'Report a problem';
+  }
+  modal.hidden = false;
+}
+
+function closeSupportIssueModal() {
+  const modal = document.getElementById('supportIssueModal');
+  if (modal) modal.hidden = true;
+  _supportIssueContext = null;
+}
+
+function updateSupportEvidencePreview() {
+  const input = document.getElementById('supportIssueEvidence');
+  const list = document.getElementById('supportIssueEvidenceList');
+  if (!input || !list) return;
+  const files = [...(input.files || [])].slice(0, 6);
+  list.hidden = !files.length;
+  list.innerHTML = files.map(file => `<span>${escapeHtml(file.name)} <small>${Math.ceil(file.size / 1024)} KB</small></span>`).join('');
+}
+
+async function submitSupportIssue(event) {
+  event.preventDefault();
+  const submit = document.getElementById('supportIssueSubmit');
+  const error = document.getElementById('supportIssueError');
+  const bookingId = document.getElementById('supportIssueBookingId')?.value || _supportIssueContext?.bookingId;
+  const type = document.getElementById('supportIssueType')?.value || 'other';
+  const description = String(document.getElementById('supportIssueDescription')?.value || '').trim();
+  const files = [...(document.getElementById('supportIssueEvidence')?.files || [])].slice(0, 6);
+
+  if (description.length < 20) {
+    if (error) {
+      error.textContent = 'Please describe the issue in at least 20 characters.';
+      error.hidden = false;
+    }
+    return;
+  }
+
+  if (submit) {
+    submit.disabled = true;
+    submit.textContent = 'Submitting...';
+  }
+  try {
+    const evidence = [];
+    for (const file of files) {
+      const uploaded = await uploadPublicFile(file, 'support');
+      if (uploaded?.url) evidence.push(uploaded.url);
+    }
+    await createSupportIssue({ bookingId, type, description, evidence });
+    closeSupportIssueModal();
+    _supportCasesLoaded = false;
+    await loadSupportCases();
+    showToast('Support case opened.', 'success');
+  } catch (err) {
+    if (error) {
+      error.textContent = err?.data?.message || err.message || 'Failed to open support case.';
+      error.hidden = false;
+    }
+  } finally {
+    if (submit) {
+      submit.disabled = false;
+      submit.textContent = 'Submit Case';
+    }
+  }
+}
+
 function wireBookingCardEvents(root) {
   if (root.dataset.eventsWired === 'true') return;
   root.dataset.eventsWired = 'true';
 
   root.addEventListener('click', async (e) => {
+    const tabLink = e.target.closest('[data-tab-link]');
+    if (tabLink) {
+      document.querySelector(`[data-tab="${tabLink.dataset.tabLink}"]`)?.click();
+      return;
+    }
+
+    const supportBtn = e.target.closest('[data-support-issue]');
+    if (supportBtn) {
+      openSupportIssueModal(supportBtn.dataset.supportIssue, supportBtn.dataset.supportMode || 'other');
+      return;
+    }
+
+    const confirmBtn = e.target.closest('[data-confirm-completion]');
+    if (confirmBtn) {
+      await confirmHistoryCompletion(confirmBtn);
+      return;
+    }
+
     const btn = e.target.closest('[data-cancel-booking]');
     if (!btn) return;
     const bookingId = btn.dataset.cancelBooking;
@@ -1162,7 +1612,7 @@ function _setBadge(el, count) {
   let badge = el.querySelector('.notif-badge');
   if (!badge) {
     badge = document.createElement('span');
-    badge.className = 'notif-badge';
+    badge.className = 'notif-badge nav-badge nav-badge--red';
     el.appendChild(badge);
   }
   badge.textContent = count;
@@ -1959,8 +2409,8 @@ function initHistoryPanel() {
 
       const match =
         matchesStatusTab(card, activeStatus) &&
-        (!vals.category || card.dataset.category === vals.category) &&
-        (!vals.payment  || card.dataset.payment  === vals.payment)  &&
+        (!vals.category || (card.dataset.category || '').toLowerCase() === vals.category.toLowerCase()) &&
+        (!vals.payment  || (card.dataset.payment || '').toLowerCase()  === vals.payment.toLowerCase())  &&
         (!vals.rating   || parseInt(card.dataset.rating || 0) >= parseInt(vals.rating)) &&
         dateMatch;
 
@@ -2063,45 +2513,112 @@ function initHistoryPanel() {
   });
 }
 
-/* ── Favourites: filter, reorder, remove ───────────────── */
+/* ── Favourites: dynamic data flow (Task 21) ───────────── */
+const FAV_PAGE_SIZE = 12;
+const favState = { offset: 0, total: 0 };
+
+function favParams() {
+  return {
+    limit: FAV_PAGE_SIZE,
+    offset: favState.offset,
+    q: document.getElementById('fav-search').value.trim(),
+    category: document.getElementById('fav-category').value,
+    minRating: document.getElementById('fav-rating').value,
+    availableNow: document.getElementById('fav-available-now').checked,
+    sort: document.getElementById('fav-sort').value,
+  };
+}
+
+async function loadFavorites() {
+  const list = document.getElementById('fav-list');
+  const empty = document.getElementById('fav-empty');
+  if (!list) return;
+  list.innerHTML = `<div class="skeleton-card"></div>`.repeat(3);
+  try {
+    const { total, items } = await listFavorites(favParams());
+    favState.total = total;
+    document.getElementById('fav-count').textContent = total;
+    list.innerHTML = '';
+    if (items.length === 0) { empty.hidden = false; return; }
+    empty.hidden = true;
+    for (const w of items) list.appendChild(renderFavCard(w));
+    renderFavPagination();
+  } catch (err) {
+    console.error('[Favourites]', err);
+    list.innerHTML = '<p class="fav-empty">Failed to load favourites. Please refresh.</p>';
+  }
+}
+
+function renderFavCard(w) {
+  const card = document.createElement('div');
+  card.className = 'fav-card';
+  const initials = (w.name || '?').split(' ').map(s => s[0]).join('').slice(0, 2).toUpperCase();
+  card.innerHTML = `
+    <button class="fav-card__remove" data-action="remove" title="Remove from favourites" aria-label="Remove from favourites">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
+    <div class="fav-card__top">
+      <div class="fav-card__avatar">${initials}</div>
+      <div class="fav-card__info">
+        <div class="fav-card__name">${escapeHtml(w.name)}</div>
+        <div class="fav-card__meta">
+          <span class="fav-card__rating">★ ${(w.averageRating || 0).toFixed(1)}</span>
+          ${(w.categories || [])[0] ? `<span class="fav-card__cat">${escapeHtml((w.categories || [])[0])}</span>` : ''}
+          ${w.locationLabel ? `<span class="fav-card__loc">${escapeHtml(w.locationLabel)}</span>` : ''}
+        </div>
+      </div>
+    </div>
+    <div class="fav-card__badges"></div>
+    <div class="fav-card__actions">
+      <a class="btn btn--sm btn--primary" href="./booking.html?worker=${w._id}">Book Now</a>
+      <a class="btn btn--sm btn--ghost" href="./technician-profile.html?id=${w._id}">View Profile</a>
+    </div>`;
+  const badge = renderBusyBadge(w.busyState);
+  if (badge) card.querySelector('.fav-card__badges').appendChild(badge);
+  if (w.busyState?.isBusy) {
+    const bookBtn = card.querySelector('.btn--primary');
+    if (bookBtn) {
+      bookBtn.style.opacity = '0.45';
+      bookBtn.style.pointerEvents = 'none';
+      bookBtn.removeAttribute('href');
+      bookBtn.setAttribute('title', `Busy — try again in ~${w.busyState.remainingMin ?? 'a few'} min`);
+    }
+  }
+  card.querySelector('[data-action="remove"]').addEventListener('click', async () => {
+    await removeFavorite(w._id);
+    await loadFavorites();
+  });
+  return card;
+}
+
+function renderFavPagination() {
+  const pag = document.getElementById('fav-pagination');
+  if (!pag) return;
+  pag.innerHTML = '';
+  const pages = Math.max(1, Math.ceil(favState.total / FAV_PAGE_SIZE));
+  const current = Math.floor(favState.offset / FAV_PAGE_SIZE);
+  for (let i = 0; i < pages; i++) {
+    const b = document.createElement('button');
+    b.textContent = String(i + 1);
+    if (i === current) b.disabled = true;
+    b.addEventListener('click', () => { favState.offset = i * FAV_PAGE_SIZE; loadFavorites(); });
+    pag.appendChild(b);
+  }
+}
+
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 function initFavouritesPanel() {
-  const grid = document.querySelector('[data-fav-list]');
-  document.querySelectorAll('[data-fav-filter]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('[data-fav-filter]').forEach(b => b.classList.remove('is-active'));
-      btn.classList.add('is-active');
-      const cat = btn.dataset.favFilter;
-      document.querySelectorAll('[data-fav-card]').forEach(card => {
-        const c = card.dataset.favCategory || '';
-        card.hidden = cat !== 'all' && c !== cat;
-      });
+  ['fav-search', 'fav-category', 'fav-rating', 'fav-available-now', 'fav-sort']
+    .forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('input', () => { favState.offset = 0; loadFavorites(); });
     });
-  });
-
-  grid?.querySelectorAll('[data-fav-up]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const card = btn.closest('[data-fav-card]');
-      const prev = card?.previousElementSibling;
-      if (card && prev?.matches?.('[data-fav-card]')) grid.insertBefore(card, prev);
-    });
-  });
-  grid?.querySelectorAll('[data-fav-down]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const card = btn.closest('[data-fav-card]');
-      const next = card?.nextElementSibling;
-      if (card && next?.matches?.('[data-fav-card]')) grid.insertBefore(next, card);
-    });
-  });
-
-  grid?.querySelectorAll('[data-fav-remove]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const _t = typeof window.t === 'function' ? window.t : (k) => k;
-      if (!confirm(_t('confirm_remove_fav'))) return;
-      const card = btn.closest('[data-fav-card]');
-      card?.remove();
-      showToast(_t('toast_removed_fav'), 'info');
-    });
-  });
 }
 
 /* ── Notifications: quick actions & prefs ──────────────── */
@@ -2137,6 +2654,16 @@ function initNotificationActions() {
 
 /* ── Sidebar toggle (click to expand/collapse) ──────────── */
 /* ── Init ───────────────────────────────────────────────── */
+function initSupportIssueModal() {
+  document.getElementById('supportIssueClose')?.addEventListener('click', closeSupportIssueModal);
+  document.getElementById('supportIssueCancel')?.addEventListener('click', closeSupportIssueModal);
+  document.getElementById('supportIssueEvidence')?.addEventListener('change', updateSupportEvidencePreview);
+  document.getElementById('supportIssueForm')?.addEventListener('submit', submitSupportIssue);
+  document.getElementById('supportIssueModal')?.addEventListener('click', (event) => {
+    if (event.target.id === 'supportIssueModal') closeSupportIssueModal();
+  });
+}
+
 populateProfile();
 loadBookingsData();
 let _custPollInterval = null;
@@ -2156,6 +2683,7 @@ initHistoryPanel();
 initFavouritesPanel();
 initNotificationActions();
 initNotifications();
+initSupportIssueModal();
 initSettingsForm();
 initEmailChangeModal();
 initDeleteAccount();

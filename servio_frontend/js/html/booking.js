@@ -369,31 +369,52 @@ confirmBtn?.addEventListener('click', async (e) => {
   collectStep2();
 
   if (state.data.payment === 'online') {
-    // Step 1: create booking first (no paymentMeta)
-    state.data.paymentMeta = null;
-    const booking = await finalizeBooking({ returnBooking: true });
-    if (!booking) return;
-
-    // Step 2: pick card and hold
-    const rate  = state.worker?.hourlyRate || 0;
-    const total = calculateBookingFee(rate, state.platformSettings.commissionRate).estimatedTotal.toFixed(2);
-    openCardPickerModal(total, async (paymentMeta) => {
-      try {
-        await holdPayment(booking._id, { savedCardId: paymentMeta.savedCardId });
-        state.data.paymentMeta = paymentMeta;
-        populateReview();
-        goToConfirmationOrNext(booking);
-      } catch (err) {
-        const msg = err?.response?.data?.message || err?.message || 'Payment failed. Please try another card.';
-        showToast(msg, 'error');
-      }
-    });
+    if (!state.data.paymentMeta?.savedCardId) {
+      promptCardThenSubmit();
+      return;
+    }
+    submitOnlineBooking();
   } else {
     state.data.paymentMeta = null;
     animate(confirmBtn, { scale: [1, 0.95, 1.02, 1] }, { duration: 0.3 });
     setTimeout(() => finalizeBooking({}), 320);
   }
 });
+
+function promptCardThenSubmit() {
+  const rate  = state.worker?.hourlyRate || 0;
+  const total = calculateBookingFee(rate, state.platformSettings.commissionRate).estimatedTotal.toFixed(2);
+  openCardPickerModal(total, async (paymentMeta) => {
+    state.data.paymentMeta = paymentMeta;
+    populateReview();
+    await submitOnlineBooking();
+  });
+}
+
+function promptCardOnly() {
+  const rate  = state.worker?.hourlyRate || 0;
+  const total = calculateBookingFee(rate, state.platformSettings.commissionRate).estimatedTotal.toFixed(2);
+  openCardPickerModal(total, (paymentMeta) => {
+    state.data.paymentMeta = paymentMeta;
+    populateReview();
+  });
+}
+
+async function submitOnlineBooking() {
+  animate(confirmBtn, { scale: [1, 0.95, 1.02, 1] }, { duration: 0.3 });
+  const booking = await finalizeBooking({ returnBooking: true });
+  if (!booking) throw new Error('Booking creation failed.');
+  try {
+    await holdPayment(booking._id, { savedCardId: state.data.paymentMeta.savedCardId });
+    goToConfirmationOrNext(booking);
+  } catch (err) {
+    const msg = err?.data?.message || err?.message || 'Payment authorization failed. Please try another card.';
+    showToast(msg, 'error');
+    state.data.paymentMeta = null;
+    populateReview();
+    throw err;
+  }
+}
 
 // ─── Validation ──────────────────────────────────────────────────────────────
 
@@ -475,9 +496,14 @@ function populateReview() {
   if (reviewPayment)  reviewPayment.textContent   = PAYMENT_LABELS[state.data.payment] || state.data.payment;
   if (reviewCard) {
     const meta = state.data.paymentMeta;
-    reviewCard.textContent = state.data.payment === 'online'
-      ? (meta?.last4 ? `${String(meta.cardType || 'Card').toUpperCase()} ending ${meta.last4} - no real charge` : 'Select a saved card before the request is sent.')
+    const isOnline = state.data.payment === 'online';
+    const hasCard = !!meta?.last4;
+    reviewCard.textContent = isOnline
+      ? (hasCard ? `${String(meta.cardType || 'Card').toUpperCase()} ending ${meta.last4} - no real charge` : 'Tap to select a card')
       : 'No card required.';
+    reviewCard.classList.toggle('is-actionable', isOnline && !hasCard);
+    reviewCard.style.cursor = (isOnline && !hasCard) ? 'pointer' : '';
+    reviewCard.onclick = isOnline ? () => promptCardOnly() : null;
   }
   if (reviewNotes)    reviewNotes.textContent     = state.data.notes || 'No additional notes added.';
 
@@ -520,6 +546,50 @@ function findNextAvailableDate(availability, fromDateStr) {
   }
   return fromDateStr;
 }
+
+// ─── Slot availability polling ────────────────────────────────────────────────
+
+let slotPollTimer = null;
+let slotPollDate  = null;
+
+function refreshBookedSlots(dateStr) {
+  if (!workerId) return;
+  const container = document.getElementById('timeslotContainer');
+  if (!container) return;
+  getWorkerBookedSlots(workerId, dateStr)
+    .then(res => {
+      const booked = new Set(res.data?.bookedSlots || res.bookedSlots || []);
+      console.debug('[booking] booked slots for', dateStr, Array.from(booked));
+      container.querySelectorAll('.timeslot-pill').forEach(pill => {
+        const shouldBlock = booked.has(pill.dataset.time);
+        pill.classList.toggle('is-unavailable', shouldBlock);
+        pill.disabled = shouldBlock;
+        pill.setAttribute('aria-disabled', String(shouldBlock));
+        if (shouldBlock && pill.classList.contains('is-selected')) {
+          pill.classList.remove('is-selected');
+          state.selectedTime = null;
+          state.data.time = '';
+        }
+      });
+    })
+    .catch(err => {
+      console.warn('[booking] failed to fetch booked slots', err);
+    });
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && slotPollDate) {
+    refreshBookedSlots(slotPollDate);
+  }
+});
+
+function startSlotPoll(dateStr) {
+  clearInterval(slotPollTimer);
+  slotPollDate  = dateStr;
+  slotPollTimer = setInterval(() => refreshBookedSlots(slotPollDate), 10_000);
+}
+
+window.addEventListener('beforeunload', () => clearInterval(slotPollTimer));
 
 // ─── Dynamic time slot generation ────────────────────────────────────────────
 
@@ -588,21 +658,10 @@ function renderTimeSlotsForDate(dateString, availability) {
     container.appendChild(section);
   });
 
-  // Fetch and mark booked slots for this date
+  // Fetch and mark booked slots, then start 30s poll for live updates
   if (workerId) {
-    getWorkerBookedSlots(workerId, dateString)
-      .then(res => {
-        const booked = res.data?.bookedSlots || res.bookedSlots || [];
-        booked.forEach(t => {
-          const pill = container.querySelector(`.timeslot-pill[data-time="${t}"]`);
-          if (pill) {
-            pill.classList.add('is-unavailable');
-            pill.disabled = true;
-            pill.setAttribute('aria-disabled', 'true');
-          }
-        });
-      })
-      .catch(() => {});
+    refreshBookedSlots(dateString);
+    startSlotPoll(dateString);
   }
 
   // Reset selection
@@ -1166,6 +1225,12 @@ async function finalizeBooking({ returnBooking = false } = {}) {
       state.data.backendBooking = createdBooking;
     } catch (e) {
       const msg = e?.message || '';
+      if (e?.status === 409 || msg.includes('already booked') || msg.includes('overlap')) {
+        showToast('This technician already has a job during your selected time. Please pick another slot.', 'warning');
+        goToStep(1);
+        document.getElementById('timeslotContainer')?.scrollIntoView({ behavior: 'smooth' });
+        return;
+      }
       let userMsg = 'Booking failed. Please try again.';
       if      (msg.includes('not currently accepting'))  userMsg = 'This technician is not currently accepting bookings.';
       else if (msg.includes('today or in the future'))   userMsg = 'Please select a valid date.';
@@ -1173,9 +1238,8 @@ async function finalizeBooking({ returnBooking = false } = {}) {
       else if (msg.includes('outside technician'))       userMsg = 'Selected time is outside this technician\'s working hours.';
       else if (msg.includes('not available on this day')) userMsg = 'This technician doesn\'t work on the selected day.';
       else if (msg.includes('time slot'))                userMsg = 'Please select a valid time slot.';
-      else if (msg.includes('already booked'))           userMsg = 'This time slot was just taken — please pick another time.';
       showToast(userMsg, 'error');
-      if (msg.includes('time slot') || msg.includes('already booked') || msg.includes('outside technician') || msg.includes('not available on this day') || msg.includes('today or in the future') || msg.includes('30 days in advance')) {
+      if (msg.includes('time slot') || msg.includes('outside technician') || msg.includes('not available on this day') || msg.includes('today or in the future') || msg.includes('30 days in advance')) {
         goToStep(1);
       }
       return;

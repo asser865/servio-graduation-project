@@ -11,6 +11,7 @@ const { StatusCodes } = require('http-status-codes');
 const ApiError        = require('../../utils/ApiError');
 const ApiResponse     = require('../../utils/ApiResponse');
 const User            = require('../users/user.model');
+const { resolveSlug } = require('../../utils/locationsTaxonomy');
 
 const SERVICE_TO_CATEGORY = {
   Plumbing: 'plumbing',
@@ -101,17 +102,22 @@ async function findMatchingWorkers(aiData, bodyLocation) {
   };
 
   if (effectiveLocation) {
+    // Preferred: resolve the request location to a canonical slug and match
+    // against `coverageMatchSlugs` (which already includes ancestors + descendants).
+    // This is what makes "Nasr City" match a worker whose coverage is "Cairo".
+    const requestSlug = resolveSlug(effectiveLocation);
+    const orClauses = [];
+    if (requestSlug) orClauses.push({ coverageMatchSlugs: requestSlug });
+
+    // Regex fallback for legacy workers without slugs and for free-form labels
+    // that fall outside the taxonomy.
     const keywords = extractAreaKeywords(effectiveLocation);
-    if (keywords.length) {
-      filter.$or = keywords.flatMap((kw) => {
-        const re = new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-        return [
-          { coverageAreas: re },
-          { serviceArea:   re },
-          { locationLabel: re },
-        ];
-      });
-    }
+    keywords.forEach((kw) => {
+      const re = new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      orClauses.push({ coverageAreas: re }, { serviceArea: re }, { locationLabel: re });
+    });
+
+    if (orClauses.length) filter.$or = orClauses;
   }
 
   const workers = await User.find(filter)

@@ -1,12 +1,56 @@
 import json
 import os
 import re
+import unicodedata
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from groq import Groq
 from pydantic import BaseModel
+
+try:
+    from zoneinfo import ZoneInfo
+    _CAIRO_TZ = ZoneInfo("Africa/Cairo")
+except Exception:
+    _CAIRO_TZ = None
+
+
+def _now_cairo() -> datetime:
+    if _CAIRO_TZ is not None:
+        return datetime.now(_CAIRO_TZ)
+    return datetime.utcnow() + timedelta(hours=2)
+
+
+_ARABIC_DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "01234567890123456789")
+
+
+def _normalize_arabic(text: str) -> str:
+    """Loose Arabic normalization: alef, ya, ta-marbuta, tashkeel, digits."""
+    if not text:
+        return ""
+    text = text.translate(_ARABIC_DIGITS)
+    text = unicodedata.normalize("NFKC", text)
+    text = re.sub(r"[\u064B-\u065F\u0670\u06D6-\u06ED]", "", text)
+    text = re.sub(r"[إأآا]", "ا", text)
+    text = re.sub(r"ى", "ي", text)
+    text = re.sub(r"ؤ", "و", text)
+    text = re.sub(r"ئ", "ي", text)
+    text = re.sub(r"ة", "ه", text)
+    return text
+
+
+def _normalize_for_match(text: str) -> str:
+    """Lowercase + Arabic normalize + strip zero-width + collapse whitespace + light typo tolerance."""
+    if not text:
+        return ""
+    text = _normalize_arabic(text)
+    text = re.sub(r"[\u200B-\u200F\u202A-\u202E\u2060\uFEFF]", "", text)
+    text = text.lower()
+    text = re.sub(r"(.)\1{2,}", r"\1\1", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
 
 load_dotenv()
 
@@ -57,6 +101,34 @@ MISSING_FIELD_LABELS = {
     "problem_details": "A clearer description of the problem",
 }
 
+# Typical service call ranges in Cairo (EGP). Used as soft estimate when user
+# omits budget — surfaced to UI as "Typical: 150-500 EGP", never enforced.
+SERVICE_BUDGET_ESTIMATES = {
+    "Plumbing":         {"min": 150,  "max": 500,  "typical": "150-500 EGP"},
+    "Electrical":       {"min": 200,  "max": 600,  "typical": "200-600 EGP"},
+    "A/C":              {"min": 300,  "max": 1500, "typical": "300-1500 EGP"},
+    "Carpentry":        {"min": 200,  "max": 800,  "typical": "200-800 EGP"},
+    "Cleaning":         {"min": 250,  "max": 900,  "typical": "250-900 EGP"},
+    "Painting":         {"min": 500,  "max": 3000, "typical": "500-3000 EGP"},
+    "Appliance Repair": {"min": 200,  "max": 1000, "typical": "200-1000 EGP"},
+    "Handyman":         {"min": 150,  "max": 500,  "typical": "150-500 EGP"},
+}
+
+# Quick-pick suggestion chips shown to the user when a field is missing.
+# Frontend appends choice text to the prompt and re-submits.
+TIME_SUGGESTIONS = ["ASAP", "Today", "Tomorrow", "This weekend", "Next week", "Flexible"]
+BUDGET_SUGGESTIONS_BY_SERVICE = {
+    "Plumbing":         ["Under 200 EGP", "200-500 EGP", "500-1000 EGP", "No limit"],
+    "Electrical":       ["Under 300 EGP", "300-600 EGP", "600-1500 EGP", "No limit"],
+    "A/C":              ["Under 500 EGP", "500-1500 EGP", "1500-3000 EGP", "No limit"],
+    "Carpentry":        ["Under 300 EGP", "300-800 EGP", "800+ EGP", "No limit"],
+    "Cleaning":         ["Under 300 EGP", "300-700 EGP", "700+ EGP", "No limit"],
+    "Painting":         ["Under 1000 EGP", "1000-3000 EGP", "3000+ EGP", "No limit"],
+    "Appliance Repair": ["Under 300 EGP", "300-700 EGP", "700+ EGP", "No limit"],
+    "Handyman":         ["Under 200 EGP", "200-500 EGP", "500+ EGP", "No limit"],
+}
+DEFAULT_BUDGET_SUGGESTIONS = ["Under 300 EGP", "300-700 EGP", "700+ EGP", "No limit"]
+
 SERVICE_PRIORITY = {
     "Electrical": 100,
     "Plumbing": 90,
@@ -73,14 +145,19 @@ SERVICE_PATTERNS = {
         r"\bplumb(?:er|ing)?\b",
         r"\bsink\b",
         r"\btoilet\b",
-        r"\bdrain(?:s|ed|ing)?\b",
+        r"\bdrain(?:s|ed|ing|age)?\b",
         r"\bpipe(?:s)?\b",
         r"\bfaucet\b",
+        r"\btap\s+(?:is\s+)?(?:leak|drip|broken)\w*\b",
         r"\bshower\b",
         r"\bwater heater\b",
         r"\bblocked pipe(?:s)?\b",
+        r"\bclogg?ed\b",
+        r"\boverflow(?:ing)?\b",
         r"\bleak\b",
         r"\bleakage\b",
+        r"\bleak(?:ing|ed|y)\b",
+        r"\bdripp?(?:in|ing|ed)?\b",
         r"\bmold(?:y)?\b",
         r"\bmould(?:y)?\b",
         r"\bdamp(?:ness)?\b",
@@ -91,70 +168,125 @@ SERVICE_PATTERNS = {
         r"\bhot\s+water\b",
         r"\bno\s+(?:hot|warm)\s+water\b",
         r"\bboiler\b",
+        r"\bgeyser\b",
+        r"\bwater\s+pressure\b",
         r"سباك",
+        r"سباكه",
         r"سباكة",
         r"حوض",
         r"تواليت",
         r"مرحاض",
         r"صرف",
+        r"بالوعه",
         r"بالوعة",
+        r"ماسوره",
         r"ماسورة",
         r"مواسير",
         r"مياه",
+        r"ميه",
         r"مية",
         r"تسريب",
+        r"بتنقط",
+        r"تنقيط",
+        r"حنفيه",
+        r"حنفية",
+        r"صنبور",
+        r"بانيو",
+        r"شطاف",
+        r"سيفون",
+        r"سخان",
+        r"المياه قاطعه",
+        r"مفيش ميه",
     ],
     "Electrical": [
         r"\belectric(?:al|ian|ity)\b",
         r"\blights?\b",
         r"\bsocket\b",
         r"\boutlet\b",
+        r"\bpower\s+(?:out|outage|cut|down|gone)\b",
+        r"\bno\s+power\b",
+        r"\bno\s+electricity\b",
         r"\bpanel\b",
         r"\bfuse box\b",
         r"\bbreaker\b",
         r"\bcircuit breaker\b",
+        r"\btripping\b",
         r"\bwiring\b",
         r"\bwire(?:s)?\b",
         r"\bflicker(?:ing)?\b",
         r"\bsparks?\b",
+        r"\bshort\s+circuit\b",
+        r"\bvoltage\b",
         r"كهرب",
+        r"كهربا",
+        r"الكهرباء",
+        r"بريزه",
         r"بريزة",
         r"مقبس",
         r"سوكت",
+        r"لوحه كهرب",
         r"لوحة كهرب",
         r"قاطع",
-        r"أسلاك",
         r"اسلاك",
+        r"أسلاك",
         r"شرر",
         r"الانارة",
         r"الإنارة",
+        r"الانارة",
+        r"الانارة",
         r"الأنوار",
+        r"الانوار",
+        r"النور فصل",
+        r"مفيش نور",
+        r"مفيش كهربا",
+        r"النور مقطوع",
+        r"الكهربا مقطوعه",
     ],
     "A/C": [
         r"\ba/c\b",
         r"\bac\b",
-        r"\bair conditioner\b",
-        r"\bair conditioning\b",
+        r"\baircon\b",
+        r"\bair\s*-?\s*con(?:d(?:itioner|itioning)?)?\b",
         r"\bhvac\b",
         r"\bthermostat\b",
+        r"\bsplit\s+unit\b",
+        r"\bnot\s+cool(?:ing)?\b",
+        r"\bcooling\s+(?:weak|not\s+working|gone)\b",
+        r"\bwall\s+unit\b",
+        r"\bno\s+cold\s+air\b",
         r"تكييف",
         r"تكيف",
         r"مكيف",
+        r"اسبليت",
+        r"إسبليت",
+        r"التكييف مش بيبرد",
+        r"التكييف ما بيبردش",
+        r"التكييف خربان",
+        r"التكييف بيقطر",
     ],
     "Carpentry": [
         r"\bcarpent(?:er|ry)\b",
         r"\bdoor\b",
         r"\bcabinet\b",
         r"\bwooden cabinet\b",
-        r"\bshelf(?:s)?\b",
+        r"\bshelf(?:s|ves)?\b",
         r"\bwardrobe\b",
         r"\bwindow frame\b",
         r"\bwooden\b",
+        r"\bdrawer\b",
+        r"\bhinge(?:s)?\b",
+        r"\bdoor\s+(?:wont|won't|doesn't|stuck|broken|jam+ed)\b",
         r"نجار",
+        r"نجاره",
         r"نجارة",
         r"باب",
+        r"الباب",
         r"دولاب",
+        r"خزانه",
         r"خزانة",
+        r"درج",
+        r"مفصله",
+        r"مفصلة",
         r"(?<![\u0600-\u06FF])رف(?![\u0600-\u06FF])",
         r"(?<![\u0600-\u06FF])أرفف(?![\u0600-\u06FF])",
         r"(?<![\u0600-\u06FF])ارفف(?![\u0600-\u06FF])",
@@ -167,10 +299,17 @@ SERVICE_PATTERNS = {
         r"\bhousekeeping\b",
         r"\bcarpet cleaning\b",
         r"\bsofa cleaning\b",
+        r"\bwindow\s+cleaning\b",
+        r"\bpost(?:-|\s+)construction\s+clean\b",
         r"تنظيف",
+        r"نظافه",
         r"نظافة",
-        r"عامل[ة]?\s+نظافة",
+        r"عامل[ةه]?\s+نظافه",
+        r"عامل[ةه]?\s+نظافة",
+        r"شغاله نظافه",
+        r"شغالة نظافة",
         r"clean my house",
+        r"clean my apartment",
     ],
     "Painting": [
         r"\bpaint(?:ing|ed)?\b",
@@ -186,43 +325,65 @@ SERVICE_PATTERNS = {
         r"\bwater\s+damage(?:d)?\s+(?:paint|wall|walls)\b",
         r"\bmoisture\s+damage(?:d)?\s+(?:paint|wall|walls)\b",
         r"دهان",
+        r"دهانات",
+        r"بويه",
         r"بوية",
         r"طلاء",
+        r"الحيطه محتاجه دهان",
+        r"الحائط محتاج دهان",
     ],
     "Appliance Repair": [
         r"\bappliance\b",
-        r"\bwashing machine\b",
+        r"\bwashing\s*machine\b",
         r"\bwasher\b",
-        r"\bfridge\b",
+        r"\bfridg(?:e)?\b",
         r"\brefrigerator\b",
         r"\boven\b",
         r"\bmicrowave\b",
         r"\bdishwasher\b",
         r"\bstove\b",
+        r"\bcooker\b",
         r"\bdryer\b",
+        r"\bfreezer\b",
+        r"غساله",
         r"غسالة",
+        r"ثلاجه",
         r"ثلاجة",
         r"فرن",
         r"ميكروويف",
         r"ميكرويف",
         r"غسالة أطباق",
         r"غسالة اطباق",
+        r"غساله اطباق",
         r"بوتاجاز",
+        r"بوتجاز",
+        r"ديب فريزر",
+        r"الفرن مش شغال",
+        r"الغساله بايظه",
+        r"الغسالة بايظة",
+        r"الثلاجه مش بتبرد",
     ],
     "Handyman": [
         r"\bhandyman\b",
-        r"\btv mount(?:ed|ing)?\b",
+        r"\btv\s+mount(?:ed|ing)?\b",
         r"\bmount(?:ing)?\b.*\b(tv|mirror|picture)\b",
-        r"\bhang(?:ing)?\b.*\b(picture|mirror)\b",
-        r"\bassemble(?:d|ing)? furniture\b",
-        r"\bsmall home repairs?\b",
+        r"\bhang(?:ing)?\b.*\b(picture|mirror|frame|shelf)\b",
+        r"\bassemble(?:d|ing)?\s+furniture\b",
+        r"\bikea\s+assembly\b",
+        r"\bsmall\s+home\s+repairs?\b",
+        r"\bodd\s+jobs?\b",
+        r"\bfix\s+(?:a\s+)?(?:small|minor)\b",
         r"فني شامل",
         r"تركيب تلفزيون",
+        r"تعليق مرآه",
         r"تعليق مرآة",
+        r"تعليق مرايه",
         r"تعليق مراية",
+        r"تعليق صوره",
         r"تعليق صورة",
-        r"تجميع أثاث",
         r"تجميع اثاث",
+        r"تجميع أثاث",
+        r"تركيب رف",
     ],
 }
 
@@ -294,11 +455,27 @@ WATER_ON_ELECTRICAL_PATTERNS = [
     ),
 ]
 
-SYSTEM_PROMPT = """
+_SYSTEM_PROMPT_TEMPLATE = """
 You are a home services advisor for an Egyptian home services app called Servio.
 
+CONTEXT — CURRENT MOMENT:
+Today is __TODAY_HUMAN__ (__TODAY_ISO__). The user is in Egypt (Africa/Cairo timezone).
+Resolve every relative time expression against THIS date.
+Examples:
+- "today" → __TODAY_ISO__
+- "tomorrow" / "بكرة" / "tmrw" / "tommorrow" → __TOMORROW_ISO__
+- "by Friday" → next Friday's date relative to today
+- "next Monday" → the Monday in the next ISO week
+- "in 3 days" / "بعد 3 ايام" → __TODAY_ISO__ + 3 days
+- "this weekend" → coming Saturday
+- "this evening" / "tonight" / "الليلة" → __TODAY_ISO__ (evening slot)
+Always return the user's original phrase in time_range, AND add a resolved
+ISO date in the new field "time_range_iso" (YYYY-MM-DD) when you can compute one.
+
 Analyze the user's request in English or Arabic and return a JSON object only.
-Never invent facts that are not grounded in the prompt. If data is missing, return null.
+Never invent facts that are not grounded in the prompt. Prefer null over guessing
+high-stakes fields (service), but BE GENEROUS extracting time/location/budget —
+any mention counts, even informal.
 
 Return this exact shape:
 {
@@ -306,7 +483,8 @@ Return this exact shape:
   "confidence": 0-100,
   "location": "city or area mentioned, or null",
   "budget": "budget or price mentioned, or null",
-  "time_range": "time or urgency mentioned, or null",
+  "time_range": "time or urgency mentioned verbatim, or null",
+  "time_range_iso": "YYYY-MM-DD resolved against today, or null",
   "top_3": [
     {"service": "Plumbing", "confidence": 90},
     {"service": "Electrical", "confidence": 7},
@@ -317,6 +495,28 @@ Return this exact shape:
   ],
   "advisor_message": "short grounded message"
 }
+
+ARABIC / DIALECT HANDLING (BE LENIENT):
+- Egyptian colloquial counts. Treat these as equivalent to MSA:
+  بكره / بكرة / بكرا = tomorrow; النهارده / النهاردة = today; امبارح = yesterday;
+  بعد بكرة = day after tomorrow; دلوقتي = right now; حالا = immediately.
+  بعد X يوم / بعد X ساعه = "in X days / hours".
+  Day names with or without "يوم" prefix: الجمعة, يوم الجمعة, الجمعه.
+- Service words may appear without ال prefix, with ة→ه, ى→ي, alef variants,
+  Arabizi (numbers as letters: 3=ع, 7=ح, 2=ء). Match meaning over spelling.
+- Service descriptions in dialect:
+  "الغساله بايظه" = washing machine broken (Appliance Repair)
+  "مفيش كهربا" / "النور فصل" = no power (Electrical)
+  "التكييف ما بيبردش" = AC not cooling (A/C)
+  "الحنفيه بتنقط" = faucet dripping (Plumbing)
+  "الحيطه محتاجه دهان" = wall needs painting (Painting)
+- Drop diacritics, ignore tatweel ـ. Tolerate typos within 1 character distance.
+
+ENGLISH FLEXIBILITY:
+- Accept common typos (tommorow, plummer, electric​ian, fridg, ovan, dripin).
+- Accept slang (fix my AC asap, my sink is busted, light keeps dying).
+- Accept abbreviations (tmrw, tmr, asap, w/e, w/end).
+- Match intent, not literal keywords. "no cold air from the wall unit" = A/C.
 
 Allowed services:
 Plumbing, Electrical, A/C, Carpentry, Cleaning, Painting, Appliance Repair, Handyman
@@ -338,7 +538,16 @@ WHEN TO RETURN null service AND confidence 0:
   "something is broken", "help me", "I have a problem".
 - Mentions of furniture scratching, biting, or damage BY a pet do NOT imply Handyman.
 - Digital or IT work (websites, apps, computers) is not a home service.
-- Return null even if you think you could guess — when in doubt, return null, confidence 0.
+
+WHEN TO GUESS (with calibrated confidence):
+- If there is ANY plausible home-service signal (dialect, slang, partial keyword,
+  description of symptom), pick the most likely service and set confidence honestly:
+    90-100: explicit keyword match.
+    60-89:  clear symptom description even if no exact keyword.
+    40-59:  ambiguous symptom but home context strongly suggests one service.
+    < 40:   too ambiguous — leave service null.
+- Do NOT block on missing perfect keywords. The frontend gates on confidence < 50,
+  so a low-confidence guess is safer than a null when symptom is described.
 
 CRITICAL DISAMBIGUATION — appliances vs electrical:
 - Sparks, burning smell, or smoke FROM an oven, stove, fridge, microwave, washing machine,
@@ -382,6 +591,17 @@ Do NOT trigger the safety rule for:
 
 Reply with JSON only. No markdown. No explanation.
 """
+
+def _build_system_prompt(now: Optional[datetime] = None) -> str:
+    if now is None:
+        now = _now_cairo()
+    return (
+        _SYSTEM_PROMPT_TEMPLATE
+        .replace("__TODAY_HUMAN__", now.strftime("%A, %B %d, %Y"))
+        .replace("__TODAY_ISO__", now.date().isoformat())
+        .replace("__TOMORROW_ISO__", (now + timedelta(days=1)).date().isoformat())
+    )
+
 
 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 app = FastAPI(title="Servio AI Recommender API")
@@ -489,42 +709,225 @@ def _extract_location(prompt: str) -> Optional[str]:
     return None
 
 
-def _extract_time_range(prompt: str) -> Optional[str]:
-    patterns = [
-        r"\basap\b",
-        r"\burgent\b",
-        r"\btoday\b",
-        r"\btomorrow\b",
-        r"\bthis weekend\b",
-        r"\bweekend\b",
-        r"\bthis week\b",
-        r"\bnext week\b",
-        r"\btonight\b",
-        r"\bflexible\b",
-        r"عاجل",
-        r"النهارده",
-        r"بكره",
-        r"اليوم",
-        r"هذا الأسبوع",
-        r"نهاية الأسبوع",
+_WEEKDAYS_EN = {
+    "monday": 0, "mon": 0,
+    "tuesday": 1, "tue": 1, "tues": 1,
+    "wednesday": 2, "wed": 2,
+    "thursday": 3, "thu": 3, "thur": 3, "thurs": 3,
+    "friday": 4, "fri": 4,
+    "saturday": 5, "sat": 5,
+    "sunday": 6, "sun": 6,
+}
+
+_WEEKDAYS_AR = {
+    "الاثنين": 0, "الاتنين": 0, "اثنين": 0, "اتنين": 0,
+    "الثلاثاء": 1, "التلاتاء": 1, "ثلاثاء": 1, "تلاتاء": 1,
+    "الاربعاء": 2, "الأربعاء": 2, "اربعاء": 2, "أربعاء": 2,
+    "الخميس": 3, "خميس": 3,
+    "الجمعه": 4, "الجمعة": 4, "جمعه": 4, "جمعة": 4,
+    "السبت": 5, "سبت": 5,
+    "الاحد": 6, "الأحد": 6, "احد": 6, "أحد": 6,
+}
+
+def _next_weekday(now: datetime, target_wd: int, *, force_next_week: bool = False) -> datetime:
+    delta = (target_wd - now.weekday()) % 7
+    if delta == 0 and force_next_week:
+        delta = 7
+    if delta == 0 and not force_next_week:
+        delta = 0
+    return now + timedelta(days=delta)
+
+
+def _parse_when(prompt: str, now: Optional[datetime] = None) -> Dict[str, Any]:
+    """Parse timing into {label, iso_date, bucket}. Best-effort, returns empty dict if nothing found."""
+    if now is None:
+        now = _now_cairo()
+    norm = _normalize_arabic(prompt).lower()
+
+    asap_patterns = [
+        r"\basap\b", r"\bnow\b", r"\bright now\b", r"\brn\b", r"\bimmediately\b", r"\bemergency\b", r"\burgent(?:ly)?\b",
+        r"حالا", r"فورا", r"فوراً", r"دلوقتي", r"دلوقت", r"عاجل", r"طوارئ", r"اسعاف", r"الان", r"الآن",
     ]
-    for pattern in patterns:
-        match = re.search(pattern, prompt, re.IGNORECASE)
-        if match:
-            return match.group(0)
-    return None
+    today_patterns = [
+        r"\btoday\b", r"\bthis (?:morning|afternoon)\b",
+        r"النهارده", r"النهاردة", r"اليوم",
+    ]
+    tonight_patterns = [r"\btonight\b", r"\bthis evening\b", r"الليله", r"الليلة", r"بليل"]
+    tomorrow_patterns = [
+        r"\btom+orr+ow\b", r"\btmrw\b", r"\btmr\b", r"\btomoro\b",
+        r"بكره", r"بكرة", r"بكرا", r"غدا", r"غدًا", r"الغد",
+    ]
+    day_after_tom = [r"\bday after tomorrow\b", r"بعد بكره", r"بعد بكرة", r"بعد غد"]
+    weekend_patterns = [r"\b(?:this\s+)?weekend\b", r"نهايه الاسبوع", r"نهاية الاسبوع", r"عطله الاسبوع", r"الويك ?اند"]
+    this_week_patterns = [r"\bthis week\b", r"هذا الاسبوع", r"الاسبوع ده"]
+    next_week_patterns = [r"\bnext week\b", r"الاسبوع الجاي", r"الاسبوع القادم", r"الاسبوع الجاي"]
+    flexible_patterns = [r"\bflexible\b", r"\bwhenever\b", r"\bany time\b", r"\banytime\b", r"\bno rush\b", r"مرن", r"مفيش استعجال", r"اي وقت", r"أي وقت"]
+
+    def first_match(patterns):
+        for pat in patterns:
+            m = re.search(pat, norm, re.IGNORECASE)
+            if m:
+                return m.group(0)
+        return None
+
+    label = None
+    bucket = None
+    target_dt = None
+
+    if first_match(asap_patterns):
+        bucket, label, target_dt = "asap", "ASAP", now
+    elif (m := first_match(day_after_tom)):
+        bucket, label, target_dt = "tomorrow", m, now + timedelta(days=2)
+    elif (m := first_match(tomorrow_patterns)):
+        bucket, label, target_dt = "tomorrow", m, now + timedelta(days=1)
+    elif (m := first_match(tonight_patterns)):
+        bucket, label, target_dt = "tonight", m, now
+    elif (m := first_match(today_patterns)):
+        bucket, label, target_dt = "today", m, now
+
+    if not label:
+        m = re.search(r"\bin\s+(\d+)\s+(day|days|hour|hours|week|weeks)\b", norm)
+        if m:
+            n = int(m.group(1))
+            unit = m.group(2)
+            if "week" in unit:
+                target_dt = now + timedelta(weeks=n)
+            elif "hour" in unit:
+                target_dt = now + timedelta(hours=n)
+            else:
+                target_dt = now + timedelta(days=n)
+            label = m.group(0)
+            bucket = "this_week" if (target_dt - now).days <= 7 else "next_week"
+
+    if not label:
+        m = re.search(r"بعد\s+(\d+)\s*(يوم|ايام|أيام|اسبوع|اسابيع|أسبوع|أسابيع|ساعه|ساعة|ساعات)", norm)
+        if m:
+            n = int(m.group(1))
+            unit = m.group(2)
+            if "اسبوع" in unit or "أسبوع" in unit or "اسابيع" in unit or "أسابيع" in unit:
+                target_dt = now + timedelta(weeks=n)
+            elif "ساع" in unit:
+                target_dt = now + timedelta(hours=n)
+            else:
+                target_dt = now + timedelta(days=n)
+            label = m.group(0)
+            bucket = "this_week" if (target_dt - now).days <= 7 else "next_week"
+
+    if not label:
+        for name, wd in _WEEKDAYS_EN.items():
+            pat = rf"\b(?:by|before|on|after|this|next|coming)?\s*{name}\b"
+            m = re.search(pat, norm)
+            if m:
+                force_next = "next" in m.group(0)
+                target_dt = _next_weekday(now, wd, force_next_week=force_next)
+                label = m.group(0).strip()
+                days_off = (target_dt.date() - now.date()).days
+                bucket = "today" if days_off == 0 else ("tomorrow" if days_off == 1 else ("this_week" if days_off <= 7 else "next_week"))
+                break
+
+    if not label:
+        for name, wd in _WEEKDAYS_AR.items():
+            pat = rf"(?:يوم\s+)?{name}"
+            m = re.search(pat, norm)
+            if m:
+                target_dt = _next_weekday(now, wd, force_next_week=False)
+                label = m.group(0).strip()
+                days_off = (target_dt.date() - now.date()).days
+                bucket = "today" if days_off == 0 else ("tomorrow" if days_off == 1 else ("this_week" if days_off <= 7 else "next_week"))
+                break
+
+    if not label:
+        for bk, pats in (("weekend", weekend_patterns), ("next_week", next_week_patterns),
+                        ("this_week", this_week_patterns), ("flexible", flexible_patterns)):
+            m = first_match(pats)
+            if m:
+                bucket, label = bk, m
+                if bk == "weekend":
+                    target_dt = _next_weekday(now, 5, force_next_week=False)
+                elif bk == "next_week":
+                    target_dt = now + timedelta(days=7)
+                elif bk == "this_week":
+                    target_dt = now + timedelta(days=3)
+                break
+
+    if not label:
+        return {}
+
+    result = {"label": label, "bucket": bucket}
+    if target_dt is not None:
+        result["iso_date"] = target_dt.date().isoformat()
+        result["display_date"] = target_dt.strftime("%A, %b %d")
+    return result
+
+
+_TIME_REJECT_HINTS = re.compile(
+    r"\b(sink|drain|tap|faucet|pipe|leak|leaking|drip|drips|dripping|clog|clogged|"
+    r"toilet|shower|bath|tub|water heater|geyser|boiler|"
+    r"ac|a/c|aircon|air conditioner|fridge|fridg|freezer|washer|washing machine|dryer|oven|stove|microwave|dishwasher|"
+    r"light|lights|outlet|socket|breaker|fuse|wiring|power|electric|electricity|electrical|"
+    r"door|window|lock|hinge|shelf|cabinet|paint|painting|clean|cleaning|wall|ceiling|floor|"
+    r"plumber|electrician|technician|handyman|carpenter|painter|cleaner|"
+    r"broken|busted|cracked|not working|won't|doesn't|isn't|won't start|burnt|smoking|smells)\b"
+    r"|(حنفيه|حنفية|صنبور|بلاعه|بلاعة|شطاف|سيفون|مواسير|ماسوره|ماسورة|"
+    r"تكييف|اسبليت|إسبليت|ثلاجه|ثلاجة|غساله|غسالة|ديب فريزر|سخان|"
+    r"نور|كهربا|كهرباء|لمبه|لمبة|فيشه|فيشة|قاطع|كابل|"
+    r"باب|شباك|نافذه|قفل|رف|دولاب|دهان|تنظيف|"
+    r"سباك|كهربائي|فني|نجار|دهان|عامل نظافه|"
+    r"بايظ|بايظه|مكسور|مكسوره|مش شغال|مش شغاله|بيقطر|بيرشح|عطلان|عطلانه)",
+    re.IGNORECASE,
+)
+
+_MAX_TIME_PHRASE_LEN = 60
+
+
+def _looks_like_time_phrase(text: str) -> bool:
+    """Permissive: trust LLM unless output is clearly a complaint fragment.
+
+    Reject when (a) too long to be a time phrase, or (b) contains service/symptom
+    nouns that indicate the LLM regurgitated the prompt into time_range.
+    """
+    if not text:
+        return False
+    cleaned = text.strip()
+    if not cleaned:
+        return False
+    if len(cleaned) > _MAX_TIME_PHRASE_LEN:
+        return False
+    normalized = _normalize_arabic(cleaned)
+    if _TIME_REJECT_HINTS.search(normalized):
+        return False
+    return True
+
+
+def _extract_time_range(prompt: str) -> Optional[str]:
+    parsed = _parse_when(prompt)
+    if not parsed:
+        return None
+    label = parsed.get("label", "")
+    display = parsed.get("display_date")
+    if display and parsed.get("bucket") not in ("flexible", "asap"):
+        return f"{label} ({display})"
+    return label or None
 
 
 def _find_service_mentions(prompt: str) -> Dict[str, int]:
     mentions: Dict[str, int] = {}
+    normalized = _normalize_for_match(prompt)
     for service, patterns in SERVICE_PATTERNS.items():
         for pattern in patterns:
-            match = re.search(pattern, prompt, re.IGNORECASE)
-            if not match:
-                continue
-            current = mentions.get(service)
-            if current is None or match.start() < current:
-                mentions[service] = match.start()
+            norm_pattern = _normalize_arabic(pattern).lower()
+            for haystack in (prompt, normalized):
+                target_pattern = pattern if haystack is prompt else norm_pattern
+                try:
+                    match = re.search(target_pattern, haystack, re.IGNORECASE)
+                except re.error:
+                    match = None
+                if not match:
+                    continue
+                current = mentions.get(service)
+                if current is None or match.start() < current:
+                    mentions[service] = match.start()
+                break
     return mentions
 
 
@@ -964,18 +1367,106 @@ def _build_follow_up_message(
     return "I need a bit more detail before I can match the right service."
 
 
+def _apply_smart_defaults(
+    extracted: Dict[str, Any],
+    primary_service: Optional[str],
+    safety_risk: bool,
+) -> Dict[str, Any]:
+    """Fill missing time/budget with safe, professionally-defaulted values.
+    Never overwrites user-provided data."""
+    out = dict(extracted)
+
+    # TIME: safety_risk → ASAP; else flexible. iso_date stays null when bucket=flexible.
+    if not out.get("time_range"):
+        if safety_risk:
+            out["time_range"] = "ASAP (safety risk)"
+            out["time_range_bucket"] = "asap"
+            out["time_range_display"] = "ASAP — safety risk"
+            out["time_range_default_reason"] = "safety_risk"
+        else:
+            out["time_range"] = "Flexible"
+            out["time_range_bucket"] = "flexible"
+            out["time_range_display"] = "Soonest available slot"
+            out["time_range_default_reason"] = "user_unspecified"
+        out["time_range_is_default"] = True
+    else:
+        out["time_range_is_default"] = False
+
+    # BUDGET: surface typical range from lookup table — does not fill `budget`.
+    estimate = SERVICE_BUDGET_ESTIMATES.get(primary_service) if primary_service else None
+    if estimate:
+        out["budget_estimate"] = estimate["typical"]
+        out["budget_estimate_min"] = estimate["min"]
+        out["budget_estimate_max"] = estimate["max"]
+    else:
+        out["budget_estimate"] = None
+        out["budget_estimate_min"] = None
+        out["budget_estimate_max"] = None
+    out["budget_is_default"] = not bool(out.get("budget"))
+
+    out["location_is_default"] = not bool(out.get("location"))
+
+    return out
+
+
+def _build_prompt_suggestions(
+    primary_service: Optional[str],
+    advisory_fields: List[str],
+    extracted: Dict[str, Any],
+) -> Dict[str, List[str]]:
+    """Quick-pick chip options the frontend renders for each missing field."""
+    out: Dict[str, List[str]] = {}
+    if "time_range" in advisory_fields or extracted.get("time_range_is_default"):
+        out["time_range"] = list(TIME_SUGGESTIONS)
+    if "budget" in advisory_fields or extracted.get("budget_is_default"):
+        out["budget"] = list(
+            BUDGET_SUGGESTIONS_BY_SERVICE.get(primary_service, DEFAULT_BUDGET_SUGGESTIONS)
+        )
+    if "location" in advisory_fields or extracted.get("location_is_default"):
+        out["location"] = []  # frontend uses address picker, not chips
+    return out
+
+
+def _build_field_follow_ups(
+    primary_service: Optional[str],
+    advisory_fields: List[str],
+    extracted: Dict[str, Any],
+) -> Dict[str, str]:
+    """Field-level micro-copy. Each field gets its own friendly question."""
+    out: Dict[str, str] = {}
+    if "time_range" in advisory_fields or extracted.get("time_range_is_default"):
+        out["time_range"] = "When works for you?"
+    if "budget" in advisory_fields or extracted.get("budget_is_default"):
+        if primary_service and SERVICE_BUDGET_ESTIMATES.get(primary_service):
+            tier = SERVICE_BUDGET_ESTIMATES[primary_service]["typical"]
+            out["budget"] = f"Typical {primary_service} call: {tier}. Pick a range or skip — technician quotes on site."
+        else:
+            out["budget"] = "Set a budget range, or skip — technician quotes on site."
+    if "location" in advisory_fields or extracted.get("location_is_default"):
+        out["location"] = "Add your address so we can match technicians near you."
+    return out
+
+
 def _normalize_model_result(prompt: str, raw_result: Dict[str, Any]) -> Dict[str, Any]:
     raw_primary_service = _normalize_service(raw_result.get("service"))
     explicit_services = _extract_explicit_services(prompt)
     explicit_services = _disambiguate_appliance_vs_electrical(prompt, explicit_services)
     confidence = _normalize_confidence(raw_result.get("confidence"))
+    parsed_when = _parse_when(prompt)
+    llm_time = _clean_text(raw_result.get("time_range"))
+    # Reject LLM time if parser can't validate it AND it doesn't look like a time phrase.
+    if llm_time and not parsed_when and not _looks_like_time_phrase(llm_time):
+        llm_time = None
     extracted = {
         "location": _sanitize_location(raw_result.get("location")) or _extract_location(prompt),
         "budget": _clean_text(raw_result.get("budget")) or _extract_budget(prompt),
-        "time_range": _clean_text(raw_result.get("time_range")) or _extract_time_range(prompt),
+        "time_range": llm_time or _extract_time_range(prompt),
+        "time_range_iso": _clean_text(raw_result.get("time_range_iso")) or parsed_when.get("iso_date"),
+        "time_range_display": parsed_when.get("display_date"),
+        "time_range_bucket": parsed_when.get("bucket"),
     }
     safety_risk = _detect_water_on_electrical(prompt)
-    problem_understood = bool(explicit_services or safety_risk)
+    problem_understood = bool(raw_primary_service or explicit_services or safety_risk)
 
     if not problem_understood or not _has_meaningful_text(prompt):
         normalized = _build_unrecognized_result(prompt, extracted)
@@ -1012,6 +1503,10 @@ def _normalize_model_result(prompt: str, raw_result: Dict[str, Any]) -> Dict[str
     )
     needs_follow_up = bool(blocking_fields)
     scenario = "vague" if needs_follow_up else issue_mode
+
+    extracted = _apply_smart_defaults(extracted, primary_service, safety_risk)
+    prompt_suggestions = _build_prompt_suggestions(primary_service, advisory_fields, extracted)
+    field_follow_ups = _build_field_follow_ups(primary_service, advisory_fields, extracted)
     user_selected_service = _detect_user_selected_service(
         prompt,
         [step["service"] for step in steps],
@@ -1050,6 +1545,8 @@ def _normalize_model_result(prompt: str, raw_result: Dict[str, Any]) -> Dict[str
             issue_mode=issue_mode,
         ),
         "advisory_message_missing": _build_advisory_message(advisory_fields),
+        "prompt_suggestions": prompt_suggestions,
+        "field_follow_ups": field_follow_ups,
         "service_options": [step["service"] for step in steps],
         "selected_service": user_selected_service or (steps[0]["service"] if steps else primary_service),
         "safety_risk": safety_risk,
@@ -1075,29 +1572,11 @@ def recommend(request: PromptRequest):
         result["prompt"] = prompt
         return result
 
-    explicit_services = _extract_explicit_services(prompt)
-    explicit_services = _disambiguate_appliance_vs_electrical(prompt, explicit_services)
-    safety_risk = _detect_water_on_electrical(prompt)
-    problem_understood = bool(explicit_services or safety_risk)
-
-    if not problem_understood:
-        extracted = {
-            "location": _extract_location(prompt),
-            "budget": _extract_budget(prompt),
-            "time_range": _extract_time_range(prompt),
-        }
-        if _has_home_context(prompt):
-            result = _build_vague_home_result(prompt, extracted)
-        else:
-            result = _build_unrecognized_result(prompt, extracted)
-        result["prompt"] = prompt
-        return result
-
     try:
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "system", "content": _build_system_prompt()},
                 {"role": "user", "content": prompt},
             ],
             temperature=0.1,

@@ -1,0 +1,17 @@
+.heart-toggle {
+  appearance: none;
+  background: transparent;
+  border: none;
+  padding: 6px;
+  border-radius: 999px;
+  cursor: pointer;
+  color: var(--color-text-light, #888);
+  display: inline-flex;
+  align-items: center;
+  transition: transform .12s ease, color .12s ease, background-color .12s ease;
+}
+.heart-toggle:hover  { background: rgba(255,255,255,.06); color: #ff5b6e; }
+.heart-toggle:active { transform: scale(.92); }
+.heart-toggle--on    { color: #ff5b6e; }
+.heart-toggle--on svg { filter: drop-shadow(0 0 4px rgba(255,91,110,.35)); }
+.heart-toggle:disabled { opacity: .5; cursor: not-allowed; }

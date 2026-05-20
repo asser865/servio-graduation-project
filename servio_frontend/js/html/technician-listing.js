@@ -8,6 +8,9 @@ import { SERVICES } from '../data/services-data.js';
 import { getWorkers } from '../api/users.js';
 import { subscribeNotify }  from '../api/notify.js';
 import { getSession }       from '../api/client.js';
+import { createHeartToggle } from '../components/heart-toggle.js';
+import { listMyFavoriteIds } from '../api/favorites.js';
+import { renderBusyBadge } from '../components/busy-badge.js';
 
 // Module-level cache so langchange re-renders without re-fetching
 let _cachedWorkers = [];
@@ -221,6 +224,44 @@ async function renderCards(serviceKey, lang) {
 
   _cachedWorkers = workers;
   techGrid.innerHTML = workers.map((worker, i) => buildCardFromAPI(worker, serviceKey, lang, i * 50)).join('');
+
+  // Attach heart-toggle and busy badge — wrapped so a failure never hides cards
+  try {
+    const favIds = window.__favIds || (window.__favIds = await listMyFavoriteIds().catch(() => new Set()));
+    techGrid.querySelectorAll('.tech-card').forEach((card, idx) => {
+      const workerId = card.getAttribute('data-tech-id');
+      try {
+        const heart = createHeartToggle({
+          workerId,
+          isFavorited: favIds.has(workerId),
+          onChange: (now) => now ? favIds.add(workerId) : favIds.delete(workerId),
+        });
+        heart.classList.add('tech-card__heart');
+        card.querySelector('.tech-card__top')?.appendChild(heart);
+      } catch (_) { /* heart optional */ }
+
+      const worker = workers[idx];
+      if (worker) {
+        try {
+          const badge = renderBusyBadge(worker.busyState);
+          if (badge) {
+            const metaTarget = card.querySelector('.tech-card__trust') || card.querySelector('.tech-card__top');
+            metaTarget?.appendChild(badge);
+          }
+          if (worker.busyState?.isBusy) {
+            const bookBtn = card.querySelector('[data-action="book-now"]') ||
+                            card.querySelector('.btn-book') ||
+                            card.querySelector('.book-btn');
+            if (bookBtn) {
+              bookBtn.setAttribute('disabled', 'true');
+              bookBtn.setAttribute('title',
+                `Busy — try again in ~${worker.busyState.remainingMin ?? 'a few'} min`);
+            }
+          }
+        } catch (_) { /* badge optional */ }
+      }
+    });
+  } catch (_) { /* decorations optional — cards already visible */ }
 
   techGrid.querySelectorAll('.tech-card').forEach(card => {
     card.style.cursor = 'pointer';

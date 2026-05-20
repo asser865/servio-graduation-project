@@ -19,7 +19,9 @@
 import { getBooking, cancelBooking, rescheduleBooking } from '../api/bookings.js';
 import { snapshotFeeFromBooking, formatMoney as formatFeeMoney, paymentMethodLabel } from '../utils/fee.js';
 import { holdPayment, confirmCompletion, openDispute } from '../api/payments.js';
+import { createSupportIssue } from '../api/support.js';
 import { openCardPickerModal } from '../components/card-picker-modal.js';
+import { uploadPublicFile } from '../api/uploads.js';
 
 const POLL_MS = 45000;
 const FINAL_STATUSES = new Set(['completed', 'cancelled', 'rejected', 'disputed']);
@@ -27,6 +29,8 @@ const TRACKER_STEPS = ['pending', 'accepted', 'en_route', 'arrived', 'in_progres
 const ACTIVE_STATUSES = new Set(['pending', 'accepted', 'en_route', 'arrived', 'in_progress']);
 const CANCELLABLE_STATUSES = new Set(['pending']);
 const RESCHEDULABLE_STATUSES = new Set(['pending', 'accepted']);
+const DISPUTABLE_STATUSES = new Set(['awaiting_customer_confirmation']);
+const SUPPORT_ISSUE_STATUSES = new Set(['accepted', 'en_route', 'arrived', 'in_progress', 'completed']);
 
 const STATUS_UI = {
   pending: {
@@ -138,6 +142,7 @@ let pollTimer = null;
 let lastUpdatedAt = Date.now();
 let pinRevealed = false;
 let lastFocus = null;
+let disputeDeepLinkHandled = false;
 
 const $ = (id) => document.getElementById(id);
 
@@ -160,6 +165,21 @@ function safeText(value, fallback = '-') {
 
 function isObjectId(value) {
   return /^[a-f0-9]{24}$/i.test(String(value || ''));
+}
+
+function formatEstimatedDuration(bk) {
+  const min = Number(bk?.estimatedDurationMin);
+  if (Number.isFinite(min) && min > 0) {
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    const dur = h > 0 ? (m > 0 ? `${h}h ${m}m` : `${h}h`) : `${m}m`;
+    if (bk?.estimatedFinishAt) {
+      const finish = new Date(bk.estimatedFinishAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      return `${dur} · finish ~${finish}`;
+    }
+    return dur;
+  }
+  return safeText(bk?.duration, 'Estimated 1 hour');
 }
 
 function getBookingId(bk = booking) {
@@ -230,7 +250,7 @@ function getRatingLabel(bk = booking) {
   const rating = worker.averageRating ?? worker.rating ?? bk?.workerRating;
   const reviews = worker.totalReviews ?? worker.reviewCount ?? bk?.workerReviewCount;
   if (Number.isFinite(Number(rating))) {
-    return reviews ? `${Number(rating).toFixed(1)} Â· ${reviews} reviews` : `${Number(rating).toFixed(1)} out of 5`;
+    return reviews ? `${Number(rating).toFixed(1)} · ${reviews} reviews` : `${Number(rating).toFixed(1)} out of 5`;
   }
   return 'New technician';
 }
@@ -364,6 +384,7 @@ async function loadBooking() {
     lastUpdatedAt = Date.now();
     persistBooking(booking);
     renderBooking();
+    maybeOpenDisputeFromQuery();
     startPolling();
   } catch (err) {
     if (cached) {
@@ -383,12 +404,47 @@ function renderEscrowActions(booking) {
   const status = booking?.status;
   if (status === 'awaiting_customer_confirmation') {
     bar.hidden = false;
+
+    // Compute actual elapsed time from server timestamps
+    const startedAt   = booking.actualStartedAt   ? new Date(booking.actualStartedAt)   : null;
+    const completedAt = booking.actualCompletedAt  ? new Date(booking.actualCompletedAt) : null;
+    const billedMin   = booking.actualBilledMin    ?? (
+      (startedAt && completedAt)
+        ? Math.round((completedAt - startedAt) / 60_000)
+        : null
+    );
+
+    const formatDuration = (min) => {
+      if (!Number.isFinite(min) || min < 0) return null;
+      const h = Math.floor(min / 60);
+      const m = min % 60;
+      return h > 0 ? (m > 0 ? `${h}h ${m}m` : `${h}h`) : `${m}m`;
+    };
+
+    const durationLabel  = formatDuration(billedMin);
+    const isFlagged      = !!booking.flaggedForReview;
+    const flagReason     = booking.flagReason || '';
+
+    const durationBanner = durationLabel ? `
+      <div class="bk-duration-summary ${isFlagged ? 'bk-duration-summary--flagged' : ''}">
+        <div class="bk-duration-summary__row">
+          <span class="bk-duration-summary__label">Actual job time</span>
+          <span class="bk-duration-summary__value">${durationLabel}</span>
+        </div>
+        ${isFlagged ? `
+        <div class="bk-duration-summary__flag">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <span>Duration flagged for admin review${flagReason ? ' — ' + flagReason : ''}. Admin will verify before releasing payment.</span>
+        </div>` : ''}
+      </div>` : '';
+
     bar.innerHTML = `
+      ${durationBanner}
       <button id="bkConfirmCompleteBtn" class="btn btn--primary">
         ${window.t?.('bkd_confirm_complete') || 'Confirm Service Complete'}
       </button>
       <button id="bkReportIssueBtn" class="btn btn--ghost btn--danger">
-        ${window.t?.('bkd_report_issue') || 'Report an Issue'}
+        Open Dispute
       </button>
     `;
 
@@ -398,20 +454,26 @@ function renderEscrowActions(booking) {
         showToast('Confirmed! Awaiting admin review.', 'success');
         await refreshBooking();
       } catch (err) {
-        showToast(err?.response?.data?.message || 'Failed to confirm. Please try again.', 'error');
+        showToast(err?.data?.message || err?.message || 'Failed to confirm. Please try again.', 'error');
       }
     });
 
-    document.getElementById('bkReportIssueBtn')?.addEventListener('click', () => {
-      const reason = prompt('Please describe the issue (min 20 characters):');
-      if (!reason || reason.length < 20) {
-        showToast('Reason must be at least 20 characters.', 'error');
-        return;
-      }
-      openDispute({ bookingId: booking._id || booking.bookingId, reason })
-        .then(() => { showToast('Dispute submitted.', 'info'); return refreshBooking(); })
-        .catch(err => showToast(err?.response?.data?.message || 'Failed to open dispute.', 'error'));
-    });
+    document.getElementById('bkReportIssueBtn')?.addEventListener('click', () => openDisputeDialog());
+  } else if (SUPPORT_ISSUE_STATUSES.has(status)) {
+    const completedAt = new Date(booking.updatedAt || booking.customerConfirmedAt || 0).getTime();
+    const withinCompletedWindow = status !== 'completed' || (completedAt && Date.now() - completedAt <= 48 * 60 * 60 * 1000);
+    if (!withinCompletedWindow) {
+      bar.hidden = true;
+      return;
+    }
+    const mode = ['accepted', 'en_route'].includes(status) ? 'prework' : (status === 'completed' ? 'post' : 'during');
+    bar.hidden = false;
+    bar.innerHTML = `
+      <button id="bkSupportIssueBtn" class="btn btn--ghost btn--danger">
+        ${mode === 'prework' ? 'Report late / no-show' : 'Report problem'}
+      </button>
+    `;
+    document.getElementById('bkSupportIssueBtn')?.addEventListener('click', () => openSupportIssueDialog(mode));
   } else {
     bar.hidden = true;
   }
@@ -457,7 +519,7 @@ function attachRetryHandler(booking) {
         showToast('Payment held successfully.', 'success');
         await refreshBooking();
       } catch (err) {
-        showToast(err?.response?.data?.message || 'Payment failed. Try another card.', 'error');
+        showToast(err?.data?.message || err?.message || 'Payment failed. Try another card.', 'error');
       }
     });
   });
@@ -514,7 +576,7 @@ function renderSummary(date, time, total) {
   setText('bkLocation', getAddress());
   setText('bkScheduledDate', date);
   setText('bkScheduledTime', time);
-  setText('bkDuration', safeText(booking?.duration, 'Estimated 1 hour'));
+  setText('bkDuration', formatEstimatedDuration(booking));
   setText('bkDescription', getDescription());
 }
 
@@ -527,7 +589,7 @@ function renderTechnician(workerName, phone) {
   setText('bkBarInitials', initials);
   setText('bkTechnicianName', workerName);
   setText('bkBarName', workerName);
-  setText('bkTechSpecialty', [getSpecialty(), getWorkerLocation()].filter(Boolean).join(' Â· ') || 'Verified professional');
+  setText('bkTechSpecialty', [getSpecialty(), getWorkerLocation()].filter(Boolean).join(' · ') || 'Verified professional');
   setText('bkTechRating', getRatingLabel());
 
   if (avatarImg) {
@@ -729,10 +791,23 @@ async function refreshBooking() {
   const id = getBookingId();
   if (!id) return;
   try {
+    const prevEstMin = Number(booking?.estimatedDurationMin) || null;
     const apiBooking = await getBooking(id);
     booking = normalizeBooking(apiBooking);
     lastUpdatedAt = Date.now();
     persistBooking(booking);
+    const newEstMin = Number(booking?.estimatedDurationMin) || null;
+    if (prevEstMin && newEstMin && newEstMin !== prevEstMin) {
+      const finish = booking?.estimatedFinishAt
+        ? new Date(booking.estimatedFinishAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+        : null;
+      showToast(
+        finish
+          ? `Technician updated the estimate. New finish time: ~${finish}.`
+          : `Technician updated the duration estimate to ${formatEstimatedDuration(booking)}.`,
+        'info'
+      );
+    }
     renderBooking();
     if (FINAL_STATUSES.has(getStatus())) stopPolling();
   } catch (_) {
@@ -765,6 +840,195 @@ function closeDialog(dialog) {
   dialog.hidden = true;
   lastFocus?.focus?.();
   lastFocus = null;
+}
+
+function setDisputeError(message = '') {
+  const error = $('bkDisputeError');
+  if (!error) return;
+  error.hidden = !message;
+  error.textContent = message;
+}
+
+function setDisputeBusy(isBusy) {
+  const submit = $('bkDisputeSubmit');
+  const cancel = $('bkDisputeCancel');
+  const form = $('bkDisputeForm');
+  if (submit) {
+    submit.disabled = isBusy;
+    submit.textContent = isBusy ? 'Opening...' : 'Open Dispute';
+  }
+  if (cancel) cancel.disabled = isBusy;
+  form?.querySelectorAll('input, select, textarea').forEach((field) => { field.disabled = isBusy; });
+}
+
+function resetDisputeDialog() {
+  $('bkDisputeForm')?.reset();
+  setDisputeError('');
+  const list = $('bkDisputeEvidenceList');
+  if (list) {
+    list.hidden = true;
+    list.replaceChildren();
+  }
+  setDisputeBusy(false);
+}
+
+function openDisputeDialog() {
+  if (!booking || !DISPUTABLE_STATUSES.has(getStatus())) {
+    showToast('This booking is not eligible for a dispute right now.', 'info');
+    return;
+  }
+  resetDisputeDialog();
+  openDialog($('bkDisputeDialog'));
+}
+
+function maybeOpenDisputeFromQuery() {
+  if (disputeDeepLinkHandled) return;
+  const action = new URLSearchParams(window.location.search).get('action');
+  if (action !== 'dispute') return;
+  disputeDeepLinkHandled = true;
+  setTimeout(openDisputeDialog, 80);
+}
+
+function updateEvidencePreview() {
+  const input = $('bkDisputeEvidence');
+  const list = $('bkDisputeEvidenceList');
+  if (!input || !list) return;
+  const files = [...(input.files || [])].slice(0, 6);
+  list.hidden = files.length === 0;
+  list.innerHTML = files.map(file => `
+    <span class="bk-dispute-evidence__item">
+      <span>${file.name}</span>
+      <small>${Math.ceil(file.size / 1024)} KB</small>
+    </span>
+  `).join('');
+}
+
+async function submitDispute(event) {
+  event.preventDefault();
+  const id = getBookingId();
+  const category = $('bkDisputeCategory')?.value || 'other';
+  const reason = String($('bkDisputeReason')?.value || '').trim();
+  const files = [...($('bkDisputeEvidence')?.files || [])].slice(0, 6);
+
+  if (!id) {
+    setDisputeError('Booking ID is missing. Refresh the page and try again.');
+    return;
+  }
+  if (reason.length < 20) {
+    setDisputeError('Describe the issue in at least 20 characters.');
+    return;
+  }
+
+  setDisputeBusy(true);
+  setDisputeError('');
+  try {
+    const evidence = [];
+    for (const file of files) {
+      const uploaded = await uploadPublicFile(file, 'dispute');
+      if (uploaded?.url) evidence.push(uploaded.url);
+    }
+    await openDispute({ bookingId: id, category, reason, evidence });
+    closeDialog($('bkDisputeDialog'));
+    showToast('Dispute opened. SERVIO support is reviewing it.', 'info');
+    await refreshBooking();
+  } catch (err) {
+    setDisputeError(err?.data?.message || err?.message || 'Failed to open dispute.');
+    setDisputeBusy(false);
+  }
+}
+
+function supportIssueOptions(mode) {
+  if (mode === 'prework') {
+    return [['late', 'Technician is late'], ['no_show', 'Technician did not show up'], ['other', 'Other scheduling issue']];
+  }
+  if (mode === 'post') {
+    return [['post_completion', 'Problem after completion'], ['other', 'Other completed-service issue']];
+  }
+  return [['during_work_problem', 'Problem during work'], ['safety', 'Safety concern'], ['other', 'Other work issue']];
+}
+
+function openSupportIssueDialog(mode = 'during') {
+  if (!booking || !SUPPORT_ISSUE_STATUSES.has(getStatus())) {
+    showToast('This booking is not eligible for a support case right now.', 'info');
+    return;
+  }
+  $('bkSupportIssueForm')?.reset();
+  const type = $('bkSupportIssueType');
+  if (type) {
+    type.innerHTML = supportIssueOptions(mode)
+      .map(([value, label]) => `<option value="${value}">${label}</option>`)
+      .join('');
+  }
+  const title = $('bkSupportIssueTitle');
+  if (title) title.textContent = mode === 'prework' ? 'Report late / no-show' : 'Report a problem';
+  const list = $('bkSupportIssueEvidenceList');
+  if (list) {
+    list.hidden = true;
+    list.innerHTML = '';
+  }
+  const error = $('bkSupportIssueError');
+  if (error) {
+    error.hidden = true;
+    error.textContent = '';
+  }
+  openDialog($('bkSupportIssueDialog'));
+}
+
+function updateSupportIssueEvidencePreview() {
+  const input = $('bkSupportIssueEvidence');
+  const list = $('bkSupportIssueEvidenceList');
+  if (!input || !list) return;
+  const files = [...(input.files || [])].slice(0, 6);
+  list.hidden = files.length === 0;
+  list.innerHTML = files.map(file => `
+    <span class="bk-dispute-evidence__item">
+      <span>${file.name}</span>
+      <small>${Math.ceil(file.size / 1024)} KB</small>
+    </span>
+  `).join('');
+}
+
+async function submitSupportIssue(event) {
+  event.preventDefault();
+  const id = getBookingId();
+  const type = $('bkSupportIssueType')?.value || 'other';
+  const description = String($('bkSupportIssueDescription')?.value || '').trim();
+  const files = [...($('bkSupportIssueEvidence')?.files || [])].slice(0, 6);
+  const error = $('bkSupportIssueError');
+  const submit = $('bkSupportIssueSubmit');
+
+  if (description.length < 20) {
+    if (error) {
+      error.textContent = 'Describe the issue in at least 20 characters.';
+      error.hidden = false;
+    }
+    return;
+  }
+
+  if (submit) {
+    submit.disabled = true;
+    submit.textContent = 'Submitting...';
+  }
+  try {
+    const evidence = [];
+    for (const file of files) {
+      const uploaded = await uploadPublicFile(file, 'support');
+      if (uploaded?.url) evidence.push(uploaded.url);
+    }
+    await createSupportIssue({ bookingId: id, type, description, evidence });
+    closeDialog($('bkSupportIssueDialog'));
+    showToast('Support case opened.', 'success');
+  } catch (err) {
+    if (error) {
+      error.textContent = err?.data?.message || err?.message || 'Failed to open support case.';
+      error.hidden = false;
+    }
+  } finally {
+    if (submit) {
+      submit.disabled = false;
+      submit.textContent = 'Submit Case';
+    }
+  }
 }
 
 function setupDialog(dialog, closeIds = []) {
@@ -877,10 +1141,18 @@ function wireEvents() {
     if (event.key !== 'Escape') return;
     closeDialog($('bkCancelDialog'));
     closeDialog($('bkRescheduleDialog'));
+    closeDialog($('bkDisputeDialog'));
+    closeDialog($('bkSupportIssueDialog'));
   });
 
   setupDialog($('bkCancelDialog'), ['bkDialogKeep']);
   setupDialog($('bkRescheduleDialog'), ['bkRsDialogCancel']);
+  setupDialog($('bkDisputeDialog'), ['bkDisputeCancel']);
+  setupDialog($('bkSupportIssueDialog'), ['bkSupportIssueCancel']);
+  $('bkDisputeEvidence')?.addEventListener('change', updateEvidencePreview);
+  $('bkDisputeForm')?.addEventListener('submit', submitDispute);
+  $('bkSupportIssueEvidence')?.addEventListener('change', updateSupportIssueEvidencePreview);
+  $('bkSupportIssueForm')?.addEventListener('submit', submitSupportIssue);
 }
 
 function normalizeSlotValue(value) {

@@ -23,6 +23,9 @@ const notifyRoutes         = require('./modules/notifications/notify.routes');
 const notificationsRoutes  = require('./modules/notifications/notifications.routes');
 const savedCardRoutes      = require('./modules/savedCards/savedCard.routes');
 const platformRoutes  = require('./modules/platform/platform.routes');
+const locationsRoutes = require('./modules/platform/locations.routes');
+const favoritesRoutes = require('./modules/favorites/favorite.routes');
+const supportIssueRoutes = require('./modules/support/support-issue.routes');
 
 const { notFound, errorHandler } = require('./middleware/error.middleware');
 
@@ -94,6 +97,9 @@ app.use(`${API_PREFIX}/notify`,         notifyRoutes);
 app.use(`${API_PREFIX}/notifications`,  notificationsRoutes);
 app.use(`${API_PREFIX}/saved-cards`, savedCardRoutes);
 app.use(`${API_PREFIX}/platform-settings`, platformRoutes);
+app.use(`${API_PREFIX}/locations`, locationsRoutes);
+app.use(`${API_PREFIX}/favorites`, favoritesRoutes);
+app.use(`${API_PREFIX}/support`, supportIssueRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

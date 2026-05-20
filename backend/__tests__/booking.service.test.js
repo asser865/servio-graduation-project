@@ -11,7 +11,7 @@ const Service = require('../src/modules/services/service.model.js');
 const Booking = require('../src/modules/bookings/booking.model.js');
 const SavedCard = require('../src/modules/savedCards/savedCard.model.js');
 const Settings = require('../src/modules/admin/settings.model.js');
-const { createBooking, rescheduleBooking } = require('../src/modules/bookings/booking.service.js');
+const { createBooking, rescheduleBooking, updateBookingStatus } = require('../src/modules/bookings/booking.service.js');
 
 const PLUMBING_SERVICE_ID = '664000000000000000000001';
 const HVAC_SERVICE_ID     = '664000000000000000000002';
@@ -67,14 +67,22 @@ const baseBookingData = {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  jest.restoreAllMocks();
   User.findOne    = jest.fn().mockResolvedValue(makeWorker());
   Service.findOne = jest.fn().mockResolvedValue(makeService());
-  Booking.findOne = jest.fn().mockResolvedValue(null);
-  Settings.findOne = jest.fn().mockResolvedValue({ commissionRate: 10, cashPaymentsEnabled: true });
-  Booking.create  = jest.fn().mockResolvedValue({
-    ...baseBookingData,
-    _id: 'booking123',
-    populate: jest.fn().mockResolvedValue({ _id: 'booking123', status: 'pending' }),
+  Booking.findOne = jest.fn().mockReturnValue({
+    session: () => Promise.resolve(null),
+  });
+  Settings.findOne = jest.fn().mockResolvedValue({ commissionRate: 10, cashPaymentsEnabled: true, travelBufferMin: 30 });
+  Booking.create  = jest.fn().mockImplementation(async (input) => {
+    const isArrayInput = Array.isArray(input);
+    const doc = isArrayInput ? input[0] : input;
+    const result = {
+      ...doc,
+      _id: 'booking123',
+      populate: jest.fn().mockResolvedValue({ _id: 'booking123', status: 'pending', ...doc }),
+    };
+    return isArrayInput ? [result] : result;
   });
   SavedCard.findOne = jest.fn().mockResolvedValue({
     _id: CARD_ID,
@@ -83,6 +91,15 @@ beforeEach(() => {
     expiry: '12/30',
     cardType: 'visa',
     label: 'Personal',
+  });
+
+  const mongoose = require('mongoose');
+  jest.spyOn(mongoose, 'startSession').mockResolvedValue({
+    startTransaction: jest.fn(),
+    commitTransaction: jest.fn(),
+    abortTransaction: jest.fn(),
+    endSession: jest.fn(),
+    inTransaction: () => true,
   });
 });
 
@@ -133,12 +150,13 @@ describe('createBooking — worker-service validation', () => {
   test('booking is created with correct user, worker, service fields', async () => {
     await createBooking(USER_ID, baseBookingData);
     expect(Booking.create).toHaveBeenCalledWith(
-      expect.objectContaining({
+      [expect.objectContaining({
         user: USER_ID,
         worker: WORKER_ID,
         service: PLUMBING_SERVICE_ID,
         paymentMethod: 'cash',
-      })
+      })],
+      expect.objectContaining({ session: expect.anything() })
     );
   });
 });
@@ -148,10 +166,11 @@ describe('createBooking â€” payment validation', () => {
     await createBooking(USER_ID, baseBookingData);
     expect(SavedCard.findOne).not.toHaveBeenCalled();
     expect(Booking.create).toHaveBeenCalledWith(
-      expect.objectContaining({
+      [expect.objectContaining({
         paymentMethod: 'cash',
         savedCard: undefined,
-      })
+      })],
+      expect.objectContaining({ session: expect.anything() })
     );
   });
 
@@ -167,7 +186,7 @@ describe('createBooking â€” payment validation', () => {
       userId: USER_ID,
     });
     expect(Booking.create).toHaveBeenCalledWith(
-      expect.objectContaining({
+      [expect.objectContaining({
         paymentMethod: 'card',
         savedCard: CARD_ID,
         paymentMeta: {
@@ -175,7 +194,8 @@ describe('createBooking â€” payment validation', () => {
           cardType: 'visa',
           label: 'Personal',
         },
-      })
+      })],
+      expect.objectContaining({ session: expect.anything() })
     );
   });
 
@@ -296,9 +316,11 @@ describe('createBooking — working hours', () => {
 // ── 3g: Double-booking ───────────────────────────────────────────────────────
 describe('createBooking — double-booking', () => {
   test('throws 409 when same worker+date+time slot is already booked', async () => {
-    Booking.findOne = jest.fn().mockResolvedValue({ _id: 'existing-booking' });
+    Booking.findOne = jest.fn().mockReturnValue({
+      session: () => Promise.resolve({ _id: 'existing-conflict' }),
+    });
     await expect(createBooking(USER_ID, baseBookingData))
-      .rejects.toMatchObject({ statusCode: 409, message: expect.stringContaining('already booked') });
+      .rejects.toMatchObject({ statusCode: 409, message: expect.stringMatching(/already|overlap/i) });
   });
 
   test('throws 409 on duplicate-key error (race condition safeguard)', async () => {
@@ -313,7 +335,7 @@ describe('createBooking — double-booking', () => {
 describe('createBooking — success', () => {
   test('creates booking when all validation passes', async () => {
     await createBooking(USER_ID, baseBookingData);
-    expect(Booking.create).toHaveBeenCalledWith(
+    expect(Booking.create.mock.calls[0][0][0]).toEqual(
       expect.objectContaining({ worker: WORKER_ID, scheduledTime: '10:00', address: '12 Tahrir St, Cairo', paymentMethod: 'cash' })
     );
   });
@@ -350,12 +372,17 @@ describe('rescheduleBooking', () => {
 
   test('updates schedule for the booking owner when slot is valid', async () => {
     const populated = { _id: '664000000000000000000030', scheduledTime: '11:00' };
-    const chain = {
+    const populateChain = {
       populate: jest.fn().mockReturnThis(),
       then: (resolve) => resolve(populated),
     };
-    Booking.findById = jest.fn().mockResolvedValue(makeExistingBooking());
-    Booking.findByIdAndUpdate = jest.fn().mockReturnValue(chain);
+    Booking.findById = jest.fn()
+      .mockResolvedValueOnce(makeExistingBooking())
+      .mockReturnValueOnce(populateChain);
+    Booking.findByIdAndUpdate = jest.fn().mockResolvedValue({ _id: '664000000000000000000030' });
+    Booking.findOne = jest.fn().mockReturnValue({
+      session: () => Promise.resolve(null),
+    });
 
     const result = await rescheduleBooking(
       '664000000000000000000030',
@@ -367,7 +394,6 @@ describe('rescheduleBooking', () => {
     expect(result).toBe(populated);
     expect(Booking.findOne).toHaveBeenCalledWith(expect.objectContaining({
       worker: expect.anything(),
-      scheduledTime: '11:00',
       status: expect.objectContaining({ $in: expect.arrayContaining(['pending', 'accepted', 'en_route', 'arrived', 'in_progress']) }),
     }));
     expect(Booking.findByIdAndUpdate).toHaveBeenCalledWith(
@@ -389,5 +415,151 @@ describe('rescheduleBooking', () => {
       statusCode: 400,
       message: expect.stringContaining('can no longer be rescheduled'),
     });
+  });
+});
+
+describe('createBooking overlap enforcement', () => {
+  test('rejects booking whose window overlaps an active booking', async () => {
+    Booking.findOne = jest.fn().mockReturnValue({
+      session: () => Promise.resolve({
+        _id: 'existing',
+        scheduledStart: new Date('2026-05-18T11:00:00Z'),
+        scheduledEnd:   new Date('2026-05-18T12:30:00Z'),
+      }),
+    });
+    Service.findOne = jest.fn().mockResolvedValue(makeService({ estimatedDurationMin: 60 }));
+    Settings.findOne = jest.fn().mockResolvedValue({
+      commissionRate: 10, cashPaymentsEnabled: true, travelBufferMin: 30,
+    });
+
+    await expect(createBooking(USER_ID, {
+      ...baseBookingData,
+      scheduledTime: '14:00',
+    })).rejects.toThrow(/already|overlap/i);
+  });
+
+  test('allows non-overlapping booking', async () => {
+    Booking.findOne = jest.fn().mockReturnValue({
+      session: () => Promise.resolve(null),
+    });
+    Service.findOne = jest.fn().mockResolvedValue(makeService({ estimatedDurationMin: 30 }));
+    Settings.findOne = jest.fn().mockResolvedValue({
+      commissionRate: 10, cashPaymentsEnabled: true, travelBufferMin: 30,
+    });
+
+    const result = await createBooking(USER_ID, {
+      ...baseBookingData,
+      scheduledTime: '13:00',
+    });
+    expect(result).toBeDefined();
+    expect(Booking.create).toHaveBeenCalledTimes(1);
+    const createArgs = Booking.create.mock.calls[0][0][0];
+    expect(createArgs.scheduledStart).toBeInstanceOf(Date);
+    expect(createArgs.scheduledEnd).toBeInstanceOf(Date);
+    expect(createArgs.estimatedDurationMin).toBe(30);
+    expect(createArgs.travelBufferMin).toBe(30);
+  });
+});
+
+describe('createBooking transactional guard', () => {
+  test('starts a session and aborts on conflict mid-transaction', async () => {
+    const mongoose = require('mongoose');
+    const mockSession = {
+      startTransaction: jest.fn(),
+      commitTransaction: jest.fn(),
+      abortTransaction:  jest.fn(),
+      endSession:        jest.fn(),
+      inTransaction:     () => true,
+    };
+    jest.spyOn(mongoose, 'startSession').mockResolvedValue(mockSession);
+
+    // Make Booking.findOne(...).session(...) return an existing booking
+    Booking.findOne = jest.fn().mockReturnValue({
+      session: () => Promise.resolve({
+        _id: 'existing',
+        scheduledStart: new Date('2026-05-18T11:00:00Z'),
+        scheduledEnd:   new Date('2026-05-18T12:30:00Z'),
+      }),
+    });
+    Service.findOne = jest.fn().mockResolvedValue(makeService({ estimatedDurationMin: 60 }));
+
+    await expect(createBooking(USER_ID, {
+      ...baseBookingData,
+      scheduledTime: '14:00',
+    })).rejects.toThrow(/already|overlap/i);
+
+    expect(mockSession.startTransaction).toHaveBeenCalled();
+    expect(mockSession.abortTransaction).toHaveBeenCalled();
+    expect(mockSession.endSession).toHaveBeenCalled();
+  });
+});
+
+describe('worker accept-time duration override', () => {
+  const makeBookingDoc = () => ({
+    _id:                  'b1',
+    status:               'pending',
+    worker:               { toString: () => WORKER_ID },
+    user:                 { toString: () => USER_ID },
+    paymentMethod:        'cash',
+    scheduledDate:        new Date(NEXT_MONDAY + 'T00:00:00Z'),
+    scheduledTime:        '14:00',
+    estimatedDurationMin: 60,
+    travelBufferMin:      30,
+    scheduledStart:       new Date('2026-05-18T11:00:00Z'),
+    scheduledEnd:         new Date('2026-05-18T12:30:00Z'),
+    save:                 jest.fn().mockResolvedValue(true),
+  });
+
+  test('applies override and rechecks overlap', async () => {
+    const booking = makeBookingDoc();
+    Booking.findById = jest.fn().mockResolvedValue(booking);
+    Booking.findOne  = jest.fn().mockReturnValue({ session: jest.fn().mockResolvedValue(null) });
+    // Also stub the non-session findOne used directly by override collision check
+    const realFindOne = Booking.findOne;
+    Booking.findOne = jest.fn().mockResolvedValue(null);
+    Booking.findByIdAndUpdate = jest.fn().mockResolvedValue({ _id: 'b1', status: 'accepted' });
+
+    await updateBookingStatus('b1', 'accepted', WORKER_ID, 'worker', { estimatedDurationMin: 120 });
+
+    expect(booking.estimatedDurationMin).toBe(120);
+    expect(booking.scheduledEnd.toISOString()).toBe('2026-05-18T13:30:00.000Z');
+    expect(booking.save).toHaveBeenCalled();
+  });
+
+  test('rejects override that would collide with a later booking', async () => {
+    const booking = makeBookingDoc();
+    Booking.findById = jest.fn().mockResolvedValue(booking);
+    Booking.findOne  = jest.fn().mockResolvedValue({ _id: 'b2' }); // simulate collision
+
+    await expect(
+      updateBookingStatus('b1', 'accepted', WORKER_ID, 'worker', { estimatedDurationMin: 120 })
+    ).rejects.toThrow(/overlap|conflict|already/i);
+  });
+});
+
+describe('in_progress lifecycle stamps', () => {
+  test('stamps actualStartedAt and estimatedFinishAt on transition', async () => {
+    const booking = {
+      _id:                  'b1',
+      status:               'arrived',
+      worker:               { toString: () => WORKER_ID },
+      user:                 { toString: () => USER_ID },
+      paymentMethod:        'cash',
+      estimatedDurationMin: 60,
+      travelBufferMin:      30,
+      actualStartedAt:      null,
+      estimatedFinishAt:    null,
+      save: jest.fn().mockResolvedValue(true),
+    };
+    Booking.findById = jest.fn().mockResolvedValue(booking);
+    Booking.findByIdAndUpdate = jest.fn().mockResolvedValue({ _id: 'b1', status: 'in_progress' });
+
+    const before = Date.now();
+    await updateBookingStatus('b1', 'in_progress', WORKER_ID, 'worker', {});
+
+    expect(booking.actualStartedAt).toBeInstanceOf(Date);
+    expect(booking.actualStartedAt.getTime()).toBeGreaterThanOrEqual(before);
+    expect(booking.estimatedFinishAt.getTime() - booking.actualStartedAt.getTime()).toBe(60 * 60_000);
+    expect(booking.save).toHaveBeenCalled();
   });
 });

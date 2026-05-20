@@ -16,6 +16,15 @@
   <div class="scroll-progress" data-scroll-progress aria-hidden="true"></div>
   <a class="skip-link" href="#main">Skip to content</a>
 
+  <!-- Aurora Ribbons page background (CSS-only flowing warm bands) -->
+  <div class="smart-match-liquid-bg" aria-hidden="true">
+    <div class="sm-aurora sm-aurora--1"></div>
+    <div class="sm-aurora sm-aurora--2"></div>
+    <div class="sm-aurora sm-aurora--3"></div>
+    <div class="sm-aurora sm-aurora--4"></div>
+    <div class="liquid-grain"></div>
+  </div>
+
   <!-- HEADER -->
   <header class="site-header" data-site-header>
     <div class="container header__inner">
@@ -91,19 +100,20 @@
         <div class="hero-ai__icon" data-reveal>
           <img src="../assets/icons/ai_icon.png" alt="AI Sparkle" width="72" height="72" />
         </div>
-        <h1 class="hero-ai__title" data-reveal data-reveal-delay="100" data-i18n-html="sm_hero_title">
+        <h1 class="hero-ai__title" data-reveal data-reveal-delay="1" data-i18n-html="sm_hero_title">
           Smart matching for<br><span>real home issues</span>
         </h1>
-        <p class="hero-ai__lead" data-reveal data-reveal-delay="200" data-i18n="sm_hero_lead">
+        <p class="hero-ai__lead" data-reveal data-reveal-delay="2" data-i18n="sm_hero_lead">
           Describe the full problem once. Servio separates immediate hazards from follow-up work so you know what to book first, what should happen the same day, and what can wait.
         </p>
       </div>
     </section>
 
     <!-- COMPOSER -->
-    <section class="container ai-composer-section" data-reveal="scale" data-reveal-delay="300">
+    <section class="container ai-composer-section" data-reveal>
+      <div class="ai-composer__halo" aria-hidden="true"></div>
       <div class="ai-composer">
-        <textarea id="ai-query-input" class="ai-composer__textarea" placeholder="e.g. I want a plumber to fix my water leak within one hour near Nasr City that will do the work wont exceed 50... EGP" data-i18n-placeholder="sm_composer_ph"></textarea>
+        <textarea id="ai-query-input" class="ai-composer__textarea" placeholder="Describe the work you need — what's wrong, where it is, your timing, and any budget. The more detail, the sharper the match." data-i18n-placeholder="sm_composer_ph"></textarea>
         <div class="ai-composer__footer">
           <div class="ai-composer__meta">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
@@ -111,12 +121,21 @@
             </svg>
             <span data-i18n="sm_criteria">Supported criteria: Location, Budget, Urgency, Service</span>
           </div>
-          <button id="ai-match-btn" class="ai-composer__btn" disabled>
-            <svg height="24" width="24" viewBox="0 0 24 24" class="ai-composer__sparkle">
-              <path class="star-base" d="M10,21.236,6.755,14.745.264,11.5,6.755,8.255,10,1.764l3.245,6.491L19.736,11.5l-6.491,3.245ZM18,21l1.5,3L21,21l3-1.5L21,18l-1.5-3L18,18l-3,1.5ZM19.333,4.667,20.5,7l1.167-2.333L24,3.5,21.667,2.333,20.5,0,19.333,2.333,17,3.5Z"></path>
-            </svg>
-            <span data-i18n="sm_generate">Generate</span>
-          </button>
+          <div class="ai-composer__actions">
+            <button id="ai-voice-btn" class="ai-composer__voice-btn" type="button" aria-label="Voice input" data-i18n-aria-label="sm_voice_label" title="1 click: start/stop • 2 clicks: switch to Arabic • 3 clicks: switch to English" aria-pressed="false">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="9" y="2" width="6" height="12" rx="3"/>
+                <path d="M5 10v2a7 7 0 0 0 14 0v-2"/>
+                <line x1="12" y1="19" x2="12" y2="22"/>
+              </svg>
+            </button>
+            <button id="ai-match-btn" class="ai-composer__btn" type="button" aria-label="Send" data-i18n-aria-label="sm_send_label" disabled>
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="12" y1="19" x2="12" y2="5"/>
+                <polyline points="5 12 12 5 19 12"/>
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
 

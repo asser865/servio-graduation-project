@@ -1,0 +1,13 @@
+.busy-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 999px;
+  font-size: 12px; font-weight: 600;
+  line-height: 1; white-space: nowrap;
+}
+.busy-badge--busy      { background: rgba(255, 165, 0, .12); color: #ff9b00; }
+.busy-badge--finishing { background: rgba(0, 200, 130, .12); color: #00c882; }
+.busy-badge__dot {
+  width: 6px; height: 6px; border-radius: 999px; background: currentColor;
+  animation: busy-pulse 1.4s ease-in-out infinite;
+}
+@keyframes busy-pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }

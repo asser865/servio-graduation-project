@@ -27,6 +27,11 @@ const disputeSchema = new mongoose.Schema(
       minlength: [20, 'Dispute reason must be at least 20 characters'],
       trim: true,
     },
+    category: {
+      type: String,
+      enum: ['quality', 'incomplete', 'damage', 'pricing', 'safety', 'no_show', 'other'],
+      default: 'other',
+    },
     evidence: {
       type: [String],
       default: [],
@@ -38,6 +43,10 @@ const disputeSchema = new mongoose.Schema(
     },
     resolution: {
       type: String,
+    },
+    decision: {
+      type: String,
+      enum: ['refund', 'release'],
     },
     resolvedBy: {
       type: mongoose.Schema.Types.ObjectId,
