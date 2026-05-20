@@ -18,6 +18,8 @@ void main() {
             '_id': 'service1',
             'title': 'Drain Cleaning',
             'category': 'plumbing',
+            'basePrice': 120,
+            'priceUnit': 'fixed',
           },
           <String, dynamic>{
             '_id': 'service2',
@@ -49,6 +51,8 @@ void main() {
       expect(worker.availability.single.day, 'monday');
       expect(worker.availability.single.from, '12:00');
       expect(worker.serviceLabels, <String>['Drain Cleaning', 'AC Tune Up']);
+      expect(worker.services.first.basePrice, 120);
+      expect(worker.services.first.priceUnit, 'fixed');
     });
 
     test('falls back to readable categories when services are absent', () {

@@ -108,6 +108,22 @@ void main() {
     expect(payload, <String, dynamic>{'workerId': 'worker1'});
     expect(conversation.id, 'conv1');
   });
+
+  test('deletes conversation through backend', () async {
+    final api = await _api((request) async {
+      expect(request.method, 'DELETE');
+      expect(request.url.path, '/messages/conversations/conv1');
+      return _json(<String, dynamic>{
+        'success': true,
+        'data': <String, dynamic>{
+          'conversationId': 'conv1',
+          'deletedMessages': 2,
+        },
+      });
+    });
+
+    await api.deleteConversation('conv1');
+  });
 }
 
 Future<MessagesApi> _api(

@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
+import 'core/api/ai_api.dart';
 import 'core/api/api_client.dart';
 import 'core/api/bookings_api.dart';
+import 'core/api/messages_api.dart';
 import 'core/api/token_storage.dart';
 import 'core/api/users_api.dart';
 import 'core/services/storage_service.dart';
 import 'core/state/app_state.dart';
 import 'core/state/customer_addresses_state.dart';
+import 'core/state/room_finishing_provider.dart';
 import 'core/state/services_state.dart';
 import 'core/state/notifications_provider.dart';
 import 'core/state/workers_state.dart';
@@ -56,7 +59,9 @@ class ServioApp extends StatelessWidget {
           ),
         ),
         ChangeNotifierProvider<MessagesProvider>(
-          create: (_) => MessagesProvider(),
+          create: (ctx) => MessagesProvider(
+            MessagesApi(ctx.read<ApiClient>()),
+          ),
         ),
         ChangeNotifierProvider<ServicesProvider>(
           create: (ctx) => ServicesProvider(ctx.read<ApiClient>()),
@@ -70,14 +75,43 @@ class ServioApp extends StatelessWidget {
             ctx.read<ApiClient>(),
           ),
         ),
+        ChangeNotifierProvider<RoomFinishingProvider>(
+          create: (ctx) => RoomFinishingProvider(AiApi(ctx.read<ApiClient>())),
+        ),
       ],
       child: const _AppView(),
     );
   }
 }
 
-class _AppView extends StatelessWidget {
+class _AppView extends StatefulWidget {
   const _AppView();
+
+  @override
+  State<_AppView> createState() => _AppViewState();
+}
+
+class _AppViewState extends State<_AppView> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      if (mounted) {
+        context.read<NotificationsProvider>().refresh();
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

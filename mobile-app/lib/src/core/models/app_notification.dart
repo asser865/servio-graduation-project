@@ -1,10 +1,8 @@
-/// A unified in-app notification entry derived from the user's booking history.
+/// A unified in-app notification entry backed by the server's `/notifications` API.
 ///
-/// The backend has no dedicated notification inbox or read-state storage, so:
-/// - The feed is synthesised client-side from [BackendBooking] objects.
-/// - Each unique (bookingId + status) pair becomes one notification.
-/// - Read state is tracked in [StorageService] (SharedPreferences), keyed by
-///   [AppNotification.id], so it survives app restarts without a backend call.
+/// The backend persists one notification object per booking lifecycle event
+/// (accepted, en_route, arrived, completed, etc.).  This model maps that
+/// server document to the fields the UI needs.
 library;
 
 enum AppNotificationType { booking, payment, system }
@@ -17,10 +15,11 @@ class AppNotification {
     required this.type,
     required this.createdAt,
     this.isRead = false,
+    this.referenceId,
   });
 
-  /// Stable composite key: `<bookingId>_<status>` — guarantees idempotency when
-  /// re-fetching so the same event is never duplicated.
+  /// The backend Mongo `_id` of the Notification document.  Used to call
+  /// `PATCH /notifications/:id/read` when the user taps the notification.
   final String id;
 
   final String title;
@@ -28,6 +27,10 @@ class AppNotification {
   final AppNotificationType type;
   final DateTime createdAt;
   final bool isRead;
+
+  /// The booking / review / payment ID this notification relates to.
+  /// May be null for system notifications.
+  final String? referenceId;
 
   AppNotification copyWith({bool? isRead}) {
     return AppNotification(
@@ -37,6 +40,7 @@ class AppNotification {
       type: type,
       createdAt: createdAt,
       isRead: isRead ?? this.isRead,
+      referenceId: referenceId,
     );
   }
 
@@ -47,7 +51,25 @@ class AppNotification {
         'type': type.name,
         'createdAt': createdAt.toIso8601String(),
         'isRead': isRead,
+        if (referenceId != null) 'referenceId': referenceId,
       };
+
+  /// Creates an [AppNotification] from a backend Notification document.
+  factory AppNotification.fromBackend(Map<String, dynamic> json) {
+    final typeStr = (json['type'] as String? ?? '').toLowerCase();
+    final type = _mapBackendType(typeStr);
+    return AppNotification(
+      id: (json['_id'] ?? json['id'] ?? '') as String,
+      title: (json['title'] as String?) ?? 'Notification',
+      body: (json['body'] as String?) ?? '',
+      type: type,
+      createdAt: DateTime.tryParse(
+              (json['createdAt'] ?? json['updatedAt'] ?? '') as String) ??
+          DateTime.now(),
+      isRead: (json['isRead'] as bool?) ?? false,
+      referenceId: json['referenceId'] as String?,
+    );
+  }
 
   factory AppNotification.fromJson(Map<String, dynamic> json) {
     return AppNotification(
@@ -61,6 +83,16 @@ class AppNotification {
       createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ??
           DateTime.now(),
       isRead: (json['isRead'] as bool?) ?? false,
+      referenceId: json['referenceId'] as String?,
     );
   }
+}
+
+/// Maps the backend `type` enum values to the app's [AppNotificationType].
+AppNotificationType _mapBackendType(String type) {
+  if (type.startsWith('payment')) return AppNotificationType.payment;
+  if (type.startsWith('booking') || type == 'review_received') {
+    return AppNotificationType.booking;
+  }
+  return AppNotificationType.system;
 }

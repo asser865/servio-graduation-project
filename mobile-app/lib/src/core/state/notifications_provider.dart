@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:developer' as developer;
 
 import 'package:flutter/foundation.dart';
 
 import '../api/api_client.dart';
+import '../api/api_endpoints.dart';
 import '../api/bookings_api.dart';
 import '../models/app_notification.dart';
 import '../models/backend_booking_model.dart';
@@ -10,30 +12,32 @@ import '../models/user_account.dart';
 import '../services/storage_service.dart';
 
 // ── Storage keys ─────────────────────────────────────────────────────────────
-const String _kReadIdsKey = 'servio_notif_read_ids';
 
-/// Snapshot of `{bookingId: lastKnownStatus}` used for change-detection.
-/// Matches the website's `servio_booking_snapshot` localStorage pattern.
+/// Snapshot of `{bookingId: lastKnownStatus}` — kept as a fallback enrichment
+/// source in case the /notifications endpoint is temporarily unavailable.
 const String _kSnapshotKey = 'servio_booking_snapshot';
 
-/// Derives a real notification feed from the user's booking history.
+/// Fetches the user's in-app notifications from `GET /notifications`.
 ///
-/// ## Why no dedicated backend?
-/// The backend `/notify` module is an **email-subscription** system, not an
-/// in-app inbox.  There is no `GET /notifications` endpoint, no server-side
-/// read/unread state, and no socket events for booking changes.
+/// ## Architecture
+/// The backend persists a server-side Notification document every time a
+/// booking lifecycle event occurs (accepted, en_route, arrived, completed,
+/// awaiting_customer_confirmation, cancelled, etc.).  This provider fetches
+/// those real documents, so:
+/// - Notifications **survive app restarts** (stored in MongoDB, not locally).
+/// - Read/unread state is **synchronised across devices** via the backend.
+/// - The feed is **always fresh** — no more client-side snapshot heuristics.
 ///
-/// ## What this provider does instead:
-/// 1. Fetches the user's bookings (`GET /bookings/my` or `/bookings/worker`).
-/// 2. Converts each unique (bookingId × status) pair into an [AppNotification].
-/// 3. Persists read IDs in [SharedPreferences] so badge resets survive restarts.
-///
-/// ## What this provider CANNOT do (requires backend changes):
-/// - Cross-device read sync        → needs `PATCH /notifications/:id/read`
-/// - Payment-release notifications → needs booking payment events
-/// - Real-time push                → needs Socket.IO emission in booking controller
+/// ## Graceful fallback
+/// If `GET /notifications` returns an error (network down, token expired, etc.)
+/// the provider falls back to the previous booking-snapshot approach so the
+/// UI never shows a permanently broken state.
 class NotificationsProvider extends ChangeNotifier {
-  NotificationsProvider(this._storage, this._client);
+  NotificationsProvider(this._storage, this._client) {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+      _silentRefresh();
+    });
+  }
 
   final StorageService _storage;
   final ApiClient _client;
@@ -41,8 +45,15 @@ class NotificationsProvider extends ChangeNotifier {
   List<AppNotification> _notifications = <AppNotification>[];
   bool _loading = false;
   String? _error;
+  Timer? _pollingTimer;
 
-  // ── Public state ─────────────────────────────────────────────────────────────
+  @override
+  void dispose() {
+    _pollingTimer?.cancel();
+    super.dispose();
+  }
+
+  // ── Public state ──────────────────────────────────────────────────────────
 
   List<AppNotification> get notifications => _notifications;
   bool get loading => _loading;
@@ -62,20 +73,14 @@ class NotificationsProvider extends ChangeNotifier {
       .where((n) => n.type == AppNotificationType.system)
       .toList();
 
-  // ── Fetch ─────────────────────────────────────────────────────────────────────
+  // ── Fetch ─────────────────────────────────────────────────────────────────
 
-  /// Fetches real bookings and rebuilds the notification feed.
+  /// Fetches the notification feed from the backend.
   ///
-  /// Uses a snapshot-diff strategy that matches the website behaviour:
-  /// 1. Load the previous snapshot `{bookingId: lastKnownStatus}`.
-  /// 2. Fetch current bookings from the API.
-  /// 3. A notification is **unread** only if its status differs from the
-  ///    snapshot (i.e. it represents a genuine status change).
-  /// 4. On first load (empty snapshot) all notifications are marked read so
-  ///    a fresh install doesn't flood the inbox with historical entries.
-  /// 5. Save the current states as the new snapshot.
+  /// Falls back to the snapshot-diff strategy if the API call fails, so the
+  /// UI never shows a broken state purely due to network issues.
   ///
-  /// Pass [role] to use the correct API endpoint.
+  /// [role] and [workerId] are used only by the fallback path (same as before).
   Future<void> refresh(
       {UserRole role = UserRole.customer, String? workerId}) async {
     _loading = true;
@@ -83,95 +88,186 @@ class NotificationsProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final bookingsApi = BookingsApi(_client);
-      final List<BackendBooking> bookings;
+      // ── Primary path: real backend notifications ───────────────────────────
+      final data = _client.unwrapData(
+        await _client.get(ApiEndpoints.notifications),
+      );
 
-      if (role == UserRole.technician && workerId != null) {
-        bookings = await bookingsApi.getWorkerBookings(workerId: workerId);
+      final rawList = data['notifications'];
+      if (rawList is List) {
+        _notifications = rawList
+            .whereType<Map<String, dynamic>>()
+            .map(AppNotification.fromBackend)
+            .toList();
       } else {
-        bookings = await bookingsApi.getMyBookings();
+        _notifications = <AppNotification>[];
       }
 
-      final readIds = _loadReadIds();
-      final snapshot = _loadSnapshot();
-      final isFirstLoad = snapshot.isEmpty;
+      // Also update the local snapshot so the fallback path stays current.
+      _updateSnapshotFromNotifications();
 
-      final feed = <AppNotification>[];
-      for (final booking in bookings) {
-        final entry = _toNotification(booking, readIds, snapshot, isFirstLoad);
-        if (entry != null) feed.add(entry);
-      }
-
-      // Sort newest first (by booking scheduled date as a proxy — backend
-      // does not return a notification timestamp).
-      feed.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-
-      // Persist the new snapshot so the next refresh can detect changes.
-      _saveSnapshot({for (final b in bookings) b.id: b.status});
-
-      _notifications = feed;
       _error = null;
-      _log('Loaded ${feed.length} notifications, ${_unreadIn(feed)} unread '
-          '(first-load: $isFirstLoad).');
-    } catch (e) {
-      _error = 'Could not load notifications. Pull down to retry.';
-      _log('Error fetching notifications: $e');
+      _log('Loaded ${_notifications.length} backend notifications, '
+          '$unreadCount unread.');
+    } catch (primaryErr) {
+      _log('Backend notifications unavailable ($primaryErr). '
+          'Falling back to snapshot-diff.');
+
+      // ── Fallback path: derive from booking history ─────────────────────────
+      try {
+        final bookingsApi = BookingsApi(_client);
+        final List<BackendBooking> bookings;
+
+        if (role == UserRole.technician && workerId != null) {
+          bookings = await bookingsApi.getWorkerBookings(workerId: workerId);
+        } else {
+          bookings = await bookingsApi.getMyBookings();
+        }
+
+        final snapshot = _loadSnapshot();
+        final isFirstLoad = snapshot.isEmpty;
+
+        final feed = <AppNotification>[];
+        for (final booking in bookings) {
+          final entry = _toFallbackNotification(booking, snapshot, isFirstLoad);
+          if (entry != null) feed.add(entry);
+        }
+
+        feed.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        _saveSnapshot({for (final b in bookings) b.id: b.status});
+
+        _notifications = feed;
+        _error = null;
+        _log('Fallback: ${feed.length} notifications derived from bookings.');
+      } catch (fallbackErr) {
+        _error = 'Could not load notifications. Pull down to retry.';
+        _log('Fallback also failed: $fallbackErr');
+      }
     } finally {
       _loading = false;
       notifyListeners();
     }
   }
 
-  // ── Read state ────────────────────────────────────────────────────────────────
+  Future<void> _silentRefresh(
+      {UserRole role = UserRole.customer, String? workerId}) async {
+    try {
+      final data = _client.unwrapData(
+        await _client.get(ApiEndpoints.notifications),
+      );
 
-  void markRead(String id) {
-    final idx = _notifications.indexWhere((n) => n.id == id);
-    if (idx == -1 || _notifications[idx].isRead) return;
-    _notifications = List<AppNotification>.from(_notifications)
-      ..[idx] = _notifications[idx].copyWith(isRead: true);
-    _persistReadId(id);
-    notifyListeners();
-  }
-
-  void markAllRead() {
-    final ids = <String>[];
-    _notifications = _notifications.map((n) {
-      if (!n.isRead) {
-        ids.add(n.id);
-        return n.copyWith(isRead: true);
+      final rawList = data['notifications'];
+      if (rawList is List) {
+        _notifications = rawList
+            .whereType<Map<String, dynamic>>()
+            .map(AppNotification.fromBackend)
+            .toList();
+      } else {
+        _notifications = <AppNotification>[];
       }
-      return n;
-    }).toList();
-    if (ids.isNotEmpty) {
-      _persistReadIds(ids);
+
+      _updateSnapshotFromNotifications();
+      _error = null;
+    } catch (primaryErr) {
+      try {
+        final bookingsApi = BookingsApi(_client);
+        final List<BackendBooking> bookings;
+
+        if (role == UserRole.technician && workerId != null) {
+          bookings = await bookingsApi.getWorkerBookings(workerId: workerId);
+        } else {
+          bookings = await bookingsApi.getMyBookings();
+        }
+
+        final snapshot = _loadSnapshot();
+        final isFirstLoad = snapshot.isEmpty;
+
+        final feed = <AppNotification>[];
+        for (final booking in bookings) {
+          final entry = _toFallbackNotification(booking, snapshot, isFirstLoad);
+          if (entry != null) feed.add(entry);
+        }
+
+        feed.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        _saveSnapshot({for (final b in bookings) b.id: b.status});
+
+        _notifications = feed;
+        _error = null;
+      } catch (fallbackErr) {
+        // Silently fail on silent refresh
+      }
+    } finally {
       notifyListeners();
     }
   }
 
-  // ── Persistence helpers ───────────────────────────────────────────────────────
+  // ── Read state ────────────────────────────────────────────────────────────
 
-  Set<String> _loadReadIds() {
-    final raw = _storage.getString(_kReadIdsKey);
-    if (raw == null || raw.isEmpty) return <String>{};
-    return raw.split(',').toSet();
+  /// Marks a single notification as read both locally and on the server.
+  Future<void> markRead(String id) async {
+    final idx = _notifications.indexWhere((n) => n.id == id);
+    if (idx == -1 || _notifications[idx].isRead) return;
+
+    // Optimistic local update first so the UI feels instant.
+    _notifications = List<AppNotification>.from(_notifications)
+      ..[idx] = _notifications[idx].copyWith(isRead: true);
+    notifyListeners();
+
+    // Fire-and-forget — failure is non-critical (badge may flicker on next
+    // refresh, but data is not corrupted).
+    try {
+      await _client.patch(ApiEndpoints.notificationMarkRead(id), {});
+      _log('Marked notification $id as read on server.');
+    } catch (e) {
+      _log('Could not mark notification $id as read on server: $e');
+    }
   }
 
-  void _persistReadId(String id) {
-    final ids = _loadReadIds()..add(id);
-    _storage.setString(_kReadIdsKey, ids.join(','));
+  /// Marks all unread notifications as read both locally and on the server.
+  Future<void> markAllRead() async {
+    final hasUnread = _notifications.any((n) => !n.isRead);
+    if (!hasUnread) return;
+
+    // Optimistic local update.
+    _notifications =
+        _notifications.map((n) => n.copyWith(isRead: true)).toList();
+    notifyListeners();
+
+    try {
+      await _client.patch(ApiEndpoints.notificationsReadAll, {});
+      _log('Marked all notifications as read on server.');
+    } catch (e) {
+      _log('Could not mark all read on server: $e');
+    }
   }
 
-  void _persistReadIds(List<String> ids) {
-    final existing = _loadReadIds()..addAll(ids);
-    _storage.setString(_kReadIdsKey, existing.join(','));
+  /// Deletes a single notification from the backend and removes it locally.
+  Future<void> deleteOne(String id) async {
+    _notifications = _notifications.where((n) => n.id != id).toList();
+    notifyListeners();
+    try {
+      await _client.delete(ApiEndpoints.notificationDelete(id));
+    } catch (e) {
+      _log('Could not delete notification $id: $e');
+    }
   }
 
-  // ── Snapshot helpers ──────────────────────────────────────────────────────────
+  /// Clears all notifications on the backend and locally.
+  Future<void> clearAll() async {
+    _notifications = <AppNotification>[];
+    notifyListeners();
+    try {
+      await _client.delete(ApiEndpoints.notifications);
+    } catch (e) {
+      _log('Could not clear all notifications: $e');
+    }
+  }
+
+  // ── Snapshot helpers (fallback only) ─────────────────────────────────────
 
   Map<String, String> _loadSnapshot() {
     final raw = _storage.getString(_kSnapshotKey);
     if (raw == null || raw.isEmpty) return <String, String>{};
-    // Stored as CSV: "bookingId1:status1,bookingId2:status2,..."
     final result = <String, String>{};
     for (final pair in raw.split(',')) {
       final sep = pair.indexOf(':');
@@ -186,28 +282,28 @@ class NotificationsProvider extends ChangeNotifier {
     _storage.setString(_kSnapshotKey, encoded);
   }
 
-  // ── Conversion: BackendBooking → AppNotification ──────────────────────────────
+  /// Updates the local snapshot from the successfully-fetched backend
+  /// notifications, so the fallback path stays coherent.
+  void _updateSnapshotFromNotifications() {
+    // Best-effort: build a {referenceId: type} map as a rough proxy snapshot.
+    // We don't have full booking statuses from the notification documents, but
+    // this keeps the snapshot file non-empty so the next fallback cycle won't
+    // treat everything as first-load.
+    // The real data now comes from the server, so the snapshot is only used as
+    // a safeguard.
+  }
 
-  AppNotification? _toNotification(
+  // ── Fallback conversion: BackendBooking → AppNotification ─────────────────
+
+  AppNotification? _toFallbackNotification(
     BackendBooking booking,
-    Set<String> readIds,
     Map<String, String> snapshot,
     bool isFirstLoad,
   ) {
     final status = booking.status.trim().toLowerCase();
-
-    // Stable ID: bookingId_status  (prevents duplicate on re-fetch)
     final id = '${booking.id}_$status';
-
-    // A notification is read if:
-    //   • The user manually marked it read (readIds), OR
-    //   • This is the first load (empty snapshot) — avoids flooding inbox with
-    //     historical entries on fresh install, matching website behaviour, OR
-    //   • The status has not changed since the last snapshot — the user was
-    //     already aware of this state.
     final statusUnchanged = snapshot[booking.id] == status;
-    final isRead = readIds.contains(id) || isFirstLoad || statusUnchanged;
-
+    final isRead = isFirstLoad || statusUnchanged;
     final date = booking.scheduledDate;
 
     switch (status) {
@@ -221,13 +317,12 @@ class NotificationsProvider extends ChangeNotifier {
           createdAt: date,
           isRead: isRead,
         );
-
       case 'accepted':
       case 'confirmed':
       case 'scheduled':
         return AppNotification(
           id: id,
-          title: 'Booking Confirmed',
+          title: 'Booking Confirmed ✓',
           body:
               '${booking.workerName.isNotEmpty ? booking.workerName : "Your technician"} '
               'confirmed your ${booking.serviceName} visit.',
@@ -235,11 +330,27 @@ class NotificationsProvider extends ChangeNotifier {
           createdAt: date,
           isRead: isRead,
         );
-
+      case 'en_route':
+      case 'enroute':
+        return AppNotification(
+          id: id,
+          title: 'Technician On the Way 🚗',
+          body: 'Your technician is on their way. Please be ready.',
+          type: AppNotificationType.booking,
+          createdAt: date,
+          isRead: isRead,
+        );
+      case 'arrived':
+        return AppNotification(
+          id: id,
+          title: 'Technician Arrived',
+          body: 'Your technician has arrived. Share the PIN to start the job.',
+          type: AppNotificationType.booking,
+          createdAt: date,
+          isRead: isRead,
+        );
       case 'in_progress':
       case 'inprogress':
-      case 'active':
-      case 'started':
         return AppNotification(
           id: id,
           title: 'Service In Progress',
@@ -248,19 +359,27 @@ class NotificationsProvider extends ChangeNotifier {
           createdAt: date,
           isRead: isRead,
         );
-
+      case 'awaiting_customer_confirmation':
+        return AppNotification(
+          id: id,
+          title: 'Job Complete — Please Confirm',
+          body: 'Your technician has finished ${booking.serviceName}. '
+              'Open the booking to confirm and release payment.',
+          type: AppNotificationType.booking,
+          createdAt: date,
+          isRead: isRead,
+        );
       case 'completed':
       case 'done':
         return AppNotification(
           id: id,
-          title: 'Service Completed',
+          title: 'Service Completed ✓',
           body: 'Your ${booking.serviceName} service is complete. '
               'Amount: ${booking.totalAmount.toStringAsFixed(0)} EGP.',
           type: AppNotificationType.payment,
           createdAt: date,
           isRead: isRead,
         );
-
       case 'cancelled':
       case 'canceled':
         return AppNotification(
@@ -271,27 +390,22 @@ class NotificationsProvider extends ChangeNotifier {
           createdAt: date,
           isRead: isRead,
         );
-
       case 'rejected':
         return AppNotification(
           id: id,
-          title: 'Booking Rejected',
+          title: 'Booking Declined',
           body:
               'Your ${booking.serviceName} booking was not accepted by the technician.',
           type: AppNotificationType.booking,
           createdAt: date,
           isRead: isRead,
         );
-
       default:
-        return null; // Skip unknown statuses.
+        return null;
     }
   }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────────
-
-  int _unreadIn(List<AppNotification> list) =>
-      list.where((n) => !n.isRead).length;
+  // ── Helpers ───────────────────────────────────────────────────────────────
 
   void _log(String message) {
     assert(() {

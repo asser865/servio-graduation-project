@@ -22,9 +22,14 @@ const conversations = async (req, res) => {
   return ApiResponse.success(res, StatusCodes.OK, 'Conversations retrieved', { conversations: convos });
 };
 
+const deleteConversation = async (req, res) => {
+  const result = await messageService.deleteConversation(req.user.id, req.params.id);
+  return ApiResponse.success(res, StatusCodes.OK, 'Conversation deleted', result);
+};
+
 const startConversation = async (req, res) => {
   const conversation = await messageService.startConversation(req.user.id, req.body);
   return ApiResponse.success(res, StatusCodes.OK, 'Conversation ready', { conversation });
 };
 
-module.exports = { send, list, unread, conversations, startConversation };
+module.exports = { send, list, unread, conversations, deleteConversation, startConversation };

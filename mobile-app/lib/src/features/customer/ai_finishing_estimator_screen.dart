@@ -9,6 +9,7 @@ import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
 import '../../design_system/widgets/servio_status_chip.dart';
+import 'ai_room_finisher_screen.dart';
 
 // ── Calculation engine ─────────────────────────────────────────────────────────
 // Rates ported exactly from servio_frontend/js/html/ai-estimator.js RATES table.
@@ -1115,7 +1116,16 @@ class _StepResultsState extends State<_StepResults> {
           ),
         ),
         const SizedBox(height: 20),
-        // Reset
+        // Reset / deeper AI action
+        ServioPrimaryButton(
+          label: 'Finish My Room with AI',
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => const AiRoomFinisherScreen(),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
         TextButton.icon(
           onPressed: widget.onReset,
           icon: const Icon(Icons.refresh_rounded),

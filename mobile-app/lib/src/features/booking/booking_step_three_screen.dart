@@ -492,9 +492,10 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
     final theme = Theme.of(context);
     final servio = context.servio;
 
-    final total = _moneyValue(widget.data.amount);
-    final platformFee = (total * 0.05).round();
-    final baseRate = total - platformFee;
+    final baseRate = _moneyValue(widget.data.amount);
+    final platformFee = (baseRate * 0.05).round();
+    final estimatedTotal = baseRate + platformFee;
+    final estimatedTotalLabel = _moneyLabel(estimatedTotal);
     final availabilityError = widget.data.isScheduledDateAvailable
         ? null
         : 'Technician is not available on this day';
@@ -565,7 +566,7 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
                       label: 'Platform Fee', value: '$platformFee EGP (5%)'),
                   _ReviewRow(
                     label: 'Est. Total',
-                    value: widget.data.amount,
+                    value: estimatedTotalLabel,
                     valueColor: servio.accent,
                     isBold: true,
                     isLast: true,
@@ -602,6 +603,7 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
                               widget.data.technicianName
                                   .trim()
                                   .split(' ')
+                                  .where((w) => w.isNotEmpty)
                                   .take(2)
                                   .map((w) => w[0])
                                   .join()
@@ -649,7 +651,7 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
                     const SizedBox(height: 12),
                     _PriceLine(
                       label: 'Estimated Total',
-                      value: widget.data.amount,
+                      value: estimatedTotalLabel,
                       isBold: true,
                       valueColor: servio.accent,
                     ),
@@ -1215,6 +1217,7 @@ BookingFlowData _confirmationDataFromBackend(
     savedCardLast4: booking.paymentCardLast4,
     statusCode: booking.status,
     statusLabel: _statusLabelFromBackend(booking.status),
+    createdAt: booking.createdAt,
   );
 }
 
@@ -1225,6 +1228,8 @@ String _statusLabelFromBackend(String status) {
     'en_route' || 'enroute' => 'En Route',
     'arrived' => 'Arrived',
     'in_progress' || 'inprogress' => 'In Progress',
+    'awaiting_customer_confirmation' => 'Awaiting Confirmation',
+    'pending_admin_review' => 'Under Review',
     'completed' || 'done' => 'Completed',
     'cancelled' || 'canceled' => 'Cancelled',
     'rejected' => 'Rejected',
@@ -1250,3 +1255,5 @@ int _moneyValue(String value) {
   final numeric = value.replaceAll(RegExp(r'[^0-9]'), '');
   return int.tryParse(numeric) ?? 0;
 }
+
+String _moneyLabel(int value) => '$value EGP';

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/models/backend_worker_model.dart';
 import '../../core/models/service_category.dart';
+import '../../core/services/location_service.dart';
+import '../../core/state/customer_addresses_state.dart';
 import '../../core/state/workers_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
@@ -35,10 +38,19 @@ class _TechnicianListingScreenState extends State<TechnicianListingScreen> {
     'Verified Only',
   ];
 
+  // Maps a locationLabel string to its geocoded LatLng (null = geocoding failed).
+  // A missing key means geocoding hasn't been attempted yet.
+  final Map<String, LatLng?> _geocodeCache = <String, LatLng?>{};
+
+  // The customer's reference LatLng used for distance calculation.
+  LatLng? _customerLatLng;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _resolveCustomerLocation();
+
       final serviceId =
           _looksLikeMongoId(widget.serviceId) ? widget.serviceId : null;
       final category = normalizeServiceCategory(
@@ -51,6 +63,86 @@ class _TechnicianListingScreenState extends State<TechnicianListingScreen> {
             category: category.isEmpty ? null : category,
           );
     });
+  }
+
+  /// Resolves the customer's reference location.
+  /// Uses the first saved address that has lat/lng coordinates.
+  /// Falls back to no distance labels if none is available.
+  void _resolveCustomerLocation() {
+    CustomerAddressesProvider addressesProvider;
+    try {
+      addressesProvider = context.read<CustomerAddressesProvider>();
+    } catch (_) {
+      return;
+    }
+    _pickCustomerLatLng(addressesProvider);
+
+    // If addresses haven't loaded yet, trigger a load then re-pick.
+    if (addressesProvider.addresses.isEmpty && !addressesProvider.loading) {
+      addressesProvider.load().then((_) {
+        if (!mounted) return;
+        _pickCustomerLatLng(addressesProvider);
+      });
+    }
+  }
+
+  void _pickCustomerLatLng(CustomerAddressesProvider provider) {
+    for (final addr in provider.addresses) {
+      if (addr.lat != null && addr.lng != null) {
+        if (mounted) {
+          setState(() {
+            _customerLatLng = LatLng(addr.lat!, addr.lng!);
+          });
+          _geocodePendingWorkers(context.read<WorkersProvider>().workers);
+        }
+        return;
+      }
+    }
+  }
+
+  /// Kicks off geocoding for any worker locationLabels not yet in the cache.
+  void _geocodePendingWorkers(List<BackendWorker> workers) {
+    if (_customerLatLng == null) return;
+    final uniqueLabels = workers
+        .map((w) => w.locationLabel)
+        .where((label) => label.trim().isNotEmpty)
+        .toSet();
+    for (final label in uniqueLabels) {
+      if (!_geocodeCache.containsKey(label)) {
+        _geocodeLabel(label);
+      }
+    }
+  }
+
+  Future<void> _geocodeLabel(String label) async {
+    final latLng = await LocationService().geocodeAddress(label);
+    if (!mounted) return;
+    setState(() {
+      _geocodeCache[label] = latLng;
+    });
+  }
+
+  /// Returns a formatted distance string for [worker] relative to the customer,
+  /// or null if the distance cannot be computed yet (still loading or no data).
+  String? _distanceLabelFor(BackendWorker worker) {
+    final customerPos = _customerLatLng;
+    if (customerPos == null) return null;
+
+    final label = worker.locationLabel.trim();
+    if (label.isEmpty) return null;
+
+    if (!_geocodeCache.containsKey(label)) {
+      // Not geocoded yet — trigger geocoding and return null for now.
+      _geocodeLabel(label);
+      return null;
+    }
+
+    final workerPos = _geocodeCache[label];
+    if (workerPos == null) return null; // geocoding failed for this label
+
+    final km =
+        const Distance().as(LengthUnit.Kilometer, customerPos, workerPos);
+    return '${km.toStringAsFixed(1)} km away';
   }
 
   @override
@@ -69,11 +161,22 @@ class _TechnicianListingScreenState extends State<TechnicianListingScreen> {
       serviceId: serviceId,
       category: category,
     );
+
+    // Trigger geocoding whenever the worker list changes.
+    if (!provider.loading && workers.isNotEmpty) {
+      _geocodePendingWorkers(workers);
+    }
+
     final listingTitle = widget.title?.trim().isNotEmpty == true
         ? widget.title!.trim()
         : category.isNotEmpty
             ? serviceCategoryLabel(category)
             : 'Technicians';
+    final selectedServiceName = widget.title?.trim().isNotEmpty == true
+        ? widget.title!.trim()
+        : category.isNotEmpty
+            ? listingTitle
+            : null;
 
     return Scaffold(
       body: SafeArea(
@@ -147,11 +250,18 @@ class _TechnicianListingScreenState extends State<TechnicianListingScreen> {
                         padding: const EdgeInsets.only(bottom: 16),
                         child: _TechnicianListCard(
                           worker: worker,
+                          distanceLabel: _distanceLabelFor(worker),
                           onViewProfile: () {
                             Navigator.of(context).push(
                               MaterialPageRoute<void>(
                                 builder: (_) => TechnicianProfileScreen(
-                                    technicianId: worker.id),
+                                  technicianId: worker.id,
+                                  selectedServiceId:
+                                      serviceId.isNotEmpty ? serviceId : null,
+                                  selectedServiceCategory:
+                                      category.isNotEmpty ? category : null,
+                                  selectedServiceName: selectedServiceName,
+                                ),
                               ),
                             );
                           },
@@ -228,10 +338,14 @@ class _TechnicianListCard extends StatelessWidget {
   const _TechnicianListCard({
     required this.worker,
     required this.onViewProfile,
+    this.distanceLabel,
   });
 
   final BackendWorker worker;
   final VoidCallback onViewProfile;
+
+  /// Optional "X.X km away" label. Null means distance is unavailable.
+  final String? distanceLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -282,10 +396,33 @@ class _TechnicianListCard extends StatelessWidget {
                           ?.copyWith(color: servio.textSecondary),
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      'EGP ${worker.hourlyRate}/hr',
-                      style: theme.textTheme.titleMedium
-                          ?.copyWith(color: servio.accent),
+                    Row(
+                      children: <Widget>[
+                        Text(
+                          'EGP ${worker.hourlyRate}/hr',
+                          style: theme.textTheme.titleMedium
+                              ?.copyWith(color: servio.accent),
+                        ),
+                        if (distanceLabel != null) ...<Widget>[
+                          const SizedBox(width: 10),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: <Widget>[
+                              Icon(
+                                Icons.location_on_outlined,
+                                size: 13,
+                                color: servio.textSecondary,
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                distanceLabel!,
+                                style: theme.textTheme.bodySmall
+                                    ?.copyWith(color: servio.textSecondary),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
                     ),
                   ],
                 ),

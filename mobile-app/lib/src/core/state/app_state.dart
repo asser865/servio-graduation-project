@@ -6,6 +6,7 @@ import '../api/api_client.dart';
 import '../api/api_exception.dart';
 import '../api/auth_api.dart';
 import '../api/bookings_api.dart';
+import '../api/messages_api.dart';
 import '../api/token_storage.dart';
 import '../api/users_api.dart';
 import '../models/booking_model.dart';
@@ -313,9 +314,10 @@ class ThemeProvider extends ChangeNotifier {
   ThemeMode get mode => _mode;
 
   Future<void> setMode(ThemeMode mode) async {
+    if (_mode == mode) return;
     _mode = mode;
-    await _storage.setString(_kKeyThemeMode, mode.name);
     notifyListeners();
+    await _storage.setString(_kKeyThemeMode, mode.name);
   }
 }
 
@@ -351,12 +353,22 @@ class BookingsProvider extends ChangeNotifier {
   BookingsProvider(this._storage, this._api) {
     _loadCached();
     refresh();
+    _pollingTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+      _silentRefresh();
+    });
   }
 
   final StorageService _storage;
   final BookingsApi _api;
   final List<BookingModel> _bookings = <BookingModel>[];
   bool _loading = false;
+  Timer? _pollingTimer;
+
+  @override
+  void dispose() {
+    _pollingTimer?.cancel();
+    super.dispose();
+  }
 
   List<BookingModel> get all => List<BookingModel>.unmodifiable(_bookings);
   bool get isLoading => _loading;
@@ -389,6 +401,19 @@ class BookingsProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> _silentRefresh() async {
+    try {
+      final raw = await _api.getMyBookings();
+      _bookings
+        ..clear()
+        ..addAll(raw.map(BookingModel.fromBackend));
+      await _save();
+      notifyListeners();
+    } catch (_) {
+      // keep cached data on error
+    }
+  }
+
   Future<void> _save() async {
     await _storage.setJsonList(
       _kKeyBookings,
@@ -408,15 +433,137 @@ class BookingsProvider extends ChangeNotifier {
 // ── MessagesProvider ──────────────────────────────────────────────────────────
 
 class MessagesProvider extends ChangeNotifier {
-  MessagesProvider();
+  MessagesProvider(this._api);
+
+  static const Duration _pollInterval = Duration(seconds: 20);
+
+  final MessagesApi _api;
+  final List<ApiConversation> _conversations = <ApiConversation>[];
 
   int _totalUnread = 0;
+  bool _loading = false;
+  bool _loaded = false;
+  String? _error;
+  Timer? _pollingTimer;
+  Future<void>? _activeRefresh;
 
   int get totalUnread => _totalUnread;
+  bool get loading => _loading;
+  bool get loaded => _loaded;
+  String? get error => _error;
+  List<ApiConversation> get conversations =>
+      List<ApiConversation>.unmodifiable(_conversations);
+
+  void startAutoRefresh() {
+    refresh(silent: _loaded);
+    _pollingTimer?.cancel();
+    _pollingTimer = Timer.periodic(_pollInterval, (_) {
+      refresh(silent: true);
+    });
+  }
+
+  void stopAutoRefresh() {
+    _pollingTimer?.cancel();
+    _pollingTimer = null;
+  }
+
+  Future<void> refresh({bool silent = false}) {
+    final activeRefresh = _activeRefresh;
+    if (activeRefresh != null) return activeRefresh;
+
+    final refresh = _refreshNow(silent: silent);
+    _activeRefresh = refresh.whenComplete(() {
+      _activeRefresh = null;
+    });
+    return _activeRefresh!;
+  }
+
+  Future<void> _refreshNow({required bool silent}) async {
+    if (!silent) {
+      _loading = _conversations.isEmpty;
+      _error = null;
+      notifyListeners();
+    }
+
+    try {
+      final next = await _api.getConversations();
+      final nextUnread = next.fold<int>(
+        0,
+        (sum, conversation) => sum + conversation.unreadCount,
+      );
+      final conversationsChanged = !_sameConversations(_conversations, next);
+      final unreadChanged = _totalUnread != nextUnread;
+      final errorChanged = _error != null;
+      final loadedChanged = !_loaded;
+
+      if (conversationsChanged) {
+        _conversations
+          ..clear()
+          ..addAll(next);
+      }
+      _totalUnread = nextUnread;
+      _error = null;
+      _loaded = true;
+
+      if (conversationsChanged ||
+          unreadChanged ||
+          errorChanged ||
+          loadedChanged) {
+        notifyListeners();
+      }
+    } on ApiException catch (error) {
+      if (!silent || (!_loaded && _conversations.isEmpty)) {
+        _error = error.message;
+        _loaded = true;
+        notifyListeners();
+      }
+    } catch (_) {
+      if (!silent || (!_loaded && _conversations.isEmpty)) {
+        _error = 'Unable to load messages.';
+        _loaded = true;
+        notifyListeners();
+      }
+    } finally {
+      if (!silent && _loading) {
+        _loading = false;
+        notifyListeners();
+      }
+    }
+  }
 
   void setTotalUnread(int value) {
     if (_totalUnread == value) return;
     _totalUnread = value;
     notifyListeners();
   }
+
+  @override
+  void dispose() {
+    stopAutoRefresh();
+    super.dispose();
+  }
+}
+
+bool _sameConversations(
+  List<ApiConversation> previous,
+  List<ApiConversation> next,
+) {
+  if (previous.length != next.length) return false;
+
+  for (var i = 0; i < previous.length; i += 1) {
+    final oldConversation = previous[i];
+    final newConversation = next[i];
+
+    if (oldConversation.id != newConversation.id ||
+        oldConversation.contactName != newConversation.contactName ||
+        oldConversation.otherUser.avatar != newConversation.otherUser.avatar ||
+        oldConversation.lastMessage != newConversation.lastMessage ||
+        oldConversation.unreadCount != newConversation.unreadCount ||
+        !oldConversation.updatedAt
+            .isAtSameMomentAs(newConversation.updatedAt)) {
+      return false;
+    }
+  }
+
+  return true;
 }

@@ -21,7 +21,7 @@ const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:5500/temp_re
 // Role → allowed status transitions
 const TRANSITION_RULES = {
   worker: ['accepted', 'en_route', 'arrived', 'rejected', 'in_progress', 'awaiting_customer_confirmation'],
-  user:   ['cancelled'],
+  user:   ['cancelled', 'completed', 'disputed'],
   admin:  [
     'pending', 'accepted', 'en_route', 'arrived', 'rejected', 'in_progress',
     'awaiting_customer_confirmation', 'pending_admin_review', 'completed', 'cancelled', 'disputed',
@@ -391,6 +391,14 @@ async function resolvePaymentData(userId, paymentMethod, savedCardId) {
     };
   }
 
+  if (paymentMethod === 'online') {
+    return {
+      paymentMethod: 'online',
+      savedCard:    undefined,
+      paymentMeta:  undefined,
+    };
+  }
+
   if (!savedCardId) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'A saved card is required for card payments.');
   }
@@ -426,7 +434,7 @@ const getUserBookings = async (userId, { status, page = 1, limit = 10 }) => {
 
   const [bookings, total] = await Promise.all([
     Booking.find(filter)
-      .populate('worker', 'name profileImage averageRating')
+      .populate('worker', 'name profileImage averageRating availability availabilityType isAvailable')
       .populate('service', 'title category basePrice priceUnit')
       .populate('savedCard', 'last4 expiry cardType label isDefault')
       .sort({ createdAt: -1 })
@@ -526,8 +534,13 @@ const updateBookingStatus = async (bookingId, newStatus, actorId, actorRole, det
   }
 
   // ── User can only cancel a pending booking ────────────────────────────────
-  if (actorRole === 'user' && newStatus === 'cancelled' && booking.status !== 'pending') {
-    throw new ApiError(StatusCodes.BAD_REQUEST, 'You can only cancel a booking that is still pending.');
+  if (actorRole === 'user') {
+    if (newStatus === 'cancelled' && booking.status !== 'pending') {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'You can only cancel a booking that is still pending.');
+    }
+    if ((newStatus === 'completed' || newStatus === 'disputed') && booking.status !== 'awaiting_customer_confirmation') {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'You can only confirm or dispute a booking that is awaiting your confirmation.');
+    }
   }
 
   // ── Worker mid-job estimate update (no status transition) ────────────────
@@ -689,6 +702,11 @@ const updateBookingStatus = async (bookingId, newStatus, actorId, actorRole, det
     update,
     { new: true, runValidators: false }
   );
+
+  // Increment worker's completedJobs counter when customer confirms completion
+  if (updated && newStatus === 'completed' && updated.worker) {
+    User.findByIdAndUpdate(updated.worker, { $inc: { completedJobs: 1 } }).catch(() => {});
+  }
 
   // Fire-and-forget in-app notifications
   if (updated) {

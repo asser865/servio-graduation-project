@@ -82,9 +82,17 @@ class AccountScreen extends StatelessWidget {
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.of(ctx).pop();
-              // TODO: call deactivate API when available
+              final session = ctx.read<SessionProvider>();
+              await session.logout();
+              if (ctx.mounted) {
+                Navigator.of(ctx).pushAndRemoveUntil(
+                  MaterialPageRoute<void>(
+                      builder: (_) => const AuthLandingScreen()),
+                  (Route<dynamic> _) => false,
+                );
+              }
             },
             child: const Text('Deactivate'),
           ),

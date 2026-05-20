@@ -16,6 +16,7 @@ import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_section_heading.dart';
 import '../../design_system/widgets/servio_status_chip.dart';
 import '../../design_system/widgets/servio_tab_shell.dart';
+import '../../design_system/widgets/servio_skeleton.dart';
 import 'earnings_screen.dart';
 import 'job_details_screen.dart';
 import 'job_queue_screen.dart';
@@ -40,11 +41,48 @@ class _TechnicianDashboardScreenState extends State<TechnicianDashboardScreen> {
   EarningsSummary? _earnings;
   bool _loading = true;
   String? _error;
+  Timer? _pollingTimer;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _fetchData());
+    _pollingTimer =
+        Timer.periodic(const Duration(seconds: 20), (_) => _silentRefresh());
+  }
+
+  @override
+  void dispose() {
+    _pollingTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _silentRefresh() async {
+    final client = context.read<ApiClient>();
+    final session = context.read<SessionProvider>();
+    final workerId = session.account?.id.trim() ?? '';
+    if (workerId.isEmpty || session.account?.role != UserRole.technician) {
+      return;
+    }
+
+    try {
+      final bookingsFuture =
+          BookingsApi(client).getWorkerBookings(workerId: workerId);
+      final earningsFuture = PaymentsApi(client).getEarnings();
+
+      final results = await Future.wait([bookingsFuture, earningsFuture]);
+      final jobs = (results[0] as List<BackendBooking>)
+          .where((job) => job.workerId.trim() == workerId)
+          .toList();
+      final earnings = results[1] as EarningsSummary;
+
+      if (mounted) {
+        setState(() {
+          _jobs = jobs;
+          _earnings = earnings;
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _fetchData() async {
@@ -118,7 +156,29 @@ class _TechnicianDashboardScreenState extends State<TechnicianDashboardScreen> {
     final bottomInset = ServioTabShell.bottomOverlayInsetOf(context);
 
     if (_loading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return Scaffold(
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(ServioSpacing.screenPadding),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const ServioSkeleton(height: 32, width: 200),
+                const SizedBox(height: 8),
+                const ServioSkeleton(height: 16, width: 120),
+                const SizedBox(height: 24),
+                const ServioSkeleton(height: 140, radius: ServioRadius.lg),
+                const SizedBox(height: 24),
+                const ServioSkeleton(height: 24, width: 150),
+                const SizedBox(height: 12),
+                const ServioSkeleton(height: 100, radius: ServioRadius.md),
+                const SizedBox(height: 12),
+                const ServioSkeleton(height: 100, radius: ServioRadius.md),
+              ],
+            ),
+          ),
+        ),
+      );
     }
     if (_error != null) {
       return Scaffold(

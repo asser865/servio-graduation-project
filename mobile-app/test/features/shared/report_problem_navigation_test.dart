@@ -121,6 +121,17 @@ Future<void> _tapProfileTile(WidgetTester tester, String label) async {
   );
   await tester.pumpAndSettle();
 
-  await tester.tap(tileFinder);
+  await Scrollable.ensureVisible(
+    tester.element(tileFinder),
+    alignment: 0.5,
+  );
+  await tester.pumpAndSettle();
+
+  final tapTarget = find.ancestor(
+    of: tileFinder,
+    matching: find.byType(InkWell),
+  );
+
+  await tester.tap(tapTarget.first);
   await tester.pumpAndSettle();
 }

@@ -1,3 +1,5 @@
+import 'user_account.dart';
+
 class BackendBooking {
   const BackendBooking({
     required this.id,
@@ -10,6 +12,7 @@ class BackendBooking {
     required this.workerId,
     required this.serviceName,
     required this.serviceId,
+    required this.serviceCategory,
     required this.addressCity,
     required this.addressStreet,
     required this.customerName,
@@ -19,6 +22,9 @@ class BackendBooking {
     required this.paymentCardLast4,
     required this.paymentCardType,
     required this.paymentCardLabel,
+    this.paymentStatus = 'unpaid',
+    required this.createdAt,
+    this.workerAvailability = const <AvailabilitySlot>[],
   });
 
   final String id;
@@ -31,6 +37,7 @@ class BackendBooking {
   final String workerId;
   final String serviceName;
   final String serviceId;
+  final String serviceCategory;
   final String addressCity;
   final String addressStreet;
   final String customerName;
@@ -41,10 +48,18 @@ class BackendBooking {
   final String paymentCardType;
   final String paymentCardLabel;
 
+  /// Backend `paymentStatus` field. Values: unpaid | held | released |
+  /// refunded | failed | disputed | cash_pending_settlement | cash_settled.
+  final String paymentStatus;
+
+  final DateTime createdAt;
+  final List<AvailabilitySlot> workerAvailability;
+
   factory BackendBooking.fromJson(Map<String, dynamic> json) {
     // worker is a raw ObjectId string (not populated by getWorkerBookings)
     final worker = json['worker'];
     String workerName = '';
+    var workerAvailability = const <AvailabilitySlot>[];
     String workerId = _firstAssignmentId(<dynamic>[
       json['workerId'],
       json['technicianId'],
@@ -53,6 +68,7 @@ class BackendBooking {
     ]);
     if (worker is Map<String, dynamic>) {
       workerName = (worker['name'] as String?) ?? '';
+      workerAvailability = _availabilityList(worker['availability']);
       workerId = _firstStringValue(<dynamic>[
         worker['_id'],
         worker['id'],
@@ -72,9 +88,11 @@ class BackendBooking {
     final service = json['service'];
     String serviceName = (json['serviceName'] as String?) ?? '';
     String serviceId = '';
+    String serviceCategory = (json['serviceCategory'] as String?) ?? '';
     if (service is Map<String, dynamic>) {
       serviceName = (service['title'] as String?) ?? serviceName;
       serviceId = (service['_id'] as String?) ?? '';
+      serviceCategory = (service['category'] as String?) ?? serviceCategory;
     } else if (service is String) {
       serviceId = service;
     }
@@ -124,12 +142,14 @@ class BackendBooking {
       workerId: workerId,
       serviceName: serviceName,
       serviceId: serviceId,
+      serviceCategory: serviceCategory,
       addressCity: addressCity,
       addressStreet: addressStreet,
       customerName: customerName,
       customerId: customerId,
       pin: (json['pin'] as String?) ?? '',
       paymentMethod: (json['paymentMethod'] as String?) ?? '',
+      paymentStatus: (json['paymentStatus'] as String?) ?? 'unpaid',
       paymentCardLast4: (paymentMeta['last4'] as String?) ??
           (savedCard['last4'] as String?) ??
           '',
@@ -139,6 +159,9 @@ class BackendBooking {
       paymentCardLabel: (paymentMeta['label'] as String?) ??
           (savedCard['label'] as String?) ??
           '',
+      createdAt: DateTime.tryParse((json['createdAt'] as String?) ?? '') ??
+          DateTime.now(),
+      workerAvailability: workerAvailability,
     );
   }
 
@@ -157,17 +180,30 @@ class BackendBooking {
       workerId: workerId,
       serviceName: serviceName,
       serviceId: serviceId,
+      serviceCategory: serviceCategory,
       addressCity: addressCity,
       addressStreet: addressStreet,
       customerName: customerName,
       customerId: customerId,
       pin: pin,
       paymentMethod: paymentMethod,
+      paymentStatus: paymentStatus,
       paymentCardLast4: paymentCardLast4,
       paymentCardType: paymentCardType,
       paymentCardLabel: paymentCardLabel,
+      createdAt: createdAt,
+      workerAvailability: workerAvailability,
     );
   }
+}
+
+List<AvailabilitySlot> _availabilityList(dynamic value) {
+  if (value is! List<dynamic>) return const <AvailabilitySlot>[];
+  return value
+      .whereType<Map<dynamic, dynamic>>()
+      .map((item) => AvailabilitySlot.fromJson(Map<String, dynamic>.from(item)))
+      .where((slot) => slot.day.trim().isNotEmpty)
+      .toList();
 }
 
 String _assignmentIdFrom(dynamic value) {

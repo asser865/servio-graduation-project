@@ -1,5 +1,3 @@
-import 'dart:developer' as developer;
-
 import '../models/backend_booking_model.dart';
 import 'api_client.dart';
 import 'api_endpoints.dart';
@@ -41,10 +39,6 @@ class BookingsApi {
       },
     ).query;
     final path = '${ApiEndpoints.workerBookings}?$qs';
-    _debugLog(
-      'GET $path (backend assignment field: worker, auth worker id: '
-      '${workerId?.trim() ?? '<unknown>'})',
-    );
     final data = _client.unwrapData(
       await _client.get(path),
     );
@@ -53,7 +47,6 @@ class BookingsApi {
         .whereType<Map<String, dynamic>>()
         .map(BackendBooking.fromJson)
         .toList();
-    _debugLog('Worker bookings response count: ${bookings.length}');
     return bookings;
   }
 
@@ -110,6 +103,23 @@ class BookingsApi {
     });
   }
 
+  Future<void> confirmCompletion(String bookingId) async {
+    await _client.patch(
+      ApiEndpoints.bookingStatus(bookingId),
+      <String, dynamic>{'status': 'completed'},
+    );
+  }
+
+  Future<void> reportDispute(String bookingId, {String reason = ''}) async {
+    await _client.patch(
+      ApiEndpoints.bookingStatus(bookingId),
+      <String, dynamic>{
+        'status': 'disputed',
+        if (reason.trim().isNotEmpty) 'cancellationReason': reason.trim(),
+      },
+    );
+  }
+
   Future<BackendBooking> getBooking(String id) async {
     final data =
         _client.unwrapData(await _client.get(ApiEndpoints.bookingById(id)));
@@ -160,11 +170,4 @@ List<dynamic> _bookingListFrom(Map<String, dynamic> data) {
     }
   }
   return const <dynamic>[];
-}
-
-void _debugLog(String message) {
-  assert(() {
-    developer.log(message, name: 'Servio.BookingsApi');
-    return true;
-  }());
 }

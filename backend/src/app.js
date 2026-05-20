@@ -4,9 +4,8 @@ const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
 const morgan = require('morgan');
-const path = require('path');
-const os = require('os');
 const { StatusCodes } = require('http-status-codes');
+const { resolveUploadRoot } = require('./config/uploadPath');
 
 // ── Route modules ─────────────────────────────────────────────────────────────
 const authRoutes      = require('./modules/auth/auth.routes');
@@ -15,6 +14,7 @@ const serviceRoutes   = require('./modules/services/service.routes');
 const bookingRoutes   = require('./modules/bookings/booking.routes');
 const reviewRoutes    = require('./modules/reviews/review.routes');
 const aiRoutes        = require('./modules/ai/ai.routes');
+const aiMobileRoutes  = require('./modules/ai/ai.mobile.routes');
 const messageRoutes   = require('./modules/messages/message.routes');
 const paymentRoutes   = require('./modules/payments/payment.routes');
 const adminRoutes     = require('./modules/admin/audit.routes');
@@ -30,9 +30,7 @@ const supportIssueRoutes = require('./modules/support/support-issue.routes');
 const { notFound, errorHandler } = require('./middleware/error.middleware');
 
 const app = express();
-const uploadRoot = process.env.SERVIO_UPLOAD_DIR
-  ? path.resolve(process.env.SERVIO_UPLOAD_DIR)
-  : path.join(os.tmpdir(), 'servio-uploads');
+const uploadRoot = resolveUploadRoot();
 
 app.use(helmet());
 
@@ -90,6 +88,7 @@ app.use(`${API_PREFIX}/services`, serviceRoutes);
 app.use(`${API_PREFIX}/bookings`, bookingRoutes);
 app.use(`${API_PREFIX}/reviews`, reviewRoutes);
 app.use(`${API_PREFIX}/ai`, aiRoutes);
+app.use(`${API_PREFIX}/mobile/ai`, aiMobileRoutes);
 app.use(`${API_PREFIX}/messages`, messageRoutes);
 app.use(`${API_PREFIX}/payments`, paymentRoutes);
 app.use(`${API_PREFIX}/admin`,       adminRoutes);

@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const { body }   = require('express-validator');
+const { body, param } = require('express-validator');
 const ctrl       = require('./message.controller');
 const { protect }   = require('../../middleware/auth.middleware');
 const { validate }  = require('../../middleware/validate.middleware');
@@ -32,6 +32,12 @@ router.post('/conversations/start',
   ctrl.startConversation
 );
 router.get('/conversations', ctrl.conversations);
+router.delete('/conversations/:id',
+  validate([
+    param('id').isMongoId().withMessage('Valid conversation ID required'),
+  ]),
+  ctrl.deleteConversation
+);
 router.get('/conversations/:id', ctrl.list);
 router.get('/unread',        ctrl.unread);
 router.get('/:id',           ctrl.list);

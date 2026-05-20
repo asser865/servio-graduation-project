@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart' show MediaType;
 
 import '../services/storage_service.dart';
 import 'api_config.dart';
@@ -39,6 +40,72 @@ class ApiClient {
 
   Future<Map<String, dynamic>> post(String path, Map<String, dynamic> body) =>
       _request('POST', path, body: body);
+
+  /// Multipart POST. Use for endpoints that accept binary uploads (image
+  /// analysis, document verification). [fields] is serialised as plain form
+  /// fields; [fileField] carries the binary part.
+  Future<Map<String, dynamic>> postMultipart(
+    String path, {
+    required Map<String, String> fields,
+    required MultipartFilePart fileField,
+    Duration? timeoutOverride,
+  }) async {
+    final uri = Uri.parse('$_baseUrl$path');
+    final token = await _tokenStorage.getToken();
+    final request = http.MultipartRequest('POST', uri);
+    if (token != null && token.isNotEmpty) {
+      request.headers['Authorization'] = 'Bearer $token';
+    }
+    request.fields.addAll(fields);
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        fileField.field,
+        fileField.bytes,
+        filename: fileField.filename,
+        contentType: fileField.contentType,
+      ),
+    );
+
+    final timeout = timeoutOverride ?? _timeout;
+    late final http.Response response;
+    try {
+      final streamed = await (timeout == null
+          ? _httpClient.send(request)
+          : _httpClient.send(request).timeout(timeout));
+      response = await http.Response.fromStream(streamed);
+    } on TimeoutException {
+      throw const ApiException(
+        message: 'Upload timed out. Please try again.',
+      );
+    } on http.ClientException {
+      throw const ApiException(
+        message: 'Unable to connect. Check your internet connection.',
+      );
+    }
+
+    late final Map<String, dynamic> decoded;
+    try {
+      decoded = _decode(response.body);
+    } on FormatException {
+      throw const ApiException(message: 'Invalid server response.');
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      if (response.statusCode == 401) {
+        await _tokenStorage.clearToken();
+      }
+      final errors = decoded['errors'];
+      throw ApiException(
+        statusCode: response.statusCode,
+        message: (decoded['message'] as String?) ??
+            (decoded['error'] as String?) ??
+            'Upload failed.',
+        errors: errors is List
+            ? errors.whereType<Map<String, dynamic>>().toList()
+            : const <Map<String, dynamic>>[],
+      );
+    }
+    return decoded;
+  }
 
   Future<Map<String, dynamic>> patch(String path, Map<String, dynamic> body) =>
       _request('PATCH', path, body: body);
@@ -117,4 +184,21 @@ class ApiClient {
     if (decoded is Map<String, dynamic>) return decoded;
     return <String, dynamic>{'data': decoded};
   }
+}
+
+/// Describes a single binary part for [ApiClient.postMultipart]. Keeping the
+/// API client free of business-specific file types means feature code owns
+/// MIME-type detection and naming.
+class MultipartFilePart {
+  const MultipartFilePart({
+    required this.field,
+    required this.bytes,
+    required this.filename,
+    required this.contentType,
+  });
+
+  final String field;
+  final List<int> bytes;
+  final String filename;
+  final MediaType contentType;
 }

@@ -10,8 +10,14 @@ const ApiError        = require('../../utils/ApiError');
 const ApiResponse     = require('../../utils/ApiResponse');
 const notifSvc        = require('../notifications/notification.service');
 
+const REVIEWABLE_BOOKING_STATUSES = new Set([
+  'awaiting_customer_confirmation',
+  'pending_admin_review',
+  'completed',
+]);
+
 // ── CREATE REVIEW (User Only) ────────────────────────────────────────────────
-// WHAT: Allows users to rate a worker after a booking is "completed".
+// WHAT: Allows users to rate a worker after the worker marks the job finished.
 // WHY:  Ensures data integrity (cannot review workers you didn't book).
 const createReview = async (req, res) => {
   const { bookingId, rating, comment } = req.body;
@@ -24,8 +30,11 @@ const createReview = async (req, res) => {
   if (booking.user.toString() !== userId.toString()) {
     throw new ApiError(StatusCodes.FORBIDDEN, 'You can only review your own bookings.');
   }
-  if (booking.status !== 'completed') {
-    throw new ApiError(StatusCodes.BAD_REQUEST, 'You can only review a completed booking.');
+  if (!REVIEWABLE_BOOKING_STATUSES.has(booking.status)) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'You can review once the technician has marked the job complete.'
+    );
   }
 
   // The unique index on booking prevents duplicate reviews automatically
@@ -74,4 +83,10 @@ const deleteReview = async (req, res) => {
   return ApiResponse.success(res, StatusCodes.OK, 'Review deleted.', null);
 };
 
-module.exports = { createReview, getMyReviews, getWorkerReviews, deleteReview };
+module.exports = {
+  createReview,
+  getMyReviews,
+  getWorkerReviews,
+  deleteReview,
+  REVIEWABLE_BOOKING_STATUSES,
+};

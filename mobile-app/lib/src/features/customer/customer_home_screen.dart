@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/models/booking_model.dart';
+import '../../core/models/service_category.dart';
 import '../../core/state/app_state.dart';
 import '../../core/state/notifications_provider.dart';
 import '../../core/state/workers_state.dart';
@@ -15,6 +16,7 @@ import '../../design_system/widgets/servio_section_heading.dart';
 import '../../design_system/widgets/servio_status_chip.dart';
 import '../../design_system/widgets/servio_tab_shell.dart';
 import 'ai_finishing_estimator_screen.dart';
+import 'ai_room_finisher_screen.dart';
 import 'ai_smart_match_screen.dart';
 import 'customer_profile_screen.dart';
 import 'my_addresses_screen.dart';
@@ -25,6 +27,7 @@ import 'technician_listing_screen.dart';
 import 'technician_profile_screen.dart';
 import '../shared/notifications_screen.dart';
 import '../shared/search_results_screen.dart';
+import '../booking/booking_flow_data.dart';
 
 class CustomerHomeScreen extends StatelessWidget {
   const CustomerHomeScreen({super.key});
@@ -50,7 +53,7 @@ class _HomeBody extends StatefulWidget {
 }
 
 class _HomeBodyState extends State<_HomeBody>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late ScrollController _scrollController;
   late AnimationController _entranceController;
   late Animation<double> _entranceFade;
@@ -59,6 +62,7 @@ class _HomeBodyState extends State<_HomeBody>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _scrollController = ScrollController();
     _entranceController = AnimationController(
       vsync: this,
@@ -74,12 +78,22 @@ class _HomeBodyState extends State<_HomeBody>
     ).animate(CurvedAnimation(
         parent: _entranceController, curve: ServioMotion.spring));
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _entranceController.forward();
+      if (!mounted) return;
+      _entranceController.forward();
+      context.read<BookingsProvider>().refresh();
     });
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      context.read<BookingsProvider>().refresh();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _scrollController.dispose();
     _entranceController.dispose();
     super.dispose();
@@ -294,23 +308,51 @@ class _HomeBodyState extends State<_HomeBody>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
-                            // ── Booking card ─────────────────────────
-                            ServioAnimatedEntry(
-                              delay: const Duration(milliseconds: 80),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: ServioSpacing.screenPadding,
-                                ),
+                            // ── Booking card (active bookings only) ──
+                            AnimatedSize(
+                              duration: ServioMotion.bottomSheet,
+                              curve: ServioMotion.spring,
+                              alignment: Alignment.topCenter,
+                              child: AnimatedSwitcher(
+                                duration: ServioMotion.normal,
+                                switchInCurve: ServioMotion.spring,
+                                switchOutCurve: ServioMotion.standard,
+                                transitionBuilder:
+                                    (Widget child, Animation<double> anim) {
+                                  return FadeTransition(
+                                    opacity: anim,
+                                    child: SizeTransition(
+                                      sizeFactor: anim,
+                                      axisAlignment: -1,
+                                      child: child,
+                                    ),
+                                  );
+                                },
                                 child: recentBookings.isNotEmpty
-                                    ? _FloatingBookingCard(
-                                        booking: recentBookings.first,
-                                        locale: locale,
+                                    ? Padding(
+                                        key: ValueKey<String>(
+                                          'booking-${recentBookings.first.id}-${recentBookings.first.status.name}',
+                                        ),
+                                        padding: const EdgeInsets.only(
+                                          left: ServioSpacing.screenPadding,
+                                          right: ServioSpacing.screenPadding,
+                                          bottom: 28,
+                                        ),
+                                        child: ServioAnimatedEntry(
+                                          delay:
+                                              const Duration(milliseconds: 80),
+                                          child: _FloatingBookingCard(
+                                            booking: recentBookings.first,
+                                            locale: locale,
+                                          ),
+                                        ),
                                       )
-                                    : _FloatingEmptyBookingCard(locale: locale),
+                                    : const SizedBox(
+                                        key: ValueKey<String>('no-booking'),
+                                        width: double.infinity,
+                                      ),
                               ),
                             ),
-
-                            const SizedBox(height: 28),
 
                             // ── Services grid ─────────────────────────
                             ServioAnimatedEntry(
@@ -387,6 +429,21 @@ class _HomeBodyState extends State<_HomeBody>
                                         MaterialPageRoute<void>(
                                           builder: (_) =>
                                               const AiFinishingEstimatorScreen(),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    _HeroBannerCard(
+                                      badgeLabel: 'AI FINISH',
+                                      title: 'AI Room Finisher',
+                                      body:
+                                          'Upload a photo. Get a finishing plan + AI render.',
+                                      ctaLabel: 'Finish My Room',
+                                      icon: Icons.auto_fix_high_rounded,
+                                      onTap: () => Navigator.of(context).push(
+                                        MaterialPageRoute<void>(
+                                          builder: (_) =>
+                                              const AiRoomFinisherScreen(),
                                         ),
                                       ),
                                     ),
@@ -1370,7 +1427,15 @@ class _FloatingBookingCard extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => BookingDetailsScreen(
+                          data: _flowDataFromBooking(booking),
+                        ),
+                      ),
+                    );
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: servio.accent,
                     foregroundColor: Colors.white,
@@ -1388,6 +1453,54 @@ class _FloatingBookingCard extends StatelessWidget {
       ),
     );
   }
+
+  BookingFlowData _flowDataFromBooking(BookingModel booking) {
+    return BookingFlowData(
+      backendId: booking.id,
+      serviceName: booking.serviceName,
+      serviceId: booking.serviceId,
+      category: booking.serviceCategory,
+      technicianName: booking.technicianName,
+      technicianId: booking.technicianId,
+      date: booking.date,
+      time: booking.time,
+      location: booking.location,
+      amount: booking.amount,
+      reference: booking.reference,
+      pin: booking.pin,
+      paymentMethod: booking.paymentMethod,
+      paymentMethodCode: booking.paymentMethod.toLowerCase().contains('card')
+          ? 'card'
+          : 'cash',
+      savedCardLabel: _cardLabelFor(booking),
+      savedCardLast4: booking.paymentCardLast4,
+      statusLabel: _homeStatusLabel(booking.status),
+      statusCode: _statusCodeFromStatus(booking.status),
+    );
+  }
+
+  String _cardLabelFor(BookingModel booking) {
+    if (booking.paymentCardLabel.isNotEmpty) return booking.paymentCardLabel;
+    if (booking.paymentCardLast4.isNotEmpty) {
+      return 'Card ending ${booking.paymentCardLast4}';
+    }
+    return '';
+  }
+
+  String _statusCodeFromStatus(BookingStatus status) => switch (status) {
+        BookingStatus.pending => 'pending',
+        BookingStatus.confirmed => 'confirmed',
+        BookingStatus.enRoute => 'en_route',
+        BookingStatus.arrived => 'arrived',
+        BookingStatus.inProgress => 'in_progress',
+        BookingStatus.awaitingCustomerConfirmation =>
+          'awaiting_customer_confirmation',
+        BookingStatus.completed => 'completed',
+        BookingStatus.cancelled => 'cancelled',
+        BookingStatus.rejected => 'rejected',
+        BookingStatus.disputed => 'disputed',
+        BookingStatus.pendingAdminReview => 'pending_admin_review',
+      };
 }
 
 class _AnimatedBookingStatusChip extends StatefulWidget {
@@ -1478,10 +1591,12 @@ String _homeStatusLabel(BookingStatus status) {
     BookingStatus.enRoute => 'En Route',
     BookingStatus.arrived => 'Arrived',
     BookingStatus.inProgress => 'In Progress',
+    BookingStatus.awaitingCustomerConfirmation => 'Awaiting Confirmation',
     BookingStatus.completed => 'Completed',
     BookingStatus.cancelled => 'Cancelled',
     BookingStatus.rejected => 'Rejected',
     BookingStatus.disputed => 'Disputed',
+    BookingStatus.pendingAdminReview => 'Under Review',
   };
 }
 
@@ -1492,100 +1607,13 @@ ServioStatusChipType _homeChipType(BookingStatus status) {
     BookingStatus.enRoute => ServioStatusChipType.info,
     BookingStatus.arrived => ServioStatusChipType.info,
     BookingStatus.inProgress => ServioStatusChipType.info,
+    BookingStatus.awaitingCustomerConfirmation => ServioStatusChipType.warning,
     BookingStatus.completed => ServioStatusChipType.success,
     BookingStatus.cancelled => ServioStatusChipType.danger,
     BookingStatus.rejected => ServioStatusChipType.danger,
     BookingStatus.disputed => ServioStatusChipType.warning,
+    BookingStatus.pendingAdminReview => ServioStatusChipType.warning,
   };
-}
-
-class _FloatingEmptyBookingCard extends StatelessWidget {
-  const _FloatingEmptyBookingCard({required this.locale});
-
-  final String locale;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final servio = context.servio;
-    final isDark = theme.brightness == Brightness.dark;
-
-    return ServioCard(
-      radius: ServioRadius.xl,
-      padding: const EdgeInsets.all(20),
-      child: Row(
-        children: <Widget>[
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              gradient: ServioGradients.warm,
-              borderRadius: BorderRadius.circular(ServioRadius.md),
-            ),
-            child: const Icon(
-              Icons.calendar_today_rounded,
-              color: ServioColors.deepBrown,
-              size: 23,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  locale == 'ar' ? 'لا توجد حجوزات نشطة' : 'No active bookings',
-                  style: theme.textTheme.titleMedium,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  locale == 'ar'
-                      ? 'احجز خدمتك الأولى الآن'
-                      : 'Book your first service today',
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: servio.textSecondary),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          GestureDetector(
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const ServicesMarketplaceScreen(),
-              ),
-            ),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                gradient:
-                    isDark ? ServioGradients.brandDark : ServioGradients.brand,
-                borderRadius: BorderRadius.circular(ServioRadius.full),
-                boxShadow: <BoxShadow>[
-                  BoxShadow(
-                    color: ServioColors.deepBrown.withValues(alpha: 0.25),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Text(
-                locale == 'ar' ? 'احجز' : 'Book Now',
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: isDark ? ServioColors.navyDark : Colors.white,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1844,6 +1872,7 @@ class _ProfessionalCardState extends State<_ProfessionalCard>
     final name = tech.name as String;
     final specialty =
         tech.skills.isNotEmpty ? tech.skills.first as String : 'Specialist';
+    final selectedCategory = normalizeServiceCategory(specialty);
 
     return GestureDetector(
       onTapDown: (_) => _controller.forward(),
@@ -1851,7 +1880,14 @@ class _ProfessionalCardState extends State<_ProfessionalCard>
         _controller.reverse();
         Navigator.of(context).push(
           MaterialPageRoute<void>(
-            builder: (_) => TechnicianProfileScreen(technicianId: tech.id),
+            builder: (_) => TechnicianProfileScreen(
+              technicianId: tech.id,
+              selectedServiceCategory:
+                  selectedCategory.isEmpty ? null : selectedCategory,
+              selectedServiceName: selectedCategory.isEmpty
+                  ? (specialty == 'Specialist' ? null : specialty)
+                  : serviceCategoryLabel(selectedCategory),
+            ),
           ),
         );
       },

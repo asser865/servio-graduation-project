@@ -1,4 +1,5 @@
 import 'api_client.dart';
+import 'api_config.dart';
 import 'api_endpoints.dart';
 
 class ApiParticipant {
@@ -19,7 +20,7 @@ class ApiParticipant {
       id: _string(json?['_id'] ?? json?['id']),
       name: _string(json?['name'], fallback: 'Unknown'),
       role: _string(json?['role']),
-      avatar: _nullableString(json?['profileImage'] ?? json?['avatar']),
+      avatar: _nullableUrl(json?['profileImage'] ?? json?['avatar']),
     );
   }
 }
@@ -189,6 +190,10 @@ class MessagesApi {
     );
   }
 
+  Future<void> deleteConversation(String conversationId) async {
+    await _client.delete(ApiEndpoints.conversation(conversationId));
+  }
+
   Future<ApiSendMessageResult> sendMessage({
     String? conversationId,
     String? receiverId,
@@ -222,6 +227,13 @@ bool _hasValue(String? value) => value != null && value.trim().isNotEmpty;
 
 String? _nullableString(dynamic value) {
   if (value is String && value.trim().isNotEmpty) return value.trim();
+  return null;
+}
+
+String? _nullableUrl(dynamic value) {
+  if (value is String && value.trim().isNotEmpty) {
+    return ApiConfig.normalizeBackendUrl(value);
+  }
   return null;
 }
 

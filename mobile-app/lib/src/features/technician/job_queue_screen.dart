@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -14,36 +16,109 @@ import '../../design_system/widgets/servio_status_chip.dart';
 import 'job_details_screen.dart';
 
 class JobQueueScreen extends StatefulWidget {
-  const JobQueueScreen({super.key});
+  const JobQueueScreen({
+    super.key,
+    this.autoRefreshInterval = const Duration(seconds: 20),
+  });
+
+  final Duration? autoRefreshInterval;
 
   @override
   State<JobQueueScreen> createState() => _JobQueueScreenState();
 }
 
-class _JobQueueScreenState extends State<JobQueueScreen> {
+class _JobQueueScreenState extends State<JobQueueScreen>
+    with WidgetsBindingObserver {
   int _tabIndex = 0;
+  bool _historyExpanded = false;
   static const List<String> _tabs = <String>[
     'Pending',
     'Confirmed',
     'In Progress',
-    'Completed'
+    'Completed',
+    'Cancelled',
+    'Rejected',
   ];
+  static const List<int> _primaryTabs = <int>[0, 1, 2];
+  static const List<int> _historyTabs = <int>[3, 4, 5];
 
   List<BackendBooking> _jobs = [];
   bool _loading = true;
   String? _error;
+  bool _loadedOnce = false;
+  bool? _pageActive;
+  Timer? _autoRefreshTimer;
+  Future<void>? _activeFetch;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _fetchJobs());
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_fetchJobs());
+    });
   }
 
-  Future<void> _fetchJobs() async {
-    setState(() {
-      _loading = true;
-      _error = null;
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final active = ServioTabShell.isPageActiveOf(context);
+    if (_pageActive == active) return;
+
+    final wasActive = _pageActive;
+    _pageActive = active;
+
+    if (active) {
+      _startAutoRefresh();
+      if (wasActive == false && _loadedOnce) {
+        unawaited(_fetchJobs(silent: true));
+      }
+    } else {
+      _stopAutoRefresh();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant JobQueueScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.autoRefreshInterval != oldWidget.autoRefreshInterval &&
+        _pageActive != false) {
+      _startAutoRefresh();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _pageActive != false) {
+      unawaited(_fetchJobs(silent: true));
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _stopAutoRefresh();
+    super.dispose();
+  }
+
+  Future<void> _fetchJobs({bool silent = false}) {
+    final activeFetch = _activeFetch;
+    if (activeFetch != null) return activeFetch;
+
+    final fetch = _fetchJobsNow(silent: silent);
+    _activeFetch = fetch.whenComplete(() {
+      _activeFetch = null;
     });
+    return _activeFetch!;
+  }
+
+  Future<void> _fetchJobsNow({required bool silent}) async {
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     final client = context.read<ApiClient>();
     final session = context.read<SessionProvider>();
     var workerId = session.account?.id.trim() ?? '';
@@ -52,29 +127,19 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
       final profileError = await session.loadCurrentWorkerProfile();
       if (!mounted) return;
       if (profileError != null) {
-        setState(() {
-          _error = profileError;
-          _loading = false;
-        });
+        _handleFetchError(profileError, silent: silent);
         return;
       }
       workerId = session.account?.id.trim() ?? '';
     }
 
     if (workerId.isEmpty || session.account?.role != UserRole.technician) {
-      _logJobQueueDebug('Missing authenticated technician session.');
-      setState(() {
-        _error = 'Log in as a technician to view assigned jobs.';
-        _loading = false;
-      });
+      _handleFetchError(
+        'Log in as a technician to view assigned jobs.',
+        silent: silent,
+      );
       return;
     }
-
-    _logJobQueueDebug('Authenticated worker id: $workerId');
-    _logJobQueueDebug(
-      'Booking query: GET /bookings/worker?limit=50&workerId=$workerId '
-      '(backend filters Booking.worker)',
-    );
 
     try {
       final jobs = await BookingsApi(client).getWorkerBookings(
@@ -82,30 +147,43 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
       );
       final assignedJobs =
           jobs.where((job) => _isAssignedToWorker(job, workerId)).toList();
-      final hiddenCount = jobs.length - assignedJobs.length;
-      if (hiddenCount > 0) {
-        _logJobQueueDebug(
-          'Filtered out $hiddenCount booking(s) whose worker id did not '
-          'match $workerId.',
-        );
-      }
-      _logJobQueueDebug(
-        'Backend response count: ${jobs.length}; assigned count: '
-        '${assignedJobs.length}.',
-      );
       if (!mounted) return;
       setState(() {
         _jobs = assignedJobs;
         _tabIndex = _firstTabWithJobs(assignedJobs) ?? _tabIndex;
+        _error = null;
         _loading = false;
+        _loadedOnce = true;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _error = e.toString();
-        _loading = false;
-      });
+      _handleFetchError(e.toString(), silent: silent);
     }
+  }
+
+  void _handleFetchError(String message, {required bool silent}) {
+    if (silent && _loadedOnce) return;
+
+    setState(() {
+      _error = message;
+      _loading = false;
+    });
+  }
+
+  void _startAutoRefresh() {
+    _stopAutoRefresh();
+    final interval = widget.autoRefreshInterval;
+    if (interval == null) return;
+
+    _autoRefreshTimer = Timer.periodic(interval, (_) {
+      if (!mounted || _pageActive == false) return;
+      unawaited(_fetchJobs(silent: true));
+    });
+  }
+
+  void _stopAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = null;
   }
 
   List<BackendBooking> _jobsForTab(int tab) {
@@ -116,8 +194,32 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
     const statusMap = <int, Set<String>>{
       0: <String>{'pending'},
       1: <String>{'accepted', 'confirmed', 'scheduled'},
-      2: <String>{'in_progress', 'inprogress', 'active', 'started'},
-      3: <String>{'completed', 'done'},
+      2: <String>{
+        'arrived',
+        'en_route',
+        'enroute',
+        'in_progress',
+        'inprogress',
+        'active',
+        'started',
+      },
+      3: <String>{
+        'awaiting_customer_confirmation',
+        'pending_admin_review',
+        'completed',
+        'done',
+      },
+      4: <String>{
+        'cancelled',
+        'canceled',
+        'cancelled_by_customer',
+        'canceled_by_customer',
+        'cancelled_by_provider',
+        'canceled_by_provider',
+        'cancelled_by_worker',
+        'canceled_by_worker',
+      },
+      5: <String>{'rejected', 'declined'},
     };
     final statuses = statusMap[tab] ?? const <String>{};
     return jobs
@@ -154,7 +256,7 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
       await BookingsApi(client).updateStatus(jobId, newStatus);
       // Silently refresh in the background to sync any server-side changes
       // (e.g. timestamps, populated fields) without blocking the UI.
-      if (mounted) await _fetchJobs();
+      if (mounted) await _fetchJobs(silent: true);
     } catch (_) {
       // ── Rollback on failure ───────────────────────────────────────────────
       if (!mounted) return;
@@ -189,79 +291,54 @@ class _JobQueueScreenState extends State<JobQueueScreen> {
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
                 color: servio.backgroundSoft,
-                borderRadius: BorderRadius.circular(ServioRadius.full),
+                borderRadius: BorderRadius.circular(ServioRadius.lg),
               ),
-              child: Row(
-                children: List<Widget>.generate(_tabs.length, (int index) {
-                  final active = index == _tabIndex;
-                  final count = _jobsForTab(index).length.toString();
+              child: LayoutBuilder(
+                builder: (BuildContext context, BoxConstraints constraints) {
+                  const spacing = 6.0;
+                  final tabWidth = (constraints.maxWidth - spacing * 2) / 3;
 
-                  return Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _tabIndex = index),
-                      child: AnimatedContainer(
-                        duration: ServioMotion.micro,
-                        curve: ServioMotion.curve,
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          color: active
-                              ? Theme.of(context).colorScheme.surface
-                              : Colors.transparent,
-                          borderRadius:
-                              BorderRadius.circular(ServioRadius.full),
+                  return Row(
+                    children:
+                        List<Widget>.generate(_primaryTabs.length, (int slot) {
+                      final int index = _primaryTabs[slot];
+                      final bool active = index == _tabIndex;
+                      final String count = _jobsForTab(index).length.toString();
+                      final Color tabColor = _tabColor(index, servio);
+
+                      return Padding(
+                        padding: EdgeInsets.only(
+                          right: slot == _primaryTabs.length - 1 ? 0 : spacing,
                         ),
-                        child: Column(
-                          children: <Widget>[
-                            Text(
-                              _tabs[index],
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .labelSmall
-                                  ?.copyWith(
-                                    color: active
-                                        ? servio.accent
-                                        : servio.textSecondary,
-                                  ),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 4),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: ServioColors.tint(
-                                  index == 0
-                                      ? servio.warning
-                                      : index == 3
-                                          ? servio.success
-                                          : servio.info,
-                                ),
-                                borderRadius:
-                                    BorderRadius.circular(ServioRadius.full),
-                              ),
-                              child: Text(
-                                count,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .labelSmall
-                                    ?.copyWith(
-                                      color: index == 0
-                                          ? servio.warning
-                                          : index == 3
-                                              ? servio.success
-                                              : servio.info,
-                                    ),
-                              ),
-                            ),
-                          ],
+                        child: SizedBox(
+                          width: tabWidth,
+                          child: _PrimaryTabChip(
+                            label: _tabs[index],
+                            count: count,
+                            tabColor: tabColor,
+                            active: active,
+                            onTap: () => setState(() => _tabIndex = index),
+                          ),
                         ),
-                      ),
-                    ),
+                      );
+                    }),
                   );
-                }),
+                },
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 10),
+            _HistorySection(
+              tabs: _tabs,
+              historyTabs: _historyTabs,
+              activeIndex: _tabIndex,
+              expanded: _historyExpanded,
+              onToggle: () =>
+                  setState(() => _historyExpanded = !_historyExpanded),
+              onSelect: (int idx) => setState(() => _tabIndex = idx),
+              countFor: (int idx) => _jobsForTab(idx).length,
+              colorFor: (int idx) => _tabColor(idx, servio),
+            ),
+            const SizedBox(height: 14),
             Expanded(
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
@@ -358,6 +435,9 @@ class _JobCard extends StatelessWidget {
       case 'confirmed':
       case 'scheduled':
         return ServioStatusChipType.info;
+      case 'arrived':
+      case 'en_route':
+      case 'enroute':
       case 'in_progress':
       case 'inprogress':
       case 'active':
@@ -365,7 +445,20 @@ class _JobCard extends StatelessWidget {
         return ServioStatusChipType.info;
       case 'completed':
       case 'done':
+      case 'awaiting_customer_confirmation':
+      case 'pending_admin_review':
         return ServioStatusChipType.success;
+      case 'cancelled':
+      case 'canceled':
+      case 'cancelled_by_customer':
+      case 'canceled_by_customer':
+      case 'cancelled_by_provider':
+      case 'canceled_by_provider':
+      case 'cancelled_by_worker':
+      case 'canceled_by_worker':
+      case 'rejected':
+      case 'declined':
+        return ServioStatusChipType.danger;
       default:
         return ServioStatusChipType.warning;
     }
@@ -379,6 +472,11 @@ class _JobCard extends StatelessWidget {
       case 'confirmed':
       case 'scheduled':
         return 'Confirmed';
+      case 'arrived':
+        return 'Arrived';
+      case 'en_route':
+      case 'enroute':
+        return 'En Route';
       case 'in_progress':
       case 'inprogress':
       case 'active':
@@ -387,9 +485,21 @@ class _JobCard extends StatelessWidget {
       case 'completed':
       case 'done':
         return 'Completed';
+      case 'awaiting_customer_confirmation':
+        return 'Awaiting Customer';
+      case 'pending_admin_review':
+        return 'Pending Review';
       case 'cancelled':
+      case 'canceled':
+      case 'cancelled_by_customer':
+      case 'canceled_by_customer':
+      case 'cancelled_by_provider':
+      case 'canceled_by_provider':
+      case 'cancelled_by_worker':
+      case 'canceled_by_worker':
         return 'Cancelled';
       case 'rejected':
+      case 'declined':
         return 'Rejected';
       default:
         return status;
@@ -501,24 +611,266 @@ class _JobCard extends StatelessWidget {
   }
 }
 
+Color _tabColor(int index, ServioThemeExtension servio) {
+  return switch (index) {
+    0 => servio.warning,
+    3 => servio.success,
+    4 || 5 => servio.danger,
+    _ => servio.info,
+  };
+}
+
 bool _isAssignedToWorker(BackendBooking job, String workerId) {
   final bookingWorkerId = job.workerId.trim();
-  final matches = bookingWorkerId == workerId;
-  if (!matches) {
-    _logJobQueueDebug(
-      'Skipping booking ${job.id}: worker id "$bookingWorkerId" does not '
-      'match authenticated worker "$workerId".',
-    );
-  }
-  return matches;
+  return bookingWorkerId == workerId;
 }
 
 String _normalizedStatus(String status) =>
     status.trim().toLowerCase().replaceAll('-', '_');
 
-void _logJobQueueDebug(String message) {
-  assert(() {
-    debugPrint('[JobQueue] $message');
-    return true;
-  }());
+class _PrimaryTabChip extends StatelessWidget {
+  const _PrimaryTabChip({
+    required this.label,
+    required this.count,
+    required this.tabColor,
+    required this.active,
+    required this.onTap,
+  });
+
+  final String label;
+  final String count;
+  final Color tabColor;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: ServioMotion.micro,
+        curve: ServioMotion.curve,
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: active ? theme.colorScheme.surface : Colors.transparent,
+          borderRadius: BorderRadius.circular(ServioRadius.full),
+        ),
+        child: Column(
+          children: <Widget>[
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: active ? servio.accent : servio.textSecondary,
+                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 8,
+                vertical: 4,
+              ),
+              decoration: BoxDecoration(
+                color: ServioColors.tint(tabColor),
+                borderRadius: BorderRadius.circular(ServioRadius.full),
+              ),
+              child: Text(
+                count,
+                style: theme.textTheme.labelSmall?.copyWith(color: tabColor),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HistorySection extends StatelessWidget {
+  const _HistorySection({
+    required this.tabs,
+    required this.historyTabs,
+    required this.activeIndex,
+    required this.expanded,
+    required this.onToggle,
+    required this.onSelect,
+    required this.countFor,
+    required this.colorFor,
+  });
+
+  final List<String> tabs;
+  final List<int> historyTabs;
+  final int activeIndex;
+  final bool expanded;
+  final VoidCallback onToggle;
+  final ValueChanged<int> onSelect;
+  final int Function(int index) countFor;
+  final Color Function(int index) colorFor;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+    final int total =
+        historyTabs.fold<int>(0, (int sum, int i) => sum + countFor(i));
+    final bool historyActive = historyTabs.contains(activeIndex);
+    final bool open = expanded || historyActive;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        InkWell(
+          onTap: onToggle,
+          borderRadius: BorderRadius.circular(ServioRadius.full),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+            child: Row(
+              children: <Widget>[
+                Icon(
+                  Icons.history_rounded,
+                  size: 16,
+                  color: servio.textSecondary,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'History',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: servio.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: ServioColors.tint(servio.textSecondary),
+                    borderRadius: BorderRadius.circular(ServioRadius.full),
+                  ),
+                  child: Text(
+                    '$total',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: servio.textSecondary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                AnimatedRotation(
+                  turns: open ? 0.5 : 0,
+                  duration: ServioMotion.normal,
+                  curve: ServioMotion.spring,
+                  child: Icon(
+                    Icons.expand_more_rounded,
+                    color: servio.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        AnimatedCrossFade(
+          firstChild: const SizedBox(width: double.infinity, height: 0),
+          secondChild: Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: <Widget>[
+                for (final int idx in historyTabs)
+                  _HistoryChip(
+                    label: tabs[idx],
+                    count: countFor(idx),
+                    color: colorFor(idx),
+                    active: idx == activeIndex,
+                    onTap: () => onSelect(idx),
+                  ),
+              ],
+            ),
+          ),
+          crossFadeState:
+              open ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+          duration: ServioMotion.normal,
+          sizeCurve: ServioMotion.spring,
+        ),
+      ],
+    );
+  }
+}
+
+class _HistoryChip extends StatelessWidget {
+  const _HistoryChip({
+    required this.label,
+    required this.count,
+    required this.color,
+    required this.active,
+    required this.onTap,
+  });
+
+  final String label;
+  final int count;
+  final Color color;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: ServioMotion.fast,
+        curve: ServioMotion.spring,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: active ? ServioColors.tint(color) : theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(ServioRadius.full),
+          border: Border.all(
+            color: active ? color : servio.border,
+            width: active ? 1.2 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Text(
+              label,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: active ? color : servio.textSecondary,
+                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 6,
+                vertical: 1,
+              ),
+              decoration: BoxDecoration(
+                color: ServioColors.tint(color),
+                borderRadius: BorderRadius.circular(ServioRadius.full),
+              ),
+              child: Text(
+                '$count',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

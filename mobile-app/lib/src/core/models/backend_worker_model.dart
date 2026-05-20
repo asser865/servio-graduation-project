@@ -1,16 +1,21 @@
 import 'user_account.dart';
 import 'service_category.dart';
+import '../api/api_config.dart';
 
 class BackendWorkerService {
   const BackendWorkerService({
     required this.id,
     required this.name,
     required this.category,
+    this.basePrice = 0,
+    this.priceUnit = '',
   });
 
   final String id;
   final String name;
   final String category;
+  final double basePrice;
+  final String priceUnit;
 
   String get displayName {
     if (name.trim().isNotEmpty) return name.trim();
@@ -29,6 +34,8 @@ class BackendWorkerService {
           value['name'],
         ]),
         category: _stringValue(value['category']),
+        basePrice: ((value['basePrice'] as num?) ?? 0).toDouble(),
+        priceUnit: _stringValue(value['priceUnit']),
       );
     }
     return const BackendWorkerService(id: '', name: '', category: '');
@@ -122,7 +129,8 @@ class BackendWorker {
         id: _firstStringValue(<dynamic>[json['_id'], json['id']]),
         name: _stringValue(json['name']),
         email: _stringValue(json['email']),
-        profileImage: _stringValue(json['profileImage']),
+        profileImage:
+            ApiConfig.normalizeBackendUrl(_stringValue(json['profileImage'])),
         bio: _stringValue(json['bio']),
         skills: _stringList(json['skills']),
         categories: _stringList(json['categories']),

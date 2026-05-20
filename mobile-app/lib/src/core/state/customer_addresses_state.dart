@@ -42,6 +42,8 @@ class CustomerAddressesProvider extends ChangeNotifier {
     String city = '',
     String state = '',
     String zipCode = '',
+    double? lat,
+    double? lng,
   }) async {
     return _write(() async {
       final saved = await _usersApi.addAddress(
@@ -50,6 +52,8 @@ class CustomerAddressesProvider extends ChangeNotifier {
         city: city,
         state: state,
         zipCode: zipCode,
+        lat: lat,
+        lng: lng,
       );
       await _refresh();
       return saved;
@@ -63,6 +67,8 @@ class CustomerAddressesProvider extends ChangeNotifier {
     String city = '',
     String state = '',
     String zipCode = '',
+    double? lat,
+    double? lng,
   }) async {
     return _write(() async {
       final saved = await _usersApi.updateAddress(
@@ -72,6 +78,8 @@ class CustomerAddressesProvider extends ChangeNotifier {
         city: city,
         state: state,
         zipCode: zipCode,
+        lat: lat,
+        lng: lng,
       );
       await _refresh();
       return saved;

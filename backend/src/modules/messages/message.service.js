@@ -216,6 +216,22 @@ async function getConversations(userId) {
   return conversations.map((conversation) => serializeConversation(conversation, userId));
 }
 
+async function deleteConversation(userId, conversationId) {
+  assertObjectId(conversationId, 'conversation ID');
+  const conversation = await Conversation.findById(conversationId);
+  if (!conversation) throw new ApiError(StatusCodes.NOT_FOUND, 'Conversation not found');
+
+  await ensureParticipant(conversation, userId);
+
+  const messageDeleteResult = await Message.deleteMany({ conversation: conversation._id });
+  await Conversation.deleteOne({ _id: conversation._id });
+
+  return {
+    conversationId: conversation._id?.toString(),
+    deletedMessages: messageDeleteResult.deletedCount || 0,
+  };
+}
+
 function userSummary(user) {
   if (!user) return null;
   return {
@@ -294,5 +310,6 @@ module.exports = {
   getMessages,
   getUnreadCount,
   getConversations,
+  deleteConversation,
   findOrCreateConversation,
 };

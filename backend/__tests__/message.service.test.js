@@ -90,10 +90,12 @@ beforeEach(() => {
     conversation({ ...payload, _id: CONVERSATION })
   );
   Conversation.find = jest.fn(() => query([populatedConversation()]));
+  Conversation.deleteOne = jest.fn().mockResolvedValue({ deletedCount: 1 });
   Message.create = jest.fn().mockResolvedValue(message());
   Message.updateMany = jest.fn().mockResolvedValue({ modifiedCount: 1 });
   Message.countDocuments = jest.fn().mockResolvedValue(3);
   Message.find = jest.fn(() => query([message(), message({ _id: OTHER })]));
+  Message.deleteMany = jest.fn().mockResolvedValue({ deletedCount: 2 });
   Booking.findById = jest.fn().mockResolvedValue({
     _id: BOOKING,
     user: CUSTOMER,
@@ -180,6 +182,25 @@ describe('message.service persistent conversations', () => {
     );
     expect(Message.find).toHaveBeenCalledWith({ conversation: CONVERSATION });
     expect(result.messages).toHaveLength(2);
+  });
+
+  test('participant can delete a conversation and its messages', async () => {
+    const result = await service.deleteConversation(CUSTOMER, CONVERSATION);
+
+    expect(Message.deleteMany).toHaveBeenCalledWith({ conversation: CONVERSATION });
+    expect(Conversation.deleteOne).toHaveBeenCalledWith({ _id: CONVERSATION });
+    expect(result).toEqual({
+      conversationId: CONVERSATION,
+      deletedMessages: 2,
+    });
+  });
+
+  test('non-participant cannot delete another conversation', async () => {
+    await expect(service.deleteConversation(OTHER, CONVERSATION)).rejects.toMatchObject({
+      statusCode: 403,
+    });
+    expect(Message.deleteMany).not.toHaveBeenCalled();
+    expect(Conversation.deleteOne).not.toHaveBeenCalled();
   });
 
   test('unauthorized user cannot access another conversation', async () => {

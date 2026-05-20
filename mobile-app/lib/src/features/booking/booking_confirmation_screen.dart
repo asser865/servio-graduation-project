@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/api/api_client.dart';
+import '../../core/api/bookings_api.dart';
 import '../../core/models/booking_model.dart';
 import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
@@ -13,6 +17,15 @@ import '../customer/my_bookings_screen.dart'
     show BookingDetailsScreen, MyBookingsScreen;
 import '../messages/chat_screen.dart';
 import 'booking_flow_data.dart';
+
+const _kFinalStatuses = {
+  'completed',
+  'done',
+  'cancelled',
+  'canceled',
+  'rejected',
+  'disputed',
+};
 
 class BookingConfirmationScreen extends StatefulWidget {
   const BookingConfirmationScreen({
@@ -29,59 +42,204 @@ class BookingConfirmationScreen extends StatefulWidget {
 
 class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
     with TickerProviderStateMixin {
-  late final AnimationController _checkController;
   late final AnimationController _pulseController;
-  late final Animation<double> _checkScale;
 
-  // Server-generated 4-digit arrival PIN returned by booking creation.
-  late final String _pin;
+  Timer? _pollTimer;
+  Timer? _countdownTimer;
 
+  late BookingFlowData _data;
+  late ApiClient _apiClient;
+
+  bool _pollingStarted = false;
   bool _refCopied = false;
+  bool _pinRevealed = false;
+  bool _confirmLoading = false;
+  bool _disputeLoading = false;
+  String? _actionError;
+  Duration? _confirmationWindowRemaining;
 
   @override
   void initState() {
     super.initState();
+    _data = widget.data;
 
-    _pin = widget.data.pin.trim().isNotEmpty ? widget.data.pin.trim() : '----';
-
-    _checkController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     )..repeat(reverse: true);
-    _checkScale = CurvedAnimation(
-      parent: _checkController,
-      curve: ServioMotion.spring,
-    );
-    _checkController.forward();
 
-    // Refresh provider after first frame so home screen shows real backend data.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       try {
         context.read<BookingsProvider>().refresh();
-      } catch (_) {
-        // Standalone preview/tests may mount this screen without app providers.
-      }
+      } catch (_) {}
     });
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _apiClient = context.read<ApiClient>();
+    if (!_pollingStarted &&
+        !_kFinalStatuses.contains(_data.statusCode.toLowerCase())) {
+      _pollingStarted = true;
+      _startPolling();
+      if (_data.statusCode.toLowerCase() == 'pending') _startCountdown();
+    }
+  }
+
+  @override
   void dispose() {
-    _checkController.dispose();
     _pulseController.dispose();
+    _pollTimer?.cancel();
+    _countdownTimer?.cancel();
     super.dispose();
   }
 
-  // ── helpers ──────────────────────────────────────────────────────────────────
+  // ── polling ───────────────────────────────────────────────────────────────
+
+  void _startPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(seconds: 45), (_) => _poll());
+  }
+
+  Future<void> _poll() async {
+    if (!mounted || _data.backendId.isEmpty) return;
+    try {
+      final backend = await BookingsApi(_apiClient).getBooking(_data.backendId);
+      if (!mounted) return;
+      setState(() {
+        _data = _data.copyWith(
+          statusCode: backend.status,
+          statusLabel: _labelForCode(backend.status),
+          pin: backend.pin,
+        );
+      });
+      if (_kFinalStatuses.contains(backend.status.toLowerCase())) {
+        _pollTimer?.cancel();
+        _countdownTimer?.cancel();
+      }
+    } catch (_) {}
+  }
+
+  // ── countdown ─────────────────────────────────────────────────────────────
+
+  void _startCountdown() {
+    final createdAt = _data.createdAt;
+    if (createdAt == null) return;
+    final deadline = createdAt.add(const Duration(minutes: 30));
+
+    void tick() {
+      if (!mounted) return;
+      final remaining = deadline.difference(DateTime.now());
+      setState(() => _confirmationWindowRemaining =
+          remaining.isNegative ? Duration.zero : remaining);
+    }
+
+    tick();
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) => tick());
+  }
+
+  // ── actions ───────────────────────────────────────────────────────────────
 
   Future<void> _copyReference() async {
-    await Clipboard.setData(ClipboardData(text: widget.data.reference));
+    await Clipboard.setData(ClipboardData(text: _data.reference));
     setState(() => _refCopied = true);
     await Future<void>.delayed(const Duration(seconds: 2));
     if (mounted) setState(() => _refCopied = false);
+  }
+
+  Future<void> _confirmCompletion() async {
+    setState(() {
+      _confirmLoading = true;
+      _actionError = null;
+    });
+    try {
+      await BookingsApi(_apiClient).confirmCompletion(_data.backendId);
+      if (!mounted) return;
+      _pollTimer?.cancel();
+      _countdownTimer?.cancel();
+      setState(() {
+        _data =
+            _data.copyWith(statusCode: 'completed', statusLabel: 'Completed');
+        _confirmLoading = false;
+      });
+      try {
+        context.read<BookingsProvider>().refresh();
+      } catch (_) {}
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _confirmLoading = false;
+        _actionError = 'Failed to confirm. Please try again.';
+      });
+    }
+  }
+
+  Future<void> _reportDispute() async {
+    final reason = await _showDisputeDialog();
+    if (reason == null) return;
+    setState(() {
+      _disputeLoading = true;
+      _actionError = null;
+    });
+    try {
+      await BookingsApi(_apiClient)
+          .reportDispute(_data.backendId, reason: reason);
+      if (!mounted) return;
+      _pollTimer?.cancel();
+      _countdownTimer?.cancel();
+      setState(() {
+        _data = _data.copyWith(statusCode: 'disputed', statusLabel: 'Disputed');
+        _disputeLoading = false;
+      });
+      try {
+        context.read<BookingsProvider>().refresh();
+      } catch (_) {}
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _disputeLoading = false;
+        _actionError = 'Failed to file dispute. Please try again.';
+      });
+    }
+  }
+
+  Future<String?> _showDisputeDialog() async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Report an Issue'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            const Text('Describe the issue with this service.'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                hintText: 'Enter details…',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text),
+            child: const Text('Submit'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    return result;
   }
 
   void _showCancelSheet() {
@@ -136,8 +294,9 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
                 ),
                 onPressed: () {
                   Navigator.of(ctx).pop();
-                  context.read<BookingsProvider>().updateStatus(
-                      widget.data.backendId, BookingStatus.cancelled);
+                  context
+                      .read<BookingsProvider>()
+                      .updateStatus(_data.backendId, BookingStatus.cancelled);
                   Navigator.of(context).pushAndRemoveUntil(
                     MaterialPageRoute<void>(
                         builder: (_) => const CustomerShell()),
@@ -165,15 +324,17 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
     );
   }
 
-  // ── build ────────────────────────────────────────────────────────────────────
+  // ── build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
-    final total = _moneyValue(widget.data.amount);
-    final platformFee = (total * 0.05).round();
-    final baseRate = total - platformFee;
+    final statusCode = _data.statusCode.toLowerCase();
+    final baseRate = _moneyValue(_data.amount);
+    final platformFee = (baseRate * 0.05).round();
+    final estimatedTotal = baseRate + platformFee;
+    final estimatedTotalLabel = _moneyLabel(estimatedTotal);
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -185,46 +346,25 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
             children: <Widget>[
               const SizedBox(height: 12),
 
-              // ── Animated success icon ────────────────────────────────────────
-              Center(
-                child: ScaleTransition(
-                  scale: _checkScale,
-                  child: Container(
-                    width: 96,
-                    height: 96,
-                    decoration: BoxDecoration(
-                      color: ServioColors.tint(ServioColors.success),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                          color: ServioColors.success.withValues(alpha: 0.3),
-                          width: 2),
-                    ),
-                    child: const Icon(
-                      Icons.check_rounded,
-                      color: ServioColors.success,
-                      size: 48,
-                    ),
+              // ── Status-aware hero ─────────────────────────────────────────
+              AnimatedSwitcher(
+                duration: ServioMotion.normal,
+                transitionBuilder: (child, animation) => FadeTransition(
+                  opacity: animation,
+                  child: ScaleTransition(
+                    scale:
+                        Tween<double>(begin: 0.92, end: 1.0).animate(animation),
+                    child: child,
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
-
-              Text(
-                'Booking Confirmed!',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.headlineMedium
-                    ?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Your technician has been notified and will confirm shortly.',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(color: servio.textSecondary),
+                child: _HeroSection(
+                  key: ValueKey<String>(statusCode),
+                  statusCode: statusCode,
+                ),
               ),
               const SizedBox(height: 16),
 
-              // ── Booking reference chip ────────────────────────────────────────
+              // ── Reference chip ────────────────────────────────────────────
               Center(
                 child: GestureDetector(
                   onTap: _copyReference,
@@ -241,7 +381,7 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
                       mainAxisSize: MainAxisSize.min,
                       children: <Widget>[
                         Text(
-                          widget.data.reference,
+                          _data.reference,
                           style: theme.textTheme.labelLarge?.copyWith(
                             color: servio.accent,
                             fontWeight: FontWeight.w700,
@@ -255,11 +395,11 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
                               ? const Icon(Icons.check_rounded,
                                   size: 16,
                                   color: ServioColors.success,
-                                  key: ValueKey('ok'))
+                                  key: ValueKey<String>('ok'))
                               : Icon(Icons.copy_rounded,
                                   size: 16,
                                   color: servio.accent,
-                                  key: const ValueKey('copy')),
+                                  key: const ValueKey<String>('copy')),
                         ),
                         const SizedBox(width: 4),
                         Text(
@@ -272,65 +412,84 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
 
-              // ── 6-step status tracker ────────────────────────────────────────
-              _StatusTracker(
-                pulse: _pulseController,
-                statusCode: widget.data.statusCode,
-                statusLabel: widget.data.statusLabel,
-              ),
+              // ── Pending confirmation countdown ────────────────────────────
+              if (statusCode == 'pending' &&
+                  _confirmationWindowRemaining != null) ...<Widget>[
+                const SizedBox(height: 12),
+                _buildConfirmationWindow(theme, servio),
+              ],
+
               const SizedBox(height: 20),
 
-              // ── Arrival PIN card ─────────────────────────────────────────────
-              ServioCard(
-                radius: ServioRadius.lg,
-                child: Column(
-                  children: <Widget>[
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: <Widget>[
-                        Icon(Icons.lock_outline_rounded,
-                            color: servio.accent, size: 18),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Arrival PIN',
-                          style: theme.textTheme.titleSmall
-                              ?.copyWith(fontWeight: FontWeight.w700),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 32, vertical: 14),
-                      decoration: BoxDecoration(
-                        color: servio.surfaceAlt,
-                        borderRadius: BorderRadius.circular(ServioRadius.md),
-                        border: Border.all(color: servio.accent),
-                      ),
-                      child: Text(
-                        _pin == '----' ? _pin : _pin.split('').join('  '),
-                        style: theme.textTheme.displaySmall?.copyWith(
-                          color: theme.colorScheme.onSurface,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 8,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      'Share this PIN with your technician upon arrival to confirm the service has started.',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: servio.textSecondary),
-                    ),
-                  ],
-                ),
+              // ── Status tracker ────────────────────────────────────────────
+              _StatusTracker(
+                pulse: _pulseController,
+                statusCode: _data.statusCode,
+                statusLabel: _data.statusLabel,
               ),
+
+              // ── Awaiting confirmation card ────────────────────────────────
+              if (statusCode == 'awaiting_customer_confirmation') ...<Widget>[
+                const SizedBox(height: 16),
+                _AwaitingConfirmationCard(
+                  onConfirm: _confirmCompletion,
+                  onDispute: _reportDispute,
+                  confirmLoading: _confirmLoading,
+                  disputeLoading: _disputeLoading,
+                  error: _actionError,
+                ),
+              ],
+
+              // ── Admin review banner ───────────────────────────────────────
+              if (statusCode == 'pending_admin_review') ...<Widget>[
+                const SizedBox(height: 16),
+                ServioCard(
+                  radius: ServioRadius.lg,
+                  backgroundColor: ServioColors.tint(ServioColors.info),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Icon(Icons.admin_panel_settings_rounded,
+                          color: ServioColors.info, size: 24),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Text(
+                              'Under Admin Review',
+                              style: theme.textTheme.titleSmall
+                                  ?.copyWith(fontWeight: FontWeight.w700),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Our team is reviewing this case. You will be notified once a decision is made.',
+                              style: theme.textTheme.bodySmall
+                                  ?.copyWith(color: servio.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
               const SizedBox(height: 16),
 
-              // ── Payment Summary card ─────────────────────────────────────────
+              // ── PIN card ──────────────────────────────────────────────────
+              AnimatedSwitcher(
+                duration: ServioMotion.normal,
+                child: KeyedSubtree(
+                  key: ValueKey<String>(statusCode),
+                  child: _buildPinSection(theme, servio),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // ── Payment Summary ───────────────────────────────────────────
               ServioCard(
                 radius: ServioRadius.lg,
                 child: Column(
@@ -343,15 +502,11 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
                     ),
                     const SizedBox(height: 14),
                     _ConfirmDetailRow(
-                      label: 'Method',
-                      value: widget.data.paymentMethod,
-                    ),
-                    if (widget.data.paymentMethodCode == 'card' &&
-                        widget.data.savedCardLabel.isNotEmpty)
+                        label: 'Method', value: _data.paymentMethod),
+                    if (_data.paymentMethodCode == 'card' &&
+                        _data.savedCardLabel.isNotEmpty)
                       _ConfirmDetailRow(
-                        label: 'Card',
-                        value: widget.data.savedCardLabel,
-                      ),
+                          label: 'Card', value: _data.savedCardLabel),
                     _ConfirmDetailRow(
                         label: 'Base Rate', value: '$baseRate EGP'),
                     _ConfirmDetailRow(
@@ -359,7 +514,7 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
                     const Divider(height: 20),
                     _ConfirmDetailRow(
                       label: 'Total',
-                      value: widget.data.amount,
+                      value: estimatedTotalLabel,
                       isBold: true,
                       valueColor: servio.accent,
                     ),
@@ -368,7 +523,7 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
               ),
               const SizedBox(height: 16),
 
-              // ── Confirmation Details card ─────────────────────────────────────
+              // ── Confirmation Details ──────────────────────────────────────
               ServioCard(
                 radius: ServioRadius.lg,
                 child: Column(
@@ -380,8 +535,6 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
                           ?.copyWith(fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(height: 16),
-
-                    // Technician section
                     Row(
                       children: <Widget>[
                         Container(
@@ -394,7 +547,7 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
                           ),
                           child: Center(
                             child: Text(
-                              widget.data.technicianName
+                              _data.technicianName
                                   .trim()
                                   .split(' ')
                                   .take(2)
@@ -414,12 +567,12 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: <Widget>[
                               Text(
-                                widget.data.technicianName,
+                                _data.technicianName,
                                 style: theme.textTheme.titleSmall
                                     ?.copyWith(fontWeight: FontWeight.w600),
                               ),
                               Text(
-                                widget.data.specialty,
+                                _data.specialty,
                                 style: theme.textTheme.bodySmall
                                     ?.copyWith(color: servio.textSecondary),
                               ),
@@ -447,54 +600,42 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
                     const SizedBox(height: 16),
                     const Divider(height: 1),
                     const SizedBox(height: 14),
-
-                    // Service details
                     _ConfirmDetailRow(
-                      label: 'Service',
-                      value: widget.data.serviceName,
-                      icon: Icons.build_outlined,
-                    ),
+                        label: 'Service',
+                        value: _data.serviceName,
+                        icon: Icons.build_outlined),
                     _ConfirmDetailRow(
-                      label: 'Date',
-                      value: widget.data.date,
-                      icon: Icons.calendar_today_outlined,
-                    ),
+                        label: 'Date',
+                        value: _data.date,
+                        icon: Icons.calendar_today_outlined),
                     _ConfirmDetailRow(
-                      label: 'Time Slot',
-                      value: widget.data.time,
-                      icon: Icons.access_time_rounded,
-                    ),
+                        label: 'Time Slot',
+                        value: _data.time,
+                        icon: Icons.access_time_rounded),
                     _ConfirmDetailRow(
-                      label: 'Address',
-                      value: widget.data.location,
-                      icon: Icons.location_on_outlined,
-                    ),
+                        label: 'Address',
+                        value: _data.location,
+                        icon: Icons.location_on_outlined),
                     const SizedBox(height: 6),
                     const Divider(height: 1),
                     const SizedBox(height: 14),
                     _ConfirmDetailRow(
-                      label: 'Method',
-                      value: widget.data.paymentMethod,
-                      icon: Icons.payments_outlined,
-                    ),
-                    if (widget.data.paymentMethodCode == 'card' &&
-                        widget.data.savedCardLabel.isNotEmpty)
+                        label: 'Method',
+                        value: _data.paymentMethod,
+                        icon: Icons.payments_outlined),
+                    if (_data.paymentMethodCode == 'card' &&
+                        _data.savedCardLabel.isNotEmpty)
                       _ConfirmDetailRow(
-                        label: 'Card',
-                        value: widget.data.savedCardLabel,
-                        icon: Icons.credit_card_rounded,
-                      ),
+                          label: 'Card',
+                          value: _data.savedCardLabel,
+                          icon: Icons.credit_card_rounded),
                     _ConfirmDetailRow(
-                      label: 'Base Rate',
-                      value: '$baseRate EGP',
-                    ),
+                        label: 'Base Rate', value: '$baseRate EGP'),
                     _ConfirmDetailRow(
-                      label: 'Platform Fee',
-                      value: '$platformFee EGP',
-                    ),
+                        label: 'Platform Fee', value: '$platformFee EGP'),
                     _ConfirmDetailRow(
                       label: 'Est. Total',
-                      value: widget.data.amount,
+                      value: estimatedTotalLabel,
                       isBold: true,
                       valueColor: servio.accent,
                     ),
@@ -503,12 +644,12 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
               ),
               const SizedBox(height: 24),
 
-              // ── Action stack ─────────────────────────────────────────────────
+              // ── Actions ───────────────────────────────────────────────────
               ServioPrimaryButton(
                 label: 'View Booking Details',
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) => BookingDetailsScreen(data: widget.data),
+                    builder: (_) => BookingDetailsScreen(data: _data),
                   ),
                 ),
               ),
@@ -525,9 +666,9 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => ChatScreen(
-                      contactName: widget.data.technicianName,
-                      bookingId: widget.data.backendId,
-                      workerId: widget.data.technicianId,
+                      contactName: _data.technicianName,
+                      bookingId: _data.backendId,
+                      workerId: _data.technicianId,
                     ),
                   ),
                 ),
@@ -542,8 +683,7 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
                 ),
                 onPressed: () => Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute<void>(
-                    builder: (_) => const CustomerShell(),
-                  ),
+                      builder: (_) => const CustomerShell()),
                   (route) => false,
                 ),
                 child: const Text('Go to Dashboard'),
@@ -564,8 +704,7 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
               TextButton(
                 onPressed: () => Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute<void>(
-                    builder: (_) => const CustomerShell(),
-                  ),
+                      builder: (_) => const CustomerShell()),
                   (route) => false,
                 ),
                 child: Text(
@@ -573,9 +712,7 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
                   style: TextStyle(color: servio.textSecondary),
                 ),
               ),
-              // Cancel is only available for pending bookings.
-              // Backend rejects cancellation of any other status.
-              if (widget.data.statusCode == 'pending')
+              if (statusCode == 'pending')
                 TextButton(
                   onPressed: _showCancelSheet,
                   child: const Text(
@@ -583,20 +720,17 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
                     style: TextStyle(color: ServioColors.danger),
                   ),
                 )
-              else
+              else if (!_kFinalStatuses.contains(statusCode))
                 Padding(
                   padding: const EdgeInsets.only(top: 4, bottom: 4),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: <Widget>[
-                      Icon(
-                        Icons.lock_outline_rounded,
-                        size: 14,
-                        color: servio.textSecondary,
-                      ),
+                      Icon(Icons.lock_outline_rounded,
+                          size: 14, color: servio.textSecondary),
                       const SizedBox(width: 6),
                       Text(
-                        'Cancellation unavailable — booking is ${widget.data.statusLabel.toLowerCase()}',
+                        'Cancellation unavailable — booking is ${_data.statusLabel.toLowerCase()}',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: servio.textSecondary,
                             ),
@@ -606,7 +740,7 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
                 ),
               const SizedBox(height: 16),
 
-              // ── Help card ────────────────────────────────────────────────────
+              // ── Help card ─────────────────────────────────────────────────
               ServioCard(
                 radius: ServioRadius.lg,
                 backgroundColor: ServioColors.tint(ServioColors.info),
@@ -622,9 +756,8 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
                         children: <Widget>[
                           Text(
                             'Need help?',
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
+                            style: theme.textTheme.titleSmall
+                                ?.copyWith(fontWeight: FontWeight.w700),
                           ),
                           const SizedBox(height: 4),
                           Text(
@@ -654,9 +787,459 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
       ),
     );
   }
+
+  // ── helper widgets ────────────────────────────────────────────────────────
+
+  Widget _buildConfirmationWindow(
+      ThemeData theme, ServioThemeExtension servio) {
+    final remaining = _confirmationWindowRemaining!;
+    final isExpired = remaining == Duration.zero;
+    final color = isExpired ? servio.textSecondary : ServioColors.warning;
+
+    return AnimatedSwitcher(
+      duration: ServioMotion.fast,
+      child: Container(
+        key: ValueKey<bool>(isExpired),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isExpired
+              ? servio.surfaceAlt
+              : ServioColors.tint(ServioColors.warning),
+          borderRadius: BorderRadius.circular(ServioRadius.md),
+        ),
+        child: Row(
+          children: <Widget>[
+            Icon(
+              isExpired ? Icons.timer_off_rounded : Icons.timer_rounded,
+              size: 16,
+              color: color,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                isExpired
+                    ? 'Confirmation window passed — booking will auto-confirm shortly'
+                    : 'Technician has ${_formatDuration(remaining)} to confirm',
+                style: theme.textTheme.labelSmall?.copyWith(color: color),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPinSection(ThemeData theme, ServioThemeExtension servio) {
+    final status = _data.statusCode.toLowerCase();
+    final rawPin = _data.pin.trim();
+    final pinDisplay = rawPin.isEmpty ? '----' : rawPin.split('').join('  ');
+
+    // Locked before arrived
+    if (status == 'pending' ||
+        status == 'confirmed' ||
+        status == 'accepted' ||
+        status == 'scheduled' ||
+        status == 'en_route' ||
+        status == 'enroute') {
+      return _PinCard(
+        child: Column(
+          children: <Widget>[
+            _pinRowHeader(theme,
+                icon: Icons.lock_outline_rounded,
+                label: 'Arrival PIN',
+                color: servio.accent),
+            const SizedBox(height: 14),
+            _pinBox(theme, servio, '● ● ● ●'),
+            const SizedBox(height: 10),
+            Text(
+              'PIN will be revealed when your technician arrives.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: servio.textSecondary),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Arrived — reveal toggle
+    if (status == 'arrived') {
+      return _PinCard(
+        child: Column(
+          children: <Widget>[
+            _pinRowHeader(theme,
+                icon: Icons.lock_open_rounded,
+                label: 'Arrival PIN',
+                color: ServioColors.warning),
+            const SizedBox(height: 14),
+            AnimatedSwitcher(
+              duration: ServioMotion.normal,
+              child: _pinRevealed
+                  ? _pinBox(theme, servio, pinDisplay,
+                      key: const ValueKey<String>('vis'))
+                  : SizedBox(
+                      key: const ValueKey<String>('btn'),
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.lock_open_rounded),
+                        label: const Text('Reveal PIN'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: servio.accent,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.circular(ServioRadius.md),
+                          ),
+                        ),
+                        onPressed: () => setState(() => _pinRevealed = true),
+                      ),
+                    ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Share this PIN with your technician to start the service.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: servio.textSecondary),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // In progress
+    if (status == 'in_progress' || status == 'inprogress') {
+      return _PinCard(
+        child: Column(
+          children: <Widget>[
+            _pinRowHeader(theme,
+                icon: Icons.verified_rounded,
+                label: 'PIN Verified',
+                color: ServioColors.success),
+            const SizedBox(height: 14),
+            _pinBox(theme, servio, pinDisplay),
+            const SizedBox(height: 10),
+            Text(
+              'Service is in progress.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: servio.textSecondary),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Completed
+    if (status == 'completed' || status == 'done') {
+      return _PinCard(
+        child: Column(
+          children: <Widget>[
+            _pinRowHeader(theme,
+                icon: Icons.verified_user_rounded,
+                label: 'Verification Complete',
+                color: ServioColors.success),
+            const SizedBox(height: 10),
+            Text(
+              'Service was completed successfully.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: servio.textSecondary),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return const SizedBox.shrink();
+  }
+
+  Widget _pinRowHeader(
+    ThemeData theme, {
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: <Widget>[
+        Icon(icon, color: color, size: 18),
+        const SizedBox(width: 8),
+        Text(label,
+            style: theme.textTheme.titleSmall
+                ?.copyWith(fontWeight: FontWeight.w700)),
+      ],
+    );
+  }
+
+  Widget _pinBox(
+    ThemeData theme,
+    ServioThemeExtension servio,
+    String text, {
+    Key? key,
+  }) {
+    return Container(
+      key: key,
+      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+      decoration: BoxDecoration(
+        color: servio.surfaceAlt,
+        borderRadius: BorderRadius.circular(ServioRadius.md),
+        border: Border.all(color: servio.accent),
+      ),
+      child: Text(
+        text,
+        style: theme.textTheme.displaySmall?.copyWith(
+          color: theme.colorScheme.onSurface,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 8,
+        ),
+      ),
+    );
+  }
 }
 
-// ── Status Tracker ─────────────────────────────────────────────────────────────
+// ── _HeroSection ──────────────────────────────────────────────────────────────
+
+class _HeroSection extends StatelessWidget {
+  const _HeroSection({super.key, required this.statusCode});
+
+  final String statusCode;
+
+  ({String title, String subtitle, IconData icon, Color color}) get _copy =>
+      switch (statusCode) {
+        'pending' => (
+            title: 'Booking Submitted!',
+            subtitle: 'Waiting for your technician to confirm.',
+            icon: Icons.hourglass_empty_rounded,
+            color: ServioColors.warning,
+          ),
+        'confirmed' || 'accepted' || 'scheduled' => (
+            title: 'Booking Confirmed!',
+            subtitle: 'Your technician has confirmed and will arrive soon.',
+            icon: Icons.check_circle_rounded,
+            color: ServioColors.success,
+          ),
+        'en_route' || 'enroute' => (
+            title: 'Technician En Route!',
+            subtitle: 'Your technician is on the way. Get ready!',
+            icon: Icons.directions_car_rounded,
+            color: ServioColors.info,
+          ),
+        'arrived' => (
+            title: 'Technician Arrived!',
+            subtitle: 'Share your PIN to start the service.',
+            icon: Icons.location_on_rounded,
+            color: ServioColors.success,
+          ),
+        'in_progress' || 'inprogress' => (
+            title: 'Service In Progress',
+            subtitle: 'Your technician is working on your service.',
+            icon: Icons.build_rounded,
+            color: ServioColors.info,
+          ),
+        'awaiting_customer_confirmation' => (
+            title: 'Service Complete?',
+            subtitle: 'Your technician has marked the job done.',
+            icon: Icons.task_alt_rounded,
+            color: ServioColors.warning,
+          ),
+        'pending_admin_review' => (
+            title: 'Under Admin Review',
+            subtitle: 'Our team is reviewing your case.',
+            icon: Icons.admin_panel_settings_rounded,
+            color: ServioColors.warning,
+          ),
+        'completed' || 'done' => (
+            title: 'Service Completed!',
+            subtitle: 'Thank you for choosing Servio.',
+            icon: Icons.verified_rounded,
+            color: ServioColors.success,
+          ),
+        'cancelled' || 'canceled' => (
+            title: 'Booking Cancelled',
+            subtitle: 'This booking has been cancelled.',
+            icon: Icons.cancel_rounded,
+            color: ServioColors.danger,
+          ),
+        'rejected' => (
+            title: 'Booking Rejected',
+            subtitle: 'The technician was unable to accept your booking.',
+            icon: Icons.cancel_rounded,
+            color: ServioColors.danger,
+          ),
+        'disputed' => (
+            title: 'Dispute Filed',
+            subtitle: 'Admin is reviewing your dispute.',
+            icon: Icons.report_problem_rounded,
+            color: ServioColors.warning,
+          ),
+        _ => (
+            title: 'Booking Confirmed!',
+            subtitle: 'Your technician has been notified.',
+            icon: Icons.check_rounded,
+            color: ServioColors.success,
+          ),
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+    final c = _copy;
+
+    return Column(
+      children: <Widget>[
+        Container(
+          width: 96,
+          height: 96,
+          decoration: BoxDecoration(
+            color: ServioColors.tint(c.color),
+            shape: BoxShape.circle,
+            border: Border.all(color: c.color.withValues(alpha: 0.3), width: 2),
+          ),
+          child: Icon(c.icon, color: c.color, size: 48),
+        ),
+        const SizedBox(height: 20),
+        Text(
+          c.title,
+          textAlign: TextAlign.center,
+          style: theme.textTheme.headlineMedium
+              ?.copyWith(fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          c.subtitle,
+          textAlign: TextAlign.center,
+          style:
+              theme.textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
+        ),
+      ],
+    );
+  }
+}
+
+// ── _PinCard ──────────────────────────────────────────────────────────────────
+
+class _PinCard extends StatelessWidget {
+  const _PinCard({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) =>
+      ServioCard(radius: ServioRadius.lg, child: child);
+}
+
+// ── _AwaitingConfirmationCard ─────────────────────────────────────────────────
+
+class _AwaitingConfirmationCard extends StatelessWidget {
+  const _AwaitingConfirmationCard({
+    required this.onConfirm,
+    required this.onDispute,
+    required this.confirmLoading,
+    required this.disputeLoading,
+    this.error,
+  });
+
+  final VoidCallback onConfirm;
+  final VoidCallback onDispute;
+  final bool confirmLoading;
+  final bool disputeLoading;
+  final String? error;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+    final busy = confirmLoading || disputeLoading;
+
+    return ServioCard(
+      radius: ServioRadius.lg,
+      backgroundColor: ServioColors.tint(ServioColors.warning),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Icon(Icons.task_alt_rounded,
+                  color: ServioColors.warning, size: 24),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'Service Complete?',
+                      style: theme.textTheme.titleSmall
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Your technician has marked the job as done. Please confirm or report an issue.',
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: servio.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (error != null) ...<Widget>[
+            const SizedBox(height: 8),
+            Text(
+              error!,
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: ServioColors.danger),
+            ),
+          ],
+          const SizedBox(height: 16),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: ServioColors.success,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(ServioRadius.md),
+              ),
+            ),
+            onPressed: busy ? null : onConfirm,
+            child: confirmLoading
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
+                  )
+                : const Text('Confirm Service Complete'),
+          ),
+          const SizedBox(height: 10),
+          OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: ServioColors.danger,
+              side: const BorderSide(color: ServioColors.danger),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(ServioRadius.md),
+              ),
+            ),
+            onPressed: busy ? null : onDispute,
+            child: disputeLoading
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: ServioColors.danger),
+                  )
+                : const Text('Report an Issue'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Status Tracker ────────────────────────────────────────────────────────────
 
 class _StatusTracker extends StatelessWidget {
   const _StatusTracker({
@@ -731,16 +1314,11 @@ class _StatusTracker extends StatelessWidget {
                   ),
                 );
               }
-
               final stepIndex = index ~/ 2;
               final isDone = stepIndex <= completedUpTo;
               final isCurrent = !isCompleted && stepIndex == currentStep;
-
               return _TrackerDot(
-                done: isDone,
-                current: isCurrent,
-                pulse: pulse,
-              );
+                  done: isDone, current: isCurrent, pulse: pulse);
             }),
           ),
           const SizedBox(height: 8),
@@ -748,7 +1326,6 @@ class _StatusTracker extends StatelessWidget {
             children: List<Widget>.generate(steps.length, (int i) {
               final isDone = i <= completedUpTo;
               final isCurrent = i == currentStep;
-
               return Expanded(
                 child: Text(
                   steps[i],
@@ -778,6 +1355,7 @@ int _trackerIndex(String statusCode) {
     'en_route' || 'enroute' => 2,
     'arrived' => 3,
     'in_progress' || 'inprogress' => 4,
+    'awaiting_customer_confirmation' => 4,
     'completed' || 'done' => 5,
     _ => 0,
   };
@@ -835,12 +1413,8 @@ class _TrackerDot extends StatelessWidget {
     if (current) {
       dot = AnimatedBuilder(
         animation: pulse,
-        builder: (BuildContext context, Widget? child) {
-          return Transform.scale(
-            scale: 1 + (pulse.value * 0.16),
-            child: child,
-          );
-        },
+        builder: (BuildContext context, Widget? child) =>
+            Transform.scale(scale: 1 + (pulse.value * 0.16), child: child),
         child: dot,
       );
     }
@@ -849,7 +1423,7 @@ class _TrackerDot extends StatelessWidget {
   }
 }
 
-// ── _ConfirmDetailRow ──────────────────────────────────────────────────────────
+// ── _ConfirmDetailRow ─────────────────────────────────────────────────────────
 
 class _ConfirmDetailRow extends StatelessWidget {
   const _ConfirmDetailRow({
@@ -903,7 +1477,32 @@ class _ConfirmDetailRow extends StatelessWidget {
   }
 }
 
+// ── helpers ───────────────────────────────────────────────────────────────────
+
 int _moneyValue(String value) {
   final numeric = value.replaceAll(RegExp(r'[^0-9]'), '');
   return int.tryParse(numeric) ?? 0;
+}
+
+String _moneyLabel(int value) => '$value EGP';
+
+String _labelForCode(String code) => switch (code.toLowerCase()) {
+      'pending' => 'Pending',
+      'confirmed' || 'accepted' || 'scheduled' => 'Confirmed',
+      'en_route' || 'enroute' => 'En Route',
+      'arrived' => 'Arrived',
+      'in_progress' || 'inprogress' => 'In Progress',
+      'awaiting_customer_confirmation' => 'Awaiting Confirmation',
+      'pending_admin_review' => 'Under Review',
+      'completed' || 'done' => 'Completed',
+      'cancelled' || 'canceled' => 'Cancelled',
+      'rejected' => 'Rejected',
+      'disputed' => 'Disputed',
+      _ => code,
+    };
+
+String _formatDuration(Duration d) {
+  final m = d.inMinutes;
+  final s = d.inSeconds % 60;
+  return m > 0 ? '${m}m ${s}s' : '${s}s';
 }

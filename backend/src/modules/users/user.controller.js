@@ -190,7 +190,7 @@ const getWorkers = async (req, res) => {
   const [workers, total] = await Promise.all([
     User.find(filter)
       .select('name profileImage categories services skills averageRating totalReviews location locationLabel hourlyRate isVerified isAvailable serviceArea coverageAreas availability completedJobs yearsExperience bio')
-      .populate('services', 'title category')
+      .populate('services', 'title category basePrice priceUnit')
       .sort({ averageRating: -1 })
       .skip(skip)
       .limit(Number(limit)),
@@ -727,13 +727,13 @@ const toggleBlockedDate = async (req, res) => {
 };
 
 const addAddress = async (req, res) => {
-  const { label, street, city, state, zipCode } = req.body;
+  const { label, street, city, state, zipCode, lat, lng } = req.body;
   const isSmartMatchArea = (label || '').trim() === 'Smart Match Area';
   if (!isSmartMatchArea && !street) throw new ApiError(StatusCodes.BAD_REQUEST, 'Street is required.');
   if (!city) throw new ApiError(StatusCodes.BAD_REQUEST, 'City is required.');
   const user = await User.findById(req.user.id);
   if (!user) throw new ApiError(StatusCodes.NOT_FOUND, 'User not found.');
-  user.addresses.push({ label: label || 'Address', street, city, state, zipCode });
+  user.addresses.push({ label: label || 'Address', street, city, state, zipCode, lat, lng });
   await user.save({ validateModifiedOnly: true });
   const added = user.addresses[user.addresses.length - 1];
   return ApiResponse.success(res, StatusCodes.CREATED, 'Address added.', added);
@@ -741,7 +741,7 @@ const addAddress = async (req, res) => {
 
 const updateAddress = async (req, res) => {
   const { addrId } = req.params;
-  const { label, street, city, state, zipCode } = req.body;
+  const { label, street, city, state, zipCode, lat, lng } = req.body;
   const user = await User.findById(req.user.id);
   if (!user) throw new ApiError(StatusCodes.NOT_FOUND, 'User not found.');
   const addr = user.addresses.id(addrId);
@@ -751,6 +751,8 @@ const updateAddress = async (req, res) => {
   if (city    !== undefined) addr.city    = city;
   if (state   !== undefined) addr.state   = state;
   if (zipCode !== undefined) addr.zipCode = zipCode;
+  if (lat     !== undefined) addr.lat     = lat;
+  if (lng     !== undefined) addr.lng     = lng;
   await user.save({ validateModifiedOnly: true });
   return ApiResponse.success(res, StatusCodes.OK, 'Address updated.', addr);
 };

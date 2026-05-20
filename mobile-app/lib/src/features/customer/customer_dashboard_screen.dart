@@ -7,6 +7,7 @@ import '../../core/api/bookings_api.dart';
 import '../../core/models/backend_booking_model.dart';
 import '../../core/models/booking_model.dart';
 import '../../core/state/app_state.dart';
+import '../../core/state/notifications_provider.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
@@ -22,7 +23,7 @@ import 'my_bookings_screen.dart';
 
 import 'services_marketplace_screen.dart';
 
-enum _DashboardSection { overview, bookings, history, favourites }
+enum _DashboardSection { overview, bookings, history }
 
 class CustomerDashboardScreen extends StatefulWidget {
   const CustomerDashboardScreen({super.key});
@@ -206,35 +207,52 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                                             const NotificationsScreen()),
                                   );
                                 },
-                                child: Stack(
-                                  alignment: Alignment.topRight,
-                                  children: <Widget>[
-                                    Container(
-                                      width: 44,
-                                      height: 44,
-                                      decoration: BoxDecoration(
-                                        color: Colors.white
-                                            .withValues(alpha: 0.15),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(
-                                          Icons.notifications_none_rounded,
-                                          color: Colors.white,
-                                          size: 22),
-                                    ),
-                                    Positioned(
-                                      top: 10,
-                                      right: 12,
-                                      child: Container(
-                                        width: 8,
-                                        height: 8,
-                                        decoration: const BoxDecoration(
-                                          color: ServioColors.danger,
-                                          shape: BoxShape.circle,
+                                child: Consumer<NotificationsProvider>(
+                                  builder: (context, notifProvider, _) {
+                                    final unread = notifProvider.unreadCount;
+                                    return Stack(
+                                      alignment: Alignment.topRight,
+                                      children: <Widget>[
+                                        Container(
+                                          width: 44,
+                                          height: 44,
+                                          decoration: BoxDecoration(
+                                            color: Colors.white
+                                                .withValues(alpha: 0.15),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                              Icons.notifications_none_rounded,
+                                              color: Colors.white,
+                                              size: 22),
                                         ),
-                                      ),
-                                    ),
-                                  ],
+                                        if (unread > 0)
+                                          Positioned(
+                                            top: 8,
+                                            right: 8,
+                                            child: Container(
+                                              constraints: const BoxConstraints(
+                                                  minWidth: 14, minHeight: 14),
+                                              padding: const EdgeInsets.all(2),
+                                              decoration: const BoxDecoration(
+                                                color: ServioColors.danger,
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: Text(
+                                                unread > 9 ? '9+' : '$unread',
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 8,
+                                                  fontWeight: FontWeight.w800,
+                                                  height: 1,
+                                                ),
+                                                textAlign: TextAlign.center,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    );
+                                  },
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -455,10 +473,6 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                                 onFilterChanged: (value) =>
                                     setState(() => _historyFilter = value),
                               ),
-                            _DashboardSection.favourites =>
-                              const _FavouritesSection(
-                                key: ValueKey<String>('favourites'),
-                              ),
                           },
                         ),
                       ],
@@ -513,11 +527,14 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
               BookingStatus.enRoute => 'en route',
               BookingStatus.arrived => 'arrived',
               BookingStatus.inProgress => 'in progress',
+              BookingStatus.awaitingCustomerConfirmation =>
+                'awaiting your confirmation',
               BookingStatus.completed => 'completed',
               BookingStatus.cancelled => 'cancelled',
               BookingStatus.rejected => 'rejected',
               BookingStatus.disputed => 'disputed',
               BookingStatus.pending => 'pending',
+              BookingStatus.pendingAdminReview => 'under review',
             }}.'),
             duration: const Duration(seconds: 3),
           ),
@@ -617,7 +634,8 @@ class _OverviewSection extends StatelessWidget {
         _StatsGrid(
           totalBookings: bookings.length,
           activeCount: active.length,
-          savedTechnicians: 0,
+          completedJobs:
+              bookings.where((b) => b.status == BookingStatus.completed).length,
           totalSpent: totalSpent,
         ),
         const SizedBox(height: ServioSpacing.sectionGap),
@@ -723,10 +741,8 @@ class _HistorySection extends StatelessWidget {
 
   static const List<String> _filters = <String>[
     'All',
-    'Plumbing',
     'This Month',
     'Cash',
-    '5 Star',
     'Clear All',
   ];
 
@@ -811,23 +827,6 @@ class _HistorySection extends StatelessWidget {
   }
 }
 
-class _FavouritesSection extends StatelessWidget {
-  const _FavouritesSection({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        ServioSectionHeading(title: 'Saved Technicians'),
-        SizedBox(height: 16),
-        _EmptyDashboardState(
-            message: 'Save technicians from their profile to see them here.'),
-      ],
-    );
-  }
-}
-
 class _DashboardSegmentedControl extends StatelessWidget {
   const _DashboardSegmentedControl({
     required this.current,
@@ -842,7 +841,6 @@ class _DashboardSegmentedControl extends StatelessWidget {
     _DashboardSection.overview: 'Overview',
     _DashboardSection.bookings: 'Bookings',
     _DashboardSection.history: 'History',
-    _DashboardSection.favourites: 'Favourites',
   };
 
   @override
@@ -1042,13 +1040,13 @@ class _StatsGrid extends StatelessWidget {
   const _StatsGrid({
     required this.totalBookings,
     required this.activeCount,
-    required this.savedTechnicians,
+    required this.completedJobs,
     required this.totalSpent,
   });
 
   final int totalBookings;
   final int activeCount;
-  final int savedTechnicians;
+  final int completedJobs;
   final int totalSpent;
 
   @override
@@ -1073,12 +1071,12 @@ class _StatsGrid extends StatelessWidget {
           value: '$activeCount',
           icon: Icons.engineering_outlined,
           color: context.servio.info,
-          footer: const Text('1 confirmed  |  1 awaiting'),
+          footer: const Text('Active jobs'),
         ),
         _KpiCard(
-          label: 'Saved Technicians',
-          value: '$savedTechnicians',
-          icon: Icons.favorite_outline_rounded,
+          label: 'Completed Jobs',
+          value: '$completedJobs',
+          icon: Icons.check_circle_outline_rounded,
           color: context.servio.success,
           footer: const _ProgressDots(count: 5, filled: 4),
         ),
@@ -1087,7 +1085,7 @@ class _StatsGrid extends StatelessWidget {
           value: '$totalSpent EGP',
           icon: Icons.account_balance_wallet_outlined,
           color: context.servio.warning,
-          footer: const Text('Monthly budget 5,000 EGP'),
+          footer: const Text('Lifetime total'),
         ),
       ],
     );
@@ -1634,10 +1632,12 @@ class _BookingProgressTracker extends StatelessWidget {
       BookingStatus.enRoute => 2,
       BookingStatus.arrived => 3,
       BookingStatus.inProgress => 4,
+      BookingStatus.awaitingCustomerConfirmation => 4,
       BookingStatus.completed => 5,
       BookingStatus.cancelled => 0,
       BookingStatus.rejected => 0,
       BookingStatus.disputed => 0,
+      BookingStatus.pendingAdminReview => 4,
     };
 
     return Column(
@@ -2292,10 +2292,12 @@ String _statusLabel(BookingStatus status) {
     BookingStatus.enRoute => 'En Route',
     BookingStatus.arrived => 'Arrived',
     BookingStatus.inProgress => 'In Progress',
+    BookingStatus.awaitingCustomerConfirmation => 'Awaiting Your Confirmation',
     BookingStatus.completed => 'Completed',
     BookingStatus.cancelled => 'Cancelled',
     BookingStatus.rejected => 'Rejected',
     BookingStatus.disputed => 'Disputed',
+    BookingStatus.pendingAdminReview => 'Under Review',
   };
 }
 
@@ -2306,10 +2308,12 @@ ServioStatusChipType _chipType(BookingStatus status) {
     BookingStatus.enRoute => ServioStatusChipType.info,
     BookingStatus.arrived => ServioStatusChipType.info,
     BookingStatus.inProgress => ServioStatusChipType.info,
+    BookingStatus.awaitingCustomerConfirmation => ServioStatusChipType.warning,
     BookingStatus.completed => ServioStatusChipType.success,
     BookingStatus.cancelled => ServioStatusChipType.danger,
     BookingStatus.rejected => ServioStatusChipType.danger,
     BookingStatus.disputed => ServioStatusChipType.warning,
+    BookingStatus.pendingAdminReview => ServioStatusChipType.warning,
   };
 }
 
@@ -2319,10 +2323,13 @@ String _statusCodeFromStatus(BookingStatus status) => switch (status) {
       BookingStatus.enRoute => 'en_route',
       BookingStatus.arrived => 'arrived',
       BookingStatus.inProgress => 'in_progress',
+      BookingStatus.awaitingCustomerConfirmation =>
+        'awaiting_customer_confirmation',
       BookingStatus.completed => 'completed',
       BookingStatus.cancelled => 'cancelled',
       BookingStatus.rejected => 'rejected',
       BookingStatus.disputed => 'disputed',
+      BookingStatus.pendingAdminReview => 'pending_admin_review',
     };
 
 String _paymentLabelFor(BookingModel booking) {
@@ -2343,15 +2350,35 @@ String _cardLabelFor(BookingModel booking) {
 
 List<BookingModel> _filteredHistory(
     List<BookingModel> bookings, String filter) {
+  final now = DateTime.now();
   return bookings.where((booking) {
     return switch (filter) {
-      'Plumbing' => booking.serviceName.toLowerCase().contains('plumb'),
-      'This Month' => true,
+      'This Month' => _bookingIsThisMonth(booking.date, now),
       'Cash' => booking.paymentMethod.toLowerCase().contains('cash'),
-      '5 Star' => true,
-      _ => true,
+      _ => true, // 'All' and 'Clear All' resets
     };
   }).toList();
+}
+
+/// Parses `booking.date` (formats: 'dd/MM/yyyy', 'MMMM d, yyyy', ISO) and
+/// returns true if the booking falls in the current month + year.
+bool _bookingIsThisMonth(String dateStr, DateTime now) {
+  // Try dd/MM/yyyy (most common in Servio UI)
+  final slashParts = dateStr.split('/');
+  if (slashParts.length == 3) {
+    final day = int.tryParse(slashParts[0]);
+    final month = int.tryParse(slashParts[1]);
+    final year = int.tryParse(slashParts[2]);
+    if (day != null && month != null && year != null) {
+      return month == now.month && year == now.year;
+    }
+  }
+  // Try ISO or any parseable format
+  final parsed = DateTime.tryParse(dateStr);
+  if (parsed != null) {
+    return parsed.month == now.month && parsed.year == now.year;
+  }
+  return true; // Cannot parse — include rather than silently exclude
 }
 
 String _topService(List<BookingModel> bookings) {
@@ -2414,6 +2441,8 @@ BookingModel _toBookingModel(BackendBooking b) {
     id: b.id,
     reference: '#SRV-$shortId',
     serviceName: b.serviceName.isNotEmpty ? b.serviceName : 'Service',
+    serviceId: b.serviceId,
+    serviceCategory: b.serviceCategory,
     technicianName: b.workerName.isNotEmpty ? b.workerName : 'Technician',
     technicianId: b.workerId,
     date: date,

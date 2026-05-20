@@ -4,15 +4,21 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/api/bookings_api.dart';
 import '../../core/models/backend_booking_model.dart';
 import '../../core/services/job_session_service.dart';
+import '../../core/services/location_service.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
+import '../../shared/widgets/servio_map_widget.dart';
 import '../messages/chat_screen.dart';
 
 /// Technician job details screen — implements the full booking lifecycle:
@@ -20,9 +26,8 @@ import '../messages/chat_screen.dart';
 ///   pending → accepted → [enRoute] → [arrived + PIN] → inProgress (timer)
 ///          → completeConfirm (notes) → done
 ///
-/// The [enRoute] and [arrived] sections are pure local UI states; they make
-/// no backend calls. Only the transitions to [inProgress] and [done] hit the
-/// PATCH /bookings/:id/status endpoint, matching the website's behaviour.
+/// The [enRoute] and [arrived] sections mirror backend status transitions so
+/// the final PIN step can move from `arrived` to `in_progress` cleanly.
 class JobDetailsScreen extends StatefulWidget {
   const JobDetailsScreen({
     required this.jobId,
@@ -66,6 +71,10 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
   // Completion notes (Phase 5)
   final TextEditingController _notesCtrl = TextEditingController();
 
+  // Map (Phase 7)
+  LatLng? _customerLatLng;
+  bool _geocodingAddress = false;
+
   static const Duration _kTimeout = Duration(seconds: 12);
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
@@ -85,8 +94,12 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
     _timeoutTimer?.cancel();
     _tickTimer?.cancel();
     _shakeCtrl.dispose();
-    for (final c in _pinCtrl) { c.dispose(); }
-    for (final f in _pinFocus) { f.dispose(); }
+    for (final c in _pinCtrl) {
+      c.dispose();
+    }
+    for (final f in _pinFocus) {
+      f.dispose();
+    }
     _notesCtrl.dispose();
     super.dispose();
   }
@@ -126,6 +139,7 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
         _error = null;
         _updating = false;
       });
+      _geocodeJobAddress();
       // Restore timer if we're in an active job section.
       if (section == JobSection.inProgress ||
           section == JobSection.completeConfirm) {
@@ -142,11 +156,32 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
     }
   }
 
+  Future<void> _geocodeJobAddress() async {
+    final job = _job;
+    if (job == null) return;
+    final street = job.addressStreet;
+    final city = job.addressCity;
+    if (street.isEmpty && city.isEmpty) return;
+
+    setState(() => _geocodingAddress = true);
+    final latLng = await LocationService().geocodeAddress('$street, $city');
+    if (mounted) {
+      setState(() {
+        _customerLatLng = latLng;
+        _geocodingAddress = false;
+      });
+    }
+  }
+
   Future<JobSection> _resolveSection(BackendBooking job) async {
     final stored = await JobSessionService.getSection(job.id);
     switch (job.status.trim().toLowerCase()) {
       case 'completed':
       case 'done':
+        return JobSection.done;
+      case 'awaiting_customer_confirmation':
+      case 'pending_admin_review':
+        await JobSessionService.setSection(job.id, JobSection.done);
         return JobSection.done;
       case 'cancelled':
       case 'canceled':
@@ -163,6 +198,13 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
         }
         await JobSessionService.setSection(job.id, JobSection.inProgress);
         return JobSection.inProgress;
+      case 'arrived':
+        await JobSessionService.setSection(job.id, JobSection.arrived);
+        return JobSection.arrived;
+      case 'en_route':
+      case 'enroute':
+        await JobSessionService.setSection(job.id, JobSection.enRoute);
+        return JobSection.enRoute;
       case 'accepted':
       case 'confirmed':
       case 'scheduled':
@@ -272,6 +314,70 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
     }
   }
 
+  Future<void> _startTrip() async {
+    if (_job == null || _updating) return;
+    setState(() => _updating = true);
+    final client = context.read<ApiClient>();
+    try {
+      await _ensureBackendEnRoute(BookingsApi(client));
+      if (!mounted) return;
+      await _goTo(JobSection.enRoute);
+      setState(() => _updating = false);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _updating = false);
+      _snack('Could not mark you on the way. Please try again.');
+    }
+  }
+
+  Future<void> _markArrived() async {
+    if (_job == null || _updating) return;
+    setState(() => _updating = true);
+    final client = context.read<ApiClient>();
+    try {
+      await _ensureBackendArrived(BookingsApi(client));
+      if (!mounted) return;
+      await _goTo(JobSection.arrived);
+      setState(() => _updating = false);
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _pinFocus[0].requestFocus(),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _updating = false);
+      _snack('Could not mark arrival. Please try again.');
+    }
+  }
+
+  Future<void> _ensureBackendEnRoute(BookingsApi api) async {
+    final status = _normalizedStatus(_job?.status ?? '');
+    if (status == 'en_route' ||
+        status == 'arrived' ||
+        status == 'in_progress') {
+      return;
+    }
+    if (status == 'accepted' ||
+        status == 'confirmed' ||
+        status == 'scheduled') {
+      await api.updateStatus(widget.jobId, 'en_route');
+      _job = _job?.copyWith(status: 'en_route');
+    }
+  }
+
+  Future<void> _ensureBackendArrived(BookingsApi api) async {
+    final status = _normalizedStatus(_job?.status ?? '');
+    if (status == 'arrived' || status == 'in_progress') return;
+    if (status == 'accepted' ||
+        status == 'confirmed' ||
+        status == 'scheduled') {
+      await _ensureBackendEnRoute(api);
+    }
+    if (_normalizedStatus(_job?.status ?? '') == 'en_route') {
+      await api.updateStatus(widget.jobId, 'arrived');
+      _job = _job?.copyWith(status: 'arrived');
+    }
+  }
+
   Future<String?> _showDeclineDialog() => showDialog<String>(
         context: context,
         builder: (ctx) {
@@ -304,8 +410,7 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
                 child: const Text('Keep Job'),
               ),
               TextButton(
-                onPressed: () =>
-                    Navigator.of(ctx).pop(reasonCtrl.text.trim()),
+                onPressed: () => Navigator.of(ctx).pop(reasonCtrl.text.trim()),
                 child: Text(
                   'Decline',
                   style: TextStyle(color: servio.danger),
@@ -334,7 +439,9 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
     if (correctPin.isNotEmpty && entered != correctPin) {
       setState(() => _pinError = true);
       _shakeCtrl.forward(from: 0);
-      for (final c in _pinCtrl) { c.clear(); }
+      for (final c in _pinCtrl) {
+        c.clear();
+      }
       _pinFocus[0].requestFocus();
       return;
     }
@@ -345,7 +452,10 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
     });
     final client = context.read<ApiClient>();
     try {
-      await BookingsApi(client).updateStatus(widget.jobId, 'in_progress');
+      final api = BookingsApi(client);
+      await _ensureBackendArrived(api);
+      await api.updateStatus(widget.jobId, 'in_progress');
+      _job = _job?.copyWith(status: 'in_progress');
       if (!mounted) return;
       final t0 = DateTime.now().millisecondsSinceEpoch;
       await JobSessionService.setTimerStart(widget.jobId, t0);
@@ -368,9 +478,10 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
     try {
       await BookingsApi(client).updateStatus(
         widget.jobId,
-        'completed',
+        'awaiting_customer_confirmation',
         notes: notes.isNotEmpty ? notes : null,
       );
+      _job = _job?.copyWith(status: 'awaiting_customer_confirmation');
       if (!mounted) return;
       _tickTimer?.cancel();
       await JobSessionService.clearSession(widget.jobId);
@@ -412,7 +523,8 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
         switchOutCurve: Curves.easeIn,
         child: switch (_section) {
           JobSection.pending => _buildPending(key: const ValueKey('pending')),
-          JobSection.accepted => _buildAccepted(key: const ValueKey('accepted')),
+          JobSection.accepted =>
+            _buildAccepted(key: const ValueKey('accepted')),
           JobSection.enRoute => _buildEnRoute(key: const ValueKey('enRoute')),
           JobSection.arrived => _buildArrived(key: const ValueKey('arrived')),
           JobSection.inProgress =>
@@ -587,8 +699,8 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
           _infoRow(
             Icons.calendar_today_outlined,
             '${job.scheduledDate.day}/${job.scheduledDate.month}/'
-                '${job.scheduledDate.year}'
-                '${job.scheduledTime.isNotEmpty ? '  ·  ${job.scheduledTime}' : ''}',
+            '${job.scheduledDate.year}'
+            '${job.scheduledTime.isNotEmpty ? '  ·  ${job.scheduledTime}' : ''}',
           ),
           const SizedBox(height: 6),
           _infoRow(
@@ -701,10 +813,12 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
             _notesCard(_job!.notes),
           ],
           const SizedBox(height: 32),
-          ServioPrimaryButton(
-            label: "I'm On My Way",
-            onPressed: () => _goTo(JobSection.enRoute),
-          ),
+          _updating
+              ? const Center(child: CircularProgressIndicator())
+              : ServioPrimaryButton(
+                  label: "I'm On My Way",
+                  onPressed: _startTrip,
+                ),
         ],
       ),
     );
@@ -755,47 +869,83 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text('Destination', style: Theme.of(context).textTheme.labelMedium?.copyWith(color: servio.textSecondary)),
-                const SizedBox(height: 8),
-                Text(
-                  job.customerName.isNotEmpty
-                      ? job.customerName
-                      : 'Customer',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  job.addressCity.isNotEmpty
-                      ? job.addressCity
-                      : 'Address on file',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(color: servio.textSecondary),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Scheduled: ${job.scheduledDate.day}/${job.scheduledDate.month}/${job.scheduledDate.year}'
-                  '${job.scheduledTime.isNotEmpty ? '  ·  ${job.scheduledTime}' : ''}',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: servio.textSecondary),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Destination',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelMedium
+                                  ?.copyWith(color: servio.textSecondary)),
+                          const SizedBox(height: 8),
+                          Text(
+                            job.customerName.isNotEmpty
+                                ? job.customerName
+                                : 'Customer',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            job.addressCity.isNotEmpty
+                                ? job.addressCity
+                                : 'Address on file',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(color: servio.textSecondary),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Scheduled: ${job.scheduledDate.day}/${job.scheduledDate.month}/${job.scheduledDate.year}'
+                            '${job.scheduledTime.isNotEmpty ? '  ·  ${job.scheduledTime}' : ''}',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(color: servio.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: servio.accent.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: IconButton(
+                        icon: Icon(Icons.directions_rounded,
+                            color: servio.accent),
+                        tooltip: 'Open in Maps',
+                        onPressed: () async {
+                          final query = Uri.encodeComponent(
+                              job.addressCity.isNotEmpty
+                                  ? job.addressCity
+                                  : 'Cairo, Egypt');
+                          final url = Uri.parse(
+                              'https://www.google.com/maps/search/?api=1&query=$query');
+                          if (await canLaunchUrl(url)) {
+                            await launchUrl(url);
+                          }
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 32),
-          ServioPrimaryButton(
-            label: 'I Arrived',
-            onPressed: () {
-              _goTo(JobSection.arrived);
-              // Auto-focus first PIN box after frame settles.
-              WidgetsBinding.instance.addPostFrameCallback(
-                (_) => _pinFocus[0].requestFocus(),
-              );
-            },
-          ),
+          const SizedBox(height: 12),
+          _buildAddressMapPreview(),
+          const SizedBox(height: 20),
+          _updating
+              ? const Center(child: CircularProgressIndicator())
+              : ServioPrimaryButton(
+                  label: 'I Arrived',
+                  onPressed: _markArrived,
+                ),
         ],
       ),
     );
@@ -903,13 +1053,11 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(ServioRadius.md),
-                  borderSide:
-                      BorderSide(color: servio.accent, width: 2),
+                  borderSide: BorderSide(color: servio.accent, width: 2),
                 ),
                 errorBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(ServioRadius.md),
-                  borderSide:
-                      BorderSide(color: servio.danger, width: 2),
+                  borderSide: BorderSide(color: servio.danger, width: 2),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(ServioRadius.md),
@@ -973,12 +1121,12 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
                 Text(
                   _timerDisplay,
                   style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: servio.accent,
-                        fontFeatures: const <FontFeature>[
-                          FontFeature.tabularFigures(),
-                        ],
-                      ),
+                    fontWeight: FontWeight.w700,
+                    color: servio.accent,
+                    fontFeatures: const <FontFeature>[
+                      FontFeature.tabularFigures(),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -1045,8 +1193,8 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
                   decoration: InputDecoration(
                     hintText:
                         'Describe what was done, parts used, customer feedback…',
-                    hintStyle:
-                        theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+                    hintStyle: theme.textTheme.bodySmall
+                        ?.copyWith(color: servio.textSecondary),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(ServioRadius.md),
                     ),
@@ -1097,6 +1245,8 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
   Widget _buildDone({Key? key}) {
     final servio = context.servio;
     final theme = Theme.of(context);
+    final awaitingCustomer = _normalizedStatus(_job?.status ?? '') ==
+        'awaiting_customer_confirmation';
     return Center(
       key: key,
       child: Padding(
@@ -1111,19 +1261,22 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
                 color: ServioColors.tint(servio.success),
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.check_rounded,
-                  color: servio.success, size: 40),
+              child: Icon(Icons.check_rounded, color: servio.success, size: 40),
             ),
             const SizedBox(height: 20),
             Text(
-              'Job Completed!',
+              awaitingCustomer
+                  ? 'Waiting for Customer Confirmation'
+                  : 'Job Completed!',
               style: theme.textTheme.headlineSmall
                   ?.copyWith(fontWeight: FontWeight.w700),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
-              'Great work. The booking has been marked as complete.',
+              awaitingCustomer
+                  ? 'Great work. The customer has been asked to confirm completion.'
+                  : 'Great work. The booking has been marked as complete.',
               style: theme.textTheme.bodyMedium
                   ?.copyWith(color: servio.textSecondary, height: 1.5),
               textAlign: TextAlign.center,
@@ -1208,6 +1361,38 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
     );
   }
 
+  // ── Helper: map preview (Phase 7) ─────────────────────────────────────────
+
+  /// Renders a 220 px non-interactive map snapshot centred on the geocoded
+  /// customer address.  Shows a loading indicator while geocoding is in
+  /// progress; returns [SizedBox.shrink] when no coords are available and
+  /// geocoding has finished.
+  Widget _buildAddressMapPreview() {
+    if (_geocodingAddress) {
+      return const SizedBox(
+        height: 220,
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    final pos = _customerLatLng;
+    if (pos == null) return const SizedBox.shrink();
+
+    return SizedBox(
+      height: 220,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(ServioRadius.lg),
+        child: ServioMapWidget(
+          center: pos,
+          zoom: 15,
+          interactive: false,
+          markers: <Marker>[
+            buildPinMarker(pos, color: Colors.blue),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ── Helper: customer notes card ────────────────────────────────────────────
 
   Widget _notesCard(String notes) {
@@ -1227,10 +1412,8 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
           const SizedBox(height: 6),
           Text(
             notes,
-            style: Theme.of(context)
-                .textTheme
-                .bodyMedium
-                ?.copyWith(height: 1.5),
+            style:
+                Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.5),
           ),
         ],
       ),
@@ -1248,6 +1431,9 @@ class _PulsingDot extends StatefulWidget {
   @override
   State<_PulsingDot> createState() => _PulsingDotState();
 }
+
+String _normalizedStatus(String status) =>
+    status.trim().toLowerCase().replaceAll('-', '_');
 
 class _PulsingDotState extends State<_PulsingDot>
     with SingleTickerProviderStateMixin {

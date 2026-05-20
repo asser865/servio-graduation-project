@@ -292,6 +292,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                     technicians: technicians,
                     loading: activeLoading,
                     error: activeError,
+                    query: _q,
                   ),
           ),
         ],
@@ -422,11 +423,13 @@ class _TechniciansResults extends StatelessWidget {
     required this.technicians,
     required this.loading,
     required this.error,
+    required this.query,
   });
 
   final List<BackendWorker> technicians;
   final bool loading;
   final String? error;
+  final String query;
 
   @override
   Widget build(BuildContext context) {
@@ -437,15 +440,22 @@ class _TechniciansResults extends StatelessWidget {
       padding: const EdgeInsets.all(ServioSpacing.screenPadding),
       itemCount: technicians.length,
       separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (_, int i) => _TechnicianCard(worker: technicians[i]),
+      itemBuilder: (_, int i) => _TechnicianCard(
+        worker: technicians[i],
+        query: query,
+      ),
     );
   }
 }
 
 class _TechnicianCard extends StatelessWidget {
-  const _TechnicianCard({required this.worker});
+  const _TechnicianCard({
+    required this.worker,
+    required this.query,
+  });
 
   final BackendWorker worker;
+  final String query;
 
   @override
   Widget build(BuildContext context) {
@@ -454,6 +464,13 @@ class _TechnicianCard extends StatelessWidget {
     final subtitle = worker.serviceLabels.isNotEmpty
         ? worker.serviceLabels.take(2).join(', ')
         : worker.skills.take(2).join(', ');
+    final selectedService = _serviceForQuery(worker, query);
+    final selectedCategory = normalizeServiceCategory(
+      selectedService?.category ?? query,
+    );
+    final selectedName = selectedCategory.isEmpty
+        ? null
+        : serviceCategoryLabel(selectedCategory);
 
     return ServioCard(
       child: Column(
@@ -544,8 +561,13 @@ class _TechnicianCard extends StatelessWidget {
               onPressed: () {
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) =>
-                        TechnicianProfileScreen(technicianId: worker.id),
+                    builder: (_) => TechnicianProfileScreen(
+                      technicianId: worker.id,
+                      selectedServiceId: selectedService?.id,
+                      selectedServiceCategory:
+                          selectedCategory.isEmpty ? null : selectedCategory,
+                      selectedServiceName: selectedName,
+                    ),
                   ),
                 );
               },
@@ -555,6 +577,26 @@ class _TechnicianCard extends StatelessWidget {
       ),
     );
   }
+}
+
+BackendWorkerService? _serviceForQuery(BackendWorker worker, String query) {
+  final normalizedCategory = normalizeServiceCategory(query);
+  if (normalizedCategory.isNotEmpty) {
+    for (final service in worker.services) {
+      if (normalizeServiceCategory(service.category) == normalizedCategory) {
+        return service;
+      }
+    }
+  }
+
+  final normalizedQuery = query.trim().toLowerCase();
+  if (normalizedQuery.isEmpty) return null;
+  for (final service in worker.services) {
+    if (service.displayName.toLowerCase().contains(normalizedQuery)) {
+      return service;
+    }
+  }
+  return null;
 }
 
 class _WorkerInitials extends StatelessWidget {
