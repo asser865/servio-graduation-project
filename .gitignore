@@ -34,6 +34,9 @@ yarn-error.log*
 # Local launcher
 Launcher/
 
+# Local mobile design drafts
+mobile_app_design_pages/
+
 # IDE / Tools
 .vscode/
 .idea/
