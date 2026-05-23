@@ -28,11 +28,13 @@ async function loadConversations() {
     const res = await getConversations();
     const convs = res.conversations || [];
     if (!convs.length) {
+      list.style.visibility = '';
       list.innerHTML = `<div class="empty-state-small">
           <p data-i18n="messages_no_convs">No conversations yet.</p>
         </div>`;
       return;
     }
+    list.style.visibility = '';
     list.innerHTML = convs.map(c => {
       const bookingId = c.booking?._id || '';
       const name = c.otherUser?.name || 'User';

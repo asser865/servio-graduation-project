@@ -73,10 +73,14 @@ describe('getWorkers — serviceId filter (canonical)', () => {
     );
     expect(User.find).toHaveBeenCalledWith(
       expect.objectContaining({
-        $or: [
-          { services: PLUMBING_ID },
-          { categories: { $in: ['plumbing'] } },
-        ],
+        $and: expect.arrayContaining([
+          expect.objectContaining({
+            $or: expect.arrayContaining([
+              { services: PLUMBING_ID },
+              { categories: { $in: ['plumbing'] } },
+            ]),
+          }),
+        ]),
         isAvailable: true,
         'availability.0': { $exists: true },
       })
@@ -134,10 +138,14 @@ describe('getWorkers — category filter (legacy backward compat)', () => {
     );
     expect(User.find).toHaveBeenCalledWith(
       expect.objectContaining({
-        $or: [
-          { categories: { $in: ['plumbing'] } },
-          { services: { $in: [PLUMBING_ID] } },
-        ],
+        $and: expect.arrayContaining([
+          expect.objectContaining({
+            $or: expect.arrayContaining([
+              { categories: { $in: ['plumbing'] } },
+              { services: { $in: [PLUMBING_ID] } },
+            ]),
+          }),
+        ]),
         isAvailable: true,
         'availability.0': { $exists: true },
       })
@@ -154,19 +162,20 @@ describe('getWorkers — category filter (legacy backward compat)', () => {
 
     expect(User.find).toHaveBeenCalledWith(
       expect.objectContaining({
-        $or: [
-          { categories: { $in: ['electrical'] } },
-          { services: { $in: [ELECTRICAL_ID] } },
-        ],
-      })
-    );
-    expect(User.find).toHaveBeenCalledWith(
-      expect.not.objectContaining({
-        $or: expect.arrayContaining([
-          { categories: { $in: ['plumbing'] } },
+        $and: expect.arrayContaining([
+          expect.objectContaining({
+            $or: expect.arrayContaining([
+              { categories: { $in: ['electrical'] } },
+              { services: { $in: [ELECTRICAL_ID] } },
+            ]),
+          }),
         ]),
       })
     );
+    // Plumbing should NOT appear in the electrical query
+    const callArg = User.find.mock.calls[0][0];
+    const allOrClauses = (callArg.$and || []).flatMap((c) => c.$or || []);
+    expect(allOrClauses).not.toContainEqual({ categories: { $in: ['plumbing'] } });
   });
 });
 
@@ -180,10 +189,14 @@ describe('getWorkers — serviceId takes priority over category', () => {
 
     expect(User.find).toHaveBeenCalledWith(
       expect.objectContaining({
-        $or: [
-          { services: PLUMBING_ID },
-          { categories: { $in: ['plumbing'] } },
-        ],
+        $and: expect.arrayContaining([
+          expect.objectContaining({
+            $or: expect.arrayContaining([
+              { services: PLUMBING_ID },
+              { categories: { $in: ['plumbing'] } },
+            ]),
+          }),
+        ]),
         isAvailable: true,
         'availability.0': { $exists: true },
       })
@@ -224,13 +237,17 @@ describe('getWorkers — area filter', () => {
     const req = { query: { area: 'Maadi' } };
     await getWorkers(req, mockRes());
 
-    // Slug-based clause is unshifted to the front; regex fallbacks remain.
+    // Slug-based clause is unshifted to the front; regex fallbacks remain in $and.
     const expectedArea = expect.objectContaining({
-      $or: expect.arrayContaining([
-        expect.objectContaining({ coverageMatchSlugs: 'maadi' }),
-        expect.objectContaining({ coverageAreas: expect.any(RegExp) }),
-        expect.objectContaining({ serviceArea: expect.any(RegExp) }),
-        expect.objectContaining({ locationLabel: expect.any(RegExp) }),
+      $and: expect.arrayContaining([
+        expect.objectContaining({
+          $or: expect.arrayContaining([
+            expect.objectContaining({ coverageMatchSlugs: 'maadi' }),
+            expect.objectContaining({ coverageAreas: expect.any(RegExp) }),
+            expect.objectContaining({ serviceArea: expect.any(RegExp) }),
+            expect.objectContaining({ locationLabel: expect.any(RegExp) }),
+          ]),
+        }),
       ]),
     });
 
@@ -250,8 +267,12 @@ describe('getWorkers — area filter', () => {
 
     expect(User.find).toHaveBeenCalledWith(
       expect.objectContaining({
-        $or: expect.arrayContaining([
-          expect.objectContaining({ coverageMatchSlugs: 'nasr-city' }),
+        $and: expect.arrayContaining([
+          expect.objectContaining({
+            $or: expect.arrayContaining([
+              expect.objectContaining({ coverageMatchSlugs: 'nasr-city' }),
+            ]),
+          }),
         ]),
       })
     );
@@ -297,6 +318,16 @@ describe('getWorkers — no filters', () => {
     );
     expect(User.find).toHaveBeenCalledWith(
       expect.not.objectContaining({ services: expect.anything(), categories: expect.anything() })
+    );
+    // Suspended workers always excluded via $and clause
+    expect(User.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        $and: expect.arrayContaining([
+          expect.objectContaining({
+            $or: expect.arrayContaining([{ suspendedUntil: { $exists: false } }]),
+          }),
+        ]),
+      })
     );
   });
 });

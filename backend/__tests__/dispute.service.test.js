@@ -87,7 +87,9 @@ describe('disputeService.openDispute', () => {
       booking: BOOKING_ID,
       payment: 'payment1',
       category: 'incomplete',
-      evidence: ['https://example.com/evidence.jpg'],
+      evidence: expect.arrayContaining([
+        expect.objectContaining({ url: 'https://example.com/evidence.jpg' }),
+      ]),
     }));
     expect(dispute._id).toBe('dispute1');
   });
@@ -141,6 +143,7 @@ describe('disputeService.markDisputeReviewing', () => {
     const dispute = {
       _id: 'dispute1',
       status: 'open',
+      history: [],
       save: jest.fn().mockResolvedValue(true),
     };
     Dispute.findById = jest.fn().mockReturnValue(queryResult(dispute));
@@ -172,11 +175,16 @@ describe('disputeService.resolveDispute', () => {
       status: 'open',
       booking,
       payment: null,
+      history: [],
+      internalNotes: [],
       save: jest.fn().mockResolvedValue(true),
     };
     Dispute.findById = jest.fn().mockReturnValue(queryResult(dispute));
 
-    await disputeService.resolveDispute('dispute1', ADMIN_ID, 'Customer evidence accepted.', 'refund');
+    await disputeService.resolveDispute('dispute1', ADMIN_ID, {
+      resolution: 'Customer evidence accepted.',
+      decision: 'refund',
+    });
 
     expect(paymentService.refundPayment).not.toHaveBeenCalled();
     expect(booking.status).toBe('cancelled');
@@ -192,13 +200,18 @@ describe('disputeService.resolveDispute', () => {
       _id: 'dispute1',
       status: 'open',
       booking,
-      payment: { _id: { toString: () => 'payment1' } },
+      payment: { _id: { toString: () => 'payment1' }, amount: 440 },
+      history: [],
+      internalNotes: [],
       save: jest.fn().mockResolvedValue(true),
     };
     Dispute.findById = jest.fn().mockReturnValue(queryResult(dispute));
     paymentService.refundPayment.mockResolvedValue(true);
 
-    await disputeService.resolveDispute('dispute1', ADMIN_ID, 'Refund approved.', 'refund');
+    await disputeService.resolveDispute('dispute1', ADMIN_ID, {
+      resolution: 'Refund approved.',
+      decision: 'refund',
+    });
 
     expect(paymentService.refundPayment).toHaveBeenCalledWith('payment1', ADMIN_ID, 'Refund approved.');
     expect(dispute.status).toBe('resolved_refund');

@@ -8,6 +8,7 @@
   <script src="../js/config.js"></script>
   <script src="../js/theme-init.js"></script>
   <script src="../js/lang-init.js"></script>
+  <script src="../js/boot-init.js"></script>
   <link rel="stylesheet" href="../css/main.css" />
   <link rel="stylesheet" href="../css/pages/messages.css" />
 </head>
@@ -55,7 +56,7 @@
           </div>
         </div>
 
-      <ul class="conv-list" role="listbox" aria-label="Conversation list">
+      <ul class="conv-list" id="conversationsList" role="listbox" aria-label="Conversation list" style="visibility:hidden">
         <li class="conv-item is-active" data-conv="1" role="option" aria-selected="true">
           <div class="conv-item__avatar">KM</div>
           <div class="conv-item__content">

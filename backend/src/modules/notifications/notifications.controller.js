@@ -2,7 +2,10 @@
 
 const { StatusCodes } = require('http-status-codes');
 const Notification    = require('./notification.model');
+const NotificationPreference = require('./preferences.model');
 const ApiResponse     = require('../../utils/ApiResponse');
+
+const DEFAULT_CHANNELS = { email: true, inApp: true, push: true, sms: false };
 
 // GET /api/v1/notifications
 const getNotifications = async (req, res) => {
@@ -61,4 +64,38 @@ const deleteOne = async (req, res) => {
   return ApiResponse.success(res, StatusCodes.OK, 'Notification deleted.');
 };
 
-module.exports = { getNotifications, getUnreadCount, markOneRead, markAllRead, clearAll, deleteOne };
+// GET /api/v1/notifications/preferences
+const getPreferences = async (req, res) => {
+  const pref = await NotificationPreference.findOne({ user: req.user.id });
+  const channels = { ...DEFAULT_CHANNELS, ...(pref?.channels || {}) };
+  return ApiResponse.success(res, StatusCodes.OK, 'Preferences fetched.', { channels });
+};
+
+// PUT /api/v1/notifications/preferences
+const updatePreferences = async (req, res) => {
+  const body = req.body || {};
+  const channels = body.channels && typeof body.channels === 'object' ? body.channels : null;
+  if (!channels) return ApiResponse.error(res, StatusCodes.BAD_REQUEST, 'channels object required.');
+
+  const updates = {};
+  for (const [k, v] of Object.entries(channels)) {
+    if (!Object.prototype.hasOwnProperty.call(DEFAULT_CHANNELS, k)) continue;
+    updates[`channels.${k}`] = !!v;
+  }
+  if (Object.keys(updates).length === 0) {
+    return ApiResponse.error(res, StatusCodes.BAD_REQUEST, 'No valid channel keys provided.');
+  }
+
+  const pref = await NotificationPreference.findOneAndUpdate(
+    { user: req.user.id },
+    { $set: updates },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+  const merged = { ...DEFAULT_CHANNELS, ...(pref?.channels || {}) };
+  return ApiResponse.success(res, StatusCodes.OK, 'Preferences updated.', { channels: merged });
+};
+
+module.exports = {
+  getNotifications, getUnreadCount, markOneRead, markAllRead, clearAll, deleteOne,
+  getPreferences, updatePreferences,
+};

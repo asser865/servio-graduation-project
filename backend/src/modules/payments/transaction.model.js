@@ -12,7 +12,12 @@ const transactionSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['charge', 'hold', 'release', 'refund', 'fee', 'dispute', 'cash_debt_auto_deduct', 'cash_debt_manual_payment'],
+      enum: [
+        'charge', 'hold', 'release', 'refund', 'fee', 'dispute',
+        'cash_debt_auto_deduct', 'cash_debt_manual_payment',
+        'platform_late_fee', 'no_show_fee', 'worker_no_show_refund',
+        'credit_apply', 'credit_issue',
+      ],
       required: [true, 'Transaction type is required'],
     },
     amount: {

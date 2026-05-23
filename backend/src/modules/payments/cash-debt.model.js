@@ -38,12 +38,24 @@ const cashDebtSchema = new mongoose.Schema(
       enum: ['auto_wallet', 'manual_admin'],
     },
     adminNote: { type: String },
+    remaining: { type: Number },
+    settlementMethod: {
+      type: String,
+      enum: ['auto_offset', 'wallet_balance', 'instapay', 'vodafone_cash', 'bank_transfer', 'cash_to_office', 'card', 'admin_override'],
+    },
+    settlementRef: { type: mongoose.Schema.Types.ObjectId, ref: 'DebtSettlement' },
   },
   { timestamps: true }
 );
 
 cashDebtSchema.index({ worker: 1, status: 1 });
 cashDebtSchema.index({ worker: 1, createdAt: 1 });
+
+cashDebtSchema.pre('save', async function () {
+  if (this.isNew && (this.remaining === undefined || this.remaining === null)) {
+    this.remaining = this.amount;
+  }
+});
 
 const CashDebt = mongoose.model('CashDebt', cashDebtSchema);
 

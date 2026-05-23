@@ -515,7 +515,7 @@ function attachRetryHandler(booking) {
     const total = booking.estimatedTotal || booking.totalPrice;
     openCardPickerModal(total, async (paymentMeta) => {
       try {
-        await holdPayment(booking._id || booking.bookingId, { savedCardId: paymentMeta.savedCardId });
+        await holdPayment(booking._id || booking.bookingId, { savedCardId: paymentMeta.savedCardId, useCredit: true });
         showToast('Payment held successfully.', 'success');
         await refreshBooking();
       } catch (err) {

@@ -26,4 +26,16 @@ class ApiError extends Error {
   }
 }
 
+class BookingBlockedError extends ApiError {
+  constructor(code, details = {}) {
+    super(403, `Blocked: ${code}`);
+    this.name = 'BookingBlockedError';
+    this.code = code;
+    this.details = details;
+  }
+}
+
+ApiError.BookingBlockedError = BookingBlockedError;
+
 module.exports = ApiError;
+module.exports.BookingBlockedError = BookingBlockedError;

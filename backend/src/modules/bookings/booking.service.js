@@ -167,7 +167,7 @@ const assertWorkerAvailableForSchedule = (worker, bookingDateUTC, bookingDateStr
  * HOW:  Checks if worker and service are valid/active before creating.
  */
 const createBooking = async (userId, data) => {
-  const { workerId, serviceId, serviceCategory, serviceName, scheduledDate, scheduledTime, address, description, images, savedCardId } = data;
+  const { workerId, serviceId, serviceCategory, serviceName, scheduledDate, scheduledTime, address, description, images, savedCardId, paymentMeta: inputPaymentMeta } = data;
   const paymentMethod = normalizePaymentMethod(data.paymentMethod);
 
   // Fetch worker
@@ -177,6 +177,11 @@ const createBooking = async (userId, data) => {
   // 3a — Worker availability gate
   if (!worker.isAvailable) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'This technician is not currently accepting bookings.');
+  }
+
+  // 3a-bis — Worker not suspended
+  if (worker.suspendedUntil && new Date(worker.suspendedUntil) > new Date()) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'This technician is temporarily suspended.');
   }
 
   // 3b — Date range (UTC-based to match Mongoose's Date type storage)
@@ -299,7 +304,7 @@ const createBooking = async (userId, data) => {
   const paymentDeadline = paymentMethod === 'online'
     ? new Date(Date.now() + 30 * 60 * 1000)
     : undefined;
-  const paymentData = await resolvePaymentData(userId, paymentMethod, savedCardId);
+  const paymentData = await resolvePaymentData(userId, paymentMethod, savedCardId, inputPaymentMeta);
 
   // ── Session-wrapped overlap check + create ───────────────────────────────
   const session = await mongoose.startSession();
@@ -351,7 +356,7 @@ const createBooking = async (userId, data) => {
         paymentMethod:    paymentData.paymentMethod,
         savedCard:        paymentData.savedCard,
         paymentMeta:      paymentData.paymentMeta,
-        paymentStatus:    paymentMethod === 'cash' ? 'cash_pending_settlement' : 'unpaid',
+        paymentStatus:    paymentData.paymentStatus,
         paymentDeadline,
         ...feeSnapshot,
       }], { session });
@@ -382,20 +387,33 @@ const createBooking = async (userId, data) => {
 };
 
 
-async function resolvePaymentData(userId, paymentMethod, savedCardId) {
+async function resolvePaymentData(userId, paymentMethod, savedCardId, inputPaymentMeta) {
   if (paymentMethod === 'cash') {
     return {
       paymentMethod: 'cash',
       savedCard:    undefined,
       paymentMeta:  undefined,
+      paymentStatus: 'cash_pending_settlement',
     };
   }
 
   if (paymentMethod === 'online') {
+    // Demo-card path: snapshot card metadata (stripping cvv) and mark demo_pending
+    const hasDemoCard = inputPaymentMeta && (inputPaymentMeta.last4 || inputPaymentMeta.cardType || inputPaymentMeta.label);
+    if (hasDemoCard) {
+      const { cvv, ...safeMeta } = inputPaymentMeta;
+      return {
+        paymentMethod: 'online',
+        savedCard:    undefined,
+        paymentMeta:  safeMeta,
+        paymentStatus: 'demo_pending',
+      };
+    }
     return {
       paymentMethod: 'online',
       savedCard:    undefined,
       paymentMeta:  undefined,
+      paymentStatus: 'unpaid',
     };
   }
 
@@ -416,6 +434,7 @@ async function resolvePaymentData(userId, paymentMethod, savedCardId) {
       cardType: card.cardType,
       label:    card.label,
     },
+    paymentStatus: 'unpaid',
   };
 }
 
@@ -845,4 +864,75 @@ const getBookingById = async (bookingId, requestingUser) => {
   return booking;
 };
 
-module.exports = { createBooking, getUserBookings, getWorkerBookings, getAllBookings, updateBookingStatus, rescheduleBooking, getBookingById, getPublicPlatformSettings, calculateFeeSnapshot };
+const adminSettings = require('../admin/admin-settings.service');
+
+async function markComplete({ bookingId, technicianId, notes, photos = [] }) {
+  const booking = await Booking.findById(bookingId);
+  if (!booking) throw new ApiError(StatusCodes.NOT_FOUND, 'Booking not found');
+  if (String(booking.worker) !== String(technicianId)) {
+    throw new ApiError(StatusCodes.FORBIDDEN, 'Not your booking');
+  }
+  if (booking.status !== 'in_progress') {
+    throw new ApiError(StatusCodes.BAD_REQUEST, `Must be in_progress (was ${booking.status})`);
+  }
+  const cfg = await adminSettings.get();
+  booking.status = 'awaiting_customer_confirmation';
+  booking.customerConfirmAutoAt = new Date(Date.now() + cfg.escrow.autoConfirmHours * 3600 * 1000);
+  booking.completionNotes = notes || '';
+  booking.completionPhotos = photos;
+  await booking.save();
+  return booking;
+}
+
+async function startWork({ bookingId, technicianId }) {
+  const booking = await Booking.findById(bookingId);
+  if (!booking) throw new ApiError(StatusCodes.NOT_FOUND, 'Booking not found');
+  if (String(booking.worker) !== String(technicianId)) {
+    throw new ApiError(StatusCodes.FORBIDDEN, 'Not your booking');
+  }
+  if (!['accepted', 'en_route', 'arrived'].includes(booking.status)) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, `Cannot start from ${booking.status}`);
+  }
+  booking.status = 'in_progress';
+  booking.startedAt = new Date();
+  await booking.save();
+  return booking;
+}
+
+async function acceptBooking({ bookingId, technicianId }) {
+  const booking = await Booking.findById(bookingId);
+  if (!booking) throw new ApiError(StatusCodes.NOT_FOUND, 'Booking not found');
+  if (booking.status !== 'pending') {
+    throw new ApiError(StatusCodes.BAD_REQUEST, `Cannot accept from ${booking.status}`);
+  }
+  const tech = await User.findById(technicianId).select('suspendedUntil');
+  if (tech?.suspendedUntil && new Date(tech.suspendedUntil) > new Date()) {
+    throw new ApiError(StatusCodes.FORBIDDEN, 'Account suspended; cannot accept bookings.');
+  }
+  const { BookingBlockedError } = require('../../utils/ApiError');
+  const cashDebtService = require('../payments/cash-debt.service');
+  const cfg = await adminSettings.get();
+  const debtSummary = await cashDebtService.getWorkerDebtSummary(technicianId);
+  if (debtSummary.totalOutstanding >= cfg.debt.absoluteBlockThreshold) {
+    throw new BookingBlockedError('absolute_block', {
+      debtAmount: debtSummary.totalOutstanding,
+      threshold: cfg.debt.absoluteBlockThreshold,
+      settleUrl: '/technician-dashboard.html#debts',
+    });
+  }
+  const isCash = booking.paymentType === 'cash' || booking.paymentMethod === 'cash';
+  if (isCash && debtSummary.totalOutstanding >= cfg.debt.blockThreshold) {
+    throw new BookingBlockedError('cash_block', {
+      debtAmount: debtSummary.totalOutstanding,
+      threshold: cfg.debt.blockThreshold,
+      settleUrl: '/technician-dashboard.html#debts',
+    });
+  }
+  booking.status = 'accepted';
+  booking.worker = technicianId;
+  booking.acceptedAt = new Date();
+  await booking.save();
+  return booking;
+}
+
+module.exports = { createBooking, getUserBookings, getWorkerBookings, getAllBookings, updateBookingStatus, rescheduleBooking, getBookingById, getPublicPlatformSettings, calculateFeeSnapshot, markComplete, acceptBooking, startWork };

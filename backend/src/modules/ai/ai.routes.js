@@ -6,7 +6,6 @@ const { Router }       = require('express');
 const multer           = require('multer');
 const { protect }      = require('../../middleware/auth.middleware');
 const aiController     = require('./ai.controller');
-const { protect }      = require('../../middleware/auth.middleware');
 
 const router  = Router();
 const upload  = multer({

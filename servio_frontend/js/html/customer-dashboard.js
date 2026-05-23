@@ -7,7 +7,8 @@ import { getInitials } from '../utils/string.js';
 import { getMe, updateMe, updateEmail, deleteMe, updatePassword, addAddress, updateAddress, deleteAddress } from '../api/users.js';
 import { clearSession } from '../api/client.js';
 import { uploadPublicFile } from '../api/uploads.js';
-import { getMyBookings, cancelBooking } from '../api/bookings.js';
+import { getMyBookings, cancelBooking, postCancelBooking } from '../api/bookings.js';
+import { getNotificationPreferences, updateNotificationPreferences } from '../api/notifications.js';
 import { getMyReviews, createReview } from '../api/reviews.js';
 import { getSavedCards, addSavedCard, deleteSavedCard, setDefaultCard } from '../api/savedCards.js';
 import { confirmCompletion, getMyDisputes } from '../api/payments.js';
@@ -16,6 +17,7 @@ import { snapshotFeeFromBooking, formatMoney as formatFeeMoney, paymentMethodLab
 import { getNotifications as apiGetNotifications, markOneRead as apiMarkOneRead, markAllRead as apiMarkAllRead, clearAll as apiClearAll, deleteOne as apiDeleteOne } from '../api/notifications.js';
 import { listFavorites, removeFavorite } from '../api/favorites.js';
 import { renderBusyBadge } from '../components/busy-badge.js';
+import { skCardGrid, skList } from '../components/skeleton.js';
 
 const STAR_SVG = (fill = '#F59E0B', size = 14) =>
   `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="${fill}" stroke="${fill}" stroke-width="0"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
@@ -295,6 +297,10 @@ function initTabs() {
     }
     if (tab.dataset.tab === 'favourites') loadFavorites().catch(err => console.error('[Favourites]', err));
     if (tab.dataset.tab === 'support') loadSupportCases().catch(err => console.error('[Support]', err));
+    if (tab.dataset.tab === 'job-posts') showJobPostsSkeleton();
+    if (tab.dataset.tab === 'proposals') showProposalsSkeleton();
+    if (tab.dataset.tab === 'overview') showOverviewSkeleton();
+    if (tab.dataset.tab === 'bookings') showBookingsSkeleton();
   }));
   document.querySelectorAll('.dash-mobile-tab').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -309,6 +315,10 @@ function initTabs() {
       }
       if (btn.dataset.mobileTab === 'favourites') loadFavorites().catch(err => console.error('[Favourites]', err));
       if (btn.dataset.mobileTab === 'support') loadSupportCases().catch(err => console.error('[Support]', err));
+      if (btn.dataset.mobileTab === 'job-posts') showJobPostsSkeleton();
+      if (btn.dataset.mobileTab === 'proposals') showProposalsSkeleton();
+      if (btn.dataset.mobileTab === 'overview') showOverviewSkeleton();
+      if (btn.dataset.mobileTab === 'bookings') showBookingsSkeleton();
     });
   });
 
@@ -318,6 +328,10 @@ function initTabs() {
       showTab(btn.dataset.tabLink);
       if (btn.dataset.tabLink === 'favourites') loadFavorites().catch(err => console.error('[Favourites]', err));
       if (btn.dataset.tabLink === 'support') loadSupportCases().catch(err => console.error('[Support]', err));
+      if (btn.dataset.tabLink === 'job-posts') showJobPostsSkeleton();
+      if (btn.dataset.tabLink === 'proposals') showProposalsSkeleton();
+      if (btn.dataset.tabLink === 'overview') showOverviewSkeleton();
+      if (btn.dataset.tabLink === 'bookings') showBookingsSkeleton();
     });
   });
 
@@ -343,8 +357,17 @@ function initTabs() {
           ? (typeof window.t === 'function' ? window.t('confirm_withdraw') : 'Withdraw this pending request? You can submit a new booking anytime.')
           : (typeof window.t === 'function' ? window.t('confirm_cancel') : 'Cancel this confirmed visit? You may need to book a new slot if you still need the service.');
       if (!window.confirm(msg)) return;
+      const reason = window.prompt('Optional reason (e.g. changed mind, found alternative):', '') || '';
       try {
-        if (bookingId) await cancelBooking(bookingId);
+        if (bookingId) {
+          // Plan 3 — use new cancellation endpoint that handles refund/late-fee
+          const res = await postCancelBooking(bookingId, { reason });
+          const r = res?.data || res;
+          if (r && typeof r.refundAmount === 'number') {
+            const dest = r.refundDestination || 'gateway';
+            showToast(`Cancelled. Refund: ${r.refundAmount} EGP (${dest})`, 'info');
+          }
+        }
         const card = btn.closest('.dash-card, .booking-card');
         if (card) {
           card.style.transition = 'opacity 0.3s, transform 0.3s';
@@ -359,6 +382,8 @@ function initTabs() {
           ? (type === 'pending' ? window.t('toast_request_withdrawn') : window.t('toast_booking_cancelled'))
           : (type === 'pending' ? 'Request withdrawn.' : 'Booking cancelled.'), 'info');
       } catch (err) {
+        // Fallback to legacy status-update cancel if new endpoint not available
+        try { await cancelBooking(bookingId); } catch (_) {}
         showToast(err.message || 'Failed to cancel booking', 'error');
       }
     });
@@ -375,7 +400,259 @@ function initTabs() {
       if (root) root.innerHTML = '<div class="history-error-state"><p>Failed to load history. Please refresh.</p></div>';
     });
   }
+  if (saved === 'job-posts') showJobPostsSkeleton();
+  if (saved === 'proposals') showProposalsSkeleton();
+  if (saved === 'overview') showOverviewSkeleton();
+  if (saved === 'bookings') showBookingsSkeleton();
   apiGetNotifications(1, 0).then(res => updateNotifBadge(res.data?.unreadCount ?? 0)).catch(() => {});
+}
+
+/* ── First-paint skeletons for static panels (Overview, Job Posts, Proposals) ── */
+let _overviewSkShown = false;
+let _jobPostsSkShown = false;
+let _proposalsSkShown = false;
+
+function showOverviewSkeleton(delay = 650) {
+  if (_overviewSkShown) return;
+  _overviewSkShown = true;
+  const panel = document.getElementById('panel-overview');
+  if (!panel) return;
+
+  const welcome = panel.querySelector('.dash-welcome');
+  const statGrid = panel.querySelector('.dash-stat-grid');
+  const bottomGrid = panel.querySelector('.dash-bottom-grid');
+
+  const prevWelcomeDisplay = welcome ? welcome.style.display : '';
+  const prevStatDisplay = statGrid ? statGrid.style.display : '';
+  const prevBottomDisplay = bottomGrid ? bottomGrid.style.display : '';
+
+  if (welcome) welcome.style.display = 'none';
+  if (statGrid) statGrid.style.display = 'none';
+  if (bottomGrid) bottomGrid.style.display = 'none';
+
+  let welcomeSkWrap = null;
+  if (welcome) {
+    welcomeSkWrap = document.createElement('div');
+    welcomeSkWrap.className = 'dash-skeleton-temp overview-welcome-skeleton';
+    welcomeSkWrap.setAttribute('aria-hidden', 'true');
+    welcomeSkWrap.innerHTML = `
+      <div class="overview-welcome-skeleton__text">
+        <div class="overview-welcome-skeleton__greeting skeleton-shimmer"></div>
+        <div class="overview-welcome-skeleton__name skeleton-shimmer"></div>
+        <div class="overview-welcome-skeleton__sub skeleton-shimmer"></div>
+      </div>
+      <div class="overview-welcome-skeleton__cta skeleton-shimmer"></div>`;
+    welcome.after(welcomeSkWrap);
+  }
+
+  let statSkWrap = null;
+  if (statGrid) {
+    statSkWrap = document.createElement('div');
+    statSkWrap.className = 'dash-skeleton-temp';
+    statSkWrap.setAttribute('aria-hidden', 'true');
+    const cardCount = Math.max(2, statGrid.children.length || 4);
+    statSkWrap.innerHTML = `
+      <div class="overview-stat-skeleton-grid">
+        ${Array.from({ length: cardCount }, () => `
+          <div class="overview-stat-skeleton">
+            <div class="overview-stat-skeleton__stripe skeleton-shimmer"></div>
+            <div class="overview-stat-skeleton__top">
+              <div class="overview-stat-skeleton__icon skeleton-shimmer"></div>
+              <div class="overview-stat-skeleton__chip skeleton-shimmer"></div>
+            </div>
+            <div class="overview-stat-skeleton__value skeleton-shimmer"></div>
+            <div class="overview-stat-skeleton__label skeleton-shimmer"></div>
+            <div class="overview-stat-skeleton__ctx skeleton-shimmer"></div>
+            <div class="overview-stat-skeleton__bar skeleton-shimmer"></div>
+          </div>`).join('')}
+      </div>`;
+    statGrid.after(statSkWrap);
+  }
+
+  let bottomSkWrap = null;
+  if (bottomGrid) {
+    bottomSkWrap = document.createElement('div');
+    bottomSkWrap.className = 'dash-skeleton-temp overview-bottom-skeleton-grid';
+    bottomSkWrap.setAttribute('aria-hidden', 'true');
+    const bookingRows = Array.from({ length: 3 }, () => `
+      <div class="overview-booking-skeleton">
+        <div class="overview-booking-skeleton__icon skeleton-shimmer"></div>
+        <div class="overview-booking-skeleton__lines">
+          <div class="overview-booking-skeleton__title skeleton-shimmer"></div>
+          <div class="overview-booking-skeleton__meta skeleton-shimmer"></div>
+        </div>
+        <div class="overview-booking-skeleton__badge skeleton-shimmer"></div>
+      </div>`).join('');
+    const scheduleRows = Array.from({ length: 2 }, () => `
+      <div class="overview-schedule-skeleton">
+        <div class="overview-schedule-skeleton__dot skeleton-shimmer"></div>
+        <div class="overview-schedule-skeleton__date skeleton-shimmer"></div>
+        <div class="overview-schedule-skeleton__detail">
+          <div class="overview-schedule-skeleton__line skeleton-shimmer"></div>
+          <div class="overview-schedule-skeleton__line overview-schedule-skeleton__line--sm skeleton-shimmer"></div>
+        </div>
+        <div class="overview-schedule-skeleton__status skeleton-shimmer"></div>
+      </div>`).join('');
+    bottomSkWrap.innerHTML = `
+      <div class="overview-card-skeleton">
+        <div class="overview-card-skeleton__header">
+          <div class="overview-card-skeleton__title skeleton-shimmer"></div>
+          <div class="overview-card-skeleton__link skeleton-shimmer"></div>
+        </div>
+        ${bookingRows}
+      </div>
+      <div class="overview-card-skeleton">
+        <div class="overview-card-skeleton__header">
+          <div class="overview-card-skeleton__title skeleton-shimmer"></div>
+          <div class="overview-card-skeleton__link skeleton-shimmer"></div>
+        </div>
+        <div class="overview-next-skeleton">
+          <div class="overview-next-skeleton__badge skeleton-shimmer"></div>
+          <div class="overview-next-skeleton__row">
+            <div class="overview-next-skeleton__icon skeleton-shimmer"></div>
+            <div class="overview-next-skeleton__lines">
+              <div class="overview-next-skeleton__title skeleton-shimmer"></div>
+              <div class="overview-next-skeleton__sub skeleton-shimmer"></div>
+            </div>
+            <div class="overview-next-skeleton__time skeleton-shimmer"></div>
+          </div>
+          <div class="overview-next-skeleton__track skeleton-shimmer"></div>
+        </div>
+        ${scheduleRows}
+      </div>`;
+    bottomGrid.after(bottomSkWrap);
+  }
+
+  setTimeout(() => {
+    if (welcomeSkWrap) welcomeSkWrap.remove();
+    if (statSkWrap) statSkWrap.remove();
+    if (bottomSkWrap) bottomSkWrap.remove();
+    if (welcome) welcome.style.display = prevWelcomeDisplay;
+    if (statGrid) statGrid.style.display = prevStatDisplay;
+    if (bottomGrid) bottomGrid.style.display = prevBottomDisplay;
+  }, delay);
+}
+
+function showJobPostsSkeleton(delay = 650) {
+  if (_jobPostsSkShown) return;
+  _jobPostsSkShown = true;
+  const list = document.getElementById('jobPostsList');
+  if (!list) return;
+  const realCards = Array.from(list.children);
+  realCards.forEach(c => { c.style.display = 'none'; });
+  const skWrap = document.createElement('div');
+  skWrap.className = 'dash-skeleton-temp';
+  skWrap.setAttribute('aria-hidden', 'true');
+  skWrap.innerHTML = Array.from({ length: Math.max(2, realCards.length || 2) }, () => `
+    <div class="job-post-skeleton">
+      <div class="job-post-skeleton__row">
+        <div class="job-post-skeleton__badge skeleton-shimmer"></div>
+        <div class="job-post-skeleton__badge skeleton-shimmer" style="width:58px;"></div>
+        <div class="job-post-skeleton__badge skeleton-shimmer" style="width:90px;"></div>
+      </div>
+      <div class="job-post-skeleton__title skeleton-shimmer"></div>
+      <div class="job-post-skeleton__meta">
+        <div class="job-post-skeleton__meta-item skeleton-shimmer"></div>
+        <div class="job-post-skeleton__meta-item skeleton-shimmer" style="width:140px;"></div>
+        <div class="job-post-skeleton__meta-item skeleton-shimmer" style="width:90px;"></div>
+      </div>
+      <div class="job-post-skeleton__actions">
+        <div class="job-post-skeleton__btn skeleton-shimmer"></div>
+        <div class="job-post-skeleton__btn skeleton-shimmer" style="width:70px;"></div>
+        <div class="job-post-skeleton__btn skeleton-shimmer" style="width:90px;"></div>
+      </div>
+    </div>`).join('');
+  list.appendChild(skWrap);
+  setTimeout(() => {
+    skWrap.remove();
+    realCards.forEach(c => { c.style.display = ''; });
+  }, delay);
+}
+
+function showProposalsSkeleton(delay = 650) {
+  if (_proposalsSkShown) return;
+  _proposalsSkShown = true;
+  const panel = document.getElementById('panel-proposals');
+  if (!panel) return;
+  const groups = Array.from(panel.querySelectorAll('.proposals-group'));
+  groups.forEach(g => { g.style.display = 'none'; });
+  const skWrap = document.createElement('div');
+  skWrap.className = 'dash-skeleton-temp';
+  skWrap.setAttribute('aria-hidden', 'true');
+  const groupCount = Math.max(1, groups.length || 1);
+  let html = '';
+  for (let g = 0; g < groupCount; g++) {
+    html += `<div class="proposals-group-skeleton__heading skeleton-shimmer"></div>`;
+    for (let i = 0; i < 2; i++) {
+      html += `
+        <div class="proposal-skeleton">
+          <div class="proposal-skeleton__avatar skeleton-shimmer"></div>
+          <div class="proposal-skeleton__lines">
+            <div class="proposal-skeleton__name skeleton-shimmer"></div>
+            <div class="proposal-skeleton__sub skeleton-shimmer"></div>
+          </div>
+          <div class="proposal-skeleton__price skeleton-shimmer"></div>
+        </div>`;
+    }
+  }
+  skWrap.innerHTML = html;
+  const header = panel.querySelector('.dash-panel__header');
+  if (header) header.after(skWrap); else panel.appendChild(skWrap);
+  setTimeout(() => {
+    skWrap.remove();
+    groups.forEach(g => { g.style.display = ''; });
+  }, delay);
+}
+
+function showBookingsSkeleton(delay = 900) {
+  const panel = document.getElementById('panel-bookings');
+  if (!panel) return;
+  const activePane = panel.querySelector('.stab-pane--active') || document.getElementById('stab-bookings-active');
+  if (!activePane) return;
+  if (activePane.querySelector('.dash-skeleton-temp')) return;
+
+  const realChildren = Array.from(activePane.children).filter(c => !c.classList.contains('dash-skeleton-temp'));
+  const prevDisplays = realChildren.map(c => c.style.display);
+  realChildren.forEach(c => { c.style.display = 'none'; });
+
+  const skWrap = document.createElement('div');
+  skWrap.className = 'dash-skeleton-temp bookings-loading-state';
+  skWrap.setAttribute('aria-hidden', 'true');
+
+  const card = (titleW, subW, metaWidths) => `
+    <div class="booking-skeleton">
+      <div class="booking-skeleton__body">
+        <div class="booking-skeleton__row">
+          <div class="booking-skeleton__icon skeleton-shimmer"></div>
+          <div class="booking-skeleton__titles">
+            <div class="skeleton-line skeleton-shimmer" style="width:${titleW}%;height:18px;"></div>
+            <div class="skeleton-line skeleton-shimmer" style="width:${subW}%;height:12px;"></div>
+          </div>
+          <div class="booking-skeleton__chip skeleton-shimmer"></div>
+        </div>
+        <div class="booking-skeleton__meta">
+          ${metaWidths.map(w => `<div class="skeleton-line skeleton-shimmer" style="width:${w}%;"></div>`).join('')}
+        </div>
+      </div>
+      <div class="booking-skeleton__aside">
+        <div class="skeleton-line skeleton-shimmer" style="width:40%;height:12px;"></div>
+        <div class="skeleton-line skeleton-shimmer" style="width:70%;height:22px;"></div>
+        <div class="booking-skeleton__btn skeleton-shimmer"></div>
+        <div class="booking-skeleton__btn skeleton-shimmer"></div>
+      </div>
+    </div>`;
+
+  skWrap.innerHTML = `
+    <span class="visually-hidden">Loading bookings…</span>
+    ${card(55, 35, [70, 50, 60])}
+    ${card(45, 30, [65, 55])}`;
+
+  activePane.appendChild(skWrap);
+
+  setTimeout(() => {
+    skWrap.remove();
+    realChildren.forEach((c, i) => { c.style.display = prevDisplays[i] || ''; });
+  }, delay);
 }
 
 /* ── Populate profile info ──────────────────────────────── */
@@ -581,7 +858,7 @@ function _diffAndNotify(bookings) {
 async function loadHistoryData() {
   const root = document.getElementById('historyListRoot');
   if (!root) return;
-  root.innerHTML = '<div class="bookings-loading-state">Loading history…</div>';
+  root.innerHTML = skList(5);
 
   const [bookings, reviews] = await Promise.all([
     getMyBookings({ status: 'completed,cancelled,rejected', limit: 200 }).then(r => r?.bookings || []),
@@ -1243,7 +1520,7 @@ async function loadSupportCases() {
   if (!root) return;
 
   if (!_supportCasesLoaded) {
-    root.innerHTML = '<p class="support-cases-empty">Loading support cases...</p>';
+    root.innerHTML = skList(4);
   }
 
   const [issueResult, disputeResult] = await Promise.all([
@@ -1495,9 +1772,18 @@ function wireBookingCardEvents(root) {
       ? (typeof window.t === 'function' ? window.t('confirm_withdraw') : 'Withdraw this pending request? You can submit a new booking anytime.')
       : (typeof window.t === 'function' ? window.t('confirm_cancel') : 'Cancel this confirmed visit? You may need to book a new slot if you still need the service.');
     if (!confirm(msg)) return;
+    const reason2 = window.prompt('Optional reason:', '') || '';
     btn.disabled = true;
     try {
-      await cancelBooking(bookingId);
+      try {
+        const res = await postCancelBooking(bookingId, { reason: reason2 });
+        const r = res?.data || res;
+        if (r && typeof r.refundAmount === 'number') {
+          showToast(`Refund: ${r.refundAmount} EGP (${r.refundDestination || 'gateway'})`, 'info');
+        }
+      } catch (_) {
+        await cancelBooking(bookingId);
+      }
       const card = btn.closest('.booking-card');
       if (card) {
         card.style.transition = 'opacity 0.3s, transform 0.3s';
@@ -1523,6 +1809,46 @@ function wireBookingCardEvents(root) {
 }
 
 /* ── Stats ──────────────────────────────────────────────── */
+const STATS_CACHE_KEY = 'servio_customer_stats_cache_v1';
+
+const _STATS_MIN_SHIMMER_MS = 700;
+const _statsBootTime = Date.now();
+let _statsAppliedOnce = false;
+
+function _writeStatsDOM({ total, active, totalSpent, pct }) {
+  const tEl = document.querySelector('[data-stat="total-bookings"]');
+  const aEl = document.querySelector('[data-stat="active-bookings"]');
+  if (tEl) tEl.textContent = total;
+  if (aEl) aEl.textContent = active;
+
+  const spentEl = document.querySelector('[data-stat="total-spent"]');
+  if (spentEl) spentEl.textContent = totalSpent + ' EGP';
+
+  const ctxE = document.querySelector('.dash-stat-card__context[data-i18n-html]');
+  if (ctxE) {
+    ctxE.setAttribute('data-i18n-pct', String(pct));
+    if (window.applyLanguage && window.__lang) window.applyLanguage(window.__lang);
+  }
+  const barFill = document.querySelector('[data-stat-goal-bar="total"]');
+  if (barFill) barFill.style.width = pct + '%';
+  _statsAppliedOnce = true;
+}
+
+function applyStatsToDOM(stats) {
+  if (_statsAppliedOnce) { _writeStatsDOM(stats); return; }
+  const elapsed = Date.now() - _statsBootTime;
+  const wait = Math.max(0, _STATS_MIN_SHIMMER_MS - elapsed);
+  if (wait === 0) { _writeStatsDOM(stats); return; }
+  setTimeout(() => _writeStatsDOM(stats), wait);
+}
+
+function renderCachedStats() {
+  try {
+    const cached = JSON.parse(localStorage.getItem(STATS_CACHE_KEY) || 'null');
+    if (cached && typeof cached.total === 'number') applyStatsToDOM(cached);
+  } catch { /* ignore */ }
+}
+
 async function populateStats(bookings = null) {
   try {
     if (!bookings) {
@@ -1540,21 +1866,11 @@ async function populateStats(bookings = null) {
     const goalTotal = 5;
     const pct = Math.min(Math.round((completed / goalTotal) * 100), 100);
 
-    const tEl = document.querySelector('[data-stat="total-bookings"]');
-    const aEl = document.querySelector('[data-stat="active-bookings"]');
-    if (tEl) tEl.textContent = total;
-    if (aEl) aEl.textContent = active;
+    applyStatsToDOM({ total, active, totalSpent, pct });
 
-    const spentEl = document.querySelector('[data-stat="total-spent"]');
-    if (spentEl) spentEl.textContent = totalSpent + ' EGP';
-
-    const ctxE = document.querySelector('.dash-stat-card__context[data-i18n-html]');
-    if (ctxE) {
-      ctxE.setAttribute('data-i18n-pct', String(pct));
-      if (window.applyLanguage && window.__lang) window.applyLanguage(window.__lang);
-    }
-    const barFill = document.querySelector('[data-stat-goal-bar="total"]');
-    if (barFill) barFill.style.width = pct + '%';
+    try {
+      localStorage.setItem(STATS_CACHE_KEY, JSON.stringify({ total, active, totalSpent, pct, ts: Date.now() }));
+    } catch { /* quota */ }
   } catch {
     // silently fallback — stats not critical
   }
@@ -1768,7 +2084,7 @@ async function renderNotifications() {
   const list = document.getElementById('notif-list');
   if (!list) return;
 
-  list.innerHTML = '<div class="notif-loading"><span>Loading…</span></div>';
+  list.innerHTML = skList(5);
   try {
     const res = await apiGetNotifications(50);
     _cachedNotifs = res.notifications || [];
@@ -2533,11 +2849,13 @@ async function loadFavorites() {
   const list = document.getElementById('fav-list');
   const empty = document.getElementById('fav-empty');
   if (!list) return;
-  list.innerHTML = `<div class="skeleton-card"></div>`.repeat(3);
+  list.innerHTML = skCardGrid(6);
   try {
     const { total, items } = await listFavorites(favParams());
     favState.total = total;
     document.getElementById('fav-count').textContent = total;
+    const savedEl = document.querySelector('[data-stat="saved-technicians"]');
+    if (savedEl) savedEl.textContent = total;
     list.innerHTML = '';
     if (items.length === 0) { empty.hidden = false; return; }
     empty.hidden = true;
@@ -2553,31 +2871,32 @@ function renderFavCard(w) {
   const card = document.createElement('div');
   card.className = 'fav-card';
   const initials = (w.name || '?').split(' ').map(s => s[0]).join('').slice(0, 2).toUpperCase();
+  const isBusy = !!w.busyState?.isBusy;
+  const showAvail = w.busyState && !isBusy;
   card.innerHTML = `
+    <div class="fav-card__avatar">${initials}</div>
+    <div class="fav-card__info">
+      <div class="fav-card__name">${escapeHtml(w.name)}</div>
+      <div class="fav-card__meta">
+        <span class="fav-card__rating">★ ${(w.averageRating || 0).toFixed(1)}</span>
+        ${(w.categories || [])[0] ? `<span class="fav-card__cat">${escapeHtml((w.categories || [])[0])}</span>` : ''}
+        ${w.locationLabel ? `<span class="fav-card__loc">${escapeHtml(w.locationLabel)}</span>` : ''}
+        ${showAvail ? `<span class="fav-card__avail">Available now</span>` : ''}
+        <span class="fav-card__badges"></span>
+      </div>
+    </div>
+    <div class="fav-card__actions">
+      <a class="btn btn--sm btn--primary" href="./booking.html?worker=${w._id}">Book Now</a>
+      <a class="btn btn--sm btn--ghost" href="./technician-profile.html?id=${w._id}">View Profile</a>
+    </div>
     <button class="fav-card__remove" data-action="remove" title="Remove from favourites" aria-label="Remove from favourites">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
         <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
       </svg>
-    </button>
-    <div class="fav-card__top">
-      <div class="fav-card__avatar">${initials}</div>
-      <div class="fav-card__info">
-        <div class="fav-card__name">${escapeHtml(w.name)}</div>
-        <div class="fav-card__meta">
-          <span class="fav-card__rating">★ ${(w.averageRating || 0).toFixed(1)}</span>
-          ${(w.categories || [])[0] ? `<span class="fav-card__cat">${escapeHtml((w.categories || [])[0])}</span>` : ''}
-          ${w.locationLabel ? `<span class="fav-card__loc">${escapeHtml(w.locationLabel)}</span>` : ''}
-        </div>
-      </div>
-    </div>
-    <div class="fav-card__badges"></div>
-    <div class="fav-card__actions">
-      <a class="btn btn--sm btn--primary" href="./booking.html?worker=${w._id}">Book Now</a>
-      <a class="btn btn--sm btn--ghost" href="./technician-profile.html?id=${w._id}">View Profile</a>
-    </div>`;
+    </button>`;
   const badge = renderBusyBadge(w.busyState);
   if (badge) card.querySelector('.fav-card__badges').appendChild(badge);
-  if (w.busyState?.isBusy) {
+  if (isBusy) {
     const bookBtn = card.querySelector('.btn--primary');
     if (bookBtn) {
       bookBtn.style.opacity = '0.45';
@@ -2664,8 +2983,20 @@ function initSupportIssueModal() {
   });
 }
 
+renderCachedStats();
 populateProfile();
 loadBookingsData();
+listFavorites({ limit: 1, offset: 0 }).then(({ total }) => {
+  const savedEl = document.querySelector('[data-stat="saved-technicians"]');
+  if (savedEl) {
+    const elapsed = Date.now() - _statsBootTime;
+    const wait = Math.max(0, _STATS_MIN_SHIMMER_MS - elapsed);
+    setTimeout(() => { savedEl.textContent = total ?? 0; }, wait);
+  }
+}).catch(() => {
+  const savedEl = document.querySelector('[data-stat="saved-technicians"]');
+  if (savedEl) savedEl.textContent = 0;
+});
 let _custPollInterval = null;
 const startCustPolling = () => {
   if (_custPollInterval) clearInterval(_custPollInterval);
@@ -3474,6 +3805,49 @@ document.addEventListener('DOMContentLoaded', refreshDynamicText, { once: true }
       showToast(_t('toast_notif_dismissed'), 'info');
     });
   });
+
+  // ── Notification delivery channel prefs ────
+  (async function bindNotifChannelPrefs() {
+    const checkboxes = document.querySelectorAll('[data-notif-channel]');
+    if (!checkboxes.length) return;
+    try {
+      const data = await getNotificationPreferences();
+      const channels = data?.channels || {};
+      checkboxes.forEach((cb) => {
+        const k = cb.dataset.notifChannel;
+        cb.checked = channels[k] !== false;
+      });
+    } catch (_) { /* defaults remain unchecked */ }
+
+    checkboxes.forEach((cb) => {
+      cb.addEventListener('change', async () => {
+        try {
+          await updateNotificationPreferences({ [cb.dataset.notifChannel]: cb.checked });
+          showToast('Saved', 'success');
+        } catch (e) {
+          cb.checked = !cb.checked;
+          showToast(e?.message || 'Failed to save', 'error');
+        }
+      });
+    });
+
+    const pushBtn = document.getElementById('enable-browser-push-btn');
+    if (pushBtn) {
+      pushBtn.addEventListener('click', async () => {
+        if (!('Notification' in window)) {
+          showToast('Browser does not support notifications', 'error');
+          return;
+        }
+        try {
+          const perm = await Notification.requestPermission();
+          if (perm === 'granted') showToast('Browser notifications enabled', 'success');
+          else showToast('Permission denied', 'error');
+        } catch (_) {
+          showToast('Could not request permission', 'error');
+        }
+      });
+    }
+  })();
 })();
 
 // .

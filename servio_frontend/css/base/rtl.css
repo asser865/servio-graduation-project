@@ -691,6 +691,17 @@
   text-align: right;
 }
 
+/* Atelier ledger — flip seal + hairline accents for RTL */
+[dir="rtl"] .atelier-ledger__seal { right: auto; left: 26px; }
+[dir="rtl"] .atelier-ledger__meta { padding-right: 0; padding-left: 78px; }
+[dir="rtl"] .atelier-cta__arrow svg { transform: scaleX(-1); }
+[dir="rtl"] .atelier-cta:hover .atelier-cta__arrow { transform: translateX(-3px); }
+[dir="rtl"] .atelier-balance__eyebrow::before { margin-left: 0; margin-right: 0; }
+@media (max-width: 920px) {
+  [dir="rtl"] .atelier-ledger__seal { left: 18px; }
+  [dir="rtl"] .atelier-ledger__meta { padding-left: 60px; }
+}
+
 /* ── Availability panel ────────────────────────────────────────── */
 [dir="rtl"] .availability-row,
 [dir="rtl"] .schedule-row {
