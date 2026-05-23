@@ -131,6 +131,13 @@ const getWorkers = async (req, res) => {
     isAvailable: true,
     'availability.0': { $exists: true },
   };
+  const andClauses = [
+    { $or: [
+      { suspendedUntil: { $exists: false } },
+      { suspendedUntil: null },
+      { suspendedUntil: { $lte: new Date() } },
+    ]},
+  ];
 
   if (serviceId) {
     if (!looksLikeObjectId(serviceId)) {
@@ -142,10 +149,10 @@ const getWorkers = async (req, res) => {
     const serviceCategory = normalizeWorkerCategory(service.category);
     if (!serviceCategory) return emptyWorkerDiscovery(res, page, limit);
 
-    filter.$or = [
+    andClauses.push({ $or: [
       { services: serviceId },
       { categories: { $in: [serviceCategory] } },
-    ];
+    ]});
   } else if (category) {
     if (!normalizedCategory) return emptyWorkerDiscovery(res, page, limit);
 
@@ -155,10 +162,10 @@ const getWorkers = async (req, res) => {
     );
     const serviceIds = servicesInCategory.map((service) => service._id);
 
-    filter.$or = [
+    andClauses.push({ $or: [
       { categories: { $in: [normalizedCategory] } },
       ...(serviceIds.length ? [{ services: { $in: serviceIds } }] : []),
-    ];
+    ]});
   }
 
   const normalizedArea = String(area || '').trim();
@@ -175,15 +182,10 @@ const getWorkers = async (req, res) => {
       { locationLabel: commaAreaRegex },
     ];
     if (areaSlug) orClauses.unshift({ coverageMatchSlugs: areaSlug });
-
-    if (filter.$or) {
-      // Combine category filter ($or) with area filter ($or) via $and so neither is overwritten.
-      filter.$and = [{ $or: filter.$or }, { $or: orClauses }];
-      delete filter.$or;
-    } else {
-      filter.$or = orClauses;
-    }
+    andClauses.push({ $or: orClauses });
   }
+
+  filter.$and = andClauses;
 
   const skip = (Number(page) - 1) * Number(limit);
 

@@ -9,6 +9,9 @@ const router = express.Router();
 // All routes require auth
 router.use(protect);
 
+router.get('/preferences',    ctrl.getPreferences);
+router.put('/preferences',    ctrl.updatePreferences);
+
 router.get('/',               ctrl.getNotifications);
 router.get('/unread-count',   ctrl.getUnreadCount);
 router.patch('/read-all',     ctrl.markAllRead);

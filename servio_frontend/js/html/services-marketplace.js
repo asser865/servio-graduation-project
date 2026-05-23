@@ -681,6 +681,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderCategoryGrid() {
     if (!resultsContainer) return;
     resultsContainer.innerHTML = '';
+    resultsContainer.style.visibility = '';
 
     const catMap = {};
     (state.apiServices || []).forEach(svc => {
@@ -784,6 +785,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderCategoryServices(catKey) {
     if (!resultsContainer) return;
     resultsContainer.innerHTML = '';
+    resultsContainer.style.visibility = '';
 
     const label = CATEGORY_LABELS[catKey] || catKey.charAt(0).toUpperCase() + catKey.slice(1);
 
@@ -900,6 +902,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Clear and render groups
     if (resultsContainer) {
       resultsContainer.innerHTML = '';
+      resultsContainer.style.visibility = '';
       
       if (pageItems.length === 0) {
         resultsContainer.appendChild(emptyState);

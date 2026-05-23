@@ -1,0 +1,38 @@
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 3rem 1.5rem;
+  color: var(--color-text-muted, #6b7280);
+  min-height: 12rem;
+}
+
+.empty-state__icon {
+  font-size: 4rem;
+  line-height: 1;
+  margin-bottom: 0.75rem;
+  opacity: 0.7;
+}
+
+.empty-state__title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+  color: var(--color-text, #1f2937);
+}
+
+.empty-state__body {
+  margin: 0 0 1rem;
+  font-size: 0.95rem;
+  max-width: 28rem;
+}
+
+.empty-state .btn-primary {
+  margin-top: 0.5rem;
+}
+
+[dir="rtl"] .empty-state {
+  direction: rtl;
+}

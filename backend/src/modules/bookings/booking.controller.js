@@ -105,4 +105,79 @@ const getWorkerBookedSlots = async (req, res) => {
   });
 };
 
-module.exports = { create, getMyBookings, getWorkerBookings, updateStatus, reschedule, getAllBookings, getBookingById, getWorkerBookedSlots };
+const cancellationService = require('./cancellation.service');
+const noShowService       = require('./no-show.service');
+const ApiError            = require('../../utils/ApiError');
+
+const cancelBooking = async (req, res) => {
+  const booking = await Booking.findById(req.params.id).select('user worker status');
+  if (!booking) throw new ApiError(StatusCodes.NOT_FOUND, 'Booking not found.');
+  const isCustomer = String(booking.user)   === String(req.user.id);
+  const isWorker   = String(booking.worker) === String(req.user.id);
+  if (!isCustomer && !isWorker) throw new ApiError(StatusCodes.FORBIDDEN, 'Not a party to this booking.');
+
+  const reason = (req.body && req.body.reason) || '';
+  let result;
+  if (isCustomer) {
+    result = await cancellationService.customerCancel(booking._id, { reason, by: req.user.id });
+  } else {
+    result = await cancellationService.workerCancel(booking._id, { reason, by: req.user.id });
+  }
+  logEvent({ req, type: 'booking', action: `Booking cancelled by ${isCustomer ? 'customer' : 'worker'}`, target: booking._id?.toString() });
+  return ApiResponse.success(res, StatusCodes.OK, 'Booking cancelled.', result);
+};
+
+const markCustomerNoShow = async (req, res) => {
+  const result = await noShowService.markCustomerNoShow(req.params.id, {
+    by: req.user.id,
+    evidence: Array.isArray(req.body?.evidence) ? req.body.evidence : [],
+    note: req.body?.note,
+  });
+  logEvent({ req, type: 'booking', action: 'Customer no-show marked', target: req.params.id });
+  return ApiResponse.success(res, StatusCodes.OK, 'Customer marked no-show.', result);
+};
+
+const markWorkerNoShow = async (req, res) => {
+  const result = await noShowService.markWorkerNoShow(req.params.id, {
+    by: req.user.id,
+    note: req.body?.note,
+  });
+  logEvent({ req, type: 'booking', action: 'Worker no-show marked', target: req.params.id });
+  return ApiResponse.success(res, StatusCodes.OK, 'Worker marked no-show.', result);
+};
+
+const acceptBooking = async (req, res) => {
+  const booking = await bookingService.acceptBooking({
+    bookingId: req.params.id,
+    technicianId: req.user.id,
+  });
+  logEvent({ req, type: 'booking', action: 'Booking accepted', target: booking._id?.toString() });
+  return ApiResponse.success(res, StatusCodes.OK, 'Booking accepted.', booking);
+};
+
+const startBooking = async (req, res) => {
+  const booking = await bookingService.startWork({
+    bookingId: req.params.id,
+    technicianId: req.user.id,
+  });
+  logEvent({ req, type: 'booking', action: 'Booking started', target: booking._id?.toString() });
+  return ApiResponse.success(res, StatusCodes.OK, 'Booking started.', booking);
+};
+
+const completeBooking = async (req, res) => {
+  const booking = await bookingService.markComplete({
+    bookingId: req.params.id,
+    technicianId: req.user.id,
+    notes: req.body?.notes,
+    photos: Array.isArray(req.body?.photos) ? req.body.photos : [],
+  });
+  logEvent({ req, type: 'booking', action: 'Booking completed', target: booking._id?.toString() });
+  return ApiResponse.success(res, StatusCodes.OK, 'Booking completed.', booking);
+};
+
+module.exports = {
+  create, getMyBookings, getWorkerBookings, updateStatus, reschedule,
+  getAllBookings, getBookingById, getWorkerBookedSlots,
+  cancelBooking, markCustomerNoShow, markWorkerNoShow,
+  acceptBooking, startBooking, completeBooking,
+};

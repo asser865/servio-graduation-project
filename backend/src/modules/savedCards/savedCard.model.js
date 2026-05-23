@@ -39,6 +39,11 @@ const savedCardSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+
+    brand:                  { type: String },
+    gateway:                { type: String, default: 'demo' },
+    gatewayCustomerId:      { type: String },
+    gatewayPaymentMethodId: { type: String },
   },
   { timestamps: true }
 );

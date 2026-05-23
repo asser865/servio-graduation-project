@@ -40,7 +40,7 @@ const paymentSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['pending', 'held', 'released', 'refunded', 'failed', 'disputed'],
+      enum: ['pending', 'held', 'released', 'refunded', 'failed', 'disputed', 'partially_refunded'],
       default: 'pending',
     },
     paymentMethod: {
@@ -88,6 +88,19 @@ const paymentSchema = new mongoose.Schema(
     releaseRequestedBy:  { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     releaseApprovedAt:   { type: Date },
     releaseApprovedBy:   { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+
+    gatewayId:       { type: String, default: 'demo' },
+    gatewayIntentId: { type: String, index: true },
+    lastError:       { code: String, message: String, at: Date },
+    refundAttempts:  { type: Number, default: 0 },
+    refundedAmount:  { type: Number, default: 0 },
+    capturedAt:      { type: Date },
+    creditApplied:       { type: Number, default: 0 },
+    gatewayChargeAmount: { type: Number },
+    heldAt:          { type: Date },
+    lockedAt:        { type: Date },
+    lockReason:      { type: String },
+    lockedBy:        { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
   {
     timestamps: true,

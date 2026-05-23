@@ -21,3 +21,11 @@ export const updateBookingStatus  = (id, status, details = {}) =>
 export const rescheduleBooking    = (id, data)     => api.patch(`/bookings/${id}/schedule`, data);
 export const getWorkerBookedSlots = (workerId, date) =>
   api.get(`/bookings/worker/${workerId}/slots?date=${date}`);
+
+// Plan 3 — cancel/no-show endpoints
+export const postCancelBooking = (id, { reason } = {}) =>
+  api.post(`/bookings/${id}/cancel`, { reason });
+export const markCustomerNoShow = (id, { note, evidence = [] } = {}) =>
+  api.post(`/bookings/${id}/no-show/customer`, { note, evidence });
+export const markWorkerNoShow = (id, { note, evidence = [] } = {}) =>
+  api.post(`/bookings/${id}/no-show/worker`, { note, evidence });

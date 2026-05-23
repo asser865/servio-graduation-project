@@ -405,7 +405,7 @@ async function submitOnlineBooking() {
   const booking = await finalizeBooking({ returnBooking: true });
   if (!booking) throw new Error('Booking creation failed.');
   try {
-    await holdPayment(booking._id, { savedCardId: state.data.paymentMeta.savedCardId });
+    await holdPayment(booking._id, { savedCardId: state.data.paymentMeta.savedCardId, useCredit: true });
     goToConfirmationOrNext(booking);
   } catch (err) {
     const msg = err?.data?.message || err?.message || 'Payment authorization failed. Please try another card.';

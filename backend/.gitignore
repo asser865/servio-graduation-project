@@ -16,6 +16,7 @@ build/
 logs/
 *.log
 uploads/
+storage/
 
 # ─── Local-only files ─────────────────────────────────────────────────────────
 src/modules/uploads/upload.routes.js

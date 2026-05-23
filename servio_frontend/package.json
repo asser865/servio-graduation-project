@@ -1,4 +1,8 @@
 {
+  "scripts": {
+    "lint": "eslint js/ --ext .js",
+    "preview": "npx serve . -l 5173"
+  },
   "dependencies": {
     "motion": "^12.38.0"
   },
