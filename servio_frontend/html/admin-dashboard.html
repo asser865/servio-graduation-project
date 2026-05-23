@@ -7,6 +7,7 @@
   <script src="../js/config.js"></script>
   <script src="../js/theme-init.js"></script>
   <script src="../js/lang-init.js"></script>
+  <script src="../js/boot-init.js"></script>
   <link rel="stylesheet" href="../css/main.css" />
   <link rel="stylesheet" href="../css/pages/admin-dashboard.css" />
 </head>
@@ -107,13 +108,9 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
           <span>Support <span id="adminSupportBadge" class="tab-badge" hidden>0</span></span>
         </button>
-        <button class="admin-nav__btn" data-tab="settlements">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>
-          <span data-i18n="admin_nav_settlements">Cash Settlements</span>
-        </button>
-        <button class="admin-nav__btn" data-tab="payments">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>
-          <span>Payments <span id="adminPaymentsBadge" class="tab-badge" hidden>0</span></span>
+        <button class="admin-nav__btn" data-tab="finance">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7z"/><path d="M3 7l3-3h12l3 3"/><path d="M8 12h.01M12 12h4"/></svg>
+          <span><span data-i18n="admin_nav_finance">Finance</span> <span id="adminPaymentsBadge" class="tab-badge" hidden>0</span></span>
         </button>
         <button class="admin-nav__btn" data-tab="analytics">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
@@ -460,7 +457,7 @@
               </div>
               <div class="quick-action-card__label"><span data-i18n="admin_view_open_disputes">View Open Disputes</span> <span class="nav-badge nav-badge--red" id="qa-dispute-badge">0</span></div>
             </button>
-            <button class="quick-action-card" type="button" data-goto-tab="settlements">
+            <button class="quick-action-card" type="button" data-goto-tab="finance" data-goto-fin="settlements">
               <div class="quick-action-card__icon">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>
               </div>
@@ -774,7 +771,7 @@
                 <th data-i18n="admin_th_action">Action</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody style="visibility:hidden">
               <!-- Row 1 -->
               <tr class="booking-row" data-status="Active">
                 <td><div style="font-weight:600;">Ahmed Yasser</div></td>
@@ -989,7 +986,7 @@
                 <th data-i18n="admin_th_actions" class="center-align" style="width: 250px;">Actions</th>
               </tr>
             </thead>
-            <tbody id="servicesList">
+            <tbody id="servicesList" style="visibility:hidden">
               <tr>
                 <td style="font-weight:600;">Full Home Cleaning</td>
                 <td><span class="badge" style="background:rgba(59,130,246,0.1); color:#3b82f6;">Cleaning</span></td>
@@ -1056,8 +1053,13 @@
               <option value="">All disputes</option>
               <option value="open">Open</option>
               <option value="reviewing">Reviewing</option>
-              <option value="resolved_refund">Resolved - refunded</option>
-              <option value="resolved_release">Resolved - released</option>
+              <option value="awaiting_evidence">Awaiting evidence</option>
+              <option value="appealed">Appealed</option>
+              <option value="resolved_refund">Refunded</option>
+              <option value="resolved_partial">Partial refund</option>
+              <option value="resolved_release">Released</option>
+              <option value="resolved_redo">Sent for redo</option>
+              <option value="closed">Closed</option>
             </select>
           </label>
           <label class="admin-dispute-toolbar__field admin-dispute-toolbar__field--search" for="disputeSearch">
@@ -1145,87 +1147,226 @@
         </div>
       </section>
 
-      <section class="admin-panel" data-panel="settlements">
-        <div class="admin-panel__header">
-          <h2 data-i18n="admin_settlements_title">Cash Settlements</h2>
-        </div>
-
-        <div class="admin-kpi-grid" style="margin-bottom: 2rem;">
-          <div class="admin-kpi-card">
-            <div class="admin-kpi-card__main">
-              <span class="admin-kpi-card__label" data-i18n="admin_total_cash">Total Cash Collected</span>
-              <div class="admin-kpi-card__value">—</div>
-            </div>
+      <!-- ── Panel: Finance (Payments + Cash Settlements unified) ── -->
+      <section class="admin-panel fin-panel" data-panel="finance">
+        <div class="admin-panel__header fin-header">
+          <div class="fin-header__title">
+            <span class="fin-header__eyebrow" data-i18n="admin_finance_eyebrow">Financial operations</span>
+            <h2 data-i18n="admin_finance_title">Finance</h2>
+            <p class="fin-header__lede" data-i18n="admin_finance_lede">Online card escrow and offline cash settlements — one ledger.</p>
           </div>
-          <div class="admin-kpi-card">
-            <div class="admin-kpi-card__main">
-              <span class="admin-kpi-card__label" data-i18n="admin_pending_fees">Pending Fees</span>
-              <div class="admin-kpi-card__value" style="color: var(--color-warning);">—</div>
-            </div>
-          </div>
-          <div class="admin-kpi-card">
-            <div class="admin-kpi-card__main">
-              <span class="admin-kpi-card__label" data-i18n="admin_settled_fees">Settled</span>
-              <div class="admin-kpi-card__value" style="color: var(--color-success);">—</div>
-            </div>
+          <div class="fin-header__meta">
+            <span class="fin-header__pulse" aria-hidden="true">
+              <span class="fin-header__dot"></span>
+              <span data-i18n="admin_finance_live">Live</span>
+            </span>
           </div>
         </div>
 
-        <div class="admin-table-wrap" style="border:1px solid var(--color-border); border-radius:12px; overflow:hidden; background:var(--color-surface);">
-          <table class="bk-table" id="settlementsTable">
-            <thead>
-              <tr>
-                <th data-i18n="admin_th_tech_id">Tech ID</th>
-                <th data-i18n="admin_th_name">Technician</th>
-                <th class="right-align" data-i18n="admin_th_cash_amount">Cash Collected</th>
-                <th class="right-align" data-i18n="admin_th_fee">Platform Fee</th>
-                <th data-i18n="admin_th_status">Status</th>
-                <th data-i18n="admin_th_actions" class="center-align">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td colspan="6" class="center-align" style="padding: 3rem; color: var(--color-text-muted);">No pending cash settlements found.</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+        <nav class="fin-tabs" role="tablist" aria-label="Finance sections">
+          <button class="fin-tab is-active" data-fin-tab="payments" role="tab" aria-selected="true">
+            <span class="fin-tab__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 11h20M6 15h4"/></svg>
+            </span>
+            <span class="fin-tab__label" data-i18n="admin_finance_tab_payments">Payments</span>
+            <span class="fin-tab__hint" data-i18n="admin_finance_tab_payments_hint">Card escrow</span>
+          </button>
+          <button class="fin-tab" data-fin-tab="settlements" role="tab" aria-selected="false">
+            <span class="fin-tab__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            </span>
+            <span class="fin-tab__label" data-i18n="admin_finance_tab_settlements">Cash Settlements</span>
+            <span class="fin-tab__hint" data-i18n="admin_finance_tab_settlements_hint">Worker debts</span>
+          </button>
+        </nav>
 
-      <!-- ── Panel: Payments ───────────────────── -->
-      <section class="admin-panel" data-panel="payments">
-        <div class="admin-panel__header">
-          <h2>Payments</h2>
+        <!-- ── Inner: Cash Settlements ── -->
+        <div class="fin-section cs-panel" data-fin-section="settlements" hidden>
+        <div class="cs-header" style="margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--color-border);">
+          <div class="cs-header__title">
+            <h2 data-i18n="admin_settlements_title">Cash Settlements</h2>
+            <p class="cs-header__lede" data-i18n="admin_settlements_lede">Track outstanding worker debts, queue payouts, and audit settled cash flow.</p>
+          </div>
+          <span class="cs-header__pulse" aria-hidden="true">
+            <span class="cs-header__dot"></span>
+            <span data-i18n="admin_settlements_live">Live ledger</span>
+          </span>
         </div>
 
-        <div class="admin-section">
-          <div class="admin-section-header">
-            <h2>Pending Approvals</h2>
-            <div class="admin-filter-row">
-              <select id="approvalMethodFilter">
-                <option value="">All Methods</option>
-                <option value="online">Online</option>
-                <option value="cash">Cash</option>
-              </select>
+        <!-- KPI bento — asymmetric, distinct per metric -->
+        <div class="kpi-strip cs-kpis" id="settlementsKpis">
+          <div class="kpi cs-kpi cs-kpi--debt" data-key="outstandingDebt">
+            <span class="cs-kpi__glyph" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            </span>
+            <span class="kpi__label cs-kpi__label" data-i18n="admin_settlements_outstanding">Outstanding</span>
+            <span class="kpi__value cs-kpi__value">—</span>
+            <span class="cs-kpi__foot" data-i18n="admin_settlements_outstanding_foot">Cash owed by workers</span>
+          </div>
+          <div class="kpi cs-kpi cs-kpi--blocked" data-key="blockedWorkers">
+            <span class="cs-kpi__glyph" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg>
+            </span>
+            <span class="kpi__label cs-kpi__label" data-i18n="admin_settlements_blocked">Blocked workers</span>
+            <span class="kpi__value cs-kpi__value">—</span>
+            <span class="cs-kpi__foot" data-i18n="admin_settlements_blocked_foot">Locked until paid</span>
+          </div>
+          <div class="kpi cs-kpi cs-kpi--queue" data-key="payoutQueue">
+            <span class="cs-kpi__glyph" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h13l-3-3M21 17H8l3 3"/></svg>
+            </span>
+            <span class="kpi__label cs-kpi__label" data-i18n="admin_settlements_queue">Payout queue</span>
+            <span class="kpi__value cs-kpi__value">—</span>
+            <span class="cs-kpi__foot" data-i18n="admin_settlements_queue_foot">Awaiting verification</span>
+          </div>
+          <div class="kpi cs-kpi cs-kpi--settled" data-key="settledToday">
+            <span class="cs-kpi__glyph" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6"/></svg>
+            </span>
+            <span class="kpi__label cs-kpi__label" data-i18n="admin_settlements_settled">Settled today</span>
+            <span class="kpi__value cs-kpi__value">—</span>
+            <span class="cs-kpi__foot" data-i18n="admin_settlements_settled_foot">Closed since 00:00</span>
+          </div>
+        </div>
+
+        <nav class="subtabs cs-subtabs" role="tablist">
+          <button class="subtab cs-subtab is-active" data-subtab="worker-debts" role="tab" aria-selected="true">
+            <span class="cs-subtab__label" data-i18n="admin_settlements_tab_debts">Worker Debts</span>
+          </button>
+          <button class="subtab cs-subtab" data-subtab="payout-requests" role="tab" aria-selected="false">
+            <span class="cs-subtab__label" data-i18n="admin_settlements_tab_payouts">Payout Requests</span>
+          </button>
+          <button class="subtab cs-subtab" data-subtab="history" role="tab" aria-selected="false">
+            <span class="cs-subtab__label" data-i18n="admin_settlements_tab_history">History</span>
+          </button>
+        </nav>
+
+        <div id="subWorkerDebts" class="subpanel cs-subpanel is-active">
+          <div class="cs-table-wrap">
+            <table class="bk-table cs-table" id="workerDebtsTable">
+              <thead><tr><th data-i18n="admin_settlements_col_worker">Worker</th><th class="right-align" data-i18n="admin_settlements_col_owed">Total owed</th><th data-i18n="admin_settlements_col_oldest">Oldest</th><th class="right-align" data-i18n="admin_settlements_col_count"># Debts</th><th data-i18n="admin_settlements_col_status">Status</th><th data-i18n="admin_settlements_col_blocked">Blocked</th><th></th></tr></thead>
+              <tbody id="workerDebtsTbody"><tr><td colspan="7" class="center-align cs-empty">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div id="subPayoutRequests" class="subpanel cs-subpanel" hidden>
+          <div class="cs-table-wrap">
+            <table class="bk-table cs-table" id="payoutRequestsTable">
+              <thead><tr><th data-i18n="admin_settlements_col_worker">Worker</th><th data-i18n="admin_settlements_col_requested">Requested</th><th class="right-align" data-i18n="admin_settlements_col_amount">Amount</th><th data-i18n="admin_settlements_col_method">Method</th><th data-i18n="admin_settlements_col_status">Status</th><th></th></tr></thead>
+              <tbody id="payoutRequestsTbody"><tr><td colspan="6" class="center-align cs-empty">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div id="subHistory" class="subpanel cs-subpanel" hidden>
+          <div class="cs-history-toolbar">
+            <button type="button" id="btnExportSettlementsCsv" class="btn-premium btn-premium--ghost cs-export-btn">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
+              <span data-i18n="admin_settlements_export_csv">Export CSV</span>
+            </button>
+          </div>
+          <div class="cs-table-wrap">
+            <table class="bk-table cs-table" id="historyTable">
+              <thead><tr><th data-i18n="admin_settlements_col_date">Date</th><th data-i18n="admin_settlements_col_worker">Worker</th><th data-i18n="admin_settlements_col_method">Method</th><th class="right-align" data-i18n="admin_settlements_col_amount">Amount</th><th data-i18n="admin_settlements_col_status">Status</th><th data-i18n="admin_settlements_col_verifier">Verifier</th></tr></thead>
+              <tbody id="historyTbody"><tr><td colspan="6" class="center-align cs-empty">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <aside class="drawer cs-drawer" id="settlementDrawer" hidden></aside>
+        </div><!-- /.fin-section[settlements] -->
+
+        <!-- ── Inner: Payments (card escrow) ── -->
+        <div class="fin-section fp-panel" data-fin-section="payments">
+          <div class="fp-header">
+            <div class="fp-header__title">
+              <h2 data-i18n="admin.payments.title">Payments</h2>
+              <p class="fp-header__lede" data-i18n="admin_payments_lede">Card-paid bookings held in escrow — approve releases, refunds and disputes.</p>
             </div>
           </div>
-          <div id="adminPendingApprovalsList"><!-- populated by JS --></div>
-        </div>
 
-        <div class="admin-section">
-          <div class="admin-section-header">
-            <h2>Cash Debts</h2>
-            <div id="adminCashDebtsSummary" class="admin-summary-row"><!-- populated by JS --></div>
-            <div class="admin-filter-row">
-              <select id="debtStatusFilter">
-                <option value="">All</option>
-                <option value="outstanding">Outstanding</option>
-                <option value="partially_paid">Partially Paid</option>
-                <option value="paid">Paid</option>
-              </select>
+          <div class="kpi-strip fp-kpis" id="paymentsKpis">
+            <div class="kpi fp-kpi fp-kpi--held" data-key="heldTotal">
+              <span class="fp-kpi__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/></svg></span>
+              <span class="kpi__label fp-kpi__label" data-i18n="admin_payments_held">Held</span>
+              <span class="kpi__value fp-kpi__value">—</span>
+            </div>
+            <div class="kpi fp-kpi fp-kpi--review" data-key="pendingReviewCount">
+              <span class="fp-kpi__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+              <span class="kpi__label fp-kpi__label" data-i18n="admin_payments_review">Pending review</span>
+              <span class="kpi__value fp-kpi__value">—</span>
+            </div>
+            <div class="kpi fp-kpi fp-kpi--released" data-key="releasedTodayTotal">
+              <span class="fp-kpi__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6"/></svg></span>
+              <span class="kpi__label fp-kpi__label" data-i18n="admin_payments_released">Released today</span>
+              <span class="kpi__value fp-kpi__value">—</span>
+            </div>
+            <div class="kpi fp-kpi fp-kpi--disputed" data-key="disputedCount">
+              <span class="fp-kpi__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.7 3.86a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span>
+              <span class="kpi__label fp-kpi__label" data-i18n="admin_payments_disputed">Disputed</span>
+              <span class="kpi__value fp-kpi__value">—</span>
+            </div>
+            <div class="kpi fp-kpi fp-kpi--refunds" data-key="refundsTodayCount">
+              <span class="fp-kpi__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></span>
+              <span class="kpi__label fp-kpi__label" data-i18n="admin_payments_refunds">Refunds today</span>
+              <span class="kpi__value fp-kpi__value">—</span>
+            </div>
+            <div class="kpi fp-kpi fp-kpi--avg" data-key="avgReleaseHours">
+              <span class="fp-kpi__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M2 12h4M12 22v-4M22 12h-4"/><circle cx="12" cy="12" r="5"/></svg></span>
+              <span class="kpi__label fp-kpi__label" data-i18n="admin_payments_avg">Avg release</span>
+              <span class="kpi__value fp-kpi__value">—</span>
             </div>
           </div>
-          <div id="adminCashDebtsList"><!-- populated by JS --></div>
-        </div>
-      </section>
+
+          <div class="fp-section">
+            <div class="fp-section__head">
+              <h3 class="fp-section__title" data-i18n="admin_payments_ledger">Transaction ledger</h3>
+              <div class="filters-bar fp-filters">
+                <select id="payStatusFilter">
+                  <option value="all">All</option>
+                  <option value="held">Held</option>
+                  <option value="released">Released</option>
+                  <option value="refunded">Refunded</option>
+                  <option value="partially_refunded">Partial refund</option>
+                  <option value="disputed">Disputed</option>
+                </select>
+                <input id="payCustomerFilter" placeholder="Customer search">
+                <input id="payWorkerFilter" placeholder="Worker search">
+                <input id="payFromDate" type="date">
+                <input id="payToDate" type="date">
+                <button id="payResetFilters" class="btn btn--ghost">Reset</button>
+              </div>
+            </div>
+
+            <div class="fp-table-wrap">
+              <table class="admin-table fp-table" id="paymentsTable">
+                <thead>
+                  <tr><th>#</th><th>Date</th><th>Customer</th><th>Tech</th><th>Service</th><th>Amount</th><th>Fee</th><th>Status</th><th>Age</th><th></th></tr>
+                </thead>
+                <tbody id="paymentsTbody"></tbody>
+              </table>
+            </div>
+            <div class="pagination" id="paymentsPagination"></div>
+          </div>
+
+          <aside class="drawer cs-drawer" id="paymentDrawer" hidden></aside>
+
+          <div class="fp-section">
+            <div class="fp-section__head">
+              <h3 class="fp-section__title" data-i18n="admin_payments_pending_approvals">Pending approvals</h3>
+              <div class="admin-filter-row">
+                <select id="approvalMethodFilter">
+                  <option value="">All Methods</option>
+                  <option value="online">Online</option>
+                  <option value="cash">Cash</option>
+                </select>
+              </div>
+            </div>
+            <div id="adminPendingApprovalsList" class="fp-list"><!-- populated by JS --></div>
+          </div>
+
+        </div><!-- /.fin-section[payments] -->
+
+      </section><!-- /.fin-panel -->
 
 
       <!-- ── Panel: Analytics ───────────────────── -->

@@ -16,6 +16,14 @@
   animation: header-slide-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* Suppress intro animation on reload / bfcache restore so the header
+   appears in its final position immediately — prevents a perceived flicker
+   where the header is missing for ~450ms after every refresh. */
+html.no-intro .site-header,
+html.no-intro .site-header * {
+  animation: none !important;
+}
+
 @keyframes header-slide-in {
   from {
     transform: translateY(-110%);
@@ -341,14 +349,22 @@
   transform: scale(0.72) rotate(-18deg);
 }
 
-[data-theme-button][data-theme-state="dark"] .theme-button__icon--sun {
+[data-theme-button][data-theme-state="dark"] .theme-button__icon--sun,
+html[data-theme="dark"] [data-theme-button]:not([data-theme-state="light"]) .theme-button__icon--sun {
   opacity: 1;
   transform: scale(1) rotate(0deg);
 }
 
-[data-theme-button][data-theme-state="dark"] .theme-button__icon--moon {
+[data-theme-button][data-theme-state="dark"] .theme-button__icon--moon,
+html[data-theme="dark"] [data-theme-button]:not([data-theme-state="light"]) .theme-button__icon--moon {
   opacity: 0;
   transform: scale(0.72) rotate(18deg);
+}
+
+/* Suppress icon transition during boot so we never see a moon→sun swap flash
+   on dark-mode refresh. Transitions return once boot completes. */
+html.is-booting [data-theme-button] .theme-button__icon {
+  transition: none !important;
 }
 
 .header__right .btn--header-signup {

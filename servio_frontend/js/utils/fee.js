@@ -32,7 +32,13 @@ export function snapshotFeeFromBooking(booking, fallbackRate = DEFAULT_PLATFORM_
 }
 
 export function formatMoney(value, currency = 'EGP') {
-  return `${money(value).toFixed(2)} ${currency}`;
+  const num = money(value);
+  const locale = (typeof navigator !== 'undefined' && navigator.language) || 'en-EG';
+  try {
+    return new Intl.NumberFormat(locale, { style: 'currency', currency, minimumFractionDigits: 2 }).format(num);
+  } catch {
+    return `${num.toFixed(2)} ${currency}`;
+  }
 }
 
 export function paymentMethodLabel(method, paymentMeta) {

@@ -52,4 +52,8 @@ async function dispatchAvailabilityMatches(worker, baseUrl) {
   }
 }
 
-module.exports = { dispatchAvailabilityMatches };
+async function sendToUser({ userId, event, bookingId, payload } = {}) {
+  console.log(`[notify] event=${event} userId=${userId} bookingId=${bookingId || ''}`);
+}
+
+module.exports = { dispatchAvailabilityMatches, sendToUser };

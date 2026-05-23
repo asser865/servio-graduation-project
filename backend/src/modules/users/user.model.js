@@ -78,8 +78,13 @@ const userSchema = new mongoose.Schema(
 
     role: {
       type:    String,
-      enum:    ['user', 'worker', 'admin'],
+      enum:    ['user', 'worker', 'admin', 'superadmin'],
       default: 'user',
+    },
+
+    adminPermissions: {
+      type:    [String],
+      default: [],
     },
 
     profileImage: {
@@ -91,6 +96,9 @@ const userSchema = new mongoose.Schema(
       type:    Boolean,
       default: true,
     },
+
+    // Plan 3 Task 5 — auto-suspension after N strikes
+    suspendedUntil: { type: Date, default: null },
 
     restrictions: {
       cashBookingsBlocked: { type: Boolean, default: false },

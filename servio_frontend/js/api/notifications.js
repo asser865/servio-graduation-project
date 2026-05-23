@@ -6,3 +6,6 @@ export const markOneRead       = (id)                     => api.patch(`/notific
 export const markAllRead       = ()                       => api.patch('/notifications/read-all');
 export const clearAll          = ()                       => api.delete('/notifications');
 export const deleteOne         = (id)                     => api.delete(`/notifications/${id}`);
+
+export const getNotificationPreferences = ()              => api.get('/notifications/preferences');
+export const updateNotificationPreferences = (channels)   => api.put('/notifications/preferences', { channels });

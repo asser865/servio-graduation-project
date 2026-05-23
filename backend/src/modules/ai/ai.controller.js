@@ -169,6 +169,7 @@ function postProcessAiData(aiData, effectiveLocation) {
 
   const stillNeedsFollowUp = newMissingFields.length > 0;
   const newScenario = stillNeedsFollowUp ? aiData.scenario : (aiData.issue_mode || 'single');
+  const locationWasMissing = (aiData.missing_fields || []).includes('location');
 
   return {
     ...aiData,
@@ -180,7 +181,7 @@ function postProcessAiData(aiData, effectiveLocation) {
     advisory_message_missing:      newAdvisoryMessageMissing,
     needs_follow_up:               stillNeedsFollowUp,
     scenario:                      newScenario,
-    follow_up_message:             stillNeedsFollowUp ? aiData.follow_up_message : '',
+    follow_up_message:             (stillNeedsFollowUp && !locationWasMissing) ? aiData.follow_up_message : '',
   };
 }
 

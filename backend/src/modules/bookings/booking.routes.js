@@ -75,6 +75,59 @@ router.patch(
   bookingController.updateStatus
 );
 
+const cancelValidation = [
+  body('reason').optional({ checkFalsy: true }).isString().trim().isLength({ max: 240 }),
+];
+const noShowValidation = [
+  body('note').optional({ checkFalsy: true }).isString().trim().isLength({ max: 240 }),
+  body('evidence').optional().isArray({ max: 8 }),
+  body('evidence.*').optional({ checkFalsy: true }).isURL({ require_protocol: true }),
+];
+
+const completeValidation = [
+  body('notes').optional({ checkFalsy: true }).isString().trim().isLength({ max: 400 }),
+  body('photos').optional().isArray({ max: 4 }),
+  body('photos.*').optional({ checkFalsy: true }).isURL({ require_protocol: true }),
+];
+
+// POST /api/v1/bookings/:id/accept — worker accepts booking (runs cash-debt gate)
+router.post('/:id/accept', protect, authorize('worker'), bookingController.acceptBooking);
+
+// POST /api/v1/bookings/:id/start — worker starts the job
+router.post('/:id/start', protect, authorize('worker'), bookingController.startBooking);
+
+// POST /api/v1/bookings/:id/complete — worker marks job complete
+router.post('/:id/complete',
+  protect,
+  authorize('worker'),
+  validate(completeValidation),
+  bookingController.completeBooking
+);
+
+// POST /api/v1/bookings/:id/cancel — customer or worker cancels (Plan 3 Task 6)
+router.post('/:id/cancel',
+  protect,
+  authorize('user', 'worker'),
+  validate(cancelValidation),
+  bookingController.cancelBooking
+);
+
+// POST /api/v1/bookings/:id/no-show/customer — worker reports customer no-show (Plan 3 Task 19)
+router.post('/:id/no-show/customer',
+  protect,
+  authorize('worker'),
+  validate(noShowValidation),
+  bookingController.markCustomerNoShow
+);
+
+// POST /api/v1/bookings/:id/no-show/worker — customer reports worker no-show (Plan 3 Task 19)
+router.post('/:id/no-show/worker',
+  protect,
+  authorize('user'),
+  validate(noShowValidation),
+  bookingController.markWorkerNoShow
+);
+
 // GET /api/v1/bookings/:id — view a single booking (user, worker, or admin)
 router.get('/:id', protect, bookingController.getBookingById);
 

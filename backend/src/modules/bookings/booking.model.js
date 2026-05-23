@@ -10,6 +10,7 @@ const BOOKING_STATUSES = [
   'pending', 'accepted', 'en_route', 'arrived', 'rejected', 'in_progress',
   'awaiting_customer_confirmation', 'pending_admin_review',
   'completed', 'cancelled', 'disputed',
+  'cancelled_no_show', 'customer_no_show', 'worker_no_show', 're_pooling',
 ];
 const PAYMENT_METHODS = ['cash', 'card', 'online'];
 
@@ -212,6 +213,22 @@ const bookingSchema = new mongoose.Schema(
       trim:  true,
     },
 
+    // Cancellation metadata (Plan 3 Task 3+)
+    acceptedAt:    { type: Date },
+    cancelledAt:   { type: Date },
+    cancelledBy:   { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    cancelledByRole: { type: String, enum: ['user', 'worker', 'admin', 'system'] },
+    lateFeeAmount: { type: Number, default: 0 },
+
+    // Re-pool tracking after worker cancel (Task 5)
+    rePooledFrom: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    rePooledAt:   { type: Date },
+
+    // No-show metadata (Task 7)
+    noShowMarkedAt:   { type: Date },
+    noShowMarkedBy:   { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    noShowEvidence:   { type: [String], default: [] },
+
     savedCard: {
       type: mongoose.Schema.Types.ObjectId,
       ref:  'SavedCard',
@@ -261,9 +278,30 @@ const bookingSchema = new mongoose.Schema(
       type:  String,
       trim:  true,
     },
+
+    completedAt: { type: Date },
+    releasedAt: { type: Date },
+    cashCollectedAt: { type: Date },
+    customerConfirmAutoAt: { type: Date },
+    customerConfirmedVia: {
+      type: String,
+      enum: ['customer', 'system_auto', 'admin'],
+    },
+    completionNotes:  { type: String },
+    completionPhotos: { type: [String], default: [] },
+    confirmRemindersSent: { type: [Number], default: [] },
   },
   { timestamps: true }
 );
+
+bookingSchema.pre('save', async function () {
+  if (this.isModified('status') && this.status === 'completed' && !this.completedAt) {
+    this.completedAt = new Date();
+  }
+  if (this.isModified('paymentStatus') && this.paymentStatus === 'released' && !this.releasedAt) {
+    this.releasedAt = new Date();
+  }
+});
 
 // ── Indexes for common queries ────────────────────────────────────────────────
 bookingSchema.index({ user:   1, status: 1 });

@@ -3,14 +3,17 @@
    ═══════════════════════════════════════════════════════════ */
 import { revealAll } from '../components/scroll-reveal.js';
 import { showToast } from '../components/toast.js';
+import { skCardGrid, skList, skStatGrid, skTableRows } from '../components/skeleton.js';
 import { getInitials } from '../utils/string.js';
 import { getMe, updateMe, updatePassword, updateEmail, deleteMe, updateAvailability, toggleAvailableNow, toggleBlockedDate } from '../api/users.js';
 import { uploadPublicFile } from '../api/uploads.js';
 import { getWorkerBookings, updateBookingStatus } from '../api/bookings.js';
 import { getWorkerReviews } from '../api/reviews.js';
 import { getServices } from '../api/services.js';
-import { getMyDebts } from '../api/payments.js';
-import { getNotifications as apiGetTechNotifs, markOneRead as apiMarkTechNotifRead, markAllRead as apiMarkTechAllRead } from '../api/notifications.js';
+import { getMyDebts, getWorkerDisputes, getPartyDisputeById, addDisputeEvidence, appealDispute, getMyDebtsV2, getMySettlements, getMyPayouts, getMyTransactions, getWorkerEarnings } from '../api/payments.js';
+import { openSettleDebtModal } from '../components/settle-debt-form.js';
+import { openPayoutRequestModal } from '../components/payout-request-form.js';
+import { getNotifications as apiGetTechNotifs, markOneRead as apiMarkTechNotifRead, markAllRead as apiMarkTechAllRead, getNotificationPreferences, updateNotificationPreferences } from '../api/notifications.js';
 import { getHierarchy as getLocationHierarchy, resolveSlug as resolveLocationSlug, labelForSlug as locationLabel, getDescendants as locationDescendants } from '../data/locations.js';
 
 const TAB_KEY = 'servio_activeTab_technician';
@@ -216,6 +219,7 @@ const TAB_LABEL_KEYS = {
   'settings':      'tech_nav_settings',
   'job-board':     'tech_nav_job_board',
   'my-proposals':  'tech_nav_proposals',
+  'disputes':      'tech_nav_disputes',
 };
 
 function getSession() {
@@ -363,8 +367,13 @@ function initTabs() {
         initJobQueue().catch(() => {});
       } else if (id === 'overview' || id === 'earnings') {
         populateStats().catch(() => {});
+      } else if (id === 'disputes') {
+        loadTechDisputes().catch(() => {});
       }
     } else if (tabLastRefresh[id] === undefined) {
+      if (id === 'disputes') {
+        loadTechDisputes().catch(() => {});
+      }
       // Mark as seen so next visit triggers refresh
       tabLastRefresh[id] = now;
     }
@@ -382,8 +391,17 @@ function initTabs() {
   const quickAvail = document.querySelector('[data-quick-availability]');
   if (quickAvail) quickAvail.addEventListener('click', () => showTab('availability'));
 
-  const saved = sessionStorage.getItem(TAB_KEY) || 'overview';
+  const hashTab = (location.hash || '').replace('#', '').trim();
+  const knownTabs = Array.from(tabs).map(t => t.dataset.tab);
+  const saved = (hashTab && knownTabs.includes(hashTab))
+    ? hashTab
+    : (sessionStorage.getItem(TAB_KEY) || 'overview');
   showTab(saved);
+
+  window.addEventListener('hashchange', () => {
+    const h = (location.hash || '').replace('#', '').trim();
+    if (h && knownTabs.includes(h)) showTab(h);
+  });
 }
 
 function populateProfile() {
@@ -616,17 +634,39 @@ function updateWelcomeText() {
   });
 }
 
+const TECH_STATS_CACHE_KEY = 'servio_technician_stats_cache_v1';
+
+function setStatTextEl(key, val) {
+  const el = document.querySelector(`[data-stat="${key}"]`);
+  if (el) el.textContent = val;
+}
+function setStatSubTextEl(key, val) {
+  const el = document.querySelector(`[data-stat-sub="${key}"]`);
+  if (el) el.textContent = val;
+}
+
+function renderCachedTechStats() {
+  try {
+    const c = JSON.parse(localStorage.getItem(TECH_STATS_CACHE_KEY) || 'null');
+    if (!c) return;
+    if (c.totalJobs != null)       setStatTextEl('total-jobs', c.totalJobs);
+    if (c.totalJobsMonthSub)       setStatSubTextEl('total-jobs-month', c.totalJobsMonthSub);
+    if (c.monthEarningsLabel)      setStatTextEl('month-earnings', c.monthEarningsLabel);
+    if (c.monthEarningsChange)     setStatSubTextEl('month-earnings-change', c.monthEarningsChange);
+    if (c.pendingRequests != null) setStatTextEl('pending-requests', c.pendingRequests);
+    if (c.pendingRequestsNote)     setStatSubTextEl('pending-requests-note', c.pendingRequestsNote);
+    if (c.outstandingHtml) {
+      const el = document.querySelector('[data-stat="outstanding-balance"]');
+      if (el) el.innerHTML = c.outstandingHtml;
+    }
+  } catch { /* ignore */ }
+}
+
 async function populateStats() {
   const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
 
-  function setStat(key, val) {
-    const el = document.querySelector(`[data-stat="${key}"]`);
-    if (el) el.textContent = val;
-  }
-  function setStatSub(key, val) {
-    const el = document.querySelector(`[data-stat-sub="${key}"]`);
-    if (el) el.textContent = val;
-  }
+  function setStat(key, val) { setStatTextEl(key, val); }
+  function setStatSub(key, val) { setStatSubTextEl(key, val); }
 
   // Fetch all bookings for this worker (up to 200 to compute stats)
   let bookings = [];
@@ -693,10 +733,27 @@ async function populateStats() {
   setStatSub('pending-requests-note', pending.length > 0 ? (_tSafe('tech_action_needed') || 'Action needed') : (_tSafe('tech_no_pending') || 'All clear'));
 
   // Outstanding balance stat card
+  const outstandingHtml = `${outstandingAmount.toLocaleString('en-US')} <span data-i18n="currency_egp">EGP</span>`;
   const outstandingEl = document.querySelector('[data-stat="outstanding-balance"]');
-  if (outstandingEl) {
-    outstandingEl.innerHTML = `${outstandingAmount.toLocaleString('en-US')} <span data-i18n="currency_egp">EGP</span>`;
-  }
+  if (outstandingEl) outstandingEl.innerHTML = outstandingHtml;
+
+  // Cache snapshot so refresh shows last-known numbers immediately instead of
+  // flashing the skeleton placeholder before the API responds.
+  try {
+    const pendingNote = pending.length > 0
+      ? (_tSafe('tech_action_needed') || 'Action needed')
+      : (_tSafe('tech_no_pending') || 'All clear');
+    localStorage.setItem(TECH_STATS_CACHE_KEY, JSON.stringify({
+      totalJobs: totalCount > bookings.length ? totalCount : nonCancelled.length,
+      totalJobsMonthSub: `+${monthJobs} ${_t('tech_stat_this_month') || 'this month'}`,
+      monthEarningsLabel: monthEarnings > 0 ? `EGP ${monthEarnings.toLocaleString('en-US')}` : 'EGP 0',
+      monthEarningsChange: deltaStr,
+      pendingRequests: pending.length,
+      pendingRequestsNote: pendingNote,
+      outstandingHtml,
+      ts: Date.now()
+    }));
+  } catch { /* quota */ }
 
   // Notification badge = pending requests
   updateTopbarBadge(pending.length);
@@ -1079,8 +1136,8 @@ async function initJobQueue(restoreTab = null) {
       <p style="color:${color};font-size:0.95rem;margin:0;">${text}</p>
     </div>`);
 
-  // Loading state
-  showMsg('Loading jobs…');
+  // Loading state — shimmer skeleton
+  container.innerHTML = skCardGrid(4, { wide: true });
 
   let bookings = [];
   try {
@@ -1489,6 +1546,9 @@ function buildJobCard(b, _t) {
             <button class="btn-premium btn-premium--amber" data-flow-action="start-job">
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
               Verify &amp; Start Job
+            </button>
+            <button class="btn-premium btn-premium--red" data-flow-action="customer-no-show" style="margin-left:8px;">
+              Mark Customer No-Show
             </button>
           </div>
         </div>
@@ -2024,6 +2084,27 @@ function wireArrivalFlows(container) {
         return;
       }
 
+      if (action === 'customer-no-show') {
+        const note = window.prompt('Describe what happened (min 5 chars):', '');
+        if (!note || note.trim().length < 5) {
+          showToast('Please describe what happened (5+ chars).', 'error');
+          return;
+        }
+        if (!window.confirm('Mark customer as no-show? You will receive a partial fee; the customer is refunded the remainder.')) return;
+        btn.disabled = true;
+        try {
+          const { markCustomerNoShow } = await import('../api/bookings.js');
+          const res = await markCustomerNoShow(bookingId, { note: note.trim(), evidence: [] });
+          const r = res?.data || res;
+          showToast(`Marked no-show. Fee: ${r?.workerCompensation || 0} EGP.`, 'success');
+          setTimeout(() => window.location.reload(), 800);
+        } catch (err) {
+          btn.disabled = false;
+          showToast(err?.message || 'Failed to mark no-show.', 'error');
+        }
+        return;
+      }
+
       if (action === 'start-job') {
         const boxes  = [...flow.querySelectorAll('.jq-pin-box')];
         const entered = boxes.map(b => b.value).join('');
@@ -2242,17 +2323,57 @@ function populateOverviewSchedule(bookings) {
   }).join('');
 }
 
+// ── Atelier sparkline: 7-day earnings trend ──────────────────────────────────
+function renderEarningsSparkline(completed) {
+  const area = document.getElementById('sparkArea');
+  const line = document.getElementById('sparkLine');
+  if (!area || !line) return;
+
+  const days = 7;
+  const now = new Date();
+  const buckets = new Array(days).fill(0);
+  completed.forEach(b => {
+    const d = new Date(b.scheduledDate || b.updatedAt);
+    if (Number.isNaN(d.getTime())) return;
+    const diff = Math.floor((now - d) / 86400000);
+    if (diff >= 0 && diff < days) buckets[days - 1 - diff] += (b.totalPrice || 0);
+  });
+
+  const max = Math.max(...buckets, 1);
+  const W = 120, H = 28, pad = 2;
+  const step = (W - pad * 2) / (days - 1);
+  const points = buckets.map((v, i) => {
+    const x = pad + i * step;
+    const y = H - pad - (v / max) * (H - pad * 2 - 2);
+    return [x, y];
+  });
+
+  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ');
+  const areaPath = `${linePath} L${points[points.length - 1][0].toFixed(1)} ${H} L${points[0][0].toFixed(1)} ${H} Z`;
+
+  line.setAttribute('d', linePath);
+  area.setAttribute('d', areaPath);
+}
+
 // ── Populate earnings panel ───────────────────────────────────────────────────
 function populateEarnings(allBookings, completed, monthEarnings, lastMonthEarnings, cashCompleted, outstandingAmount) {
   const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
 
-  // Summary stats
+  // Ledger period header (e.g. "MAY · 2026")
+  const periodEl = document.getElementById('ledgerPeriod');
+  if (periodEl) {
+    const now = new Date();
+    const month = now.toLocaleString('en-US', { month: 'short' }).toUpperCase();
+    periodEl.textContent = `${month} \u00B7 ${now.getFullYear()}`;
+  }
+
+  // Summary stats (atelier rail strips out the trailing "EGP" via <em>)
   const totalEarned = completed.reduce((s, b) => s + (b.totalPrice || 0), 0);
   const earnTotalEl = document.getElementById('earn-total');
-  if (earnTotalEl) earnTotalEl.textContent = `${totalEarned.toLocaleString('en-US')} EGP`;
+  if (earnTotalEl) earnTotalEl.textContent = totalEarned.toLocaleString('en-US');
 
   const earnMonthEl = document.getElementById('earn-month');
-  if (earnMonthEl) earnMonthEl.textContent = `${monthEarnings.toLocaleString('en-US')} EGP`;
+  if (earnMonthEl) earnMonthEl.textContent = monthEarnings.toLocaleString('en-US');
 
   const earnMonthSubEl = document.getElementById('earn-month-sub');
   if (earnMonthSubEl) {
@@ -2267,15 +2388,35 @@ function populateEarnings(allBookings, completed, monthEarnings, lastMonthEarnin
   const earnCompletedEl = document.getElementById('earn-completed-count');
   if (earnCompletedEl) earnCompletedEl.textContent = completed.length;
 
-  // Outstanding cash balance
+  // Sparkline: last 7 days of completed earnings
+  renderEarningsSparkline(completed);
+
+  // Outstanding cash balance — also drives walletAvailable plain-number format
   const liabilityAmountEl = document.getElementById('liabilityAmount');
   if (liabilityAmountEl) liabilityAmountEl.innerHTML = `${outstandingAmount.toLocaleString('en-US')} <span>EGP</span>`;
+  const liabilityCard = document.getElementById('liabilityCard');
+  if (liabilityCard) liabilityCard.dataset.state = outstandingAmount > 0 ? 'owing' : 'settled';
+  const payLiabBtn = document.getElementById('payLiabilityBtn');
+  if (payLiabBtn) payLiabBtn.hidden = outstandingAmount <= 0;
+
+  // Strip trailing "EGP" from wallet amounts (atelier ledger renders ccy separately)
+  ['walletAvailable', 'walletPending'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      const raw = el.textContent.replace(/EGP/gi, '').trim() || '0';
+      el.textContent = raw;
+    }
+  });
 
   // Liability items — last 5 cash completed bookings
   const liabilityList = document.getElementById('liability-items-list');
   if (liabilityList) {
     if (cashCompleted.length === 0) {
-      liabilityList.innerHTML = `<p style="color:var(--color-text-muted);font-size:0.85rem;padding:8px 0;">${_t('tech_no_outstanding') || 'No outstanding cash balance.'}</p>`;
+      liabilityList.innerHTML = `
+        <div class="liability-empty">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>
+          <span>${_t('tech_no_outstanding') || 'All settled — no outstanding cash balance.'}</span>
+        </div>`;
     } else {
       liabilityList.innerHTML = cashCompleted.slice(0, 5).map(b => {
         const shortId = b._id.slice(-6).toUpperCase();
@@ -3434,7 +3575,7 @@ async function initReviewsTab(workerId) {
   const listEl    = document.getElementById('tech-dash-reviews-list');
   if (!summaryEl || !listEl) return;
 
-  listEl.innerHTML = `<p style="padding:1rem;opacity:0.6">Loading reviews…</p>`;
+  listEl.innerHTML = skList(4);
 
   let reviews = [];
   try {
@@ -3636,8 +3777,6 @@ async function initDashboard() {
     finally { _jqPolling = false; }
   }, 15_000);
 }
-
-initDashboard().catch(err => console.error('[Dashboard init error]', err));
 
 /* Re-render dynamic grids and welcome text on language change */
 document.addEventListener('langchange', () => {
@@ -4340,3 +4479,973 @@ initDeleteAccount();
 
 // Re-run on language change
 document.addEventListener('langchange', updateActionNeededDates);
+
+
+/* ═══════════════════════════════════════════════════════════
+   Disputes panel
+   ═══════════════════════════════════════════════════════════ */
+
+const TECH_DISP_STATE = {
+  filter: 'all',
+  disputes: [],
+  loading: false,
+  currentId: null,
+};
+
+function escapeHtmlDisp(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+}
+
+function fmtDateTimeDisp(value) {
+  if (!value) return '—';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function fmtMoneyDisp(amount, currency = 'EGP') {
+  const n = Number(amount);
+  if (!Number.isFinite(n)) return '—';
+  const cur = String(currency || 'EGP').toUpperCase();
+  return `${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}\u00A0${cur}`;
+}
+
+function categoryIconDisp(cat) {
+  const c = String(cat || '').toLowerCase();
+  if (c.includes('plumb'))  return '<path d="M3 8h6a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h8"/><path d="M9 3v5"/><path d="M19 12v9"/>';
+  if (c.includes('electric')) return '<polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>';
+  if (c.includes('ac') || c.includes('hvac') || c.includes('cool')) return '<circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="9"/><line x1="12" y1="15" x2="12" y2="22"/><line x1="2" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="22" y2="12"/>';
+  if (c.includes('paint')) return '<path d="M19 11h2v2a2 2 0 0 1-2 2h-1l-1 7H7l-1-7H3v-2h2V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v6z"/>';
+  if (c.includes('carpent')) return '<path d="M14 3l7 7-3 3-7-7 3-3z"/><path d="M11 6l-8 8v7h7l8-8"/>';
+  if (c.includes('clean')) return '<path d="M9 3h6v4H9z"/><path d="M5 7h14l-1 14H6L5 7z"/>';
+  return '<path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>';
+}
+
+function svgIconDisp(paths, size = 16) {
+  return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+}
+
+function getCustomerInitial(d) {
+  const name = getCustomerName(d) || '?';
+  return String(name).trim().charAt(0).toUpperCase() || '?';
+}
+
+function statusLabelDisp(s) {
+  return ({
+    open: 'Open',
+    reviewing: 'Reviewing',
+    awaiting_evidence: 'Awaiting Evidence',
+    resolved_refund: 'Refunded',
+    resolved_release: 'Payment Released',
+    resolved_partial: 'Partial Refund',
+    resolved_redo: 'Redo Required',
+    appealed: 'Appealed',
+    closed: 'Closed',
+  })[s] || (s || '').replace(/_/g, ' ');
+}
+
+function statusClassDisp(s) {
+  if (s === 'open') return 'is-open';
+  if (s === 'reviewing') return 'is-reviewing';
+  if (s === 'awaiting_evidence') return 'is-action';
+  if (s === 'appealed') return 'is-appealed';
+  if (s && s.startsWith('resolved')) return 'is-resolved';
+  return '';
+}
+
+function decisionLabelDisp(d) {
+  return ({
+    refund: 'Full refund to customer',
+    release: 'Payment released to you',
+    partial_refund: 'Partial refund issued',
+    redo: 'You must redo the job',
+  })[d] || (d || '—');
+}
+
+function isActionableForTech(d) {
+  if (!d) return false;
+  if (d.status === 'awaiting_evidence' && (d.evidenceRequestedFrom === 'worker' || d.evidenceRequestedFrom === 'both')) return true;
+  return false;
+}
+
+function recalcTechDispStats() {
+  const list = TECH_DISP_STATE.disputes;
+  const counts = { open: 0, action: 0, resolved: 0, total: list.length };
+  list.forEach(d => {
+    if (['open', 'reviewing', 'awaiting_evidence'].includes(d.status)) counts.open += 1;
+    if (isActionableForTech(d)) counts.action += 1;
+    if (String(d.status || '').startsWith('resolved') || d.status === 'closed') counts.resolved += 1;
+  });
+  document.querySelectorAll('[data-disp-stat]').forEach(el => {
+    const k = el.dataset.dispStat;
+    if (counts[k] != null) el.textContent = String(counts[k]);
+  });
+  const badge = document.querySelector('[data-nav-badge="disputes"]');
+  if (badge) {
+    if (counts.action > 0) { badge.hidden = false; badge.textContent = String(counts.action); }
+    else { badge.hidden = true; }
+  }
+}
+
+function getCustomerName(d) {
+  return d?.booking?.user?.name || d?.booking?.user?.fullName || 'Customer';
+}
+
+function getServiceName(d) {
+  return d?.booking?.service?.title || d?.booking?.serviceCategory || 'Service';
+}
+
+function renderTechDisputeCard(d) {
+  const status = d.status || 'open';
+  const sClass = statusClassDisp(status);
+  const customerName = escapeHtmlDisp(getCustomerName(d));
+  const customerInitial = escapeHtmlDisp(getCustomerInitial(d));
+  const service = escapeHtmlDisp(getServiceName(d));
+  const opened = fmtDateTimeDisp(d.createdAt);
+  const amt = d.payment?.amount ?? d.booking?.estimatedTotal ?? d.booking?.totalPrice;
+  const actionable = isActionableForTech(d);
+  const isResolved = String(status).startsWith('resolved') || status === 'closed';
+  const decision = (isResolved && d.decision)
+    ? `<div class="tdisp-card__decision"><span class="tdisp-card__decision-label">Decision</span><span class="tdisp-card__decision-value">${escapeHtmlDisp(decisionLabelDisp(d.decision))}${d.refundAmount ? ` · ${fmtMoneyDisp(d.refundAmount, d.payment?.currency)}` : ''}</span></div>`
+    : '';
+  const reason = d.reason
+    ? `<div class="tdisp-card__quote">${svgIconDisp('<path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"/>', 14)}<p>${escapeHtmlDisp(d.reason).slice(0, 200)}${d.reason.length > 200 ? '…' : ''}</p></div>`
+    : '';
+  const sevClass = ['low','medium','high','critical'].includes(d.severity) ? `is-sev-${d.severity}` : '';
+
+  return `
+    <article class="tdisp-card ${actionable ? 'is-actionable' : ''} ${sClass} ${sevClass}" data-disp-card="${escapeHtmlDisp(d._id)}" tabindex="0" role="button" data-disp-open="${escapeHtmlDisp(d._id)}">
+      <div class="tdisp-card__stripe" aria-hidden="true"></div>
+      <header class="tdisp-card__head">
+        <div class="tdisp-card__avatar" aria-hidden="true">${customerInitial}</div>
+        <div class="tdisp-card__head-text">
+          <h3 class="tdisp-card__title">${service}</h3>
+          <p class="tdisp-card__customer"><span class="tdisp-card__customer-name">${customerName}</span> <span class="tdisp-card__dot">·</span> <span class="tdisp-card__when">${escapeHtmlDisp(opened)}</span></p>
+        </div>
+        ${amt != null ? `<div class="tdisp-card__amount" title="Job total"><span class="tdisp-card__amount-label">Job total</span><span class="tdisp-card__amount-value">${fmtMoneyDisp(amt, d.payment?.currency)}</span></div>` : ''}
+      </header>
+      <div class="tdisp-card__body">
+        <div class="tdisp-card__badges">
+          <span class="tdisp-status ${sClass}">${escapeHtmlDisp(statusLabelDisp(status))}</span>
+          ${actionable ? `<span class="tdisp-action-pill">${svgIconDisp('<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>', 12)} Action required</span>` : ''}
+          ${d.category ? `<span class="tdisp-category">${escapeHtmlDisp(String(d.category).replace(/_/g, ' '))}</span>` : ''}
+        </div>
+        ${reason}
+        ${decision}
+      </div>
+      <footer class="tdisp-card__foot">
+        <span class="tdisp-card__id">#${escapeHtmlDisp(String(d._id || '').slice(-6))}</span>
+        <button type="button" class="tdisp-card__cta" data-disp-open="${escapeHtmlDisp(d._id)}">
+          <span>${actionable ? 'Respond now' : 'View details'}</span>
+          ${svgIconDisp('<polyline points="9 18 15 12 9 6"/>', 14)}
+        </button>
+      </footer>
+    </article>
+  `;
+}
+
+function renderTechDisputesList() {
+  const root = document.getElementById('techDisputesList');
+  if (!root) return;
+  const filter = TECH_DISP_STATE.filter;
+  const list = TECH_DISP_STATE.disputes.filter(d => {
+    if (filter === 'all') return true;
+    if (filter === 'resolved') return String(d.status || '').startsWith('resolved') || d.status === 'closed';
+    return d.status === filter;
+  });
+
+  if (!list.length) {
+    root.innerHTML = `
+      <div class="tdisp-empty">
+        <div class="tdisp-empty__icon">
+          <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/>
+          </svg>
+        </div>
+        <h3 class="tdisp-empty__title">${filter === 'all' ? 'No disputes yet' : 'Nothing to show here'}</h3>
+        <p class="tdisp-empty__desc">${filter === 'all' ? 'When a customer disputes one of your jobs, it will show up here.' : 'Try a different filter to see more disputes.'}</p>
+      </div>`;
+    return;
+  }
+  root.innerHTML = list.map(renderTechDisputeCard).join('');
+  root.querySelectorAll('[data-disp-open]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openTechDisputeModal(btn.dataset.dispOpen);
+    });
+  });
+  root.querySelectorAll('.tdisp-card').forEach(card => {
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openTechDisputeModal(card.dataset.dispCard);
+      }
+    });
+  });
+}
+
+async function loadTechDisputes() {
+  const root = document.getElementById('techDisputesList');
+  if (!root) return;
+  if (TECH_DISP_STATE.loading) return;
+  TECH_DISP_STATE.loading = true;
+  root.innerHTML = `<div aria-busy="true">${skCardGrid(3, { wide: true })}</div>`;
+  try {
+    const res = await getWorkerDisputes({ limit: 100 });
+    const payload = res?.data || res;
+    TECH_DISP_STATE.disputes = Array.isArray(payload?.disputes) ? payload.disputes : [];
+    recalcTechDispStats();
+    renderTechDisputesList();
+  } catch (err) {
+    root.innerHTML = `
+      <div class="tdisp-empty tdisp-empty--error">
+        <div class="tdisp-empty__icon">
+          <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+        <h3 class="tdisp-empty__title">Failed to load disputes</h3>
+        <p class="tdisp-empty__desc">${escapeHtmlDisp(err?.message || 'Network error')}</p>
+      </div>`;
+  } finally {
+    TECH_DISP_STATE.loading = false;
+  }
+}
+
+function initTechDisputesFilters() {
+  const filterRoot = document.querySelector('[data-disp-filter]')?.parentElement;
+  if (filterRoot) {
+    filterRoot.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-disp-filter]');
+      if (!btn) return;
+      filterRoot.querySelectorAll('[data-disp-filter]').forEach(b => b.classList.toggle('is-active', b === btn));
+      TECH_DISP_STATE.filter = btn.dataset.dispFilter;
+      renderTechDisputesList();
+    });
+  }
+  document.getElementById('techDispRefresh')?.addEventListener('click', () => loadTechDisputes());
+  document.querySelectorAll('#techDisputeModal [data-tdisp-close]').forEach(el => {
+    el.addEventListener('click', closeTechDisputeModal);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const m = document.getElementById('techDisputeModal');
+      if (m && !m.hidden) closeTechDisputeModal();
+    }
+  });
+}
+
+function closeTechDisputeModal() {
+  const m = document.getElementById('techDisputeModal');
+  if (!m) return;
+  m.hidden = true;
+  m.setAttribute('aria-hidden', 'true');
+  TECH_DISP_STATE.currentId = null;
+}
+
+async function openTechDisputeModal(disputeId) {
+  if (!disputeId) return;
+  const m = document.getElementById('techDisputeModal');
+  const body = document.getElementById('techDisputeModalBody');
+  const sub = document.getElementById('techDisputeModalSub');
+  if (!m || !body) return;
+  TECH_DISP_STATE.currentId = disputeId;
+  m.hidden = false;
+  m.setAttribute('aria-hidden', 'false');
+  body.innerHTML = '<div class="tech-disp-empty">Loading…</div>';
+  if (sub) sub.textContent = `#${String(disputeId).slice(-8)}`;
+
+  try {
+    const res = await getPartyDisputeById(disputeId);
+    const dispute = res?.data || res;
+    renderTechDisputeModal(dispute);
+  } catch (err) {
+    body.innerHTML = `<div class="tech-disp-empty tech-disp-empty--error">Failed to load dispute: ${escapeHtmlDisp(err?.message || 'Error')}</div>`;
+  }
+}
+
+function renderEvidenceCardDisp(item) {
+  const url = item?.url || '';
+  if (!url) return '';
+  const role = item?.uploadedByRole || 'unknown';
+  const name = escapeHtmlDisp(item?.uploadedBy?.name || role);
+  const when = fmtDateTimeDisp(item?.uploadedAt);
+  const mime = String(item?.mime || '').toLowerCase();
+  const isImg = mime.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg)$/i.test(url);
+  const preview = isImg
+    ? `<img src="${escapeHtmlDisp(url)}" alt="evidence" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'tech-disp-evidence-fallback',textContent:'File'}))" />`
+    : `<div class="tech-disp-evidence-fallback">File</div>`;
+  return `
+    <a class="tech-disp-evidence-item" href="${escapeHtmlDisp(url)}" target="_blank" rel="noopener">
+      ${preview}
+      <div class="tech-disp-evidence-meta">
+        <span class="tech-disp-evidence-role tech-disp-evidence-role--${escapeHtmlDisp(role)}">${escapeHtmlDisp(role)}</span>
+        <span class="tech-disp-evidence-by">${name}</span>
+        <span class="tech-disp-evidence-at">${escapeHtmlDisp(when)}</span>
+      </div>
+    </a>
+  `;
+}
+
+function renderHistoryItemDisp(h) {
+  const statusRaw = h?.status || '';
+  const status = escapeHtmlDisp(statusLabelDisp(statusRaw));
+  const roleRaw = escapeHtmlDisp(h?.byRole || 'system');
+  
+  let roleFriendly = 'System';
+  if (roleRaw === 'user') roleFriendly = 'Customer';
+  else if (roleRaw === 'worker') roleFriendly = 'Technician (You)';
+  else if (roleRaw === 'admin') roleFriendly = 'Support Admin';
+
+  const who = h?.by?.name ? escapeHtmlDisp(h.by.name) : roleFriendly;
+  const when = fmtDateTimeDisp(h?.at);
+  const note = h?.note ? `<p class="tech-disp-hist__note">"${escapeHtmlDisp(h.note)}"</p>` : '';
+  
+  let actionDesc = `Status updated to ${status}`;
+  if (statusRaw === 'open') actionDesc = 'Dispute opened';
+  else if (statusRaw === 'reviewing') actionDesc = 'Review started';
+  else if (statusRaw === 'awaiting_evidence') actionDesc = 'Requested evidence';
+  else if (statusRaw === 'appealed') actionDesc = 'Decision appealed';
+  else if (statusRaw.startsWith('resolved')) actionDesc = `Dispute resolved: ${status}`;
+  else if (statusRaw === 'closed') actionDesc = 'Dispute closed';
+
+  return `
+    <li class="tech-disp-hist__item">
+      <div class="tech-disp-hist__dot tech-disp-hist__dot--${roleRaw}"></div>
+      <div class="tech-disp-hist__body">
+        <div class="tech-disp-hist__row">
+          <span class="tech-disp-hist__status">${actionDesc}</span>
+          <span class="tech-disp-hist__when">${escapeHtmlDisp(when)}</span>
+        </div>
+        <div class="tech-disp-hist__by">By: <strong>${who}</strong> <span class="tech-disp-hist__role">(${roleFriendly})</span></div>
+        ${note}
+      </div>
+    </li>
+  `;
+}
+
+function renderTechDisputeModal(dispute) {
+  const body = document.getElementById('techDisputeModalBody');
+  const sub = document.getElementById('techDisputeModalSub');
+  if (!body || !dispute) return;
+  const status = dispute.status || 'open';
+  const actionable = isActionableForTech(dispute);
+  const customerName = escapeHtmlDisp(getCustomerName(dispute));
+  const service = escapeHtmlDisp(getServiceName(dispute));
+  const opened = fmtDateTimeDisp(dispute.createdAt);
+  const amt = dispute.payment?.amount ?? dispute.booking?.estimatedTotal ?? dispute.booking?.totalPrice;
+  const currency = dispute.payment?.currency || 'EGP';
+  const decision = dispute.decision ? decisionLabelDisp(dispute.decision) : null;
+  const customerEvidence = (dispute.evidence || []).filter(e => (e?.uploadedByRole || 'user') === 'user');
+  const workerEvidence = (dispute.evidence || []).filter(e => e?.uploadedByRole === 'worker');
+  const adminEvidence = (dispute.evidence || []).filter(e => e?.uploadedByRole === 'admin');
+  const requestMsg = (dispute.status === 'awaiting_evidence' && (dispute.evidenceRequestedFrom === 'worker' || dispute.evidenceRequestedFrom === 'both'))
+    ? `<div class="tech-disp-callout tech-disp-callout--warn">
+         <strong>Admin requested more evidence from you.</strong>
+         <p>Upload photos, receipts, or any proof that supports your work. Be specific — quality evidence helps your case.</p>
+       </div>`
+    : '';
+  const appealBlock = dispute.appealStatus
+    ? `<section class="tech-disp-section">
+         <h4 class="tech-disp-section__title">Appeal</h4>
+         <div class="tech-disp-appeal tech-disp-appeal--${escapeHtmlDisp(dispute.appealStatus)}">
+           <div><strong>Status:</strong> ${escapeHtmlDisp(dispute.appealStatus)}</div>
+           ${dispute.appealReason ? `<p>${escapeHtmlDisp(dispute.appealReason)}</p>` : ''}
+           ${dispute.appealedAt ? `<small>Filed ${escapeHtmlDisp(fmtDateTimeDisp(dispute.appealedAt))}</small>` : ''}
+         </div>
+       </section>`
+    : '';
+  const canAppeal = ['resolved_refund', 'resolved_partial', 'resolved_redo'].includes(status) && !dispute.appealStatus;
+
+  if (sub) sub.textContent = `${service} · #${String(dispute._id || '').slice(-8)}`;
+
+  body.innerHTML = `
+    <div class="tech-disp-detail">
+      <header class="tech-disp-detail__head">
+        <div>
+          <div class="tech-disp-detail__head-row">
+            <span class="tech-disp-status ${statusClassDisp(status)}">${escapeHtmlDisp(statusLabelDisp(status))}</span>
+            ${actionable ? '<span class="tech-disp-action-pill">Action required</span>' : ''}
+          </div>
+          <h3 class="tech-disp-detail__service">${service}</h3>
+          <div class="tech-disp-detail__meta">
+            Filed by <strong>${customerName}</strong> · ${escapeHtmlDisp(opened)}
+          </div>
+        </div>
+        <div class="tech-disp-detail__amount">
+          <span class="tech-disp-detail__amount-label">Job total</span>
+          <span class="tech-disp-detail__amount-value">${amt != null ? fmtMoneyDisp(amt, currency) : '—'}</span>
+        </div>
+      </header>
+
+      ${requestMsg}
+
+      <section class="tech-disp-section">
+        <h4 class="tech-disp-section__title">Customer's complaint</h4>
+        <div class="tech-disp-quote">
+          ${dispute.category ? `<span class="tech-disp-category">${escapeHtmlDisp(dispute.category.replace(/_/g, ' '))}</span>` : ''}
+          <p>${escapeHtmlDisp(dispute.reason || '—')}</p>
+        </div>
+      </section>
+
+      ${decision ? `
+        <section class="tech-disp-section">
+          <h4 class="tech-disp-section__title">Admin Decision</h4>
+          <div class="tech-disp-callout tech-disp-callout--${status.startsWith('resolved') ? 'ok' : 'warn'}">
+            <strong>${escapeHtmlDisp(decision)}</strong>
+            ${dispute.refundAmount ? `<div>Refund amount: ${fmtMoneyDisp(dispute.refundAmount, currency)}</div>` : ''}
+            ${dispute.resolution ? `<p>${escapeHtmlDisp(dispute.resolution)}</p>` : ''}
+            ${dispute.resolvedAt ? `<small>Resolved ${escapeHtmlDisp(fmtDateTimeDisp(dispute.resolvedAt))}</small>` : ''}
+          </div>
+        </section>
+      ` : ''}
+
+      ${appealBlock}
+
+      <section class="tech-disp-section">
+        <h4 class="tech-disp-section__title">Customer Evidence ${customerEvidence.length ? `(${customerEvidence.length})` : ''}</h4>
+        ${customerEvidence.length
+          ? `<div class="tech-disp-evidence-grid">${customerEvidence.map(renderEvidenceCardDisp).join('')}</div>`
+          : '<p class="tech-disp-empty tech-disp-empty--inline">No customer evidence uploaded.</p>'}
+      </section>
+
+      <section class="tech-disp-section">
+        <h4 class="tech-disp-section__title">Your Evidence ${workerEvidence.length ? `(${workerEvidence.length})` : ''}</h4>
+        ${workerEvidence.length
+          ? `<div class="tech-disp-evidence-grid">${workerEvidence.map(renderEvidenceCardDisp).join('')}</div>`
+          : '<p class="tech-disp-empty tech-disp-empty--inline">You have not uploaded evidence yet.</p>'}
+
+        ${!String(status || '').startsWith('resolved') && status !== 'closed' ? `
+          <div class="tech-disp-upload">
+            <input type="file" id="techDispEvidenceInput" multiple accept="image/jpeg,image/png,image/webp" hidden />
+            <button type="button" class="btn btn--primary btn--sm" id="techDispUploadBtn">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Upload Evidence
+            </button>
+            <p class="tech-disp-upload__hint">JPG / PNG / WebP · up to 12 files total · 15 MB each</p>
+            <div class="tech-disp-upload__status" id="techDispUploadStatus" hidden></div>
+          </div>
+        ` : ''}
+      </section>
+
+      ${adminEvidence.length ? `
+        <section class="tech-disp-section">
+          <h4 class="tech-disp-section__title">Admin Evidence (${adminEvidence.length})</h4>
+          <div class="tech-disp-evidence-grid">${adminEvidence.map(renderEvidenceCardDisp).join('')}</div>
+        </section>
+      ` : ''}
+
+      <section class="tech-disp-section">
+        <h4 class="tech-disp-section__title">Timeline</h4>
+        <ul class="tech-disp-hist">
+          ${(dispute.history || []).slice().sort((a, b) => new Date(a.at) - new Date(b.at)).map(renderHistoryItemDisp).join('') || '<li class="tech-disp-empty tech-disp-empty--inline">No activity yet.</li>'}
+        </ul>
+      </section>
+
+      ${canAppeal ? `
+        <section class="tech-disp-section tech-disp-section--appeal">
+          <h4 class="tech-disp-section__title">File an Appeal</h4>
+          <p class="tech-disp-section__desc">If you believe the decision was wrong, you have 48 hours from resolution to appeal. Be specific — admins will re-review.</p>
+          <textarea id="techDispAppealReason" class="tech-disp-textarea" rows="4" placeholder="Explain why this decision should be reconsidered (minimum 20 characters)…"></textarea>
+          <button type="button" class="btn btn--danger-outline btn--sm" id="techDispAppealBtn">Submit Appeal</button>
+        </section>
+      ` : ''}
+    </div>
+  `;
+
+  wireTechDisputeModalActions(dispute);
+}
+
+function wireTechDisputeModalActions(dispute) {
+  const disputeId = dispute._id;
+  const uploadBtn = document.getElementById('techDispUploadBtn');
+  const fileInput = document.getElementById('techDispEvidenceInput');
+  const statusEl = document.getElementById('techDispUploadStatus');
+
+  if (uploadBtn && fileInput) {
+    uploadBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', async () => {
+      const files = Array.from(fileInput.files || []);
+      if (!files.length) return;
+      uploadBtn.disabled = true;
+      if (statusEl) {
+        statusEl.hidden = false;
+        statusEl.textContent = `Uploading ${files.length} file(s)…`;
+        statusEl.classList.remove('is-error');
+      }
+      try {
+        const uploaded = [];
+        for (const f of files) {
+          const meta = await uploadPublicFile(f, 'dispute');
+          uploaded.push({
+            url: meta?.url || meta?.secureUrl || meta?.publicUrl || meta,
+            name: f.name,
+            mime: f.type,
+            size: f.size,
+          });
+        }
+        await addDisputeEvidence(disputeId, uploaded);
+        if (statusEl) { statusEl.textContent = 'Evidence uploaded successfully.'; statusEl.classList.remove('is-error'); }
+        showToast?.('Evidence uploaded.', 'success');
+        await refreshTechDisputeModal();
+        loadTechDisputes().catch(() => {});
+      } catch (err) {
+        if (statusEl) { statusEl.textContent = `Upload failed: ${err?.message || 'Error'}`; statusEl.classList.add('is-error'); }
+        showToast?.(err?.message || 'Upload failed.', 'error');
+      } finally {
+        uploadBtn.disabled = false;
+        fileInput.value = '';
+      }
+    });
+  }
+
+  const appealBtn = document.getElementById('techDispAppealBtn');
+  const reasonEl = document.getElementById('techDispAppealReason');
+  if (appealBtn && reasonEl) {
+    appealBtn.addEventListener('click', async () => {
+      const reason = (reasonEl.value || '').trim();
+      if (reason.length < 20) {
+        showToast?.('Appeal reason must be at least 20 characters.', 'error');
+        reasonEl.focus();
+        return;
+      }
+      appealBtn.disabled = true;
+      try {
+        await appealDispute(disputeId, reason);
+        showToast?.('Appeal submitted.', 'success');
+        await refreshTechDisputeModal();
+        loadTechDisputes().catch(() => {});
+      } catch (err) {
+        showToast?.(err?.message || 'Failed to submit appeal.', 'error');
+      } finally {
+        appealBtn.disabled = false;
+      }
+    });
+  }
+}
+
+async function refreshTechDisputeModal() {
+  const id = TECH_DISP_STATE.currentId;
+  if (!id) return;
+  try {
+    const res = await getPartyDisputeById(id);
+    const dispute = res?.data || res;
+    renderTechDisputeModal(dispute);
+  } catch {}
+}
+
+initTechDisputesFilters();
+
+renderCachedTechStats();
+initDashboard().catch(err => console.error('[Dashboard init error]', err));
+
+
+/* ── Plan 2: earnings split + debt panel + payouts ──────────────────── */
+
+function fmtMoney2(n) {
+  try {
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'EGP', maximumFractionDigits: 2 }).format(Number(n) || 0);
+  } catch (_) {
+    return `${Number(n || 0).toFixed(2)} EGP`;
+  }
+}
+
+function ageOf2(d) {
+  if (!d) return '—';
+  const h = Math.floor((Date.now() - new Date(d).getTime()) / 3600000);
+  if (h < 1) return 'now';
+  if (h < 24) return `${h}h`;
+  return `${Math.floor(h / 24)}d`;
+}
+
+function relativeTime2(d) {
+  if (!d) return '—';
+  try { return new Date(d).toLocaleString(); } catch (_) { return '—'; }
+}
+
+async function renderEarningsSplitV2(wallet) {
+  const wa = document.getElementById('walletAvailable');
+  const wp = document.getElementById('walletPending');
+  const fmt = n => Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
+  if (wa) wa.textContent = fmt(wallet?.balance);
+  if (wp) wp.textContent = fmt(wallet?.pendingBalance);
+}
+
+async function renderMyDebtsV2() {
+  const banner = document.getElementById('debtBanner');
+  const panel  = document.getElementById('debtPanel');
+  if (!banner || !panel) return;
+  let r;
+  try { r = await getMyDebtsV2(); }
+  catch (e) { console.error('[debts]', e); return; }
+  const { summary = {}, debts = [], submittedSettlements = [] } = r?.data || {};
+  const total = Number(summary.totalOutstanding);
+  const debtTab = document.getElementById('earnSubnavDebts');
+  const debtBadge = document.getElementById('earnSubnavDebtsBadge');
+  if (!Number.isFinite(total) || total <= 0) {
+    banner.hidden = true;
+    panel.hidden = true;
+    if (debtTab) debtTab.hidden = true;
+    if (debtBadge) debtBadge.hidden = true;
+    return;
+  }
+  banner.hidden = false;
+  panel.hidden = false;
+  if (debtTab) debtTab.hidden = false;
+  if (debtBadge) { debtBadge.hidden = false; debtBadge.textContent = String(debts.length || 1); }
+  const amtEl = document.getElementById('debtBannerAmount');
+  if (amtEl) amtEl.textContent = fmtMoney2(total);
+  const pct = Math.min(100, Math.round((total / 300) * 100));
+  const labelEl = document.getElementById('debtProgressLabel');
+  if (labelEl) labelEl.textContent = `${fmtMoney2(total)} owed — ${pct}% of cash-block threshold`;
+  const bar = document.getElementById('debtProgressBar');
+  if (bar) {
+    bar.style.width = pct + '%';
+    const sev = pct >= 100 ? 'blocked' : pct >= 80 ? 'warn' : '';
+    bar.className = 'debt-progress__bar debt-meter__fill' + (sev ? ` debt-progress__bar--${sev} debt-meter__fill--${sev}` : '');
+  }
+  const tbody = document.getElementById('debtsTbody');
+  if (tbody) {
+    tbody.innerHTML = debts.map(d => `
+      <tr>
+        <td>#${String(d.booking || '').toString().slice(-4)}</td>
+        <td>${fmtMoney2(d.remaining ?? d.amount)}/${fmtMoney2(d.amount)}</td>
+        <td>${ageOf2(d.createdAt)}</td>
+        <td><span class="status-chip status-chip--${d.status}">${d.status}</span></td>
+        <td>${d.settlementMethod || '—'}</td>
+      </tr>`).join('') || '<tr><td colspan="5">No debts</td></tr>';
+  }
+  const stb = document.getElementById('settlementsTbody');
+  if (stb) {
+    stb.innerHTML = (submittedSettlements || []).map(s => `
+      <tr>
+        <td>${s.reference || '—'}</td>
+        <td>${fmtMoney2(s.totalAmount)}</td>
+        <td>${s.method}</td>
+        <td><span class="status-chip status-chip--${s.status}">${s.status}</span></td>
+        <td>${relativeTime2(s.createdAt)}</td>
+      </tr>`).join('') || '<tr><td colspan="5">No settlements yet</td></tr>';
+  }
+}
+
+let _allPayouts = [];
+
+const PAYOUT_METHOD_ICONS = {
+  bank:     '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V10M19 21V10M3 10h18L12 3 3 10z"/><path d="M9 21v-6M15 21v-6"/></svg>',
+  instapay: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2.5"/><path d="M11 18h2"/></svg>',
+  vodafone: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>',
+  wallet:   '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="14" rx="2.5"/><path d="M2 10h20M18 15h.01"/></svg>'
+};
+
+const PAYOUT_STATUS_GROUP = {
+  pending: 'warn', processing: 'warn',
+  paid: 'ok', completed: 'ok', approved: 'ok',
+  rejected: 'bad', failed: 'bad', cancelled: 'bad'
+};
+
+function _methodLabel(m) {
+  const map = { bank: 'Bank transfer', instapay: 'InstaPay', vodafone: 'Vodafone Cash', wallet: 'E-wallet' };
+  return map[m] || (m ? m.charAt(0).toUpperCase() + m.slice(1) : '—');
+}
+
+function _renderPayoutRows(items) {
+  const tbody = document.getElementById('payoutsTbody');
+  if (!tbody) return;
+  if (!items.length) {
+    tbody.innerHTML = `
+      <tr class="payouts-empty-row">
+        <td colspan="5">
+          <div class="payouts-empty">
+            <div class="payouts-empty__icon">
+              <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h3"/></svg>
+            </div>
+            <h4 class="payouts-empty__title">No payouts yet</h4>
+            <p class="payouts-empty__desc">When you request a withdrawal, every transfer will appear here with its reference and status.</p>
+            <button type="button" class="atelier-link" id="payoutsEmptyCta">
+              <span>Request your first payout</span>
+              <span aria-hidden="true">&rarr;</span>
+            </button>
+          </div>
+        </td>
+      </tr>`;
+    document.getElementById('payoutsEmptyCta')?.addEventListener('click', async () => {
+      let availableBalance = 0;
+      try {
+        const earn = await getWorkerEarnings();
+        availableBalance = Number(earn?.wallet?.balance) || 0;
+      } catch (_) { /* fall through with 0 */ }
+      openPayoutRequestModal({ availableBalance, onSuccess: () => renderMyPayoutsV2() });
+    });
+    return;
+  }
+  tbody.innerHTML = items.map(p => {
+    const method   = (p.payoutMethod || '').toLowerCase();
+    const icon     = PAYOUT_METHOD_ICONS[method] || PAYOUT_METHOD_ICONS.wallet;
+    const status   = (p.status || '').toLowerCase();
+    const group    = PAYOUT_STATUS_GROUP[status] || 'neutral';
+    const dateStr  = p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+    const timeStr  = p.createdAt ? new Date(p.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '';
+    const ref      = p.transactionRef || p.reference || '—';
+    return `
+      <tr>
+        <td>
+          <div class="payouts-cell-date">
+            <strong>${dateStr}</strong>
+            <span>${timeStr}</span>
+          </div>
+        </td>
+        <td>
+          <span class="payouts-method-badge">
+            <span class="payouts-method-badge__icon">${icon}</span>
+            <span>${_methodLabel(method)}</span>
+          </span>
+        </td>
+        <td class="payouts-table__num"><strong>${fmtMoney2(p.amount)}</strong></td>
+        <td><span class="payouts-status payouts-status--${group}">${status || '—'}</span></td>
+        <td><code class="payouts-ref">${ref}</code></td>
+      </tr>`;
+  }).join('');
+}
+
+function _applyPayoutFilters() {
+  const status = document.getElementById('payoutFilterStatus')?.value || '';
+  const from   = document.getElementById('payoutFilterFrom')?.value;
+  const to     = document.getElementById('payoutFilterTo')?.value;
+  const fromTs = from ? new Date(from).getTime() : -Infinity;
+  const toTs   = to   ? new Date(to).getTime() + 86400000 : Infinity;
+  const filtered = _allPayouts.filter(p => {
+    if (status && (p.status || '').toLowerCase() !== status) return false;
+    const ts = new Date(p.createdAt).getTime();
+    if (Number.isFinite(ts) && (ts < fromTs || ts > toTs)) return false;
+    return true;
+  });
+  _renderPayoutRows(filtered);
+}
+
+function _renderPayoutsSummary() {
+  const total = _allPayouts
+    .filter(p => ['paid', 'completed', 'approved'].includes((p.status || '').toLowerCase()))
+    .reduce((s, p) => s + (Number(p.amount) || 0), 0);
+  const pending = _allPayouts.filter(p => ['pending', 'processing'].includes((p.status || '').toLowerCase())).length;
+  const totalEl   = document.getElementById('payoutsTotalAmount');
+  const countEl   = document.getElementById('payoutsTotalCount');
+  const pendingEl = document.getElementById('payoutsPendingCount');
+  if (totalEl)   totalEl.textContent   = total.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  if (countEl)   countEl.textContent   = _allPayouts.length;
+  if (pendingEl) pendingEl.textContent = pending;
+}
+
+async function renderMyPayoutsV2() {
+  const tbody = document.getElementById('payoutsTbody');
+  if (!tbody) return;
+  try {
+    const r = await getMyPayouts();
+    _allPayouts = r?.data || [];
+  } catch (e) {
+    console.error('[payouts]', e);
+    _allPayouts = [];
+  }
+  _renderPayoutsSummary();
+  _applyPayoutFilters();
+}
+
+function _wirePayoutFilters() {
+  ['payoutFilterStatus', 'payoutFilterFrom', 'payoutFilterTo'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', _applyPayoutFilters);
+    document.getElementById(id)?.addEventListener('change', _applyPayoutFilters);
+  });
+  document.getElementById('payoutFiltersClear')?.addEventListener('click', () => {
+    ['payoutFilterStatus', 'payoutFilterFrom', 'payoutFilterTo'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.value = '';
+    });
+    _applyPayoutFilters();
+  });
+}
+
+function wireDebtActionsV2() {
+  document.getElementById('btnGoSettle')?.addEventListener('click', () => {
+    activateEarnSubTab('debts');
+  });
+  document.getElementById('btnSettleDebt')?.addEventListener('click', () => {
+    openSettleDebtModal({ onSuccess: () => renderMyDebtsV2() });
+  });
+  const payoutHandler = async () => {
+    let availableBalance = 0;
+    try {
+      const earn = await getWorkerEarnings();
+      availableBalance = Number(earn?.wallet?.balance) || 0;
+    } catch (_) { /* fall through with 0 */ }
+    openPayoutRequestModal({ availableBalance, onSuccess: () => renderMyPayoutsV2() });
+  };
+  document.getElementById('btnRequestPayout')?.addEventListener('click', payoutHandler);
+  document.getElementById('btnRequestPayout2')?.addEventListener('click', payoutHandler);
+}
+
+/* Earnings sub-nav (Overview / Payouts / Debts) */
+function activateEarnSubTab(name) {
+  const panel = document.getElementById('panel-earnings');
+  if (!panel) return;
+  panel.querySelectorAll('.earn-subnav__tab').forEach(btn => {
+    const on = btn.dataset.earnTab === name;
+    btn.classList.toggle('is-active', on);
+    btn.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  panel.querySelectorAll('.earn-view').forEach(view => {
+    const on = view.dataset.earnView === name;
+    view.classList.toggle('is-active', on);
+    view.hidden = !on;
+  });
+}
+
+function wireEarnSubnav() {
+  document.querySelectorAll('#panel-earnings .earn-subnav__tab').forEach(btn => {
+    btn.addEventListener('click', () => activateEarnSubTab(btn.dataset.earnTab));
+  });
+  document.querySelectorAll('#panel-earnings [data-earn-view-jump]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.dataset.earnViewJump;
+      activateEarnSubTab(target);
+      if (target === 'payouts') renderMyPayoutsV2().catch(() => {});
+      document.getElementById('panel-earnings')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+}
+
+async function initPlan2EarningsTab() {
+  const earningsBtn = document.querySelector('[data-tab="earnings"]');
+  earningsBtn?.addEventListener('click', () => {
+    setTimeout(() => {
+      renderMyDebtsV2();
+      renderMyPayoutsV2();
+    }, 100);
+  });
+  if (!document.getElementById('panel-earnings')?.hidden) {
+    await Promise.all([renderMyDebtsV2(), renderMyPayoutsV2()]);
+  }
+  wireDebtActionsV2();
+  wireEarnSubnav();
+  _wirePayoutFilters();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  initPlan2EarningsTab().catch(err => console.error('[plan2 earnings]', err));
+});
+
+// ──────────────── Plan 2 Task 20: Transactions tab ────────────────
+
+function _txFmtMoney(n) {
+  if (n === null || n === undefined || Number.isNaN(Number(n))) return '—';
+  const v = Number(n);
+  return (v < 0 ? '-' : '') + 'EGP ' + Math.abs(v).toLocaleString('en-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function _txBookingCell(t) {
+  const bid = t.payment && t.payment.booking;
+  if (!bid) return '—';
+  const s = String(bid);
+  return '#' + s.slice(-6);
+}
+
+async function renderTransactions() {
+  const tbody = document.getElementById('txTbody');
+  if (!tbody) return;
+  const params = {
+    type: document.getElementById('txType')?.value || undefined,
+    from: document.getElementById('txFrom')?.value || undefined,
+    to:   document.getElementById('txTo')?.value || undefined,
+  };
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;opacity:0.6;padding:16px;">Loading…</td></tr>';
+  let r;
+  try {
+    r = await getMyTransactions(params);
+  } catch (err) {
+    console.error('[tech tx]', err);
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#b00;padding:16px;">Failed to load transactions.</td></tr>';
+    return;
+  }
+  const rows = Array.isArray(r?.data) ? r.data : [];
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;opacity:0.6;padding:16px;">No transactions.</td></tr>';
+  } else {
+    tbody.innerHTML = rows.map(t => {
+      const amt = t.direction === 'debit' ? -Number(t.amount || 0) : Number(t.amount || 0);
+      const cls = amt >= 0 ? 'pos' : 'neg';
+      const date = t.createdAt ? new Date(t.createdAt).toLocaleString() : '—';
+      let note = t.note ? String(t.note).replace(/[<>&]/g, '') : '';
+      note = note
+        .replace(/^Demo\s+/i, '')
+        .replace(/\bbooking\s+([0-9a-f]{20,})\b/i, (_, id) => 'booking #' + id.slice(-6));
+      note = note.charAt(0).toUpperCase() + note.slice(1);
+      return '<tr>'
+        + '<td>' + date + '</td>'
+        + '<td>' + (t.type || '—') + '</td>'
+        + '<td>' + (t.direction || '—') + '</td>'
+        + '<td>' + _txBookingCell(t) + '</td>'
+        + '<td class="tx-amount tx-amount--' + cls + '">' + _txFmtMoney(amt) + '</td>'
+        + '<td>' + note + '</td>'
+        + '</tr>';
+    }).join('');
+  }
+  const pag = document.getElementById('txPagination');
+  if (pag) {
+    const meta = r?.meta || {};
+    pag.textContent = meta.total != null ? (meta.total + ' transactions') : '';
+  }
+}
+
+function initTxTab() {
+  const btn = document.querySelector('[data-tab="transactions"]');
+  btn?.addEventListener('click', () => setTimeout(renderTransactions, 100));
+  document.getElementById('txType')?.addEventListener('change', renderTransactions);
+  document.getElementById('txFrom')?.addEventListener('change', renderTransactions);
+  document.getElementById('txTo')?.addEventListener('change', renderTransactions);
+  document.getElementById('txRefresh')?.addEventListener('click', renderTransactions);
+  if (!document.getElementById('panel-transactions')?.hidden) renderTransactions();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  try { initTxTab(); } catch (err) { console.error('[tech tx init]', err); }
+  try { bindTechNotifChannelPrefs(); } catch (err) { console.error('[tech notif prefs]', err); }
+});
+
+async function bindTechNotifChannelPrefs() {
+  const checkboxes = document.querySelectorAll('[data-notif-channel]');
+  if (!checkboxes.length) return;
+  try {
+    const data = await getNotificationPreferences();
+    const channels = data?.channels || {};
+    checkboxes.forEach((cb) => {
+      const k = cb.dataset.notifChannel;
+      cb.checked = channels[k] !== false;
+    });
+  } catch (_) {}
+
+  checkboxes.forEach((cb) => {
+    cb.addEventListener('change', async () => {
+      try {
+        await updateNotificationPreferences({ [cb.dataset.notifChannel]: cb.checked });
+        showToast('Saved', 'success');
+      } catch (e) {
+        cb.checked = !cb.checked;
+        showToast(e?.message || 'Failed to save', 'error');
+      }
+    });
+  });
+
+  const pushBtn = document.getElementById('enable-browser-push-btn');
+  if (pushBtn) {
+    pushBtn.addEventListener('click', async () => {
+      if (!('Notification' in window)) {
+        showToast('Browser does not support notifications', 'error');
+        return;
+      }
+      try {
+        const perm = await Notification.requestPermission();
+        if (perm === 'granted') showToast('Browser notifications enabled', 'success');
+        else showToast('Permission denied', 'error');
+      } catch (_) {
+        showToast('Could not request permission', 'error');
+      }
+    });
+  }
+}

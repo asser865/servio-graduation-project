@@ -7,11 +7,21 @@ const SavedCard  = require('../savedCards/savedCard.model');
 const Wallet     = require('./wallet.model');
 const Transaction = require('./transaction.model');
 const ApiError   = require('../../utils/ApiError');
+const getGateway = require('./gateways');
+const adminAction = require('../admin/admin-action.service');
+const events = require('../../sockets/payment.events');
+const notify = require('../notifications/dispatcher');
 
 let cashDebtSvc;
 const getCashDebtSvc = () => {
   if (!cashDebtSvc) cashDebtSvc = require('./cash-debt.service');
   return cashDebtSvc;
+};
+
+let adminSettingsSvc;
+const getAdminSettingsSvc = () => {
+  if (!adminSettingsSvc) adminSettingsSvc = require('../admin/admin-settings.service');
+  return adminSettingsSvc;
 };
 
 const logTransaction = async (data, session) => {
@@ -28,7 +38,7 @@ const getOrCreateWallet = async (workerId, session) => {
 };
 
 class PaymentService {
-  async holdPayment(bookingId, customerId, { savedCardId }) {
+  async holdPayment(bookingId, customerId, { savedCardId, useCredit = false }) {
     const booking = await Booking.findById(bookingId);
     if (!booking) throw new ApiError(StatusCodes.NOT_FOUND, 'Booking not found.');
     if (booking.user.toString() !== customerId.toString()) {
@@ -77,7 +87,27 @@ class PaymentService {
       throw new ApiError(StatusCodes.PAYMENT_REQUIRED, 'Card was declined (demo).');
     }
 
-    // Success path
+    // Credit pre-apply (Plan 3 Task 10)
+    let creditApplied = 0;
+    if (useCredit) {
+      const customerCreditSvc = require('./customer-credit.service');
+      const available = await customerCreditSvc.balance(customerId);
+      creditApplied = Math.min(available, booking.estimatedTotal);
+    }
+    const gatewayChargeAmount = Math.max(0, booking.estimatedTotal - creditApplied);
+
+    // Success path — call gateway first (for remaining amount)
+    const gateway = getGateway();
+    const authz = gatewayChargeAmount > 0
+      ? await gateway.authorize({
+          amount: gatewayChargeAmount,
+          currency: 'EGP',
+          customerId,
+          savedCardId: card._id,
+          metadata: { bookingId },
+        })
+      : { intentId: `credit_only_${Date.now()}` };
+
     const demoCard = { savedCardId: card._id, last4: card.last4, cardType: card.cardType, expiry: card.expiry, label: card.label };
     const paymentData = {
       booking: bookingId,
@@ -87,9 +117,14 @@ class PaymentService {
       platformFee: booking.platformFeeAmount,
       workerEarning: booking.totalPrice,
       gateway: 'demo',
+      gatewayId: gateway.id,
+      gatewayIntentId: authz.intentId,
+      heldAt: new Date(),
       status: 'held',
       paymentMethod: 'online',
       skipFeeCalc: true,
+      creditApplied,
+      gatewayChargeAmount,
       metadata: { demoCard },
     };
 
@@ -112,6 +147,20 @@ class PaymentService {
           }
         }
 
+        if (creditApplied > 0) {
+          const customerCreditSvc = require('./customer-credit.service');
+          await customerCreditSvc.consume(customerId, creditApplied, { booking: bookingId, session });
+          await logTransaction({
+            payment: savedPayment._id,
+            type: 'credit_apply',
+            amount: creditApplied,
+            currency: 'egp',
+            direction: 'debit',
+            actor: customerId,
+            note: `Customer credit applied to booking ${bookingId}`,
+          }, session);
+        }
+
         booking.paymentMeta = demoCard;
         booking.paymentStatus = 'held';
         await booking.save({ session });
@@ -127,12 +176,19 @@ class PaymentService {
           currency: savedPayment.currency,
           direction: 'debit',
           actor: customerId,
-          note: `Demo escrow hold for booking ${bookingId}`,
+          note: `Escrow hold for booking #${String(bookingId).slice(-6)}`,
         }, session);
       });
     } finally {
       await session.endSession();
     }
+
+    notify.safeDispatch('payment.held', {
+      customer: customerId,
+      amount: savedPayment.amount,
+      currency: savedPayment.currency,
+      bookingId,
+    });
 
     return savedPayment;
   }
@@ -190,6 +246,7 @@ class PaymentService {
     }
 
     await booking.save();
+    events.emitPaymentPendingReview({ booking });
     return booking;
   }
 
@@ -222,11 +279,6 @@ class PaymentService {
           amount: booking.platformFeeAmount,
         }], { session });
 
-        await getCashDebtSvc().settleCashDebtsFromAmount(
-          booking.worker,
-          0,
-          session
-        );
         booking.paymentStatus = 'cash_pending_settlement';
       }
 
@@ -237,6 +289,15 @@ class PaymentService {
 
     await session.endSession();
 
+    // Generate receipt PDF outside transaction (Plan 3 Task 14)
+    if (booking._pendingInvoiceId) {
+      const Invoice = require('./invoice.model');
+      const receiptSvc = require('./receipt.service');
+      Invoice.findById(booking._pendingInvoiceId)
+        .then(inv => inv && receiptSvc.generate(inv))
+        .catch(() => {});
+    }
+
     // Check thresholds outside transaction (non-critical)
     if (booking.paymentMethod === 'cash') {
       getCashDebtSvc().checkDebtThresholds(booking.worker).catch(() => {});
@@ -246,6 +307,9 @@ class PaymentService {
   }
 
   async releaseHeldPayment(payment, booking, adminId, session) {
+    if (payment.lockedAt) {
+      throw new ApiError(StatusCodes.CONFLICT, 'Payment is locked by admin.');
+    }
     const workerId = payment.worker || booking.worker;
 
     const { remainingAmount } = await getCashDebtSvc().settleCashDebtsFromAmount(
@@ -258,20 +322,67 @@ class PaymentService {
     await wallet.deductPending(payment.workerEarning);
     await wallet.credit(remainingAmount);
 
+    if (payment.gatewayIntentId) {
+      const gw = getGateway();
+      const capture = await gw.capture({ intentId: payment.gatewayIntentId });
+      payment.gatewayChargeId = capture.chargeId;
+      payment.capturedAt = new Date();
+    }
     payment.status = 'released';
+    payment.releasedAt = new Date();
     payment.releaseApprovedAt = new Date();
     payment.releaseApprovedBy = adminId;
     await payment.save({ session });
+
+    // Auto-issue invoice inside txn (Plan 3 Task 14)
+    let invoiceId = null;
+    try {
+      const invoiceSvc = require('./invoice.service');
+      const cfg = await getAdminSettingsSvc().get();
+      const VAT_RATE = cfg?.vat?.rate ?? 0.14;
+      const subtotal = roundMoney(payment.amount / (1 + VAT_RATE));
+      const inv = await invoiceSvc.create({
+        payment: payment._id,
+        booking: payment.booking,
+        customer: payment.user,
+        worker: workerId,
+        subtotal,
+        vatRate: VAT_RATE,
+        currency: (payment.currency || 'egp').toUpperCase(),
+        session,
+      });
+      invoiceId = inv?._id;
+    } catch (e) { /* non-fatal */ }
+    if (invoiceId) booking._pendingInvoiceId = invoiceId;
+
+    await adminAction.record({
+      adminId,
+      actionType: 'payment_release',
+      targetType: 'payment',
+      targetId: payment._id,
+      details: { amount: payment.amount, bookingId: booking._id },
+      session,
+    });
+
+    events.emitPaymentReleased({ payment, booking });
+
+    notify.safeDispatch('payment.released', {
+      worker: workerId,
+      customer: payment.user,
+      amount: remainingAmount,
+      currency: payment.currency,
+      bookingId: booking._id,
+    });
 
     await logTransaction({
       payment: payment._id,
       wallet: wallet._id,
       type: 'release',
-      amount: payment.workerEarning,
+      amount: remainingAmount,
       currency: payment.currency,
       direction: 'credit',
       actor: adminId,
-      note: `Escrow released to worker for booking ${payment.booking}`,
+      note: `Escrow released to worker for booking ${payment.booking} (gross ${payment.workerEarning}, after debt offset ${remainingAmount})`,
     }, session);
 
     await logTransaction({
@@ -309,6 +420,9 @@ class PaymentService {
   async refundPayment(paymentId, adminId, reason) {
     const payment = await Payment.findById(paymentId);
     if (!payment) throw new ApiError(StatusCodes.NOT_FOUND, 'Payment not found.');
+    if (payment.lockedAt) {
+      throw new ApiError(StatusCodes.CONFLICT, 'Payment is locked by admin.');
+    }
 
     const booking = await Booking.findById(payment.booking);
     if (!booking) throw new ApiError(StatusCodes.NOT_FOUND, 'Booking not found.');
@@ -333,6 +447,15 @@ class PaymentService {
       const wallet = await getOrCreateWallet(payment.worker, session);
       await wallet.deductPending(payment.workerEarning);
 
+      if (payment.gatewayChargeId) {
+        const gw = getGateway();
+        const refund = await gw.refund({
+          chargeId: payment.gatewayChargeId,
+          amount: payment.amount,
+          reason: reason || 'admin_refund',
+        });
+        payment.gatewayRefundId = refund.refundId;
+      }
       payment.status = 'refunded';
       payment.refundedAt = new Date();
       updatedPayment = await payment.save({ session });
@@ -356,6 +479,15 @@ class PaymentService {
     });
 
     await session.endSession();
+
+    notify.safeDispatch('payment.refunded', {
+      customer: updatedPayment.user,
+      amount: updatedPayment.amount,
+      currency: updatedPayment.currency,
+      bookingId: updatedPayment.booking,
+      reason,
+    });
+
     return updatedPayment;
   }
 
@@ -475,5 +607,226 @@ class PaymentService {
     return wallet;
   }
 }
+
+const { money: roundMoney } = require('../../utils/rounding');
+
+const REFUND_WINDOW_DAYS = 90;
+
+PaymentService.prototype.refundWithFallback = async function ({ paymentId, amount, reason, actor, session, evidence }) {
+  const CustomerCredit = require('./customer-credit.model');
+  const ownSession = !session;
+  if (ownSession) session = await mongoose.startSession();
+  try {
+    const doRefund = async () => {
+      const payment = await Payment.findById(paymentId).session(session);
+      if (!payment) throw new ApiError(StatusCodes.NOT_FOUND, 'Payment not found');
+      if (payment.lockedAt) {
+        throw new ApiError(StatusCodes.CONFLICT, 'Payment is locked by admin.');
+      }
+      const available = payment.amount - (payment.refundedAmount || 0);
+      if (amount > available) {
+        throw new ApiError(StatusCodes.BAD_REQUEST, 'Refund exceeds available amount');
+      }
+
+      const capturedAt = payment.capturedAt || payment.releasedAt || payment.heldAt || payment.createdAt;
+      const ageDays = (Date.now() - new Date(capturedAt).getTime()) / 86400000;
+
+      let destination = 'gateway';
+      try {
+        if (ageDays > REFUND_WINDOW_DAYS) throw new Error('refund_window_expired');
+        if (payment.gatewayChargeId) {
+          const gw = getGateway();
+          const ref = await gw.refund({
+            chargeId: payment.gatewayChargeId,
+            amount,
+            reason: reason || 'refund',
+          });
+          payment.gatewayRefundId = ref?.refundId;
+        }
+      } catch (e) {
+        destination = 'wallet_credit';
+        await CustomerCredit.create([{
+          customer: payment.user,
+          amount,
+          source: 'refund_fallback',
+          relatedPayment: payment._id,
+          reason: reason || 'gateway refund unavailable',
+          issuedBy: actor,
+        }], { session });
+      }
+
+      payment.refundedAmount = roundMoney((payment.refundedAmount || 0) + amount);
+      payment.status = payment.refundedAmount >= payment.amount ? 'refunded' : 'partially_refunded';
+      payment.refundedAt = new Date();
+      await payment.save({ session });
+
+      await logTransaction({
+        payment: payment._id,
+        type: 'refund',
+        amount,
+        currency: payment.currency || 'egp',
+        direction: 'credit',
+        actor,
+        note: `Refund (${destination}) — ${reason || 'n/a'}`,
+      }, session);
+
+      return { destination, amount };
+    };
+
+    return ownSession ? await session.withTransaction(doRefund) : await doRefund();
+  } finally { if (ownSession) await session.endSession(); }
+};
+
+PaymentService.prototype.partialRefund = async function ({ bookingId, adminId, refundAmount, deductFrom, reason, ipAddress }) {
+  const session = await mongoose.startSession();
+  try {
+    return await session.withTransaction(async () => {
+      const payment = await Payment.findOne({ booking: bookingId }).session(session);
+      if (!payment) throw new ApiError(StatusCodes.NOT_FOUND, 'Payment not found');
+      if (!['held', 'released'].includes(payment.status)) {
+        throw new ApiError(StatusCodes.BAD_REQUEST, `Cannot refund status=${payment.status}`);
+      }
+      if (refundAmount > payment.amount) {
+        throw new ApiError(StatusCodes.BAD_REQUEST, 'Refund > payment amount');
+      }
+
+      const booking = await Booking.findById(bookingId).session(session);
+      const techShare = payment.workerEarning;
+      const platformShare = payment.platformFee;
+      let fromTech = 0, fromPlatform = 0;
+      switch (deductFrom) {
+        case 'tech':         fromTech = refundAmount; break;
+        case 'platform':     fromPlatform = refundAmount; break;
+        case 'proportional': {
+          const ratio = refundAmount / payment.amount;
+          fromTech = roundMoney(techShare * ratio);
+          fromPlatform = roundMoney(platformShare * ratio);
+          break;
+        }
+        default: throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid deductFrom');
+      }
+
+      if (payment.gatewayChargeId) {
+        const gateway = getGateway();
+        const refund = await gateway.refund({
+          chargeId: payment.gatewayChargeId,
+          amount: refundAmount,
+          reason,
+        });
+        payment.gatewayRefundId = refund.refundId;
+      }
+
+      payment.status = 'partially_refunded';
+      payment.refundedAt = new Date();
+      await payment.save({ session });
+
+      const wallet = await Wallet.findOne({ worker: booking.worker }).session(session);
+      if (wallet && fromTech > 0) {
+        if (payment.releasedAt) wallet.balance = roundMoney((wallet.balance || 0) - fromTech);
+        else wallet.pendingBalance = roundMoney((wallet.pendingBalance || 0) - fromTech);
+        await wallet.save({ session });
+      }
+
+      await adminAction.record({
+        adminId, actionType: 'payment_partial_refund',
+        targetType: 'payment', targetId: payment._id,
+        details: { refundAmount, fromTech, fromPlatform, reason },
+        ipAddress, session,
+      });
+      return { payment, splits: { fromTech, fromPlatform } };
+    });
+  } finally {
+    await session.endSession();
+  }
+};
+
+PaymentService.prototype.forceRelease = async function (paymentId, { actor, reason, ipAddress } = {}) {
+  if (!reason || reason.trim().length < 10) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Reason required (min 10 chars).');
+  }
+  const session = await mongoose.startSession();
+  try {
+    let result;
+    await session.withTransaction(async () => {
+      const payment = await Payment.findById(paymentId).session(session);
+      if (!payment) throw new ApiError(StatusCodes.NOT_FOUND, 'Payment not found.');
+      if (payment.lockedAt) {
+        throw new ApiError(StatusCodes.CONFLICT, 'Payment is locked by admin.');
+      }
+      if (payment.status !== 'held') {
+        throw new ApiError(StatusCodes.BAD_REQUEST, `Only held payments can be force-released (current: ${payment.status}).`);
+      }
+      const booking = await Booking.findById(payment.booking).session(session);
+      if (!booking) throw new ApiError(StatusCodes.NOT_FOUND, 'Booking not found.');
+
+      await this.releaseHeldPayment(payment, booking, actor, session);
+      if (booking.status !== 'completed') {
+        booking.status = 'completed';
+        booking.paymentStatus = 'released';
+        await booking.save({ session });
+      }
+
+      await adminAction.record({
+        adminId: actor,
+        actionType: 'emergency_release',
+        targetType: 'payment',
+        targetId: payment._id,
+        details: { reason, amount: payment.amount, bookingId: booking._id },
+        ipAddress,
+        session,
+      });
+
+      result = payment;
+    });
+    return result;
+  } finally { await session.endSession(); }
+};
+
+PaymentService.prototype.forceLock = async function (paymentId, { actor, reason, ipAddress } = {}) {
+  if (!reason || reason.trim().length < 10) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Reason required (min 10 chars).');
+  }
+  const payment = await Payment.findOneAndUpdate(
+    { _id: paymentId, lockedAt: null },
+    { $set: { lockedAt: new Date(), lockReason: reason, lockedBy: actor } },
+    { new: true }
+  );
+  if (!payment) {
+    const exists = await Payment.findById(paymentId);
+    if (!exists) throw new ApiError(StatusCodes.NOT_FOUND, 'Payment not found.');
+    throw new ApiError(StatusCodes.CONFLICT, 'Payment already locked.');
+  }
+  await adminAction.record({
+    adminId: actor,
+    actionType: 'emergency_lock',
+    targetType: 'payment',
+    targetId: payment._id,
+    details: { reason },
+    ipAddress,
+  });
+  return payment;
+};
+
+PaymentService.prototype.forceUnlock = async function (paymentId, { actor, reason, ipAddress } = {}) {
+  if (!reason || reason.trim().length < 5) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Reason required (min 5 chars).');
+  }
+  const payment = await Payment.findById(paymentId);
+  if (!payment) throw new ApiError(StatusCodes.NOT_FOUND, 'Payment not found.');
+  if (!payment.lockedAt) throw new ApiError(StatusCodes.BAD_REQUEST, 'Payment is not locked.');
+  payment.lockedAt = undefined;
+  payment.lockReason = undefined;
+  payment.lockedBy = undefined;
+  await payment.save();
+  await adminAction.record({
+    adminId: actor,
+    actionType: 'emergency_unlock',
+    targetType: 'payment',
+    targetId: payment._id,
+    details: { reason },
+    ipAddress,
+  });
+  return payment;
+};
 
 module.exports = new PaymentService();

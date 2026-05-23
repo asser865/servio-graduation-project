@@ -347,7 +347,7 @@ describe('createBooking — success', () => {
       paymentMethod: 'online',
       paymentMeta: { last4: '4242', cardType: 'visa', expiry: '12/30', label: 'Demo Visa', cvv: '123' },
     });
-    expect(Booking.create).toHaveBeenCalledWith(
+    expect(Booking.create.mock.calls[0][0][0]).toEqual(
       expect.objectContaining({
         paymentMethod: 'online',
         paymentStatus: 'demo_pending',
@@ -357,7 +357,7 @@ describe('createBooking — success', () => {
         paymentMeta: expect.objectContaining({ last4: '4242', cardType: 'visa', expiry: '12/30', label: 'Demo Visa' }),
       })
     );
-    expect(Booking.create.mock.calls[0][0].paymentMeta.cvv).toBeUndefined();
+    expect(Booking.create.mock.calls[0][0][0].paymentMeta.cvv).toBeUndefined();
   });
 });
 

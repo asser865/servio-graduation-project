@@ -3,6 +3,7 @@
    ─────────────────────────────────────────────── */
 
 import { showToast } from '../components/toast.js';
+import { skList, skTableRows } from '../components/skeleton.js';
 import { getAllUsers, deleteUser, updateUserStatus, updatePassword, reviewWorker, approveWorkerCategory } from '../api/users.js';
 import { getServices, createService, updateService, deleteService as apiDeleteService } from '../api/services.js';
 import { getAllBookings } from '../api/bookings.js';
@@ -17,7 +18,26 @@ import {
   getDisputes,
   resolveDispute,
   reviewDispute,
+  getDisputeById,
+  assignDispute,
+  addDisputeNote,
+  requestDisputeEvidence,
+  resolveDisputeAppeal,
+  adminListPayments,
+  adminPaymentsStats,
+  adminPartialRefund,
+  adminListCashDebtsGrouped,
+  adminWorkerDebts,
+  adminListSettlements,
+  adminListPayouts,
+  adminForceRelease,
+  adminForceLock,
+  adminForceUnlock,
 } from '../api/payments.js';
+import { openPaymentConfirmModal } from '../components/payment-confirm-modal.js';
+import { openSettlementVerifyModal } from '../components/settlement-verify-modal.js';
+import { openPayoutDecisionModal } from '../components/payout-decision-modal.js';
+import { openPartialRefundModal } from '../components/partial-refund-modal.js';
 import {
   getAdminSupportIssues,
   updateSupportIssueStatus,
@@ -184,7 +204,12 @@ function initAdminDashboard() {
   }
 
   // Restore active tab from sessionStorage or default to overview
-  const savedTab = sessionStorage.getItem('servio_admin_active_tab');
+  let savedTab = sessionStorage.getItem('servio_admin_active_tab');
+  if (savedTab === 'payments' || savedTab === 'settlements') {
+    sessionStorage.setItem('servio_admin_fin_tab', savedTab);
+    savedTab = 'finance';
+    sessionStorage.setItem('servio_admin_active_tab', 'finance');
+  }
   if (savedTab) {
     switchTab(savedTab, false);
   } else {
@@ -205,8 +230,19 @@ function initAdminDashboard() {
       switchTab(btn.dataset.gotoTab);
       if (btn.dataset.gotoTab === 'disputes') renderDisputes().catch(err => console.error('Error loading disputes:', err));
       if (btn.dataset.gotoTab === 'support') renderSupportIssues().catch(err => console.error('Error loading support issues:', err));
+      if (btn.dataset.gotoFin && typeof switchFinanceTab === 'function') {
+        switchFinanceTab(btn.dataset.gotoFin);
+      }
     });
   });
+
+  // ── Finance inner tabs (Payments | Cash Settlements) ──
+  document.querySelectorAll('.fin-tab').forEach(t => {
+    t.addEventListener('click', () => window.switchFinanceTab && window.switchFinanceTab(t.dataset.finTab));
+  });
+  const savedFin = sessionStorage.getItem('servio_admin_fin_tab');
+  // Defer until window.switchFinanceTab is assigned later in this file
+  queueMicrotask(() => window.switchFinanceTab && window.switchFinanceTab(savedFin || 'payments'));
 
   // ── Users: combined search + status filter ─
   function _updateUserCount() {
@@ -801,6 +837,7 @@ function initAdminDashboard() {
       const apiServices = response.services || [];
       
       list.innerHTML = '';
+      list.style.visibility = '';
       if (apiServices.length === 0) {
         list.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:2rem; color:var(--color-text-muted);">No services found in database. Add your first service to get started.</td></tr>';
         _updateServiceKPIs([]);
@@ -1761,10 +1798,9 @@ function initAdminDashboard() {
     if (btn.dataset.tab === 'audit') {
       btn.addEventListener('click', () => { _auditPage = 1; _loadAuditPage(); });
     }
-    if (btn.dataset.tab === 'payments') {
+    if (btn.dataset.tab === 'finance') {
       btn.addEventListener('click', () => {
         renderPendingApprovals();
-        renderCashDebts();
       });
     }
   });
@@ -2036,6 +2072,7 @@ async function loadAdminData() {
 
     const bkRoot = document.querySelector('[data-panel="bookings"] tbody');
     if (bkRoot) {
+      bkRoot.style.visibility = '';
       if (bookings.length === 0) {
         bkRoot.innerHTML = '<tr><td colspan="6" class="center-align" style="padding: 2rem;">No bookings found.</td></tr>';
       } else {
@@ -2228,8 +2265,13 @@ function formatDisputeStatusAdmin(status) {
   return ({
     open: 'Open',
     reviewing: 'Reviewing',
-    resolved_refund: 'Resolved - refunded',
-    resolved_release: 'Resolved - released',
+    awaiting_evidence: 'Awaiting evidence',
+    resolved_refund: 'Refunded',
+    resolved_release: 'Released',
+    resolved_partial: 'Partial refund',
+    resolved_redo: 'Sent for redo',
+    appealed: 'Appealed',
+    closed: 'Closed',
   })[status] || 'Open';
 }
 
@@ -2237,8 +2279,13 @@ function disputeStatusClass(status) {
   return ({
     open: 'admin-dispute-status--open',
     reviewing: 'admin-dispute-status--reviewing',
+    awaiting_evidence: 'admin-dispute-status--reviewing',
     resolved_refund: 'admin-dispute-status--resolved',
     resolved_release: 'admin-dispute-status--resolved',
+    resolved_partial: 'admin-dispute-status--resolved',
+    resolved_redo: 'admin-dispute-status--resolved',
+    appealed: 'admin-dispute-status--open',
+    closed: 'admin-dispute-status--resolved',
   })[status] || 'admin-dispute-status--open';
 }
 
@@ -2297,7 +2344,7 @@ async function renderDisputes(options = {}) {
 
   const shouldFetch = options.force || !options.reuseCache || !_disputesLoadedOnce;
   if (shouldFetch) {
-    tbody.innerHTML = '<tr><td colspan="8" class="center-align" style="padding: 3rem; color: var(--color-text-muted);">Loading disputes...</td></tr>';
+    tbody.innerHTML = skTableRows(6, 8);
     _adminDisputes = await fetchAdminDisputes();
     _disputesLoadedOnce = true;
   }
@@ -2323,8 +2370,7 @@ async function renderDisputes(options = {}) {
     const status = dispute.status || 'open';
     const amount = booking.totalPrice ?? booking.estimatedTotal ?? dispute.payment?.amount;
     const paymentLabel = booking.paymentMethod ? `${booking.paymentMethod} / ${booking.paymentStatus || 'pending'}` : (dispute.payment?.status || 'No payment');
-    const canReview = status === 'open';
-    const canResolve = status === 'open' || status === 'reviewing';
+    const slaBadge = renderSlaBadge(dispute);
     return `
       <tr>
         <td><strong>${escapeHtml(String(dispute._id || '').slice(-8) || '-')}</strong></td>
@@ -2341,17 +2387,17 @@ async function renderDisputes(options = {}) {
           <small>${escapeHtml(worker.email || '')}</small>
         </td>
         <td>
-          <div class="admin-dispute-issue">${escapeHtml(dispute.category || 'other')}</div>
+          <div class="admin-dispute-issue">${escapeHtml(dispute.category || 'other')} <span class="admin-dispute-sev admin-dispute-sev--${escapeHtml(dispute.severity || 'medium')}">${escapeHtml(dispute.severity || 'medium')}</span></div>
           <small>${escapeHtml(dispute.reason || '').slice(0, 72)}${String(dispute.reason || '').length > 72 ? '...' : ''}</small>
         </td>
-        <td><span class="admin-dispute-status ${disputeStatusClass(status)}">${escapeHtml(formatDisputeStatusAdmin(status))}</span></td>
+        <td>
+          <span class="admin-dispute-status ${disputeStatusClass(status)}">${escapeHtml(formatDisputeStatusAdmin(status))}</span>
+          ${slaBadge}
+        </td>
         <td>${escapeHtml(formatAdminDate(dispute.createdAt))}</td>
         <td class="center-align">
           <div class="admin-dispute-actions">
-            <button class="bk-action-btn bk-action-btn--xs" type="button" data-dispute-view="${escapeHtml(dispute._id)}">View</button>
-            ${canReview ? `<button class="bk-action-btn bk-action-btn--xs" type="button" data-dispute-review="${escapeHtml(dispute._id)}">Review</button>` : ''}
-            ${canResolve ? `<button class="bk-action-btn bk-action-btn--xs admin-dispute-actions__refund" type="button" data-dispute-resolve="refund" data-id="${escapeHtml(dispute._id)}">Refund</button>` : ''}
-            ${canResolve ? `<button class="bk-action-btn bk-action-btn--xs admin-dispute-actions__release" type="button" data-dispute-resolve="release" data-id="${escapeHtml(dispute._id)}">Release</button>` : ''}
+            <button class="bk-action-btn bk-action-btn--xs" type="button" data-dispute-manage="${escapeHtml(dispute._id)}">Manage</button>
           </div>
         </td>
       </tr>
@@ -2361,92 +2407,385 @@ async function renderDisputes(options = {}) {
   bindDisputeActions();
 }
 
+function renderSlaBadge(dispute) {
+  const due = dispute.slaResolveDueAt ? new Date(dispute.slaResolveDueAt).getTime() : null;
+  if (!due || ['resolved_refund','resolved_release','resolved_partial','resolved_redo','closed'].includes(dispute.status)) return '';
+  const remaining = due - Date.now();
+  const hours = Math.round(remaining / 3600000);
+  if (remaining < 0) return `<small class="admin-dispute-sla admin-dispute-sla--breach">SLA breached ${Math.abs(hours)}h ago</small>`;
+  if (hours <= 6) return `<small class="admin-dispute-sla admin-dispute-sla--urgent">${hours}h left</small>`;
+  return `<small class="admin-dispute-sla">${hours}h left</small>`;
+}
+
 function bindDisputeActions() {
-  document.querySelectorAll('[data-dispute-view]').forEach(btn => {
-    btn.onclick = () => openAdminDisputeModal(btn.dataset.disputeView);
-  });
-
-  document.querySelectorAll('[data-dispute-review]').forEach(btn => {
-    btn.onclick = async () => {
-      btn.disabled = true;
-      try {
-        await reviewDispute(btn.dataset.disputeReview);
-        showToast('Dispute marked as under review.', 'success');
-        await renderDisputes({ force: true });
-      } catch (err) {
-        showToast(err?.response?.data?.message || err?.data?.message || err.message || 'Failed to update dispute.', 'error');
-      } finally {
-        btn.disabled = false;
-      }
-    };
-  });
-
-  document.querySelectorAll('[data-dispute-resolve]').forEach(btn => {
-    btn.onclick = async () => {
-      const decision = btn.dataset.disputeResolve;
-      const label = decision === 'refund' ? 'refund the customer' : 'release payment to the technician';
-      if (!confirm(`Resolve this dispute and ${label}?`)) return;
-      const resolution = prompt('Resolution note for both parties:');
-      if (!resolution || !resolution.trim()) return;
-      btn.disabled = true;
-      try {
-        await resolveDispute(btn.dataset.id, { decision, resolution: resolution.trim() });
-        showToast('Dispute resolved.', 'success');
-        await renderDisputes({ force: true });
-        loadAdminData();
-      } catch (err) {
-        showToast(err?.response?.data?.message || err?.data?.message || err.message || 'Failed to resolve dispute.', 'error');
-      } finally {
-        btn.disabled = false;
-      }
-    };
+  document.querySelectorAll('[data-dispute-manage]').forEach(btn => {
+    btn.onclick = () => openAdminDisputeModal(btn.dataset.disputeManage);
   });
 }
 
-function openAdminDisputeModal(disputeId) {
-  const dispute = _adminDisputes.find(item => item._id === disputeId);
-  const body = document.getElementById('adminDisputeBody');
-  if (!dispute || !body) return;
+const RESOLVED_DISPUTE_STATUSES = ['resolved_refund', 'resolved_release', 'resolved_partial', 'resolved_redo', 'closed'];
 
+function isResolved(dispute) {
+  return RESOLVED_DISPUTE_STATUSES.includes(dispute.status);
+}
+
+function renderEvidenceItem(file) {
+  const url = file?.url || file?.secureUrl || file?.path || (typeof file === 'string' ? file : '');
+  const name = file?.name || file?.originalName || file?.filename || 'Evidence';
+  const role = file?.uploadedByRole || file?.role || '';
+  const by = file?.uploadedBy?.name || '';
+  const meta = [role && `by ${role}`, by].filter(Boolean).join(' - ');
+  if (!url) return `<span class="admin-dispute-evidence__missing">${escapeHtml(name)}</span>`;
+  const ext = (name.includes('.') ? name.split('.').pop() : (url.split('?')[0].split('.').pop() || 'file')).toLowerCase();
+  const isImage = /^(png|jpe?g|gif|webp|bmp|avif|svg)$/i.test(ext) || /^image\//.test(file?.mime || '');
+  const fallback = `this.style.display='none';this.nextElementSibling.style.display='grid';`;
+  return `
+    <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="admin-dispute-evidence__item${isImage ? '' : ' admin-dispute-evidence__item--file'}">
+      ${isImage
+        ? `<img src="${escapeHtml(url)}" alt="${escapeHtml(name)}" onerror="${fallback}"><div class="admin-dispute-evidence__file" style="display:none">${escapeHtml(ext.toUpperCase())}</div>`
+        : `<div class="admin-dispute-evidence__file">${escapeHtml(ext.toUpperCase())}</div>`}
+      <div class="admin-dispute-evidence__meta">
+        <span>${escapeHtml(name)}</span>
+        ${meta ? `<small>${escapeHtml(meta)}</small>` : ''}
+      </div>
+    </a>
+  `;
+}
+
+function renderHistoryTimeline(history) {
+  if (!Array.isArray(history) || !history.length) {
+    return '<p class="admin-dispute-empty">No history yet.</p>';
+  }
+  return `<ol class="admin-dispute-history">
+    ${history.slice().reverse().map(h => {
+      const statusRaw = h?.status || '';
+      const status = escapeHtml(formatDisputeStatusAdmin(statusRaw));
+      const roleRaw = escapeHtml(h?.byRole || 'system');
+      
+      let roleFriendly = 'System';
+      if (roleRaw === 'user') roleFriendly = 'Customer';
+      else if (roleRaw === 'worker') roleFriendly = 'Technician';
+      else if (roleRaw === 'admin') roleFriendly = 'Support Admin';
+
+      const who = h?.by?.name ? escapeHtml(h.by.name) : roleFriendly;
+      
+      let actionDesc = `Status updated to ${status}`;
+      if (statusRaw === 'open') actionDesc = 'Dispute opened';
+      else if (statusRaw === 'reviewing') actionDesc = 'Review started';
+      else if (statusRaw === 'awaiting_evidence') actionDesc = 'Requested evidence';
+      else if (statusRaw === 'appealed') actionDesc = 'Decision appealed';
+      else if (statusRaw.startsWith('resolved')) actionDesc = `Dispute resolved: ${status}`;
+      else if (statusRaw === 'closed') actionDesc = 'Dispute closed';
+
+      return `
+      <li>
+        <div><strong>${actionDesc}</strong><small>${escapeHtml(formatAdminDate(h.at))}</small></div>
+        <div class="admin-dispute-history__meta">By: <strong>${who}</strong> <span style="opacity:0.7;">(${roleFriendly})</span></div>
+        ${h.note ? `<div class="admin-dispute-history__note">"${escapeHtml(h.note)}"</div>` : ''}
+      </li>
+      `;
+    }).join('')}
+  </ol>`;
+}
+
+function renderInternalNotes(notes) {
+  if (!Array.isArray(notes) || !notes.length) return '<p class="admin-dispute-empty">No internal notes.</p>';
+  return notes.slice().reverse().map(n => `
+    <div class="admin-dispute-note">
+      <header><strong>${escapeHtml(n.by?.name || 'Admin')}</strong><small>${escapeHtml(formatAdminDate(n.at))}</small></header>
+      <p>${escapeHtml(n.note)}</p>
+    </div>
+  `).join('');
+}
+
+async function openAdminDisputeModal(disputeId) {
+  const body = document.getElementById('adminDisputeBody');
+  if (!body) return;
+  body.innerHTML = skList(4);
+  if (_openProfileModal) _openProfileModal('adminDisputeModal');
+  else document.getElementById('adminDisputeModal')?.removeAttribute('hidden');
+
+  let dispute;
+  try {
+    const res = await getDisputeById(disputeId);
+    dispute = res?.data || res;
+    const idx = _adminDisputes.findIndex(d => d._id === disputeId);
+    if (idx >= 0) _adminDisputes[idx] = dispute;
+    else _adminDisputes.push(dispute);
+  } catch (err) {
+    body.innerHTML = `<p class="admin-dispute-empty">Failed to load dispute: ${escapeHtml(err.message || 'error')}</p>`;
+    return;
+  }
+
+  renderDisputeModal(dispute);
+}
+
+function renderDisputeModal(dispute) {
+  const body = document.getElementById('adminDisputeBody');
+  if (!body) return;
   const booking = getDisputeBooking(dispute);
   const customer = getDisputeCustomer(dispute);
   const worker = getDisputeWorker(dispute);
   const evidence = Array.isArray(dispute.evidence) ? dispute.evidence : [];
-  const amount = booking.totalPrice ?? booking.estimatedTotal ?? dispute.payment?.amount;
+  const customerEvidence = evidence.filter(e => (e?.uploadedByRole || 'user') === 'user');
+  const workerEvidence = evidence.filter(e => e?.uploadedByRole === 'worker');
+  const adminEvidence = evidence.filter(e => e?.uploadedByRole === 'admin');
+  const amount = booking.totalPrice ?? booking.estimatedTotal ?? dispute.payment?.amount ?? 0;
+  const paymentAmount = Number(dispute.payment?.amount || amount || 0);
+  const resolved = isResolved(dispute);
+  const isAppealed = dispute.status === 'appealed';
+  const hasEscrow = Boolean(dispute.payment);
+  const slaBadge = renderSlaBadge(dispute);
+  const assignedName = dispute.assignedAdmin?.name || '';
+  const sessionUser = (() => { try { return JSON.parse(localStorage.getItem('servio_session') || '{}'); } catch { return {}; } })();
+  const isMineAssigned = dispute.assignedAdmin?._id && sessionUser?.id && String(dispute.assignedAdmin._id) === String(sessionUser.id);
 
   body.innerHTML = `
-    <div class="admin-dispute-detail">
-      <div class="admin-dispute-detail__summary">
-        <span class="admin-dispute-status ${disputeStatusClass(dispute.status)}">${escapeHtml(formatDisputeStatusAdmin(dispute.status))}</span>
-        <h4>${escapeHtml(getDisputeService(dispute))}</h4>
+    <div class="admin-dispute-detail" data-dispute-id="${escapeHtml(dispute._id)}">
+      <header class="admin-dispute-detail__head">
+        <div>
+          <span class="admin-dispute-status ${disputeStatusClass(dispute.status)}">${escapeHtml(formatDisputeStatusAdmin(dispute.status))}</span>
+          <span class="admin-dispute-sev admin-dispute-sev--${escapeHtml(dispute.severity || 'medium')}">${escapeHtml(dispute.severity || 'medium')}</span>
+          ${slaBadge}
+        </div>
+        <div class="admin-dispute-detail__assign">
+          <small>${assignedName ? `Assigned: ${escapeHtml(assignedName)}` : 'Unassigned'}</small>
+          ${!resolved && !isMineAssigned ? `<button class="bk-action-btn bk-action-btn--xs" type="button" data-action="assign-me">Assign to me</button>` : ''}
+        </div>
+      </header>
+
+      <section class="admin-dispute-detail__summary">
+        <h4>${escapeHtml(getDisputeService(dispute))} <small>#${escapeHtml(String(dispute._id).slice(-8))}</small></h4>
         <p>${escapeHtml(dispute.reason || 'No reason provided.')}</p>
-      </div>
-      <div class="admin-dispute-detail__grid">
+      </section>
+
+      <section class="admin-dispute-detail__grid">
         <div><span>Customer</span><strong>${escapeHtml(customer.name || '-')}</strong><small>${escapeHtml(customer.email || customer.phone || '')}</small></div>
         <div><span>Technician</span><strong>${escapeHtml(worker.name || '-')}</strong><small>${escapeHtml(worker.email || worker.phone || '')}</small></div>
         <div><span>Booking</span><strong>${escapeHtml(String(booking._id || dispute.booking || '-').slice(-10))}</strong><small>${escapeHtml(booking.status || '-')}</small></div>
         <div><span>Payment</span><strong>${escapeHtml(formatMoney(amount))}</strong><small>${escapeHtml(`${booking.paymentMethod || '-'} / ${booking.paymentStatus || dispute.payment?.status || '-'}`)}</small></div>
-        <div><span>Category</span><strong>${escapeHtml(dispute.category || 'other')}</strong><small>${escapeHtml(formatAdminDate(dispute.createdAt))}</small></div>
-        <div><span>Resolution</span><strong>${escapeHtml(dispute.decision || 'Pending')}</strong><small>${escapeHtml(dispute.resolution || '')}</small></div>
-      </div>
-      <div class="admin-dispute-evidence">
-        <h4>Evidence</h4>
-        ${evidence.length ? evidence.map(file => {
-          const url = file.url || file.secureUrl || file.path || '';
-          const name = file.originalName || file.name || file.filename || 'Evidence file';
-          return url
-            ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHtml(url)}" alt="${escapeHtml(name)}"><span>${escapeHtml(name)}</span></a>`
-            : `<span class="admin-dispute-evidence__missing">${escapeHtml(name)}</span>`;
-        }).join('') : '<p>No evidence files uploaded.</p>'}
-      </div>
+        <div><span>Category</span><strong>${escapeHtml(dispute.category || 'other')}</strong><small>Opened ${escapeHtml(formatAdminDate(dispute.createdAt))}</small></div>
+        <div><span>Decision</span><strong>${escapeHtml(dispute.decision || 'Pending')}</strong><small>${escapeHtml(dispute.refundAmount ? `Refund ${formatMoney(dispute.refundAmount)}` : (dispute.resolution || ''))}</small></div>
+      </section>
+
+      ${isAppealed || dispute.appealStatus ? `
+        <section class="admin-dispute-appeal">
+          <h4>Appeal - <span>${escapeHtml(dispute.appealStatus || '-')}</span></h4>
+          <p>${escapeHtml(dispute.appealReason || '')}</p>
+          <small>By ${escapeHtml(dispute.appealedByRole || '-')} - ${escapeHtml(formatAdminDate(dispute.appealedAt))}</small>
+          ${dispute.appealStatus === 'pending' ? `
+            <div class="admin-dispute-appeal__actions">
+              <button class="bk-action-btn bk-action-btn--xs" data-action="appeal-uphold">Uphold appeal</button>
+              <button class="bk-action-btn bk-action-btn--xs" data-action="appeal-overturn">Overturn appeal</button>
+            </div>
+          ` : ''}
+        </section>
+      ` : ''}
+
+      <section class="admin-dispute-evidence-section">
+        <h4>Evidence (${evidence.length})</h4>
+        <div class="admin-dispute-evidence-grid">
+          <div>
+            <h5>Customer (${customerEvidence.length})</h5>
+            <div class="admin-dispute-evidence">${customerEvidence.length ? customerEvidence.map(renderEvidenceItem).join('') : '<p class="admin-dispute-empty">No customer evidence.</p>'}</div>
+          </div>
+          <div>
+            <h5>Technician (${workerEvidence.length})</h5>
+            <div class="admin-dispute-evidence">${workerEvidence.length ? workerEvidence.map(renderEvidenceItem).join('') : '<p class="admin-dispute-empty">No technician evidence.</p>'}</div>
+          </div>
+          ${adminEvidence.length ? `
+            <div>
+              <h5>Admin (${adminEvidence.length})</h5>
+              <div class="admin-dispute-evidence">${adminEvidence.map(renderEvidenceItem).join('')}</div>
+            </div>
+          ` : ''}
+        </div>
+        ${!resolved ? `
+          <div class="admin-dispute-evidence-actions">
+            <label>Request more evidence:</label>
+            <select data-field="evidence-target">
+              <option value="both">Both parties</option>
+              <option value="user">Customer only</option>
+              <option value="worker">Technician only</option>
+            </select>
+            <input type="text" data-field="evidence-message" placeholder="Optional message" maxlength="200">
+            <button class="bk-action-btn bk-action-btn--xs" data-action="request-evidence">Request</button>
+          </div>
+        ` : ''}
+      </section>
+
+      <section class="admin-dispute-history-section">
+        <h4>Timeline</h4>
+        ${renderHistoryTimeline(dispute.history)}
+      </section>
+
+      <section class="admin-dispute-notes-section">
+        <h4>Internal notes (not visible to parties)</h4>
+        ${renderInternalNotes(dispute.internalNotes)}
+        ${!resolved ? `
+          <div class="admin-dispute-notes-actions">
+            <textarea data-field="internal-note" rows="2" maxlength="2000" placeholder="Add an internal note..."></textarea>
+            <button class="bk-action-btn bk-action-btn--xs" data-action="add-note">Save note</button>
+          </div>
+        ` : ''}
+      </section>
+
+      ${!resolved ? `
+        <section class="admin-dispute-decision">
+          <h4>Decision</h4>
+          ${dispute.status === 'open' ? `
+            <button class="bk-action-btn bk-action-btn--xs" data-action="mark-reviewing">Mark as reviewing</button>
+          ` : ''}
+          <div class="admin-dispute-decision__form">
+            <label>Outcome
+              <select data-field="decision">
+                ${hasEscrow ? '<option value="refund">Full refund to customer</option>' : ''}
+                <option value="release">Release to technician${hasEscrow ? '' : ' (close cash booking)'}</option>
+                ${hasEscrow ? '<option value="partial_refund">Partial refund</option>' : ''}
+                <option value="redo">Send back for redo</option>
+              </select>
+            </label>
+            <label class="admin-dispute-decision__refund" hidden>
+              <span class="admin-dispute-decision__refund-label">Refund amount: <strong data-field="refund-display">${formatMoney(Math.floor(paymentAmount / 2))}</strong> <small>of ${formatMoney(paymentAmount)}</small></span>
+              <input type="range" min="1" max="${Math.max(1, Math.floor(paymentAmount) - 1)}" step="1" value="${Math.floor(paymentAmount / 2)}" data-field="refund-range">
+              <input type="number" min="1" max="${Math.max(1, Math.floor(paymentAmount) - 1)}" step="1" value="${Math.floor(paymentAmount / 2)}" data-field="refund-amount">
+            </label>
+            <label>Resolution note (sent to both parties)
+              <textarea data-field="resolution" rows="3" required minlength="10" placeholder="Explain decision to customer and technician..."></textarea>
+            </label>
+            <label>Internal note (admin-only, optional)
+              <textarea data-field="decision-internal-note" rows="2" maxlength="2000" placeholder="Private rationale..."></textarea>
+            </label>
+            <div class="admin-dispute-decision__actions">
+              <button class="bk-action-btn admin-dispute-actions__release" data-action="resolve">Resolve dispute</button>
+            </div>
+          </div>
+        </section>
+      ` : `
+        <section class="admin-dispute-decision admin-dispute-decision--resolved">
+          <h4>Resolved</h4>
+          <p><strong>${escapeHtml(dispute.decision || '-')}</strong>${dispute.refundAmount ? ` - Refund ${escapeHtml(formatMoney(dispute.refundAmount))}` : ''}</p>
+          <p>${escapeHtml(dispute.resolution || '')}</p>
+          <small>By ${escapeHtml(dispute.resolvedBy?.name || '-')} at ${escapeHtml(formatAdminDate(dispute.resolvedAt))}</small>
+        </section>
+      `}
     </div>
   `;
 
-  if (_openProfileModal) {
-    _openProfileModal('adminDisputeModal');
-  } else {
-    document.getElementById('adminDisputeModal')?.removeAttribute('hidden');
+  wireDisputeModalActions(dispute._id);
+}
+
+function wireDisputeModalActions(disputeId) {
+  const body = document.getElementById('adminDisputeBody');
+  if (!body) return;
+
+  const decisionSelect = body.querySelector('[data-field="decision"]');
+  const refundWrap = body.querySelector('.admin-dispute-decision__refund');
+  const refundRange = body.querySelector('[data-field="refund-range"]');
+  const refundAmount = body.querySelector('[data-field="refund-amount"]');
+
+  const syncRefundVisibility = () => {
+    if (!decisionSelect || !refundWrap) return;
+    refundWrap.hidden = decisionSelect.value !== 'partial_refund';
+  };
+  decisionSelect?.addEventListener('change', syncRefundVisibility);
+  syncRefundVisibility();
+
+  const refundDisplay = body.querySelector('[data-field="refund-display"]');
+  const syncRefundDisplay = (v) => { if (refundDisplay) refundDisplay.textContent = formatMoney(Number(v) || 0); };
+  if (refundRange && refundAmount) {
+    refundRange.addEventListener('input', () => { refundAmount.value = refundRange.value; syncRefundDisplay(refundRange.value); });
+    refundAmount.addEventListener('input', () => {
+      const v = Number(refundAmount.value);
+      if (Number.isFinite(v)) { refundRange.value = String(v); syncRefundDisplay(v); }
+    });
   }
+
+  body.querySelector('[data-action="assign-me"]')?.addEventListener('click', () => safeRun(async () => {
+    await assignDispute(disputeId);
+    showToast('Assigned to you.', 'success');
+    await refreshDisputeAndModal(disputeId);
+  }));
+
+  body.querySelector('[data-action="mark-reviewing"]')?.addEventListener('click', () => safeRun(async () => {
+    await reviewDispute(disputeId);
+    showToast('Marked as reviewing.', 'success');
+    await refreshDisputeAndModal(disputeId);
+  }));
+
+  body.querySelector('[data-action="request-evidence"]')?.addEventListener('click', () => safeRun(async () => {
+    const target = body.querySelector('[data-field="evidence-target"]')?.value || 'both';
+    const message = body.querySelector('[data-field="evidence-message"]')?.value || '';
+    await requestDisputeEvidence(disputeId, target, message);
+    showToast('Evidence requested.', 'success');
+    await refreshDisputeAndModal(disputeId);
+  }));
+
+  body.querySelector('[data-action="add-note"]')?.addEventListener('click', () => safeRun(async () => {
+    const noteEl = body.querySelector('[data-field="internal-note"]');
+    const note = String(noteEl?.value || '').trim();
+    if (!note) { showToast('Note is empty.', 'error'); return; }
+    await addDisputeNote(disputeId, note);
+    showToast('Note added.', 'success');
+    if (noteEl) noteEl.value = '';
+    await refreshDisputeAndModal(disputeId);
+  }));
+
+  body.querySelector('[data-action="resolve"]')?.addEventListener('click', () => safeRun(async () => {
+    const decision = decisionSelect?.value;
+    const resolution = String(body.querySelector('[data-field="resolution"]')?.value || '').trim();
+    const internalNote = String(body.querySelector('[data-field="decision-internal-note"]')?.value || '').trim();
+    if (resolution.length < 10) { showToast('Resolution note must be at least 10 chars.', 'error'); return; }
+    const payload = { decision, resolution };
+    if (decision === 'partial_refund') {
+      payload.refundAmount = Number(refundAmount?.value || refundRange?.value || 0);
+    }
+    if (internalNote) payload.internalNote = internalNote;
+    const label = decision === 'refund' ? 'refund customer in full'
+      : decision === 'release' ? 'release payment to technician'
+      : decision === 'partial_refund' ? `partially refund ${payload.refundAmount} EGP`
+      : 'send job back for redo';
+    if (!confirm(`Confirm: ${label}?`)) return;
+    await resolveDispute(disputeId, payload);
+    showToast('Dispute resolved.', 'success');
+    await renderDisputes({ force: true });
+    loadAdminData();
+    await refreshDisputeAndModal(disputeId);
+  }));
+
+  body.querySelector('[data-action="appeal-uphold"]')?.addEventListener('click', () => safeRun(async () => {
+    const note = prompt('Optional note for upholding appeal:') || '';
+    await resolveDisputeAppeal(disputeId, 'upheld', note);
+    showToast('Appeal upheld.', 'success');
+    await refreshDisputeAndModal(disputeId);
+  }));
+  body.querySelector('[data-action="appeal-overturn"]')?.addEventListener('click', () => safeRun(async () => {
+    const note = prompt('Optional note for overturning appeal:') || '';
+    await resolveDisputeAppeal(disputeId, 'overturned', note);
+    showToast('Appeal overturned. Case re-opened for review.', 'success');
+    await refreshDisputeAndModal(disputeId);
+  }));
+}
+
+async function refreshDisputeAndModal(disputeId) {
+  try {
+    const res = await getDisputeById(disputeId);
+    const dispute = res?.data || res;
+    const idx = _adminDisputes.findIndex(d => d._id === disputeId);
+    if (idx >= 0) _adminDisputes[idx] = dispute;
+    renderDisputeModal(dispute);
+    updateDisputeKpis(_adminDisputes);
+  } catch (err) {
+    showToast(err?.message || 'Failed to refresh dispute.', 'error');
+  }
+}
+
+function safeRun(fn) {
+  return Promise.resolve()
+    .then(fn)
+    .catch(err => {
+      showToast(err?.response?.data?.message || err?.data?.message || err?.message || 'Action failed.', 'error');
+    });
 }
 
 function formatSupportIssueType(type) {
@@ -2513,7 +2852,7 @@ async function renderSupportIssues(options = {}) {
 
   const shouldFetch = options.force || !options.reuseCache || !_supportLoadedOnce;
   if (shouldFetch) {
-    tbody.innerHTML = '<tr><td colspan="8" class="center-align" style="padding: 3rem; color: var(--color-text-muted);">Loading support issues...</td></tr>';
+    tbody.innerHTML = skTableRows(6, 8);
     _adminSupportIssues = await fetchAdminSupportIssues();
     _supportLoadedOnce = true;
   }
@@ -2638,7 +2977,7 @@ function openAdminSupportModal(issueId) {
 async function renderPendingApprovals(filter = {}) {
   const container = document.getElementById('adminPendingApprovalsList');
   if (!container) return;
-  container.innerHTML = '<p>Loading...</p>';
+  container.innerHTML = skList(4);
 
   try {
     const { items } = await getPendingApprovals(filter);
@@ -2648,7 +2987,8 @@ async function renderPendingApprovals(filter = {}) {
     }
 
     container.innerHTML = `
-      <table class="admin-table">
+      <div class="fp-table-wrap">
+      <table class="admin-table fp-table">
         <thead>
           <tr>
             <th>Customer</th><th>Worker</th><th>Service</th>
@@ -2676,6 +3016,7 @@ async function renderPendingApprovals(filter = {}) {
           `).join('')}
         </tbody>
       </table>
+      </div>
     `;
 
     container.querySelectorAll('.js-approve-btn').forEach(btn => {
@@ -2727,7 +3068,7 @@ async function renderPendingApprovals(filter = {}) {
 async function renderCashDebts(filter = {}) {
   const container = document.getElementById('adminCashDebtsList');
   if (!container) return;
-  container.innerHTML = '<p>Loading...</p>';
+  container.innerHTML = skList(4);
 
   try {
     const { items, summary } = await getCashDebts(filter);
@@ -2747,7 +3088,8 @@ async function renderCashDebts(filter = {}) {
     }
 
     container.innerHTML = `
-      <table class="admin-table">
+      <div class="fp-table-wrap">
+      <table class="admin-table fp-table">
         <thead>
           <tr>
             <th>Worker</th><th>Booking</th><th>Amount</th>
@@ -2772,6 +3114,7 @@ async function renderCashDebts(filter = {}) {
           `).join('')}
         </tbody>
       </table>
+      </div>
     `;
 
     container.querySelectorAll('.js-mark-paid-btn').forEach(btn => {
@@ -2812,6 +3155,29 @@ document.getElementById('markPaidCancel')?.addEventListener('click', () => {
 });
 
 initAdminDashboard();
+
+// CSV export — anchor tags cannot send Authorization, so fetch as blob and trigger download manually.
+document.getElementById('btnExportSettlementsCsv')?.addEventListener('click', async () => {
+  try {
+    const apiBase = (window.SERVIO_CONFIG && window.SERVIO_CONFIG.API_BASE) || '';
+    const token   = localStorage.getItem('servio_token');
+    const res = await fetch(`${apiBase}/payments/admin/settlements/history.csv`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `settlements-history-${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    showToast(err.message || 'Failed to export CSV.', 'error');
+  }
+});
 
 // ── Preview Mode: View Site as Customer ───────
 document.getElementById('viewSiteAsCustomer')?.addEventListener('click', () => {
@@ -2863,3 +3229,473 @@ document.getElementById('viewSiteAsCustomer')?.addEventListener('click', () => {
     }
   });
 })();
+
+// ─── Escrow Payments Tab (Plan 1 Task 18) ───────────────────────────────
+
+const _payState = { page: 1, limit: 20, filters: {} };
+
+function _payFmtMoney(n) {
+  return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'EGP' }).format(Number(n) || 0);
+}
+function _payFmtDate(d) { return d ? new Date(d).toLocaleDateString() : '—'; }
+function _payAge(d) {
+  if (!d) return '—';
+  const h = Math.floor((Date.now() - new Date(d).getTime()) / 3600000);
+  return h < 24 ? `${h}h` : `${Math.floor(h / 24)}d`;
+}
+
+async function loadPaymentsKpis() {
+  try {
+    const r = await adminPaymentsStats();
+    const data = r?.data || r || {};
+    for (const [k, v] of Object.entries(data)) {
+      const el = document.querySelector(`#paymentsKpis .kpi[data-key="${k}"] .kpi__value`);
+      if (!el) continue;
+      el.textContent = (typeof v === 'number' && /Total$/i.test(k)) ? _payFmtMoney(v) : String(v ?? '—');
+    }
+  } catch (e) { console.warn('kpi load failed', e); }
+}
+
+async function loadPaymentsTable() {
+  const tbody = document.getElementById('paymentsTbody');
+  if (!tbody) return;
+  try {
+    const r = await adminListPayments({ ..._payState.filters, page: _payState.page, limit: _payState.limit });
+    const items = r?.data || [];
+    tbody.innerHTML = items.length
+      ? items.map(_payRowHtml).join('')
+      : '<tr><td colspan="10" class="center-align" style="padding:1.5rem;">No payments found.</td></tr>';
+    tbody.querySelectorAll('[data-action="view"]').forEach((btn) => {
+      btn.onclick = () => openPaymentDetailDrawer(btn.dataset.bookingId);
+    });
+  } catch (e) { console.warn('payments table load failed', e); }
+}
+
+function _payRowHtml(p) {
+  const b = p.booking || {};
+  const cust = b.user || b.customer || {};
+  const tech = b.worker || b.technician || {};
+  const svc = b.service || {};
+  return `<tr>
+    <td>#${(b._id || p._id || '').toString().slice(-4) || '—'}</td>
+    <td>${_payFmtDate(p.createdAt)}</td>
+    <td>${cust.name || '—'}</td>
+    <td>${tech.name || '—'}</td>
+    <td>${svc.title || '—'}</td>
+    <td>${_payFmtMoney(p.amount)}</td>
+    <td>${_payFmtMoney(b.platformFeeAmount || 0)}</td>
+    <td><span class="status-chip status-chip--${p.status}">${p.status}</span></td>
+    <td>${_payAge(p.createdAt)}</td>
+    <td><button class="btn btn--small" data-action="view" data-booking-id="${b._id || ''}">View</button></td>
+  </tr>`;
+}
+
+async function openPaymentDetailDrawer(bookingId) {
+  const drawer = document.getElementById('paymentDrawer');
+  if (!drawer || !bookingId) return;
+  drawer.hidden = false;
+  drawer.innerHTML = '<p style="padding:1rem;">Loading…</p>';
+  try {
+    const r = await adminListPayments({ bookingId, limit: 1 });
+    const p = (r?.data || [])[0];
+    if (!p) { drawer.innerHTML = '<p style="padding:1rem;">Not found</p>'; return; }
+    drawer.innerHTML = _payDrawerHtml(p);
+    drawer.querySelector('[data-close]').onclick = () => { drawer.hidden = true; };
+    const approveBtn = drawer.querySelector('[data-action="approve"]');
+    if (approveBtn) approveBtn.onclick = () => {
+      const tech = p.booking?.worker?.name || p.booking?.technician?.name || 'tech';
+      const earn = (p.booking?.basePrice || p.booking?.totalPrice || p.amount) - (p.booking?.platformFeeAmount || 0);
+      openPaymentConfirmModal({
+        title: 'Approve & Release',
+        body: `Release ${_payFmtMoney(earn)} to ${tech}?`,
+        onConfirm: async () => {
+          await adminApprovePayment(p.booking._id);
+          drawer.hidden = true;
+          await renderPaymentsTab();
+        },
+      });
+    };
+    const refundBtn = drawer.querySelector('[data-action="partial-refund"]');
+    if (refundBtn) refundBtn.onclick = () => {
+      openPartialRefundModal({
+        payment: p,
+        onConfirm: async (payload) => {
+          await adminPartialRefund(p.booking._id, payload);
+          drawer.hidden = true;
+          await renderPaymentsTab();
+        },
+      });
+    };
+    const forceReleaseBtn = drawer.querySelector('[data-action="force-release"]');
+    if (forceReleaseBtn) forceReleaseBtn.onclick = () => {
+      const reason = window.prompt('Emergency force-release reason (required, min 10 chars):');
+      if (!reason || reason.trim().length < 10) { showToast('Reason required (min 10 chars)', 'error'); return; }
+      openPaymentConfirmModal({
+        title: 'Force-release (emergency)',
+        body: `Bypass workflow and release ${_payFmtMoney(p.amount)} now? Logged for audit.`,
+        onConfirm: async () => {
+          try {
+            await adminForceRelease(p._id, { reason: reason.trim() });
+            showToast('Payment force-released', 'success');
+            drawer.hidden = true;
+            await renderPaymentsTab();
+          } catch (err) { showToast(err.message || 'Force-release failed', 'error'); }
+        },
+      });
+    };
+    const forceLockBtn = drawer.querySelector('[data-action="force-lock"]');
+    if (forceLockBtn) forceLockBtn.onclick = () => {
+      const reason = window.prompt('Lock reason (required, min 10 chars):');
+      if (!reason || reason.trim().length < 10) { showToast('Reason required (min 10 chars)', 'error'); return; }
+      openPaymentConfirmModal({
+        title: 'Lock payment',
+        body: 'Lock prevents auto-release and worker actions until unlocked.',
+        onConfirm: async () => {
+          try {
+            await adminForceLock(p._id, { reason: reason.trim() });
+            showToast('Payment locked', 'success');
+            drawer.hidden = true;
+            await renderPaymentsTab();
+          } catch (err) { showToast(err.message || 'Lock failed', 'error'); }
+        },
+      });
+    };
+    const forceUnlockBtn = drawer.querySelector('[data-action="force-unlock"]');
+    if (forceUnlockBtn) forceUnlockBtn.onclick = () => {
+      const reason = window.prompt('Unlock reason (required, min 10 chars):');
+      if (!reason || reason.trim().length < 10) { showToast('Reason required (min 10 chars)', 'error'); return; }
+      openPaymentConfirmModal({
+        title: 'Unlock payment',
+        body: 'Resume normal escrow flow for this payment.',
+        onConfirm: async () => {
+          try {
+            await adminForceUnlock(p._id, { reason: reason.trim() });
+            showToast('Payment unlocked', 'success');
+            drawer.hidden = true;
+            await renderPaymentsTab();
+          } catch (err) { showToast(err.message || 'Unlock failed', 'error'); }
+        },
+      });
+    };
+  } catch (e) {
+    drawer.innerHTML = `<p style="padding:1rem;">Error: ${e.message || e}</p>`;
+  }
+}
+
+function _payDrawerHtml(p) {
+  const b = p.booking || {};
+  const cust = b.user || b.customer || {};
+  const tech = b.worker || b.technician || {};
+  const total = b.basePrice || b.totalPrice || p.amount;
+  const fee = b.platformFeeAmount || 0;
+  return `<div class="drawer__head">
+      <h3>Payment ${_payFmtMoney(p.amount)}</h3>
+      <button data-close aria-label="Close">&times;</button>
+    </div>
+    <dl class="drawer__meta">
+      <dt>Status</dt><dd><span class="status-chip status-chip--${p.status}">${p.status}</span></dd>
+      <dt>Booking</dt><dd>#${b._id || ''}</dd>
+      <dt>Customer</dt><dd>${cust.name || '—'}</dd>
+      <dt>Tech</dt><dd>${tech.name || '—'}</dd>
+      <dt>Service</dt><dd>${(b.service && b.service.title) || '—'}</dd>
+      <dt>Tech earns</dt><dd>${_payFmtMoney(total - fee)}</dd>
+      <dt>Platform fee</dt><dd>${_payFmtMoney(fee)}</dd>
+    </dl>
+    <div class="drawer__actions">
+      ${p.status === 'held' || p.status === 'pending_review' ? '<button class="btn btn--primary" data-action="approve">Approve &amp; Release</button>' : ''}
+      ${p.status === 'held' || p.status === 'released' ? '<button class="btn btn--warn" data-action="partial-refund">Partial refund…</button>' : ''}
+      ${p.status === 'held' && !p.locked ? '<button class="btn btn--danger" data-action="force-release">Force-release (emergency)</button>' : ''}
+      ${p.status === 'held' && !p.locked ? '<button class="btn btn--ghost" data-action="force-lock">Lock</button>' : ''}
+      ${p.locked ? '<button class="btn btn--ghost" data-action="force-unlock">Unlock</button>' : ''}
+    </div>`;
+}
+
+export async function renderPaymentsTab() {
+  await Promise.all([loadPaymentsKpis(), loadPaymentsTable(), renderPendingApprovals()]);
+  const statusEl = document.getElementById('payStatusFilter');
+  if (statusEl) statusEl.onchange = (e) => {
+    _payState.filters.status = e.target.value === 'all' ? '' : e.target.value;
+    _payState.page = 1;
+    loadPaymentsTable();
+  };
+  const custEl = document.getElementById('payCustomerFilter');
+  if (custEl) custEl.onchange = (e) => { _payState.filters.customer = e.target.value; loadPaymentsTable(); };
+  const wrkEl = document.getElementById('payWorkerFilter');
+  if (wrkEl) wrkEl.onchange = (e) => { _payState.filters.worker = e.target.value; loadPaymentsTable(); };
+  const fromEl = document.getElementById('payFromDate');
+  if (fromEl) fromEl.onchange = (e) => { _payState.filters.from = e.target.value; loadPaymentsTable(); };
+  const toEl = document.getElementById('payToDate');
+  if (toEl) toEl.onchange = (e) => { _payState.filters.to = e.target.value; loadPaymentsTable(); };
+  const resetEl = document.getElementById('payResetFilters');
+  if (resetEl) resetEl.onclick = () => {
+    _payState.filters = {};
+    _payState.page = 1;
+    document.querySelectorAll('.filters-bar input, .filters-bar select').forEach((el) => { el.value = ''; });
+    loadPaymentsTable();
+  };
+  const approvalMethodEl = document.getElementById('approvalMethodFilter');
+  if (approvalMethodEl) approvalMethodEl.onchange = (e) => renderPendingApprovals(e.target.value ? { method: e.target.value } : {});
+}
+
+// Finance inner tab switching (global so other modules can call)
+window.switchFinanceTab = function switchFinanceTab(name) {
+  const target = name === 'settlements' ? 'settlements' : 'payments';
+  document.querySelectorAll('.fin-tab').forEach(t => {
+    const on = t.dataset.finTab === target;
+    t.classList.toggle('is-active', on);
+    t.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  document.querySelectorAll('.fin-section').forEach(s => {
+    s.hidden = (s.dataset.finSection !== target);
+  });
+  sessionStorage.setItem('servio_admin_fin_tab', target);
+  if (target === 'payments' && typeof renderPaymentsTab === 'function') {
+    setTimeout(() => renderPaymentsTab(), 30);
+  }
+  if (target === 'settlements' && typeof renderSettlementsTab === 'function') {
+    setTimeout(() => renderSettlementsTab(), 30);
+  }
+};
+
+// Auto-render when finance tab opened
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.admin-nav__btn[data-tab="finance"]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const sub = sessionStorage.getItem('servio_admin_fin_tab') || 'payments';
+      setTimeout(() => window.switchFinanceTab(sub), 50);
+    });
+  });
+  if (document.querySelector('.admin-panel[data-panel="finance"].is-active')) {
+    const sub = sessionStorage.getItem('servio_admin_fin_tab') || 'payments';
+    window.switchFinanceTab(sub);
+  }
+});
+/* ── Plan 2 Task 17: Cash Settlements 3 sub-tabs ──────────────────── */
+
+function _fmtMoney(n) {
+  try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'EGP', maximumFractionDigits: 2 }).format(Number(n) || 0); }
+  catch (_) { return (Number(n || 0)).toFixed(2) + ' EGP'; }
+}
+
+function _ageOf(d) {
+  if (!d) return '—';
+  const h = Math.floor((Date.now() - new Date(d).getTime()) / 3600000);
+  if (h < 1) return 'now';
+  if (h < 24) return h + 'h';
+  return Math.floor(h / 24) + 'd';
+}
+
+function _setKpi(key, val) {
+  const el = document.querySelector('#settlementsKpis .kpi[data-key="' + key + '"] .kpi__value');
+  if (el) el.textContent = val;
+}
+
+function switchSettlementSubtab(name) {
+  document.querySelectorAll('.subtab').forEach(t => {
+    const on = t.dataset.subtab === name;
+    t.classList.toggle('is-active', on);
+    t.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  const map = { 'worker-debts': 'subWorkerDebts', 'payout-requests': 'subPayoutRequests', 'history': 'subHistory' };
+  Object.entries(map).forEach(([k, id]) => {
+    const el = document.getElementById(id);
+    if (el) el.hidden = (k !== name);
+  });
+}
+
+async function renderWorkerDebts() {
+  const tbody = document.getElementById('workerDebtsTbody');
+  if (!tbody) return;
+  try {
+    const r = await adminListCashDebtsGrouped();
+    const rows = r?.data || [];
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="center-align" style="padding:3rem;color:var(--color-text-muted);">No outstanding debts.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(row => {
+      const name = row.worker?.name || '—';
+      const email = row.worker?.email || '';
+      const blocked = (row.totalOwed || 0) >= 300 ? '<span style="color:#dc2626;">BLOCKED</span>' : '';
+      return '<tr>'
+        + '<td>' + name + '<br><small style="color:#6b7280;">' + email + '</small></td>'
+        + '<td class="right-align">' + _fmtMoney(row.totalOwed) + '</td>'
+        + '<td>' + (row.oldest ? _ageOf(row.oldest) : '—') + '</td>'
+        + '<td class="right-align">' + row.debtCount + '</td>'
+        + '<td>' + (row.statusMix || []).join(', ') + '</td>'
+        + '<td>' + blocked + '</td>'
+        + '<td><button class="btn-premium btn-premium--sm" data-action="view" data-worker-id="' + row.workerId + '">View</button></td>'
+        + '</tr>';
+    }).join('');
+    tbody.querySelectorAll('[data-action="view"]').forEach(b => {
+      b.onclick = () => openWorkerDebtDrawer(b.dataset.workerId);
+    });
+  } catch (e) {
+    console.error('[workerDebts]', e);
+    tbody.innerHTML = '<tr><td colspan="7" class="center-align" style="color:#dc2626;">Load failed: ' + (e.message || e) + '</td></tr>';
+  }
+}
+
+async function renderPayoutRequests() {
+  const tbody = document.getElementById('payoutRequestsTbody');
+  if (!tbody) return;
+  try {
+    const r = await adminListPayouts();
+    const items = r?.data || [];
+    if (!items.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="center-align" style="padding:3rem;color:var(--color-text-muted);">No payout requests.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = items.map(p => {
+      const name = p.worker?.name || '—';
+      const email = p.worker?.email || '';
+      return '<tr>'
+        + '<td>' + name + '<br><small style="color:#6b7280;">' + email + '</small></td>'
+        + '<td>' + _ageOf(p.requestedAt || p.createdAt) + '</td>'
+        + '<td class="right-align">' + _fmtMoney(p.amount) + '</td>'
+        + '<td>' + p.payoutMethod + '</td>'
+        + '<td><span class="status-chip status-chip--' + p.status + '">' + p.status + '</span></td>'
+        + '<td><button class="btn-premium btn-premium--sm" data-payout-id="' + p._id + '" data-status="' + p.status + '">View</button></td>'
+        + '</tr>';
+    }).join('');
+    tbody.querySelectorAll('button[data-payout-id]').forEach(b => {
+      b.onclick = () => openPayoutDecisionModal({
+        payoutId: b.dataset.payoutId,
+        currentStatus: b.dataset.status,
+        onSuccess: () => { renderPayoutRequests(); renderSettlementsKpis(); },
+      });
+    });
+  } catch (e) {
+    console.error('[payouts]', e);
+    tbody.innerHTML = '<tr><td colspan="6" class="center-align" style="color:#dc2626;">Load failed: ' + (e.message || e) + '</td></tr>';
+  }
+}
+
+async function renderSettlementHistory() {
+  const tbody = document.getElementById('historyTbody');
+  if (!tbody) return;
+  try {
+    const r = await adminListSettlements({ status: 'verified' });
+    const items = r?.data || [];
+    if (!items.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="center-align" style="padding:3rem;color:var(--color-text-muted);">No verified settlements.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = items.map(s => '<tr>'
+      + '<td>' + new Date(s.createdAt).toLocaleString() + '</td>'
+      + '<td>' + (s.worker?.name || '—') + '</td>'
+      + '<td>' + s.method + '</td>'
+      + '<td class="right-align">' + _fmtMoney(s.totalAmount) + '</td>'
+      + '<td>' + s.status + '</td>'
+      + '<td>' + (s.verifiedBy?.name || '—') + '</td>'
+      + '</tr>').join('');
+  } catch (e) {
+    console.error('[history]', e);
+    tbody.innerHTML = '<tr><td colspan="6" class="center-align" style="color:#dc2626;">Load failed: ' + (e.message || e) + '</td></tr>';
+  }
+}
+
+async function renderSettlementsKpis() {
+  try {
+    const [debts, payouts, verified] = await Promise.all([
+      adminListCashDebtsGrouped().catch(() => ({ data: [] })),
+      adminListPayouts().catch(() => ({ data: [] })),
+      adminListSettlements({ status: 'verified' }).catch(() => ({ data: [] })),
+    ]);
+    const drows = debts?.data || [];
+    const outstanding = drows.reduce((a, r) => a + (Number(r.totalOwed) || 0), 0);
+    const blocked = drows.filter(r => (r.totalOwed || 0) >= 300).length;
+    const queue = (payouts?.data || []).filter(p => ['pending', 'approved'].includes(p.status)).reduce((a, p) => a + (Number(p.amount) || 0), 0);
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    const settledTodayCount = (verified?.data || []).filter(s => new Date(s.verifiedAt || s.createdAt) >= todayStart).length;
+    _setKpi('outstandingDebt', _fmtMoney(outstanding));
+    _setKpi('blockedWorkers', String(blocked));
+    _setKpi('payoutQueue', _fmtMoney(queue));
+    _setKpi('settledToday', String(settledTodayCount));
+  } catch (e) {
+    console.error('[kpis]', e);
+  }
+}
+
+async function openWorkerDebtDrawer(workerId) {
+  const drawer = document.getElementById('settlementDrawer');
+  if (!drawer) return;
+  drawer.hidden = false;
+  drawer.innerHTML = '<p>Loading…</p>';
+  try {
+    const r = await adminWorkerDebts(workerId);
+    drawer.innerHTML = workerDrawerHtml(r?.data || {});
+    drawer.querySelector('[data-close]').onclick = () => { drawer.hidden = true; };
+    drawer.querySelectorAll('[data-action="verify-settlement"]').forEach(b => {
+      b.onclick = () => openSettlementVerifyModal({
+        settlementId: b.dataset.id,
+        onSuccess: () => { drawer.hidden = true; renderWorkerDebts(); renderSettlementHistory(); renderSettlementsKpis(); },
+      });
+    });
+    drawer.querySelectorAll('[data-action="mark-debt-paid"]').forEach(b => {
+      b.onclick = async () => {
+        if (!confirm('Mark this debt paid by admin override?')) return;
+        try {
+          await markCashDebtPaid(b.dataset.id, { amount: parseFloat(b.dataset.amount), adminNote: 'admin_override' });
+          openWorkerDebtDrawer(workerId);
+          renderWorkerDebts();
+          renderSettlementsKpis();
+        } catch (e) { alert(e.message || e); }
+      };
+    });
+  } catch (e) {
+    drawer.innerHTML = '<p style="color:#dc2626;">Load failed: ' + (e.message || e) + '</p><button data-close type="button">Close</button>';
+    drawer.querySelector('[data-close]').onclick = () => { drawer.hidden = true; };
+  }
+}
+
+function workerDrawerHtml(data) {
+  const debts = data?.debts || [];
+  const settlements = data?.settlements || [];
+  const pending = settlements.length
+    ? settlements.map(s => '<div class="drawer__settlement" style="padding:12px;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:8px;">'
+        + '<div><strong>' + _fmtMoney(s.totalAmount) + '</strong> via ' + s.method + ' · ref ' + (s.reference || '—') + '</div>'
+        + (s.proofUrl ? '<div><a href="' + s.proofUrl + '" target="_blank" rel="noopener">View proof</a></div>' : '')
+        + '<button class="btn-premium btn-premium--sm" data-action="verify-settlement" data-id="' + s._id + '" style="margin-top:8px;">Verify…</button>'
+        + '</div>').join('')
+    : '<p class="empty" style="color:#6b7280;">No pending settlements.</p>';
+  const debtRows = debts.length
+    ? debts.map(d => {
+        const remaining = d.remaining ?? d.amount;
+        const actionBtn = d.status !== 'paid'
+          ? '<button class="btn-premium btn-premium--sm" data-action="mark-debt-paid" data-id="' + d._id + '" data-amount="' + remaining + '">Mark paid</button>'
+          : '';
+        return '<tr>'
+          + '<td>#' + String(d.booking || '').toString().slice(-4) + '</td>'
+          + '<td>' + _fmtMoney(remaining) + ' / ' + _fmtMoney(d.amount) + '</td>'
+          + '<td>' + _ageOf(d.createdAt) + '</td>'
+          + '<td><span class="status-chip status-chip--' + d.status + '">' + d.status + '</span></td>'
+          + '<td>' + actionBtn + '</td>'
+          + '</tr>';
+      }).join('')
+    : '<tr><td colspan="5" style="color:#6b7280;">No debts.</td></tr>';
+  return '<div class="drawer__head" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">'
+    + '<h3 style="margin:0;">Worker debts</h3>'
+    + '<button data-close type="button" style="background:none;border:none;font-size:24px;cursor:pointer;">×</button>'
+    + '</div>'
+    + '<section style="margin-bottom:24px;"><h4>Pending settlements</h4>' + pending + '</section>'
+    + '<section><h4>Debt rows</h4>'
+    + '<table class="bk-table"><thead><tr><th>Booking</th><th>Owed</th><th>Age</th><th>Status</th><th></th></tr></thead>'
+    + '<tbody>' + debtRows + '</tbody></table></section>';
+}
+
+async function renderSettlementsTab() {
+  await renderSettlementsKpis();
+  await Promise.all([renderWorkerDebts(), renderPayoutRequests(), renderSettlementHistory()]);
+  document.querySelectorAll('.subtab').forEach(t => {
+    t.onclick = () => switchSettlementSubtab(t.dataset.subtab);
+  });
+  const initial = (location.hash || '').replace('#', '');
+  if (['worker-debts', 'payout-requests', 'history'].includes(initial)) {
+    switchSettlementSubtab(initial);
+  } else {
+    switchSettlementSubtab('worker-debts');
+  }
+}
+
+// Settlements render is now driven by switchFinanceTab

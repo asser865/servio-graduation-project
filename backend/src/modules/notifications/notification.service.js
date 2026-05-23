@@ -232,14 +232,91 @@ function notifyDisputeResolved(dispute) {
   const bookingId = String(booking._id || dispute.booking || '');
   const customerId = booking.user?._id || booking.user || dispute.raisedBy;
   const workerId = booking.worker?._id || booking.worker;
-  const url = `./booking-details.html?id=${bookingId}`;
-  const result = dispute.decision === 'refund' ? 'A refund was issued.' : 'The booking was approved for release.';
+  const customerUrl = `./customer-dashboard.html#disputes`;
+  const workerUrl = `./technician-dashboard.html#disputes`;
+  const result = ({
+    refund: 'A full refund was issued to the customer.',
+    partial_refund: `A partial refund was issued${dispute.refundAmount ? ` (${dispute.refundAmount} EGP)` : ''}.`,
+    release: 'Payment was released to the technician.',
+    redo: 'Technician must redo the job.',
+  })[dispute.decision] || 'The dispute has been resolved.';
 
   if (customerId) {
-    createNotification(customerId, 'dispute_resolved', 'Dispute Resolved', result, bookingId, url);
+    createNotification(customerId, 'dispute_resolved', 'Dispute Resolved', result, bookingId, customerUrl);
   }
   if (workerId) {
-    createNotification(workerId, 'dispute_resolved', 'Dispute Resolved', result, bookingId, url);
+    createNotification(workerId, 'dispute_resolved', 'Dispute Resolved', result, bookingId, workerUrl);
+  }
+}
+
+async function notifyDisputeEvidenceRequested(dispute, target, message) {
+  const booking = dispute.booking || {};
+  const bookingId = String(booking._id || dispute.booking || '');
+  const customerId = booking.user?._id || booking.user;
+  const workerId = booking.worker?._id || booking.worker;
+  const customerUrl = `./customer-dashboard.html#disputes`;
+  const workerUrl = `./technician-dashboard.html#disputes`;
+  const body = (message && message.trim())
+    ? `Admin requested more evidence: ${message.trim().slice(0, 180)}`
+    : 'Admin requested more evidence on this dispute. Please upload supporting photos or notes.';
+
+  if ((target === 'user' || target === 'both') && customerId) {
+    createNotification(customerId, 'dispute_evidence_requested', 'Evidence Requested', body, bookingId, customerUrl);
+  }
+  if ((target === 'worker' || target === 'both') && workerId) {
+    createNotification(workerId, 'dispute_evidence_requested', 'Evidence Requested', body, bookingId, workerUrl);
+  }
+}
+
+async function notifyDisputeStatusChanged(dispute, newStatus) {
+  const booking = dispute.booking || {};
+  const bookingId = String(booking._id || dispute.booking || '');
+  const customerId = booking.user?._id || booking.user;
+  const workerId = booking.worker?._id || booking.worker;
+  const body = `Dispute status updated to: ${String(newStatus || dispute.status || '').replace('_', ' ')}.`;
+  if (customerId) {
+    createNotification(customerId, 'dispute_status_changed', 'Dispute Update', body, bookingId, './customer-dashboard.html#disputes');
+  }
+  if (workerId) {
+    createNotification(workerId, 'dispute_status_changed', 'Dispute Update', body, bookingId, './technician-dashboard.html#disputes');
+  }
+}
+
+async function notifyDisputeEvidenceAdded(dispute, role) {
+  const booking = dispute.booking || {};
+  const bookingId = String(booking._id || dispute.booking || '');
+  const customerId = booking.user?._id || booking.user;
+  const workerId = booking.worker?._id || booking.worker;
+  const otherRoleName = role === 'worker' ? 'technician' : role === 'user' ? 'customer' : 'admin';
+  const body = `New evidence added by ${otherRoleName}.`;
+  try {
+    const User = require('../users/user.model');
+    const admins = await User.find({ role: 'admin', isActive: { $ne: false } }).select('_id');
+    admins.forEach((admin) => {
+      createNotification(admin._id, 'dispute_evidence_added', 'Dispute Evidence', body, bookingId, './admin-dashboard.html#disputes');
+    });
+  } catch (err) {
+    console.error('[notification] Failed to notify admins about evidence:', err.message);
+  }
+  if (role !== 'user' && customerId) {
+    createNotification(customerId, 'dispute_evidence_added', 'Dispute Update', body, bookingId, './customer-dashboard.html#disputes');
+  }
+  if (role !== 'worker' && workerId) {
+    createNotification(workerId, 'dispute_evidence_added', 'Dispute Update', body, bookingId, './technician-dashboard.html#disputes');
+  }
+}
+
+async function notifyDisputeAppealed(dispute) {
+  const booking = dispute.booking || {};
+  const bookingId = String(booking._id || dispute.booking || '');
+  try {
+    const User = require('../users/user.model');
+    const admins = await User.find({ role: 'admin', isActive: { $ne: false } }).select('_id');
+    admins.forEach((admin) => {
+      createNotification(admin._id, 'dispute_appealed', 'Dispute Appealed', 'A resolved dispute has been appealed and needs review.', bookingId, './admin-dashboard.html#disputes');
+    });
+  } catch (err) {
+    console.error('[notification] Failed to notify admins about appeal:', err.message);
   }
 }
 
@@ -324,6 +401,10 @@ module.exports = {
   notifyReviewReceived,
   notifyDisputeOpened,
   notifyDisputeResolved,
+  notifyDisputeEvidenceRequested,
+  notifyDisputeEvidenceAdded,
+  notifyDisputeStatusChanged,
+  notifyDisputeAppealed,
   notifySupportIssueOpened,
   notifySupportIssueUpdated,
   notifySupportIssueResolved,

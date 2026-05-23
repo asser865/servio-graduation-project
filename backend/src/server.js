@@ -11,8 +11,10 @@ require('dotenv').config();
 // Fix Node.js DNS bug with IPv6 local routers (querySrv ECONNREFUSED)
 require('dns').setServers(['8.8.8.8', '8.8.4.4']);
 
+const http      = require('http');
 const connectDB = require('./config/db');
 const app       = require('./app');
+const sockets   = require('./sockets');
 
 const PORT = process.env.PORT || 5000;
 
@@ -23,7 +25,12 @@ const startServer = async () => {
   // with a broken database connection.
   await connectDB();
 
-  const server = app.listen(PORT, () => {
+  const jobs = require('./jobs');
+  jobs.start();
+
+  const httpServer = http.createServer(app);
+  sockets.init(httpServer);
+  const server = httpServer.listen(PORT, () => {
     console.log(
       `🚀 SERVIO API running in ${process.env.NODE_ENV} mode on port ${PORT}`
     );
