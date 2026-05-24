@@ -50,6 +50,18 @@ class UserAccount {
     this.isVerified = false,
     this.completedJobs = 0,
     this.createdAt,
+    this.idFrontUrl = '',
+    this.idFrontName = '',
+    this.idBackUrl = '',
+    this.idBackName = '',
+    this.idSelfieUrl = '',
+    this.idSelfieName = '',
+    this.cvUrl = '',
+    this.cvName = '',
+    this.portfolioFiles = const <Map<String, String>>[],
+    this.verificationRejectionReason = '',
+    this.verificationSubmittedAt,
+    this.verificationReviewedAt,
   });
 
   final String id;
@@ -75,12 +87,44 @@ class UserAccount {
   final bool isVerified;
   final int completedJobs;
   final DateTime? createdAt;
+  final String idFrontUrl;
+  final String idFrontName;
+  final String idBackUrl;
+  final String idBackName;
+  final String idSelfieUrl;
+  final String idSelfieName;
+  final String cvUrl;
+  final String cvName;
+  final List<Map<String, String>> portfolioFiles;
+  final String verificationRejectionReason;
+  final DateTime? verificationSubmittedAt;
+  final DateTime? verificationReviewedAt;
 
   String get initials {
     if (avatarInitials.isNotEmpty) return avatarInitials;
     final parts = name.trim().split(' ');
     if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
     return name.isNotEmpty ? name[0].toUpperCase() : 'U';
+  }
+
+  String get verificationUiStatus {
+    if (status == 'approved') return 'approved';
+    if (status == 'rejected') {
+      if (verificationRejectionReason.toLowerCase().contains('additional')) {
+        return 'additional_docs_required';
+      }
+      return 'rejected';
+    }
+    final hasAny = idFrontUrl.isNotEmpty ||
+        idBackUrl.isNotEmpty ||
+        idSelfieUrl.isNotEmpty ||
+        cvUrl.isNotEmpty ||
+        portfolioFiles.isNotEmpty;
+    if (!hasAny) return 'not_submitted';
+    final hasAllRequired = idFrontUrl.isNotEmpty &&
+        idBackUrl.isNotEmpty &&
+        idSelfieUrl.isNotEmpty;
+    return hasAllRequired ? 'under_review' : 'pending_review';
   }
 
   UserAccount copyWith({
@@ -107,6 +151,18 @@ class UserAccount {
     bool? isVerified,
     int? completedJobs,
     DateTime? createdAt,
+    String? idFrontUrl,
+    String? idFrontName,
+    String? idBackUrl,
+    String? idBackName,
+    String? idSelfieUrl,
+    String? idSelfieName,
+    String? cvUrl,
+    String? cvName,
+    List<Map<String, String>>? portfolioFiles,
+    String? verificationRejectionReason,
+    DateTime? verificationSubmittedAt,
+    DateTime? verificationReviewedAt,
   }) =>
       UserAccount(
         id: id ?? this.id,
@@ -132,6 +188,18 @@ class UserAccount {
         isVerified: isVerified ?? this.isVerified,
         completedJobs: completedJobs ?? this.completedJobs,
         createdAt: createdAt ?? this.createdAt,
+        idFrontUrl: idFrontUrl ?? this.idFrontUrl,
+        idFrontName: idFrontName ?? this.idFrontName,
+        idBackUrl: idBackUrl ?? this.idBackUrl,
+        idBackName: idBackName ?? this.idBackName,
+        idSelfieUrl: idSelfieUrl ?? this.idSelfieUrl,
+        idSelfieName: idSelfieName ?? this.idSelfieName,
+        cvUrl: cvUrl ?? this.cvUrl,
+        cvName: cvName ?? this.cvName,
+        portfolioFiles: portfolioFiles ?? this.portfolioFiles,
+        verificationRejectionReason: verificationRejectionReason ?? this.verificationRejectionReason,
+        verificationSubmittedAt: verificationSubmittedAt ?? this.verificationSubmittedAt,
+        verificationReviewedAt: verificationReviewedAt ?? this.verificationReviewedAt,
       );
 
   Map<String, dynamic> toJson() => {
@@ -158,6 +226,18 @@ class UserAccount {
         'isVerified': isVerified,
         'completedJobs': completedJobs,
         'createdAt': createdAt?.toIso8601String(),
+        'idFrontUrl': idFrontUrl,
+        'idFrontName': idFrontName,
+        'idBackUrl': idBackUrl,
+        'idBackName': idBackName,
+        'idSelfieUrl': idSelfieUrl,
+        'idSelfieName': idSelfieName,
+        'cvUrl': cvUrl,
+        'cvName': cvName,
+        'portfolioFiles': portfolioFiles,
+        'verificationRejectionReason': verificationRejectionReason,
+        'verificationSubmittedAt': verificationSubmittedAt?.toIso8601String(),
+        'verificationReviewedAt': verificationReviewedAt?.toIso8601String(),
       };
 
   factory UserAccount.fromJson(Map<String, dynamic> json) => UserAccount(
@@ -189,6 +269,18 @@ class UserAccount {
         isVerified: (json['isVerified'] as bool?) ?? false,
         completedJobs: ((json['completedJobs'] as num?) ?? 0).toInt(),
         createdAt: DateTime.tryParse((json['createdAt'] as String?) ?? ''),
+        idFrontUrl: (json['idFrontUrl'] as String?) ?? '',
+        idFrontName: (json['idFrontName'] as String?) ?? '',
+        idBackUrl: (json['idBackUrl'] as String?) ?? '',
+        idBackName: (json['idBackName'] as String?) ?? '',
+        idSelfieUrl: (json['idSelfieUrl'] as String?) ?? '',
+        idSelfieName: (json['idSelfieName'] as String?) ?? '',
+        cvUrl: (json['cvUrl'] as String?) ?? '',
+        cvName: (json['cvName'] as String?) ?? '',
+        portfolioFiles: _portfolioFromJson(json['portfolioFiles']),
+        verificationRejectionReason: (json['verificationRejectionReason'] as String?) ?? '',
+        verificationSubmittedAt: DateTime.tryParse((json['verificationSubmittedAt'] as String?) ?? ''),
+        verificationReviewedAt: DateTime.tryParse((json['verificationReviewedAt'] as String?) ?? ''),
       );
 
   // Maps backend API response (uses _id, role: 'user'|'worker', nested address)
@@ -222,6 +314,21 @@ class UserAccount {
       isVerified: (json['isVerified'] as bool?) ?? false,
       completedJobs: ((json['completedJobs'] as num?) ?? 0).toInt(),
       createdAt: DateTime.tryParse((json['createdAt'] as String?) ?? ''),
+      idFrontUrl: (json['idFrontUrl'] as String?) ?? '',
+      idFrontName: (json['idFrontName'] as String?) ?? '',
+      idBackUrl: (json['idBackUrl'] as String?) ?? '',
+      idBackName: (json['idBackName'] as String?) ?? '',
+      idSelfieUrl: (json['idSelfieUrl'] as String?) ?? '',
+      idSelfieName: (json['idSelfieName'] as String?) ?? '',
+      cvUrl: (json['cvUrl'] as String?) ?? '',
+      cvName: (json['cvName'] as String?) ?? '',
+      portfolioFiles: _portfolioFromJson(json['portfolioFiles']),
+      verificationRejectionReason:
+          (json['verificationRejectionReason'] as String?) ?? '',
+      verificationSubmittedAt: DateTime.tryParse(
+          (json['verificationSubmittedAt'] as String?) ?? ''),
+      verificationReviewedAt: DateTime.tryParse(
+          (json['verificationReviewedAt'] as String?) ?? ''),
     );
   }
 }
@@ -233,4 +340,14 @@ List<AvailabilitySlot> _availabilityFromJson(dynamic value) {
       .map(AvailabilitySlot.fromJson)
       .where((slot) => slot.day.isNotEmpty)
       .toList();
+}
+
+List<Map<String, String>> _portfolioFromJson(dynamic value) {
+  if (value is! List<dynamic>) return const <Map<String, String>>[];
+  return value.whereType<Map<String, dynamic>>().map((m) {
+    return <String, String>{
+      'url': (m['url'] as String?) ?? '',
+      'name': (m['name'] as String?) ?? '',
+    };
+  }).toList();
 }
