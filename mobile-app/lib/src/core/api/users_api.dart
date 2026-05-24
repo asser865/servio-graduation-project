@@ -1,8 +1,11 @@
+import 'package:http_parser/http_parser.dart' show MediaType;
+
 import '../models/backend_worker_model.dart';
 import '../models/customer_address.dart';
 import '../models/user_account.dart';
 import 'api_client.dart';
 import 'api_endpoints.dart';
+import 'api_exception.dart';
 
 class UsersApi {
   UsersApi(this._client);
@@ -143,6 +146,72 @@ class UsersApi {
   Future<UserAccount> updateProfile(Map<String, dynamic> fields) async {
     final response = await _client.patch(ApiEndpoints.usersMe, fields);
     return UserAccount.fromBackend(_client.unwrapData(response));
+  }
+
+  Future<void> uploadVerificationDocument({
+    required String urlField,
+    required String nameField,
+    required List<int> bytes,
+    required String filename,
+    required String mimeType,
+  }) async {
+    final uploadResp = await _client.postMultipart(
+      ApiEndpoints.uploadFile,
+      fields: <String, String>{'type': 'verification'},
+      fileField: MultipartFilePart(
+        field: 'file',
+        bytes: bytes,
+        filename: filename,
+        contentType: MediaType.parse(mimeType),
+      ),
+    );
+    final data = _client.unwrapData(uploadResp);
+    final url = (data['url'] as String?) ?? '';
+    if (url.isEmpty) {
+      throw const ApiException(message: 'Upload failed: server returned no URL.');
+    }
+    await _client.patch(ApiEndpoints.usersMe, <String, dynamic>{
+      urlField: url,
+      nameField: filename,
+    });
+  }
+
+  Future<void> uploadPortfolioPhoto({
+    required List<int> bytes,
+    required String filename,
+    required List<Map<String, String>> existingFiles,
+    String mimeType = 'image/jpeg',
+  }) async {
+    final uploadResp = await _client.postMultipart(
+      ApiEndpoints.uploadFile,
+      fields: <String, String>{'type': 'verification'},
+      fileField: MultipartFilePart(
+        field: 'file',
+        bytes: bytes,
+        filename: filename,
+        contentType: MediaType.parse(mimeType),
+      ),
+    );
+    final data = _client.unwrapData(uploadResp);
+    final url = (data['url'] as String?) ?? '';
+    if (url.isEmpty) {
+      throw const ApiException(message: 'Upload failed: server returned no URL.');
+    }
+    final updated = <Map<String, String>>[
+      ...existingFiles,
+      <String, String>{'url': url, 'name': filename},
+    ];
+    await _client.patch(ApiEndpoints.usersMe, <String, dynamic>{
+      'portfolioFiles': updated,
+    });
+  }
+
+  Future<void> removePortfolioPhoto({
+    required List<Map<String, String>> updatedFiles,
+  }) async {
+    await _client.patch(ApiEndpoints.usersMe, <String, dynamic>{
+      'portfolioFiles': updatedFiles,
+    });
   }
 
   Future<void> updateEmail({
