@@ -23,7 +23,7 @@ import '../shared/report_problem_screen.dart';
 import 'availability_manager_screen.dart';
 import 'technician_settings_screen.dart';
 import 'transaction_details_sheet.dart';
-import 'verification_upload_screen.dart';
+import 'worker_verification_screen.dart';
 
 class TechnicianSettingsProfileScreen extends StatefulWidget {
   const TechnicianSettingsProfileScreen({super.key});
@@ -41,7 +41,6 @@ class _TechnicianSettingsProfileScreenState
 
   late final Animation<double> _section0;
   late final Animation<double> _section1;
-  late final Animation<double> _section2;
   late final Animation<double> _section3;
   late final Animation<double> _section4;
   late final Animation<double> _section5;
@@ -74,10 +73,9 @@ class _TechnicianSettingsProfileScreenState
 
     _section0 = curved(0.00, 0.40);
     _section1 = curved(0.10, 0.50);
-    _section2 = curved(0.20, 0.60);
-    _section3 = curved(0.30, 0.70);
-    _section4 = curved(0.40, 0.80);
-    _section5 = curved(0.50, 1.00);
+    _section3 = curved(0.20, 0.60);
+    _section4 = curved(0.30, 0.70);
+    _section5 = curved(0.40, 0.80);
 
     _entranceCtrl.forward();
     _statsCtrl.forward();
@@ -211,19 +209,6 @@ class _TechnicianSettingsProfileScreenState
                   ),
                   const SizedBox(height: ServioSpacing.sectionGap),
 
-                  // ── Verification ─────────────────────────────────────────
-                  _FadeSlide(
-                    animation: _section2,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        const _SectionHeader(label: 'Verification'),
-                        _VerificationCard(account: account, context: context),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: ServioSpacing.sectionGap),
-
                   // ── Recent Jobs Portfolio ────────────────────────────────
                   _FadeSlide(
                     animation: _section3,
@@ -273,6 +258,18 @@ class _TechnicianSettingsProfileScreenState
                       children: <Widget>[
                         const _SectionHeader(label: 'App'),
                         _MenuGroup(children: <Widget>[
+                          _NavTile(
+                            icon: Icons.verified_user_outlined,
+                            iconColor: context.servio.accent,
+                            label: 'Verification',
+                            subtitle: 'Manage your identity documents',
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) =>
+                                    const WorkerVerificationScreen(),
+                              ),
+                            ),
+                          ),
                           _NavTile(
                             icon: Icons.schedule_rounded,
                             iconColor: context.servio.success,
@@ -630,118 +627,6 @@ String _readable(String v) {
     if (u == 'HVAC' || u == 'AC') return u;
     return w[0].toUpperCase() + w.substring(1).toLowerCase();
   }).join(' ');
-}
-
-// ── Verification card ─────────────────────────────────────────────────────────
-
-class _VerificationCard extends StatelessWidget {
-  const _VerificationCard({
-    required this.account,
-    required this.context,
-  });
-
-  final dynamic account;
-  final BuildContext context;
-
-  @override
-  Widget build(BuildContext ctx) {
-    final servio = ctx.servio;
-    final theme = Theme.of(ctx);
-
-    final isVerified = (account?.isVerified as bool?) ?? false;
-    final status = (account?.status as String?) ?? 'pending';
-
-    final ({String label, bool ok, String badge}) verStatus = switch (status) {
-      'verified' => (
-          label: 'Verified',
-          ok: true,
-          badge: 'Verified',
-        ),
-      'submitted' => (
-          label: 'Under Review',
-          ok: false,
-          badge: 'In Review',
-        ),
-      'rejected' => (
-          label: 'Action Required',
-          ok: false,
-          badge: 'Rejected',
-        ),
-      _ => (
-          label: 'Pending Submission',
-          ok: false,
-          badge: 'Pending',
-        ),
-    };
-
-    final badgeColor = isVerified || status == 'verified'
-        ? ServioColors.success
-        : ServioColors.warning;
-    final badgeText = isVerified ? 'Verified' : verStatus.badge;
-
-    return ServioCard(
-      radius: ServioRadius.lg,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              Text('Verification Status', style: theme.textTheme.titleMedium),
-              const Spacer(),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: ServioColors.tint(badgeColor),
-                  borderRadius: BorderRadius.circular(ServioRadius.full),
-                ),
-                child: Text(
-                  badgeText,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: badgeColor,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          _StatusRow(
-            label: 'Identity Documents',
-            status: isVerified ? 'Verified' : verStatus.label,
-            success: isVerified,
-            servio: servio,
-          ),
-          const SizedBox(height: 10),
-          _StatusRow(
-            label: 'Account Status',
-            status: verStatus.label,
-            success: isVerified || status == 'verified',
-            servio: servio,
-          ),
-          const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () => Navigator.of(ctx).push(
-                MaterialPageRoute<void>(
-                    builder: (_) => const VerificationUploadScreen()),
-              ),
-              icon: const Icon(Icons.upload_file_outlined, size: 18),
-              label: const Text('Manage Documents'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: servio.accent,
-                side: BorderSide(color: servio.accent.withValues(alpha: 0.4)),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(ServioRadius.sm),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 // ── Portfolio section ─────────────────────────────────────────────────────────
@@ -1718,45 +1603,6 @@ class _DetailRow extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-// ── Status row (verification) ─────────────────────────────────────────────────
-
-class _StatusRow extends StatelessWidget {
-  const _StatusRow({
-    required this.label,
-    required this.status,
-    required this.success,
-    required this.servio,
-  });
-
-  final String label;
-  final String status;
-  final bool success;
-  final ServioThemeExtension servio;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: <Widget>[
-        Icon(
-          success ? Icons.check_circle_rounded : Icons.hourglass_top_rounded,
-          color: success ? servio.success : servio.warning,
-          size: 18,
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
-        ),
-        Text(
-          status,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: success ? servio.success : servio.warning,
-              ),
-        ),
-      ],
     );
   }
 }
