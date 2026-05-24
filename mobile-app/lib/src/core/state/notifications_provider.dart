@@ -4,6 +4,7 @@ import 'dart:developer' as developer;
 import 'package:flutter/foundation.dart';
 
 import '../api/api_client.dart';
+import '../api/notifications_api.dart';
 import '../api/api_endpoints.dart';
 import '../api/bookings_api.dart';
 import '../models/app_notification.dart';
@@ -46,6 +47,12 @@ class NotificationsProvider extends ChangeNotifier {
   bool _loading = false;
   String? _error;
   Timer? _pollingTimer;
+
+  NotificationPreference _preferences = const NotificationPreference();
+  bool _prefsLoading = false;
+
+  NotificationPreference get preferences => _preferences;
+  bool get prefsLoading => _prefsLoading;
 
   @override
   void dispose() {
@@ -402,6 +409,29 @@ class NotificationsProvider extends ChangeNotifier {
         );
       default:
         return null;
+    }
+  }
+
+  Future<void> loadPreferences() async {
+    _prefsLoading = true;
+    notifyListeners();
+    try {
+      _preferences = await NotificationsApi(_client).getPreferences();
+    } catch (_) {
+      // keep defaults on error
+    } finally {
+      _prefsLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> updatePreferences(NotificationPreference prefs) async {
+    _preferences = prefs;
+    notifyListeners();
+    try {
+      await NotificationsApi(_client).updatePreferences(prefs);
+    } catch (_) {
+      // optimistic update — revert not needed for UX
     }
   }
 

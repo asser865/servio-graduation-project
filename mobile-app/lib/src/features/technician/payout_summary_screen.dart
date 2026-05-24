@@ -3,10 +3,13 @@ import 'package:provider/provider.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/api/payments_api.dart';
+import '../../core/state/payments_provider.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
+import 'payout_request_screen.dart';
+import 'settle_debt_screen.dart';
 
 /// Worker-only Payout Summary screen.
 ///
@@ -54,8 +57,12 @@ class _PayoutSummaryScreenState extends State<PayoutSummaryScreen>
       _error = null;
     });
     try {
-      final client = context.read<ApiClient>();
-      _summary = await PaymentsApi(client).getEarnings();
+      final payments = context.read<PaymentsProvider>();
+      await Future.wait([
+        payments.loadEarnings(),
+        payments.loadDebtSummary(),
+      ]);
+      _summary = payments.earnings;
     } catch (e) {
       _error = 'Unable to load payout summary.';
     } finally {
@@ -813,7 +820,81 @@ class _SuccessBodyState extends State<_SuccessBody> {
                 ],
               ),
             ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                      builder: (_) => const PayoutRequestScreen()),
+                ),
+                icon: const Icon(Icons.account_balance_wallet_outlined),
+                label: const Text('Request Payout'),
+              ),
+            ),
             const SizedBox(height: 32),
+
+            // ── Cash Debt section ─────────────────────────────────────────────
+            Consumer<PaymentsProvider>(
+              builder: (ctx, payments, _) {
+                final summary = payments.debtSummary;
+                if (summary == null || summary.debts.isEmpty) {
+                  return const SizedBox.shrink();
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 24),
+                    Text('Cash Debt',
+                        style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    if (summary.isBlocked)
+                      _DebtBanner(
+                        icon: Icons.lock_outline,
+                        color: Colors.red.shade700,
+                        message:
+                            'Cash bookings locked. Outstanding: EGP ${summary.totalOutstanding.toStringAsFixed(2)}',
+                      )
+                    else if (summary.isWarning)
+                      _DebtBanner(
+                        icon: Icons.warning_amber_outlined,
+                        color: Colors.orange.shade700,
+                        message:
+                            'Warning: EGP ${summary.totalOutstanding.toStringAsFixed(2)} outstanding cash debt.',
+                      ),
+                    const SizedBox(height: 12),
+                    ...summary.debts.where((d) => !d.isPaid).map((debt) => ListTile(
+                          dense: true,
+                          title: Text(
+                              'Booking #${debt.bookingId.length >= 8 ? debt.bookingId.substring(0, 8).toUpperCase() : debt.bookingId.toUpperCase()}'),
+                          subtitle: Text(debt.status),
+                          trailing: Text(
+                            'EGP ${debt.remaining.toStringAsFixed(2)}',
+                            style: TextStyle(
+                                color: Colors.red.shade600,
+                                fontWeight: FontWeight.bold),
+                          ),
+                        )),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () => Navigator.push(
+                          ctx,
+                          MaterialPageRoute<void>(
+                              builder: (_) =>
+                                  SettleDebtScreen(summary: summary)),
+                        ),
+                        icon: const Icon(Icons.payment_outlined),
+                        label: const Text('Settle Debt'),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
           ],
         ),
         Positioned(
@@ -1156,6 +1237,38 @@ class _ScheduleOption extends StatelessWidget {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DebtBanner extends StatelessWidget {
+  const _DebtBanner({
+    required this.icon,
+    required this.color,
+    required this.message,
+  });
+  final IconData icon;
+  final Color color;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+              child: Text(message,
+                  style: TextStyle(color: color, fontSize: 13))),
         ],
       ),
     );

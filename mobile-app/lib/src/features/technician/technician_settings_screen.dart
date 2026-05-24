@@ -11,6 +11,7 @@ import 'technician_notification_settings_screen.dart';
 import 'technician_security_screen.dart';
 import 'payout_summary_screen.dart';
 import 'service_area_screen.dart';
+import 'technician_disputes_screen.dart';
 
 class TechnicianSettingsScreen extends StatelessWidget {
   const TechnicianSettingsScreen({super.key});
@@ -74,6 +75,17 @@ class TechnicianSettingsScreen extends StatelessWidget {
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
                       builder: (_) => const PayoutSummaryScreen(),
+                    ),
+                  ),
+                ),
+                _NavTile(
+                  icon: Icons.gavel_rounded,
+                  iconColor: servio.danger,
+                  label: 'My Disputes',
+                  subtitle: 'View and manage your disputes',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const TechnicianDisputesScreen(),
                     ),
                   ),
                 ),

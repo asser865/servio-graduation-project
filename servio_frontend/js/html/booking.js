@@ -977,29 +977,45 @@ async function prefillUserAddress() {
   try {
     const res  = await getMe();
     const user = res.user || res.data?.user || res;
-    const addr = user.address;
 
-    if (addr && addr.street) {
+    // Load all saved addresses from user.addresses array
+    const savedAddresses = Array.isArray(user.addresses) ? user.addresses : [];
+    savedAddresses.forEach((addr) => {
+      if (!addr.street) return;
       const full = [addr.street, addr.city, addr.state].filter(Boolean).join(', ');
-      const homeAddr = {
-        id: 'home',
-        label: 'Home',
+      if (state.addresses.some(a => a.full === full)) return;
+      state.addresses.push({
+        id: addr._id || addr.id || full,
+        label: addr.label || 'Saved Address',
         street: addr.street,
         city: addr.city,
         state: addr.state,
-        full: full
-      };
-      
+        full,
+      });
+    });
+
+    // Also load primary address if not already in list
+    const addr = user.address;
+    if (addr && addr.street) {
+      const full = [addr.street, addr.city, addr.state].filter(Boolean).join(', ');
       if (!state.addresses.some(a => a.full === full)) {
-        state.addresses.push(homeAddr);
+        state.addresses.push({
+          id: 'home',
+          label: 'Home',
+          street: addr.street,
+          city: addr.city,
+          state: addr.state,
+          full,
+        });
       }
-      
-      // Default select the first one if none selected
-      if (!state.data.address) {
-        state.data.address = full;
-      }
-      renderAddresses();
     }
+
+    // Default select the first address if none selected
+    if (!state.data.address && state.addresses.length > 0) {
+      state.data.address = state.addresses[0].full;
+    }
+
+    renderAddresses();
   } catch (e) {
     console.warn('Could not prefill address:', e);
   }

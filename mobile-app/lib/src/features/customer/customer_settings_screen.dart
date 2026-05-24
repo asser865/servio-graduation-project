@@ -10,6 +10,7 @@ import 'customer_security_screen.dart';
 import 'edit_profile_screen.dart';
 import 'my_addresses_screen.dart';
 import 'notification_settings_screen.dart';
+import 'invoices_screen.dart';
 import 'saved_payments_screen.dart';
 
 class CustomerSettingsScreen extends StatelessWidget {
@@ -74,6 +75,17 @@ class CustomerSettingsScreen extends StatelessWidget {
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
                       builder: (_) => const SavedPaymentsScreen(),
+                    ),
+                  ),
+                ),
+                _NavTile(
+                  icon: Icons.receipt_long_outlined,
+                  iconColor: servio.accent,
+                  label: 'Invoices & Receipts',
+                  subtitle: 'View and download payment invoices',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const InvoicesScreen(),
                     ),
                   ),
                 ),

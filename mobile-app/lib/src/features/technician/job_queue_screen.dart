@@ -14,6 +14,7 @@ import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_tab_shell.dart';
 import '../../design_system/widgets/servio_status_chip.dart';
 import 'job_details_screen.dart';
+import 'widgets/duration_estimation_sheet.dart';
 
 class JobQueueScreen extends StatefulWidget {
   const JobQueueScreen({
@@ -235,30 +236,30 @@ class _JobQueueScreenState extends State<JobQueueScreen>
     return null;
   }
 
-  Future<void> _updateJobStatus(String jobId, String newStatus) async {
-    // ── Optimistic update ────────────────────────────────────────────────────
-    // Immediately reflect the new status in local state so the card moves
-    // tabs without waiting for the network round-trip.
+  Future<void> _acceptJob(BackendBooking job) async {
+    final durationMin = await showDurationEstimationSheet(context);
+    if (durationMin == null) return; // User dismissed
+
+    if (!mounted) return;
+    final client = context.read<ApiClient>();
+
+    // Optimistic update
     final originalJobs = List<BackendBooking>.from(_jobs);
-    final idx = _jobs.indexWhere((j) => j.id == jobId);
+    final idx = _jobs.indexWhere((j) => j.id == job.id);
     if (idx != -1) {
       setState(() {
         _jobs = List<BackendBooking>.from(_jobs)
-          ..[idx] = _jobs[idx].copyWith(status: newStatus);
-        // Auto-advance to the tab that now contains the updated job.
+          ..[idx] = _jobs[idx].copyWith(status: 'accepted');
         _tabIndex = _firstTabWithJobs(_jobs) ?? _tabIndex;
       });
     }
-
-    // ── API call ─────────────────────────────────────────────────────────────
-    final client = context.read<ApiClient>();
     try {
-      await BookingsApi(client).updateStatus(jobId, newStatus);
-      // Silently refresh in the background to sync any server-side changes
-      // (e.g. timestamps, populated fields) without blocking the UI.
+      await BookingsApi(client).acceptBooking(
+        job.id,
+        estimatedDurationMin: durationMin,
+      );
       if (mounted) await _fetchJobs(silent: true);
     } catch (_) {
-      // ── Rollback on failure ───────────────────────────────────────────────
       if (!mounted) return;
       setState(() {
         _jobs = originalJobs;
@@ -266,11 +267,108 @@ class _JobQueueScreenState extends State<JobQueueScreen>
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Could not update job status. Please try again.'),
+          content: Text('Could not accept job. Please try again.'),
           duration: Duration(seconds: 3),
         ),
       );
     }
+  }
+
+  Future<void> _declineJob(BackendBooking job) async {
+    final reason = await _showDeclineReasonSheet();
+    if (reason == null) return; // User dismissed
+
+    if (!mounted) return;
+    final client = context.read<ApiClient>();
+
+    // Optimistic update
+    final originalJobs = List<BackendBooking>.from(_jobs);
+    final idx = _jobs.indexWhere((j) => j.id == job.id);
+    if (idx != -1) {
+      setState(() {
+        _jobs = List<BackendBooking>.from(_jobs)
+          ..[idx] = _jobs[idx].copyWith(status: 'rejected');
+        _tabIndex = _firstTabWithJobs(_jobs) ?? _tabIndex;
+      });
+    }
+    try {
+      await BookingsApi(client).updateStatus(job.id, 'rejected', reason: reason);
+      if (mounted) await _fetchJobs(silent: true);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _jobs = originalJobs;
+        _tabIndex = _firstTabWithJobs(originalJobs) ?? _tabIndex;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not decline job. Please try again.'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+  Future<String?> _showDeclineReasonSheet() async {
+    String? selectedReason;
+    return showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                'Decline Job',
+                style: Theme.of(ctx)
+                    .textTheme
+                    .titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 16),
+              ...([
+                "I'm busy at this time",
+                'Location is too far',
+                'Outside my skill set',
+                'Personal emergency',
+                'Other',
+              ].map((reason) => RadioListTile<String>(
+                    title: Text(reason),
+                    value: reason,
+                    groupValue: selectedReason,
+                    onChanged: (v) => setS(() => selectedReason = v),
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ))),
+              const SizedBox(height: 12),
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: selectedReason == null
+                          ? null
+                          : () => Navigator.of(ctx).pop(selectedReason),
+                      style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red),
+                      child: const Text('Decline'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -394,12 +492,10 @@ class _JobQueueScreenState extends State<JobQueueScreen>
                                     );
                                   },
                                   onAccept: _tabIndex == 0
-                                      ? () =>
-                                          _updateJobStatus(job.id, 'accepted')
+                                      ? () => _acceptJob(job)
                                       : null,
                                   onDecline: _tabIndex == 0
-                                      ? () =>
-                                          _updateJobStatus(job.id, 'rejected')
+                                      ? () => _declineJob(job)
                                       : null,
                                 );
                               },

@@ -35,7 +35,7 @@ class TechnicianSettingsProfileScreen extends StatefulWidget {
 
 class _TechnicianSettingsProfileScreenState
     extends State<TechnicianSettingsProfileScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   late final AnimationController _entranceCtrl;
   late final AnimationController _statsCtrl;
 
@@ -51,11 +51,12 @@ class _TechnicianSettingsProfileScreenState
   bool _extraLoading = true;
   String? _extraError;
 
-  bool _pollingStarted = false;
+  DateTime? _lastFetch;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
 
     _entranceCtrl = AnimationController(
       vsync: this,
@@ -80,25 +81,32 @@ class _TechnicianSettingsProfileScreenState
 
     _entranceCtrl.forward();
     _statsCtrl.forward();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => _fetchExtraData());
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_pollingStarted) {
-      _pollingStarted = true;
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
       _fetchExtraData();
     }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _entranceCtrl.dispose();
     _statsCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _fetchExtraData() async {
+    final now = DateTime.now();
+    if (_lastFetch != null &&
+        now.difference(_lastFetch!) < const Duration(seconds: 30)) {
+      return;
+    }
+    _lastFetch = now;
     if (!mounted) return;
     setState(() {
       _extraLoading = true;
@@ -131,7 +139,7 @@ class _TechnicianSettingsProfileScreenState
 
       setState(() {
         _reviews = reviews;
-        _portfolio = completed.take(6).toList();
+        _portfolio = completed;
         _extraLoading = false;
       });
     } catch (_) {
@@ -228,6 +236,12 @@ class _TechnicianSettingsProfileScreenState
                           loading: _extraLoading,
                           error: _extraError,
                           onRetry: _fetchExtraData,
+                          onViewAll: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) =>
+                                  _AllJobsScreen(jobs: _portfolio),
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -738,12 +752,14 @@ class _PortfolioSection extends StatelessWidget {
     required this.loading,
     required this.error,
     required this.onRetry,
+    required this.onViewAll,
   });
 
   final List<BackendBooking> jobs;
   final bool loading;
   final String? error;
   final VoidCallback onRetry;
+  final VoidCallback onViewAll;
 
   @override
   Widget build(BuildContext context) {
@@ -760,8 +776,25 @@ class _PortfolioSection extends StatelessWidget {
       );
     }
 
+    final visible = jobs.take(5).toList();
+    final hasMore = jobs.length > 5;
+
     return Column(
-      children: jobs.map((job) => _PortfolioCard(job: job)).toList(),
+      children: <Widget>[
+        ...visible.map((job) => _PortfolioCard(job: job)),
+        if (hasMore)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: onViewAll,
+                icon: const Icon(Icons.list_rounded, size: 18),
+                label: Text('View All (${jobs.length} jobs)'),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -1724,6 +1757,29 @@ class _StatusRow extends StatelessWidget {
               ),
         ),
       ],
+    );
+  }
+}
+
+// ── All jobs screen ───────────────────────────────────────────────────────────
+
+class _AllJobsScreen extends StatelessWidget {
+  const _AllJobsScreen({required this.jobs});
+
+  final List<BackendBooking> jobs;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('All Jobs'),
+        centerTitle: false,
+      ),
+      body: ListView.builder(
+        padding: const EdgeInsets.all(ServioSpacing.screenPadding),
+        itemCount: jobs.length,
+        itemBuilder: (context, index) => _PortfolioCard(job: jobs[index]),
+      ),
     );
   }
 }

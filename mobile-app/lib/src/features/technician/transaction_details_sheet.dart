@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/api/api_client.dart';
-import '../../core/api/bookings_api.dart';
 import '../../core/models/backend_booking_model.dart';
+import '../../core/state/disputes_provider.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 
@@ -101,10 +100,15 @@ class _TransactionDetailsSheetState extends State<TransactionDetailsSheet> {
   Future<void> _submitReport(String reason) async {
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
-    final client = context.read<ApiClient>();
+    final disputes = context.read<DisputesProvider>();
     setState(() => _submittingReport = true);
     try {
-      await BookingsApi(client).reportDispute(widget.job.id, reason: reason);
+      await disputes.openDispute(
+        bookingId: widget.job.id,
+        paymentId: '',
+        reason: reason,
+        category: 'other',
+      );
       await widget.onReportSubmitted?.call();
       if (!mounted) return;
       navigator.pop();

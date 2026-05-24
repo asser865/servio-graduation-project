@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/state/notifications_provider.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
@@ -14,13 +16,18 @@ class NotificationSettingsScreen extends StatefulWidget {
 
 class _NotificationSettingsScreenState
     extends State<NotificationSettingsScreen> {
-  bool _pushEnabled = true;
-  bool _emailEnabled = false;
-  bool _bookingUpdates = true;
   bool _messages = true;
   bool _promotions = false;
   bool _sound = true;
   bool _vibration = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<NotificationsProvider>().loadPreferences();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,78 +38,86 @@ class _NotificationSettingsScreenState
         title: const Text('Notifications'),
         backgroundColor: theme.scaffoldBackgroundColor,
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(ServioSpacing.screenPadding),
-        children: <Widget>[
-          Text('General', style: theme.textTheme.titleMedium),
-          const SizedBox(height: 12),
-          ServioCard(
-            radius: ServioRadius.lg,
-            child: Column(
-              children: <Widget>[
-                _SwitchRow(
-                  label: 'Push Notifications',
-                  value: _pushEnabled,
-                  onChanged: (v) => setState(() => _pushEnabled = v),
+      body: Consumer<NotificationsProvider>(
+        builder: (context, provider, _) {
+          final prefs = provider.preferences;
+          return ListView(
+            padding: const EdgeInsets.all(ServioSpacing.screenPadding),
+            children: <Widget>[
+              Text('General', style: theme.textTheme.titleMedium),
+              const SizedBox(height: 12),
+              ServioCard(
+                radius: ServioRadius.lg,
+                child: Column(
+                  children: <Widget>[
+                    _SwitchRow(
+                      label: 'Push Notifications',
+                      value: prefs.push,
+                      onChanged: (v) =>
+                          provider.updatePreferences(prefs.copyWith(push: v)),
+                    ),
+                    const SizedBox(height: 12),
+                    _SwitchRow(
+                      label: 'Email Notifications',
+                      value: prefs.email,
+                      onChanged: (v) =>
+                          provider.updatePreferences(prefs.copyWith(email: v)),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                _SwitchRow(
-                  label: 'Email Notifications',
-                  value: _emailEnabled,
-                  onChanged: (v) => setState(() => _emailEnabled = v),
+              ),
+              const SizedBox(height: 24),
+              Text('Activity', style: theme.textTheme.titleMedium),
+              const SizedBox(height: 12),
+              ServioCard(
+                radius: ServioRadius.lg,
+                child: Column(
+                  children: <Widget>[
+                    _SwitchRow(
+                      label: 'Booking Updates',
+                      value: prefs.inApp,
+                      onChanged: (v) =>
+                          provider.updatePreferences(prefs.copyWith(inApp: v)),
+                    ),
+                    const SizedBox(height: 12),
+                    _SwitchRow(
+                      label: 'Messages',
+                      value: _messages,
+                      onChanged: (v) => setState(() => _messages = v),
+                    ),
+                    const SizedBox(height: 12),
+                    _SwitchRow(
+                      label: 'Promotions',
+                      value: _promotions,
+                      onChanged: (v) => setState(() => _promotions = v),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text('Activity', style: theme.textTheme.titleMedium),
-          const SizedBox(height: 12),
-          ServioCard(
-            radius: ServioRadius.lg,
-            child: Column(
-              children: <Widget>[
-                _SwitchRow(
-                  label: 'Booking Updates',
-                  value: _bookingUpdates,
-                  onChanged: (v) => setState(() => _bookingUpdates = v),
+              ),
+              const SizedBox(height: 24),
+              Text('Device', style: theme.textTheme.titleMedium),
+              const SizedBox(height: 12),
+              ServioCard(
+                radius: ServioRadius.lg,
+                child: Column(
+                  children: <Widget>[
+                    _SwitchRow(
+                      label: 'Sound',
+                      value: _sound,
+                      onChanged: (v) => setState(() => _sound = v),
+                    ),
+                    const SizedBox(height: 12),
+                    _SwitchRow(
+                      label: 'Vibration',
+                      value: _vibration,
+                      onChanged: (v) => setState(() => _vibration = v),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                _SwitchRow(
-                  label: 'Messages',
-                  value: _messages,
-                  onChanged: (v) => setState(() => _messages = v),
-                ),
-                const SizedBox(height: 12),
-                _SwitchRow(
-                  label: 'Promotions',
-                  value: _promotions,
-                  onChanged: (v) => setState(() => _promotions = v),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text('Device', style: theme.textTheme.titleMedium),
-          const SizedBox(height: 12),
-          ServioCard(
-            radius: ServioRadius.lg,
-            child: Column(
-              children: <Widget>[
-                _SwitchRow(
-                  label: 'Sound',
-                  value: _sound,
-                  onChanged: (v) => setState(() => _sound = v),
-                ),
-                const SizedBox(height: 12),
-                _SwitchRow(
-                  label: 'Vibration',
-                  value: _vibration,
-                  onChanged: (v) => setState(() => _vibration = v),
-                ),
-              ],
-            ),
-          ),
-        ],
+              ),
+            ],
+          );
+        },
       ),
     );
   }

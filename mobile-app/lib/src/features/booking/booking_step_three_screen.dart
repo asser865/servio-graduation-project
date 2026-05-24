@@ -3,6 +3,7 @@ import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/state/payments_provider.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/api/bookings_api.dart';
 import '../../core/api/saved_cards_api.dart';
@@ -29,6 +30,7 @@ class BookingStepThreeScreen extends StatefulWidget {
 
 class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
   bool _termsAccepted = false;
+  bool _useCredits = false;
   bool _loading = false;
   String? _error;
   late String _paymentMethodCode;
@@ -55,6 +57,9 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
     _cardLabelController = TextEditingController();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _loadSavedCards();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<PaymentsProvider>().loadCredits();
     });
   }
 
@@ -720,6 +725,41 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
                 ),
                 const SizedBox(height: 16),
               ],
+
+              // ── Credits toggle ───────────────────────────────────────────────
+              Consumer<PaymentsProvider>(
+                builder: (context, payments, _) {
+                  final balance = payments.totalCreditBalance;
+                  if (balance <= 0) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: ServioCard(
+                      child: Row(
+                        children: <Widget>[
+                          const Icon(Icons.wallet_rounded, size: 20),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                const Text('Use Credits', style: TextStyle(fontWeight: FontWeight.w600)),
+                                Text(
+                                  'Balance: EGP ${balance.toStringAsFixed(2)}',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
+                            ),
+                          ),
+                          Switch(
+                            value: _useCredits,
+                            onChanged: (v) => setState(() => _useCredits = v),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
 
               // ── Terms & Conditions consent ────────────────────────────────────
               ServioCard(

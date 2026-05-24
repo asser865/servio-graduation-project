@@ -8,7 +8,9 @@ import '../../core/api/api_client.dart';
 import '../../core/api/bookings_api.dart';
 import '../../core/api/users_api.dart';
 import '../../core/models/booking_model.dart';
+import '../../core/state/disputes_provider.dart';
 import '../../core/state/notifications_provider.dart';
+import 'raise_dispute_screen.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
@@ -187,11 +189,18 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => BookingDetailsScreen(
-                      data: _flowDataFromBooking(booking),
+                      data: bookingFlowDataFromModel(booking),
                     ),
                   ),
                 );
               },
+              onRaiseDispute: booking.status == BookingStatus.awaitingCustomerConfirmation
+                  ? () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => RaiseDisputeScreen(booking: booking),
+                        ),
+                      )
+                  : null,
             );
           },
         );
@@ -212,11 +221,18 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => BookingDetailsScreen(
-                      data: _flowDataFromBooking(booking),
+                      data: bookingFlowDataFromModel(booking),
                     ),
                   ),
                 );
               },
+              onRaiseDispute: booking.status == BookingStatus.awaitingCustomerConfirmation
+                  ? () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => RaiseDisputeScreen(booking: booking),
+                        ),
+                      )
+                  : null,
             );
           },
         );
@@ -298,11 +314,13 @@ class _LiveBookingCard extends StatelessWidget {
     required this.booking,
     required this.onViewDetails,
     required this.onRebook,
+    this.onRaiseDispute,
   });
 
   final BookingModel booking;
   final VoidCallback onViewDetails;
   final VoidCallback onRebook;
+  final VoidCallback? onRaiseDispute;
 
   static ServioStatusChipType _chipType(BookingStatus status) =>
       switch (status) {
@@ -318,6 +336,10 @@ class _LiveBookingCard extends StatelessWidget {
         BookingStatus.cancelled => ServioStatusChipType.danger,
         BookingStatus.rejected => ServioStatusChipType.danger,
         BookingStatus.disputed => ServioStatusChipType.warning,
+        BookingStatus.cancelledNoShow ||
+        BookingStatus.customerNoShow ||
+        BookingStatus.workerNoShow =>
+          ServioStatusChipType.danger,
       };
 
   static String _chipLabel(BookingStatus status) => switch (status) {
@@ -332,6 +354,9 @@ class _LiveBookingCard extends StatelessWidget {
         BookingStatus.cancelled => 'Cancelled',
         BookingStatus.rejected => 'Rejected',
         BookingStatus.disputed => 'Disputed',
+        BookingStatus.cancelledNoShow => 'Cancelled (No-Show)',
+        BookingStatus.customerNoShow => 'Customer No-Show',
+        BookingStatus.workerNoShow => 'Worker No-Show',
       };
 
   Color _accentColor(ServioThemeExtension servio) => switch (booking.status) {
@@ -399,6 +424,21 @@ class _LiveBookingCard extends StatelessWidget {
                           ),
                         ],
                       ),
+                if (onRaiseDispute != null) ...[
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: onRaiseDispute,
+                      icon: const Icon(Icons.flag_outlined, size: 16),
+                      label: const Text('Report Problem'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.orange,
+                        side: const BorderSide(color: Colors.orange),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -423,6 +463,8 @@ class BookingDetailsScreen extends StatefulWidget {
 class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
   bool _cancelling = false;
   bool _confirming = false;
+  bool _disputeLoading = false;
+  bool _pinRevealed = false;
 
   Future<void> _confirmCompletion() async {
     if (_confirming) return;
@@ -471,6 +513,91 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
       );
     } finally {
       if (mounted) setState(() => _confirming = false);
+    }
+  }
+
+  Future<void> _reportDispute() async {
+    final controller = TextEditingController();
+    final disputes = context.read<DisputesProvider>();
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (ctx) => Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        child: Builder(
+          builder: (innerCtx) => Padding(
+            padding: EdgeInsets.only(
+                bottom: MediaQuery.viewInsetsOf(innerCtx).bottom),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text('Report an Issue',
+                      style: Theme.of(innerCtx)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 12),
+                  const Text('Describe the issue with this service.'),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: controller,
+                    maxLines: 4,
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      hintText: 'Enter details…',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: <Widget>[
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        child: const Text('Cancel'),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: () {
+                          final text = controller.text.trim();
+                          if (text.isEmpty) return;
+                          Navigator.of(ctx).pop(text);
+                        },
+                        child: const Text('Submit'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    controller.dispose();
+    if (reason == null || !mounted) return;
+    setState(() => _disputeLoading = true);
+    try {
+      await disputes.openDispute(
+        bookingId: widget.data.backendId,
+        paymentId: '',
+        reason: reason,
+        category: 'other',
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Dispute filed. Our team will review it.')),
+      );
+      _leaveDetails(context);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to file dispute. Please try again.')),
+      );
+    } finally {
+      if (mounted) setState(() => _disputeLoading = false);
     }
   }
 
@@ -691,6 +818,8 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                 ),
               ),
               const SizedBox(height: 16),
+              _buildPinSection(data, theme, servio),
+              const SizedBox(height: 16),
               ServioCard(
                 child: Column(
                   children: <Widget>[
@@ -832,6 +961,25 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                               icon:
                                   const Icon(Icons.verified_rounded, size: 18),
                               label: const Text('Confirm Job Complete'),
+                            ),
+                      const SizedBox(height: 10),
+                      _disputeLoading
+                          ? const Center(child: CircularProgressIndicator())
+                          : OutlinedButton.icon(
+                              onPressed: _reportDispute,
+                              icon: const Icon(Icons.flag_outlined, size: 18),
+                              label: const Text('Report a Problem'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: ServioColors.danger,
+                                side: const BorderSide(
+                                    color: ServioColors.danger),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(ServioRadius.md),
+                                ),
+                              ),
                             ),
                     ],
                   ),
@@ -985,6 +1133,181 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
     ];
   }
 
+  Widget _buildPinSection(
+    BookingFlowData data,
+    ThemeData theme,
+    ServioThemeExtension servio,
+  ) {
+    final status = data.statusCode.toLowerCase();
+    final rawPin = data.pin.trim();
+
+    // Before technician arrives — locked
+    if (status == 'pending' ||
+        status == 'confirmed' ||
+        status == 'accepted' ||
+        status == 'scheduled' ||
+        status == 'en_route' ||
+        status == 'enroute') {
+      return ServioCard(
+        radius: ServioRadius.lg,
+        child: Column(
+          children: <Widget>[
+            Row(mainAxisAlignment: MainAxisAlignment.center, children: <Widget>[
+              Icon(Icons.lock_outline_rounded, color: servio.accent, size: 18),
+              const SizedBox(width: 8),
+              Text('Arrival PIN',
+                  style: theme.textTheme.titleSmall
+                      ?.copyWith(fontWeight: FontWeight.w700)),
+            ]),
+            const SizedBox(height: 14),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+              decoration: BoxDecoration(
+                color: servio.surfaceAlt,
+                borderRadius: BorderRadius.circular(ServioRadius.md),
+                border: Border.all(color: servio.border),
+              ),
+              child: Text(
+                '● ● ● ●',
+                style: theme.textTheme.displaySmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 8,
+                  color: servio.textSecondary,
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'PIN will be revealed when your technician arrives.',
+              textAlign: TextAlign.center,
+              style:
+                  theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Technician arrived — show reveal button
+    if (status == 'arrived') {
+      final pinDisplay =
+          rawPin.isEmpty ? '----' : rawPin.split('').join('  ');
+      return ServioCard(
+        radius: ServioRadius.lg,
+        child: Column(
+          children: <Widget>[
+            Row(mainAxisAlignment: MainAxisAlignment.center, children: <Widget>[
+              Icon(Icons.lock_open_rounded,
+                  color: ServioColors.warning, size: 18),
+              const SizedBox(width: 8),
+              Text('Arrival PIN',
+                  style: theme.textTheme.titleSmall
+                      ?.copyWith(fontWeight: FontWeight.w700)),
+            ]),
+            const SizedBox(height: 14),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              child: _pinRevealed
+                  ? Container(
+                      key: const ValueKey<String>('vis'),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 32, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: servio.surfaceAlt,
+                        borderRadius: BorderRadius.circular(ServioRadius.md),
+                        border: Border.all(color: servio.accent),
+                      ),
+                      child: Text(
+                        pinDisplay,
+                        style: theme.textTheme.displaySmall?.copyWith(
+                          color: theme.colorScheme.onSurface,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 8,
+                        ),
+                      ),
+                    )
+                  : SizedBox(
+                      key: const ValueKey<String>('btn'),
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.lock_open_rounded),
+                        label: const Text('Reveal PIN'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: servio.accent,
+                          foregroundColor: Colors.white,
+                          padding:
+                              const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.circular(ServioRadius.md),
+                          ),
+                        ),
+                        onPressed: () => setState(() => _pinRevealed = true),
+                      ),
+                    ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Share this PIN with your technician to start the service.',
+              textAlign: TextAlign.center,
+              style:
+                  theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // In progress — PIN already verified
+    if (status == 'in_progress' || status == 'inprogress') {
+      final pinDisplay =
+          rawPin.isEmpty ? '----' : rawPin.split('').join('  ');
+      return ServioCard(
+        radius: ServioRadius.lg,
+        child: Column(
+          children: <Widget>[
+            Row(mainAxisAlignment: MainAxisAlignment.center, children: <Widget>[
+              Icon(Icons.verified_rounded,
+                  color: ServioColors.success, size: 18),
+              const SizedBox(width: 8),
+              Text('PIN Verified',
+                  style: theme.textTheme.titleSmall
+                      ?.copyWith(fontWeight: FontWeight.w700)),
+            ]),
+            const SizedBox(height: 14),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+              decoration: BoxDecoration(
+                color: servio.surfaceAlt,
+                borderRadius: BorderRadius.circular(ServioRadius.md),
+                border: Border.all(color: servio.accent),
+              ),
+              child: Text(
+                pinDisplay,
+                style: theme.textTheme.displaySmall?.copyWith(
+                  color: theme.colorScheme.onSurface,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 8,
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Service is in progress.',
+              textAlign: TextAlign.center,
+              style:
+                  theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return const SizedBox.shrink();
+  }
+
   void _leaveDetails(BuildContext context) {
     final navigator = Navigator.of(context);
     if (navigator.canPop()) {
@@ -1092,7 +1415,7 @@ class _DetailsPair extends StatelessWidget {
   }
 }
 
-BookingFlowData _flowDataFromBooking(BookingModel booking) {
+BookingFlowData bookingFlowDataFromModel(BookingModel booking) {
   return BookingFlowData(
     backendId: booking.id,
     serviceName: booking.serviceName,
@@ -1157,6 +1480,9 @@ String _statusCodeFromStatus(BookingStatus status) => switch (status) {
       BookingStatus.cancelled => 'cancelled',
       BookingStatus.rejected => 'rejected',
       BookingStatus.disputed => 'disputed',
+      BookingStatus.cancelledNoShow => 'cancelled_no_show',
+      BookingStatus.customerNoShow => 'customer_no_show',
+      BookingStatus.workerNoShow => 'worker_no_show',
     };
 
 ServioStatusChipType _chipTypeForStatusCode(String statusCode) {

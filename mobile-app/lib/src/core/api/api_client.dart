@@ -31,6 +31,8 @@ class ApiClient {
   final String _baseUrl;
   final Duration? _timeout;
 
+  String get baseUrl => _baseUrl;
+
   Future<Map<String, dynamic>> get(String path) => _request('GET', path);
   Future<Map<String, dynamic>> delete(
     String path, {
@@ -169,6 +171,57 @@ class ApiClient {
       );
     }
 
+    return decoded;
+  }
+
+  /// Raw binary POST — used by the `/uploads` endpoint which accepts
+  /// `express.raw()` body instead of multipart. Returns decoded JSON.
+  Future<Map<String, dynamic>> postRaw(
+    String path, {
+    required List<int> bytes,
+    required String contentType,
+    Map<String, String>? queryParams,
+    Duration? timeoutOverride,
+  }) async {
+    final base = Uri.parse('$_baseUrl$path');
+    final uri = queryParams != null ? base.replace(queryParameters: queryParams) : base;
+    final token = await _tokenStorage.getToken();
+    final headers = <String, String>{'Content-Type': contentType};
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+
+    final timeout = timeoutOverride ?? _timeout;
+    late final http.Response response;
+    try {
+      final req = _httpClient.post(uri, headers: headers, body: bytes);
+      response = await (timeout == null ? req : req.timeout(timeout));
+    } on TimeoutException {
+      throw const ApiException(message: 'Upload timed out. Please try again.');
+    } on http.ClientException {
+      throw const ApiException(
+          message: 'Unable to connect. Check your internet connection.');
+    }
+
+    late final Map<String, dynamic> decoded;
+    try {
+      decoded = _decode(response.body);
+    } on FormatException {
+      throw const ApiException(message: 'Invalid server response.');
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      if (response.statusCode == 401) await _tokenStorage.clearToken();
+      final errors = decoded['errors'];
+      throw ApiException(
+        statusCode: response.statusCode,
+        message: (decoded['message'] as String?) ??
+            (decoded['error'] as String?) ??
+            'Upload failed.',
+        errors: errors is List
+            ? errors.whereType<Map<String, dynamic>>().toList()
+            : const <Map<String, dynamic>>[],
+      );
+    }
     return decoded;
   }
 

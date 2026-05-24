@@ -354,7 +354,7 @@ class BookingsProvider extends ChangeNotifier {
     _loadCached();
     refresh();
     _pollingTimer = Timer.periodic(const Duration(seconds: 20), (_) {
-      _silentRefresh();
+      silentRefresh();
     });
   }
 
@@ -401,7 +401,7 @@ class BookingsProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _silentRefresh() async {
+  Future<void> silentRefresh() async {
     try {
       final raw = await _api.getMyBookings();
       _bookings
@@ -412,6 +412,26 @@ class BookingsProvider extends ChangeNotifier {
     } catch (_) {
       // keep cached data on error
     }
+  }
+
+  Future<void> startJob(String bookingId, String pin) async {
+    await _api.startJob(bookingId, pin);
+    await silentRefresh();
+  }
+
+  Future<void> reportCustomerNoShow({
+    required String bookingId,
+    required String details,
+    required List<int> photoBytes,
+    required String photoFilename,
+  }) async {
+    await _api.reportCustomerNoShow(
+      bookingId: bookingId,
+      details: details,
+      photoBytes: photoBytes,
+      photoFilename: photoFilename,
+    );
+    await silentRefresh();
   }
 
   Future<void> _save() async {

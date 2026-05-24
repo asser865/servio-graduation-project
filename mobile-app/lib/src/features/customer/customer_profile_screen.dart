@@ -9,8 +9,8 @@ import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_tab_shell.dart';
 import '../auth/auth_landing_screen.dart';
 import '../marketing/about_screen.dart';
-import '../marketing/contact_screen.dart';
 import '../marketing/faq_screen.dart';
+import 'support_screen.dart';
 import '../marketing/privacy_policy_screen.dart';
 import '../marketing/terms_of_service_screen.dart';
 import '../shared/report_problem_screen.dart';
@@ -71,7 +71,7 @@ class CustomerProfileScreen extends StatelessWidget {
                         _NavTile(
                           icon: Icons.history_rounded,
                           iconColor: context.servio.accent,
-                          label: 'History',
+                          label: 'Bookings',
                           subtitle: 'Past and upcoming bookings',
                           onTap: () => Navigator.of(context).push(
                             MaterialPageRoute<void>(
@@ -111,13 +111,13 @@ class CustomerProfileScreen extends StatelessWidget {
                           ),
                         ),
                         _NavTile(
-                          icon: Icons.headset_mic_outlined,
+                          icon: Icons.shield_outlined,
                           iconColor: context.servio.info,
-                          label: 'Contact Us',
-                          subtitle: 'Get help from our team',
+                          label: 'Support',
+                          subtitle: 'Issues, disputes & resolved cases',
                           onTap: () => Navigator.of(context).push(
                             MaterialPageRoute<void>(
-                              builder: (_) => const ContactScreen(),
+                              builder: (_) => const SupportScreen(),
                             ),
                           ),
                         ),

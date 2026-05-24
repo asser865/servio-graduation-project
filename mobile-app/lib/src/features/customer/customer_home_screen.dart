@@ -1500,6 +1500,9 @@ class _FloatingBookingCard extends StatelessWidget {
         BookingStatus.rejected => 'rejected',
         BookingStatus.disputed => 'disputed',
         BookingStatus.pendingAdminReview => 'pending_admin_review',
+        BookingStatus.cancelledNoShow => 'cancelled_no_show',
+        BookingStatus.customerNoShow => 'customer_no_show',
+        BookingStatus.workerNoShow => 'worker_no_show',
       };
 }
 
@@ -1597,6 +1600,9 @@ String _homeStatusLabel(BookingStatus status) {
     BookingStatus.rejected => 'Rejected',
     BookingStatus.disputed => 'Disputed',
     BookingStatus.pendingAdminReview => 'Under Review',
+    BookingStatus.cancelledNoShow => 'Cancelled (No-Show)',
+    BookingStatus.customerNoShow => 'Customer No-Show',
+    BookingStatus.workerNoShow => 'Worker No-Show',
   };
 }
 
@@ -1613,6 +1619,9 @@ ServioStatusChipType _homeChipType(BookingStatus status) {
     BookingStatus.rejected => ServioStatusChipType.danger,
     BookingStatus.disputed => ServioStatusChipType.warning,
     BookingStatus.pendingAdminReview => ServioStatusChipType.warning,
+    BookingStatus.cancelledNoShow => ServioStatusChipType.danger,
+    BookingStatus.customerNoShow => ServioStatusChipType.danger,
+    BookingStatus.workerNoShow => ServioStatusChipType.danger,
   };
 }
 

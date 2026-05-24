@@ -64,7 +64,50 @@ class ApiEndpoints {
       '/payments/earnings?period=$period';
 
   static const String paymentSettings = '/payments/settings';
+
+  // ── Payments v2: debts, settlements, payouts, credits, invoices ──────────
+  static const String paymentMyDebts = '/payments/my-debts/v2';
+  static const String paymentSettleDebts = '/payments/my-debts/settle';
+  static const String paymentMySettlements = '/payments/my-settlements';
+  static const String paymentPayoutRequest = '/payments/payout-request';
+  static const String paymentMyPayouts = '/payments/my-payouts';
+  static const String paymentMeCredits = '/payments/me/credits';
+  static const String paymentMeInvoices = '/payments/me/invoices';
+  static String paymentReceipt(String id) => '/payments/$id/receipt';
+
+  // ── Bookings: start with PIN, no-show ────────────────────────────────────
+  static String bookingStart(String id) => '/bookings/$id/start';
+  static String bookingNoShowCustomer(String id) =>
+      '/bookings/$id/no-show/customer';
+  static String bookingNoShowWorker(String id) =>
+      '/bookings/$id/no-show/worker';
+
+  // ── Disputes ──────────────────────────────────────────────────────────────
+  static const String disputes = '/payments/disputes';
+  static const String disputesMy = '/payments/disputes/my';
+  static const String disputesWorkerMine = '/payments/disputes/worker-mine';
+  static String disputeEvidence(String id) => '/payments/disputes/$id/evidence';
+  static String disputeAppeal(String id) => '/payments/disputes/$id/appeal';
+  static String disputeById(String id) => '/payments/disputes/$id';
+  static String disputePartyById(String id) => '/payments/disputes/party/$id';
+
+  // ── Notification preferences ──────────────────────────────────────────────
+  static const String notificationPreferences = '/notifications/preferences';
+
   static const String savedCards = '/saved-cards';
   static String savedCard(String id) => '/saved-cards/$id';
   static String defaultSavedCard(String id) => '/saved-cards/$id/default';
+
+  // ── Booking accept (dedicated endpoint — enforces cash debt gate) ──────────
+  static String bookingAccept(String id) => '/bookings/$id/accept';
+
+  // ── File upload (returns { url: String }) ─────────────────────────────────
+  static const String uploadFile = '/uploads';
+
+  // ── Support issues ─────────────────────────────────────────────────────────
+  static const String supportIssues = '/support/issues';
+  static const String supportIssuesMy = '/support/issues/my';
+  static String supportIssueStatus(String id) => '/support/issues/$id/status';
+  static String supportIssueResolve(String id) => '/support/issues/$id/resolve';
+  static String supportIssueEscalate(String id) => '/support/issues/$id/escalate-dispute';
 }
