@@ -13,7 +13,6 @@ a static web frontend, a Flutter mobile app, and Python FastAPI AI services.
 | `servio_frontend/` | Browser web app | HTML, CSS, vanilla JavaScript ES modules, Motion package, static assets |
 | `mobile-app/` | Customer and technician mobile app | Flutter, Dart, Provider, Material, shared preferences, secure storage, HTTP APIs |
 | `ai-service/` | AI microservices for room analysis, recommendations, and cost estimates | Python, FastAPI, Uvicorn, Gemini/Groq integrations, Diffusers/Transformers, Torch |
-| `docs/` | Project documentation and reports | Markdown/docs assets |
 
 ## Main Features
 
