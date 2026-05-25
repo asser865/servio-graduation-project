@@ -192,4 +192,31 @@ class PaymentsApi {
 
   String receiptUrl(String paymentId) =>
       '${_client.baseUrl}${ApiEndpoints.paymentReceipt(paymentId)}';
+
+  // ── Escrow ────────────────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> holdPayment({
+    required String bookingId,
+    String? savedCardId,
+    bool useCredit = false,
+  }) async {
+    final body = <String, dynamic>{
+      if (savedCardId != null && savedCardId.isNotEmpty)
+        'savedCardId': savedCardId,
+      if (useCredit) 'useCredit': true,
+    };
+    return _client.unwrapData(
+      await _client.post(ApiEndpoints.paymentHold(bookingId), body),
+    );
+  }
+
+  Future<void> confirmEscrow(String bookingId) async {
+    await _client.post(ApiEndpoints.paymentConfirm(bookingId), {});
+  }
+
+  Future<Map<String, dynamic>> getPaymentByBooking(String bookingId) async {
+    return _client.unwrapData(
+      await _client.get(ApiEndpoints.paymentByBooking(bookingId)),
+    );
+  }
 }

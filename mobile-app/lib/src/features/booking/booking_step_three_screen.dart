@@ -6,6 +6,7 @@ import '../../core/api/api_client.dart';
 import '../../core/state/payments_provider.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/api/bookings_api.dart';
+import '../../core/api/payments_api.dart';
 import '../../core/api/saved_cards_api.dart';
 import '../../core/models/backend_booking_model.dart';
 import '../../core/models/saved_card_model.dart';
@@ -233,6 +234,32 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
         booking,
       );
       if (!mounted) return;
+
+      if (_paymentMethodCode == 'card') {
+        try {
+          final paymentData = await PaymentsApi(_apiClient).holdPayment(
+            bookingId: booking.id,
+            savedCardId: _selectedCardId,
+            useCredit: _useCredits,
+          );
+          final paymentId = paymentData['_id'] as String? ?? '';
+          confirmationData = confirmationData.copyWith(paymentId: paymentId);
+        } on ApiException catch (e) {
+          if (!mounted) return;
+          setState(() {
+            _loading = false;
+            _error = 'Payment hold failed: ${e.message}';
+          });
+          return;
+        } catch (_) {
+          if (!mounted) return;
+          setState(() {
+            _loading = false;
+            _error = 'Could not hold payment. Please try again.';
+          });
+          return;
+        }
+      }
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -498,7 +525,7 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
     final servio = context.servio;
 
     final baseRate = _moneyValue(widget.data.amount);
-    final platformFee = (baseRate * 0.05).round();
+    final platformFee = (baseRate * 0.10).round();
     final estimatedTotal = baseRate + platformFee;
     final estimatedTotalLabel = _moneyLabel(estimatedTotal);
     final availabilityError = widget.data.isScheduledDateAvailable
@@ -568,7 +595,7 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
                     ),
                   _ReviewRow(label: 'Base Rate', value: '$baseRate EGP'),
                   _ReviewRow(
-                      label: 'Platform Fee', value: '$platformFee EGP (5%)'),
+                      label: 'Platform Fee', value: '$platformFee EGP (10%)'),
                   _ReviewRow(
                     label: 'Est. Total',
                     value: estimatedTotalLabel,
@@ -648,7 +675,7 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
                         label: 'Base rate (1 hr min)', value: '$baseRate EGP'),
                     const SizedBox(height: 8),
                     _PriceLine(
-                        label: 'Platform fee (5%)', value: '$platformFee EGP'),
+                        label: 'Platform fee (10%)', value: '$platformFee EGP'),
                     const SizedBox(height: 8),
                     _PriceLine(label: 'Parts & materials', value: 'As quoted'),
                     const SizedBox(height: 12),

@@ -74,6 +74,10 @@ class ApiEndpoints {
   static const String paymentMeCredits = '/payments/me/credits';
   static const String paymentMeInvoices = '/payments/me/invoices';
   static String paymentReceipt(String id) => '/payments/$id/receipt';
+  static const String paymentMeHistory = '/payments/me/history';
+  static String paymentHold(String id) => '/payments/hold/$id';
+  static String paymentConfirm(String id) => '/payments/confirm/$id';
+  static String paymentByBooking(String id) => '/payments/booking/$id';
 
   // ── Bookings: start with PIN, no-show ────────────────────────────────────
   static String bookingStart(String id) => '/bookings/$id/start';

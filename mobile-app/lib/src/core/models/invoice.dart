@@ -30,8 +30,8 @@ class Invoice {
   factory Invoice.fromJson(Map<String, dynamic> json) => Invoice(
         id: (json['_id'] as String?) ?? (json['id'] as String?) ?? '',
         number: (json['number'] as String?) ?? '',
-        paymentId: (json['paymentId'] as String?) ?? '',
-        bookingId: (json['bookingId'] as String?) ?? '',
+        paymentId: (json['payment'] as String?) ?? (json['paymentId'] as String?) ?? '',
+        bookingId: (json['booking'] as String?) ?? (json['bookingId'] as String?) ?? '',
         subtotal: ((json['subtotal'] as num?) ?? 0).toDouble(),
         vatRate: ((json['vatRate'] as num?) ?? 0.14).toDouble(),
         vat: ((json['vat'] as num?) ?? 0).toDouble(),

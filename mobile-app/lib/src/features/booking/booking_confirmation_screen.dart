@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/api/bookings_api.dart';
+import '../../core/api/payments_api.dart';
 import '../../core/models/booking_model.dart';
 import '../../core/state/app_state.dart';
 import '../../core/state/disputes_provider.dart';
@@ -155,13 +156,15 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
       _actionError = null;
     });
     try {
-      await BookingsApi(_apiClient).confirmCompletion(_data.backendId);
+      await PaymentsApi(_apiClient).confirmEscrow(_data.backendId);
       if (!mounted) return;
       _pollTimer?.cancel();
       _countdownTimer?.cancel();
       setState(() {
-        _data =
-            _data.copyWith(statusCode: 'completed', statusLabel: 'Completed');
+        _data = _data.copyWith(
+          statusCode: 'pending_admin_review',
+          statusLabel: 'Under Review',
+        );
         _confirmLoading = false;
       });
       try {
@@ -185,9 +188,17 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
       _actionError = null;
     });
     try {
+      String paymentId = _data.paymentId;
+      if (paymentId.isEmpty) {
+        try {
+          final pd = await PaymentsApi(_apiClient)
+              .getPaymentByBooking(_data.backendId);
+          paymentId = pd['_id'] as String? ?? '';
+        } catch (_) {}
+      }
       await disputes.openDispute(
             bookingId: _data.backendId,
-            paymentId: '',
+            paymentId: paymentId,
             reason: reason,
             category: 'other',
           );
@@ -365,7 +376,7 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
     final servio = context.servio;
     final statusCode = _data.statusCode.toLowerCase();
     final baseRate = _moneyValue(_data.amount);
-    final platformFee = (baseRate * 0.05).round();
+    final platformFee = (baseRate * 0.10).round();
     final estimatedTotal = baseRate + platformFee;
     final estimatedTotalLabel = _moneyLabel(estimatedTotal);
 

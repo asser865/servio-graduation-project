@@ -468,7 +468,7 @@ const getMyInvoices = async (req, res) => {
   let invoices = [];
   if (role === 'worker') invoices = await Invoice.find({ worker: req.user.id }).sort({ createdAt: -1 });
   else invoices = await Invoice.find({ customer: req.user.id }).sort({ createdAt: -1 });
-  return res.json({ data: invoices });
+  return res.json({ data: { invoices } });
 };
 
 const getMyTransactions = async (req, res) => {

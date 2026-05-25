@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/api/api_client.dart';
+import '../../core/api/payments_api.dart';
 import '../../core/models/backend_booking_model.dart';
 import '../../core/state/disputes_provider.dart';
 import '../../design_system/servio_theme_extension.dart';
@@ -101,11 +103,18 @@ class _TransactionDetailsSheetState extends State<TransactionDetailsSheet> {
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
     final disputes = context.read<DisputesProvider>();
+    final apiClient = context.read<ApiClient>();
     setState(() => _submittingReport = true);
     try {
+      String paymentId = '';
+      try {
+        final pd = await PaymentsApi(apiClient)
+            .getPaymentByBooking(widget.job.id);
+        paymentId = pd['_id'] as String? ?? '';
+      } catch (_) {}
       await disputes.openDispute(
         bookingId: widget.job.id,
-        paymentId: '',
+        paymentId: paymentId,
         reason: reason,
         category: 'other',
       );
@@ -139,7 +148,7 @@ class _TransactionDetailsSheetState extends State<TransactionDetailsSheet> {
     final theme = Theme.of(context);
     final servio = context.servio;
     final job = widget.job;
-    final net = job.totalAmount * 0.95;
+    final net = job.totalAmount * 0.90;
     final platformFee = job.totalAmount - net;
     final d = job.scheduledDate;
     final dateStr =
@@ -321,7 +330,7 @@ class _TransactionDetailsSheetState extends State<TransactionDetailsSheet> {
                             ),
                             const SizedBox(height: 8),
                             _AmountRow(
-                              label: 'Platform fee (5%)',
+                              label: 'Platform fee (10%)',
                               value: '- ${platformFee.toStringAsFixed(0)} EGP',
                               valueColor: servio.textSecondary,
                             ),
