@@ -535,6 +535,9 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
               BookingStatus.disputed => 'disputed',
               BookingStatus.pending => 'pending',
               BookingStatus.pendingAdminReview => 'under review',
+              BookingStatus.cancelledNoShow => 'cancelled (no-show)',
+              BookingStatus.customerNoShow => 'customer no-show',
+              BookingStatus.workerNoShow => 'worker no-show',
             }}.'),
             duration: const Duration(seconds: 3),
           ),
@@ -1638,6 +1641,9 @@ class _BookingProgressTracker extends StatelessWidget {
       BookingStatus.rejected => 0,
       BookingStatus.disputed => 0,
       BookingStatus.pendingAdminReview => 4,
+      BookingStatus.cancelledNoShow => 0,
+      BookingStatus.customerNoShow => 0,
+      BookingStatus.workerNoShow => 0,
     };
 
     return Column(
@@ -2298,6 +2304,9 @@ String _statusLabel(BookingStatus status) {
     BookingStatus.rejected => 'Rejected',
     BookingStatus.disputed => 'Disputed',
     BookingStatus.pendingAdminReview => 'Under Review',
+    BookingStatus.cancelledNoShow => 'Cancelled (No-Show)',
+    BookingStatus.customerNoShow => 'Customer No-Show',
+    BookingStatus.workerNoShow => 'Worker No-Show',
   };
 }
 
@@ -2314,6 +2323,9 @@ ServioStatusChipType _chipType(BookingStatus status) {
     BookingStatus.rejected => ServioStatusChipType.danger,
     BookingStatus.disputed => ServioStatusChipType.warning,
     BookingStatus.pendingAdminReview => ServioStatusChipType.warning,
+    BookingStatus.cancelledNoShow => ServioStatusChipType.danger,
+    BookingStatus.customerNoShow => ServioStatusChipType.danger,
+    BookingStatus.workerNoShow => ServioStatusChipType.danger,
   };
 }
 
@@ -2330,6 +2342,9 @@ String _statusCodeFromStatus(BookingStatus status) => switch (status) {
       BookingStatus.rejected => 'rejected',
       BookingStatus.disputed => 'disputed',
       BookingStatus.pendingAdminReview => 'pending_admin_review',
+      BookingStatus.cancelledNoShow => 'cancelled_no_show',
+      BookingStatus.customerNoShow => 'customer_no_show',
+      BookingStatus.workerNoShow => 'worker_no_show',
     };
 
 String _paymentLabelFor(BookingModel booking) {

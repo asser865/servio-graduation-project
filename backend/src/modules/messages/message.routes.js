@@ -38,6 +38,12 @@ router.delete('/conversations/:id',
   ]),
   ctrl.deleteConversation
 );
+router.patch('/conversations/:id/archive',
+  validate([
+    param('id').isMongoId().withMessage('Valid conversation ID required'),
+  ]),
+  ctrl.archiveConversation
+);
 router.get('/conversations/:id', ctrl.list);
 router.get('/unread',        ctrl.unread);
 router.get('/:id',           ctrl.list);

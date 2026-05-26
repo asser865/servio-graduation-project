@@ -6,6 +6,7 @@ class CustomerAddress {
     this.city = '',
     this.state = '',
     this.zipCode = '',
+    this.apartment = '',
     this.lat,
     this.lng,
   });
@@ -16,6 +17,7 @@ class CustomerAddress {
   final String city;
   final String state;
   final String zipCode;
+  final String apartment;
   final double? lat;
   final double? lng;
 
@@ -23,6 +25,7 @@ class CustomerAddress {
 
   String get formattedSingleLine => <String>[
         street,
+        if (apartment.trim().isNotEmpty) 'Apt $apartment',
         city,
         state,
         zipCode,
@@ -30,7 +33,9 @@ class CustomerAddress {
 
   String get displayAddress {
     final parts = <String>[
-      street,
+      [street, if (apartment.trim().isNotEmpty) 'Apt $apartment']
+          .where((part) => part.trim().isNotEmpty)
+          .join(', '),
       [city, state].where((part) => part.trim().isNotEmpty).join(', '),
       zipCode,
     ].where((part) => part.trim().isNotEmpty).toList();
@@ -43,6 +48,7 @@ class CustomerAddress {
         'city': city.trim(),
         'state': state.trim(),
         'zipCode': zipCode.trim(),
+        'apartment': apartment.trim(),
         if (lat != null) 'lat': lat,
         if (lng != null) 'lng': lng,
       };
@@ -54,6 +60,7 @@ class CustomerAddress {
     String? city,
     String? state,
     String? zipCode,
+    String? apartment,
     double? lat,
     double? lng,
   }) {
@@ -64,6 +71,7 @@ class CustomerAddress {
       city: city ?? this.city,
       state: state ?? this.state,
       zipCode: zipCode ?? this.zipCode,
+      apartment: apartment ?? this.apartment,
       lat: lat ?? this.lat,
       lng: lng ?? this.lng,
     );
@@ -77,6 +85,7 @@ class CustomerAddress {
       city: (json['city'] as String?) ?? '',
       state: (json['state'] as String?) ?? '',
       zipCode: (json['zipCode'] as String?) ?? '',
+      apartment: (json['apartment'] as String?) ?? '',
       lat: json['lat'] != null ? (json['lat'] as num).toDouble() : null,
       lng: json['lng'] != null ? (json['lng'] as num).toDouble() : null,
     );

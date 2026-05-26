@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../design_system/servio_tokens.dart';
-import '../../design_system/widgets/servio_primary_button.dart';
 import 'auth_role.dart';
+import 'login_screen.dart';
 import 'sign_up_screen.dart';
-import 'widgets/auth_background.dart';
 
 class RoleSelectionScreen extends StatefulWidget {
   const RoleSelectionScreen({super.key});
@@ -15,20 +14,12 @@ class RoleSelectionScreen extends StatefulWidget {
 
 class _RoleSelectionScreenState extends State<RoleSelectionScreen>
     with SingleTickerProviderStateMixin {
-  AuthRole? _selectedRole;
+  AuthRole _selectedRole = AuthRole.customer;
+
   late final AnimationController _entranceController = AnimationController(
     vsync: this,
     duration: ServioMotion.page,
   )..forward();
-  late final Animation<double> _bgGlow = CurvedAnimation(
-    parent: _entranceController,
-    curve: const Interval(0.0, 0.7, curve: ServioMotion.spring),
-  );
-
-  @override
-  void initState() {
-    super.initState();
-  }
 
   @override
   void dispose() {
@@ -37,492 +28,315 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
   }
 
   void _continue() {
-    if (_selectedRole == null) return;
-    Navigator.of(context).push(MaterialPageRoute<void>(
-        builder: (_) => SignUpScreen(role: _selectedRole!)));
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => SignUpScreen(role: _selectedRole),
+      ),
+    );
+  }
+
+  void _openLogin() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
     return Scaffold(
-      backgroundColor:
-          isDark ? const Color(0xFF1E2633) : ServioColors.backgroundLight,
-      body: Stack(
-        children: <Widget>[
-          const Positioned.fill(
-            child: AuthBackground(lightHeaderHeight: 260),
-          ),
-          // Decorative accent glow blob top-right
-          Positioned(
-            top: -80,
-            right: -60,
-            child: AnimatedBuilder(
-              animation: _bgGlow,
-              builder: (BuildContext ctx, Widget? child) {
-                return Opacity(
-                  opacity: 0.55 * _bgGlow.value,
-                  child: child,
-                );
-              },
-              child: Container(
-                width: 240,
-                height: 240,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: <Color>[
-                      ServioColors.accent.withValues(alpha: 0.35),
-                      ServioColors.accent.withValues(alpha: 0.0),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: ServioSpacing.screenPadding),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  const SizedBox(height: 16),
-                  Row(
-                    children: <Widget>[
-                      _AuthBackButton(onTap: () => Navigator.of(context).pop()),
-                      const Spacer(),
-                      _StepBadge(controller: _entranceController),
-                    ],
-                  ),
-                  const SizedBox(height: 28),
+      backgroundColor: const Color(0xFFFBF9F6),
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final horizontalPadding = constraints.maxWidth >= 700 ? 32.0 : 20.0;
+            final maxWidth = constraints.maxWidth >= 700 ? 520.0 : 480.0;
+            final compactHeight = constraints.maxHeight < 720;
+            final minHeight = (constraints.maxHeight - 24)
+                .clamp(0.0, double.infinity)
+                .toDouble();
 
-                  // ── Heading ──────────────────────────────────
-                  _AnimatedSection(
-                    controller: _entranceController,
-                    interval:
-                        const Interval(0.0, 0.55, curve: ServioMotion.spring),
-                    fadeInterval: const Interval(0.0, 0.45),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          'How will you\nuse SERVIO?',
-                          style: theme.textTheme.headlineLarge?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w900,
-                            height: 1.12,
-                            letterSpacing: -0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Pick the option that fits you best — you can always switch later.',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.65),
-                            height: 1.4,
-                          ),
-                        ),
-                      ],
-                    ),
+            return Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxWidth),
+                child: SingleChildScrollView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding,
+                    compactHeight ? 14 : 20,
+                    horizontalPadding,
+                    20,
                   ),
-
-                  const SizedBox(height: 28),
-
-                  // ── Role cards ───────────────────────────────
-                  _AnimatedSection(
-                    controller: _entranceController,
-                    interval:
-                        const Interval(0.15, 0.7, curve: ServioMotion.spring),
-                    fadeInterval: const Interval(0.15, 0.6),
-                    child: _RoleCard(
-                      icon: Icons.home_repair_service_rounded,
-                      title: 'I need a service',
-                      subtitle: 'Book trusted home professionals',
-                      features: const <String>[
-                        'Verified pros',
-                        'Same-day booking',
-                        'Cash or card',
-                      ],
-                      isSelected: _selectedRole == AuthRole.customer,
-                      isDark: isDark,
-                      onTap: () =>
-                          setState(() => _selectedRole = AuthRole.customer),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  _AnimatedSection(
-                    controller: _entranceController,
-                    interval:
-                        const Interval(0.25, 0.8, curve: ServioMotion.spring),
-                    fadeInterval: const Interval(0.25, 0.7),
-                    child: _RoleCard(
-                      icon: Icons.handyman_rounded,
-                      title: "I'm a technician",
-                      subtitle: 'Offer your skills and earn',
-                      features: const <String>[
-                        'Flexible hours',
-                        'Weekly payouts',
-                        'Build reviews',
-                      ],
-                      badge: 'Most popular',
-                      isSelected: _selectedRole == AuthRole.technician,
-                      isDark: isDark,
-                      onTap: () =>
-                          setState(() => _selectedRole = AuthRole.technician),
-                    ),
-                  ),
-
-                  const Spacer(),
-
-                  _AnimatedSection(
-                    controller: _entranceController,
-                    interval:
-                        const Interval(0.45, 1.0, curve: ServioMotion.spring),
-                    fadeInterval: const Interval(0.45, 0.85),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: minHeight),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: <Widget>[
-                        AnimatedOpacity(
-                          opacity: _selectedRole == null ? 0.5 : 1.0,
-                          duration: ServioMotion.micro,
-                          child: ServioPrimaryButton(
-                            label: _selectedRole == null
-                                ? 'Choose a role'
-                                : 'Continue',
-                            onPressed: _selectedRole == null ? null : _continue,
+                        _Reveal(
+                          controller: _entranceController,
+                          intervalStart: 0,
+                          child: _TopBar(
+                            onBack: () => Navigator.of(context).pop(),
                           ),
                         ),
-                        const SizedBox(height: 14),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: <Widget>[
-                            Icon(
-                              Icons.lock_outline_rounded,
-                              size: 12,
-                              color: Colors.white.withValues(alpha: 0.45),
+                        SizedBox(height: compactHeight ? 22 : 34),
+                        _Reveal(
+                          controller: _entranceController,
+                          intervalStart: 0.08,
+                          child: const _Heading(),
+                        ),
+                        SizedBox(height: compactHeight ? 24 : 32),
+                        _Reveal(
+                          controller: _entranceController,
+                          intervalStart: 0.18,
+                          child: _RoleOptionCard(
+                            icon: Icons.home_rounded,
+                            title: 'I need a service',
+                            subtitle:
+                                'Find trusted professionals for home repairs, maintenance, and projects.',
+                            isSelected: _selectedRole == AuthRole.customer,
+                            onTap: () => setState(
+                              () => _selectedRole = AuthRole.customer,
                             ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Your information is private and secure.',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: Colors.white.withValues(alpha: 0.5),
-                              ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        _Reveal(
+                          controller: _entranceController,
+                          intervalStart: 0.28,
+                          child: _RoleOptionCard(
+                            icon: Icons.construction_rounded,
+                            title: 'Offer my skills',
+                            subtitle:
+                                'Connect with homeowners, manage jobs, and grow your service business.',
+                            isSelected: _selectedRole == AuthRole.technician,
+                            onTap: () => setState(
+                              () => _selectedRole = AuthRole.technician,
                             ),
-                          ],
+                          ),
+                        ),
+                        SizedBox(height: compactHeight ? 24 : 40),
+                        _Reveal(
+                          controller: _entranceController,
+                          intervalStart: 0.40,
+                          child: _BottomActions(
+                            onContinue: _continue,
+                            onLogin: _openLogin,
+                          ),
                         ),
                       ],
                     ),
                   ),
-
-                  const SizedBox(height: 24),
-                ],
+                ),
               ),
-            ),
-          ),
-        ],
+            );
+          },
+        ),
       ),
     );
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
+class _TopBar extends StatelessWidget {
+  const _TopBar({required this.onBack});
 
-class _AnimatedSection extends StatelessWidget {
-  const _AnimatedSection({
-    required this.controller,
-    required this.interval,
-    required this.fadeInterval,
-    required this.child,
-  });
-
-  final AnimationController controller;
-  final Interval interval;
-  final Interval fadeInterval;
-  final Widget child;
+  final VoidCallback onBack;
 
   @override
   Widget build(BuildContext context) {
-    return SlideTransition(
-      position: Tween<Offset>(
-        begin: const Offset(0, 0.18),
-        end: Offset.zero,
-      ).animate(CurvedAnimation(parent: controller, curve: interval)),
-      child: FadeTransition(
-        opacity: CurvedAnimation(parent: controller, curve: fadeInterval),
-        child: child,
-      ),
-    );
-  }
-}
-
-class _StepBadge extends StatelessWidget {
-  const _StepBadge({required this.controller});
-
-  final AnimationController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return FadeTransition(
-      opacity: CurvedAnimation(
-        parent: controller,
-        curve: const Interval(0.05, 0.55),
-      ),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.10),
-          borderRadius: BorderRadius.circular(ServioRadius.full),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.18),
+    return Row(
+      children: <Widget>[
+        IconButton.filledTonal(
+          onPressed: onBack,
+          icon: const Icon(Icons.arrow_back_rounded),
+          style: IconButton.styleFrom(
+            minimumSize: const Size(ServioSpacing.tapTarget, ServioSpacing.tapTarget),
+            backgroundColor: const Color(0xFFF5F3F0),
+            foregroundColor: ServioColors.navyDark,
           ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Container(
-              width: 6,
-              height: 6,
-              decoration: BoxDecoration(
-                color: ServioColors.accentLight,
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              'Step 1 of 3',
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: Colors.white.withValues(alpha: 0.8),
+        const Spacer(),
+        const _ProgressPills(),
+        const Spacer(),
+        const SizedBox(width: ServioSpacing.tapTarget),
+      ],
+    );
+  }
+}
+
+class _ProgressPills extends StatelessWidget {
+  const _ProgressPills();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        _pill(active: true),
+        const SizedBox(width: 8),
+        _pill(active: false),
+        const SizedBox(width: 8),
+        _pill(active: false),
+      ],
+    );
+  }
+
+  Widget _pill({required bool active}) {
+    return AnimatedContainer(
+      duration: ServioMotion.normal,
+      curve: ServioMotion.spring,
+      width: 32,
+      height: 4,
+      decoration: BoxDecoration(
+        color: active ? ServioColors.navyDark : const Color(0xFFE4E2DF),
+        borderRadius: BorderRadius.circular(ServioRadius.full),
+      ),
+    );
+  }
+}
+
+class _Heading extends StatelessWidget {
+  const _Heading();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          'How do you want to use SERVIO?',
+          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                color: ServioColors.navyDark,
+                fontFamily: 'Poppins',
+                fontSize: 28,
                 fontWeight: FontWeight.w700,
-                letterSpacing: 0.4,
+                height: 1.28,
+                letterSpacing: 0,
               ),
-            ),
-          ],
         ),
-      ),
+        const SizedBox(height: 8),
+        Text(
+          'Select an account type to customize your experience.',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: ServioColors.textSecondaryLight,
+                fontFamily: 'Inter',
+                height: 1.45,
+              ),
+        ),
+      ],
     );
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Frosted back button
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _AuthBackButton extends StatelessWidget {
-  const _AuthBackButton({required this.onTap});
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      label: 'Go back',
-      button: true,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: ServioSpacing.tapTarget,
-          height: ServioSpacing.tapTarget,
-          alignment: Alignment.center,
-          child: Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.10),
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.18),
-                width: 1,
-              ),
-            ),
-            child: const Icon(Icons.arrow_back_rounded,
-                size: 20, color: Colors.white),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Role selection card
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _RoleCard extends StatefulWidget {
-  const _RoleCard({
+class _RoleOptionCard extends StatefulWidget {
+  const _RoleOptionCard({
     required this.icon,
     required this.title,
     required this.subtitle,
-    required this.features,
     required this.isSelected,
-    required this.isDark,
     required this.onTap,
-    this.badge,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
-  final List<String> features;
   final bool isSelected;
-  final bool isDark;
   final VoidCallback onTap;
-  final String? badge;
 
   @override
-  State<_RoleCard> createState() => _RoleCardState();
+  State<_RoleOptionCard> createState() => _RoleOptionCardState();
 }
 
-class _RoleCardState extends State<_RoleCard>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _pressCtrl;
-  late final Animation<double> _pressScale;
-
-  @override
-  void initState() {
-    super.initState();
-    _pressCtrl = AnimationController(
-      vsync: this,
-      duration: ServioMotion.fast,
-      reverseDuration: ServioMotion.normal,
-    );
-    _pressScale = Tween<double>(begin: 1.0, end: 0.98).animate(
-      CurvedAnimation(parent: _pressCtrl, curve: ServioMotion.spring),
-    );
-  }
-
-  @override
-  void dispose() {
-    _pressCtrl.dispose();
-    super.dispose();
-  }
+class _RoleOptionCardState extends State<_RoleOptionCard> {
+  bool _pressed = false;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = widget.isDark;
     final selected = widget.isSelected;
+    final borderColor =
+        selected ? ServioColors.navyDark : const Color(0xFFE4E2DF);
+    final cardColor =
+        selected ? const Color(0xFFF3EDE7) : const Color(0xFFFFFFFF);
 
-    final cardColor = isDark
-        ? (selected
-            ? ServioColors.accentLight.withValues(alpha: 0.10)
-            : Colors.white.withValues(alpha: 0.05))
-        : (selected
-            ? ServioColors.accent.withValues(alpha: 0.08)
-            : Colors.white);
-    final borderColor = isDark
-        ? (selected
-            ? ServioColors.accentLight.withValues(alpha: 0.65)
-            : Colors.white.withValues(alpha: 0.10))
-        : (selected ? ServioColors.accent : ServioColors.borderLight);
-    final titleColor = isDark
-        ? Colors.white.withValues(alpha: selected ? 1.0 : 0.80)
-        : (selected ? ServioColors.deepBrown : ServioColors.textPrimaryLight);
-    final subtitleColor = isDark
-        ? Colors.white.withValues(alpha: 0.45)
-        : ServioColors.textSecondaryLight;
-    final checkColor = isDark ? ServioColors.accentLight : ServioColors.accent;
-
-    return GestureDetector(
-      onTapDown: (_) => _pressCtrl.forward(),
-      onTapUp: (_) => _pressCtrl.reverse(),
-      onTapCancel: () => _pressCtrl.reverse(),
-      onTap: widget.onTap,
-      child: ScaleTransition(
-        scale: _pressScale,
-        child: AnimatedContainer(
-          duration: ServioMotion.normal,
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: widget.title,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapCancel: () => setState(() => _pressed = false),
+        onTapUp: (_) => setState(() => _pressed = false),
+        child: AnimatedScale(
+          scale: _pressed ? 0.98 : 1,
+          duration: ServioMotion.fast,
           curve: ServioMotion.spring,
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
-          decoration: BoxDecoration(
-            color: cardColor,
-            border: Border.all(
-              color: borderColor,
-              width: selected ? 1.5 : 1,
+          child: AnimatedContainer(
+            duration: ServioMotion.normal,
+            curve: ServioMotion.spring,
+            constraints: const BoxConstraints(minHeight: 120),
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: cardColor,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: borderColor,
+                width: selected ? 1.5 : 1,
+              ),
+              boxShadow: selected
+                  ? const <BoxShadow>[
+                      BoxShadow(
+                        color: Color.fromRGBO(26, 29, 35, 0.08),
+                        blurRadius: 22,
+                        offset: Offset(0, 10),
+                      ),
+                    ]
+                  : null,
             ),
-            borderRadius: BorderRadius.circular(ServioRadius.lg),
-            boxShadow: selected
-                ? <BoxShadow>[
-                    BoxShadow(
-                      color: (isDark
-                              ? ServioColors.accentLight
-                              : ServioColors.accent)
-                          .withValues(alpha: 0.22),
-                      blurRadius: 24,
-                      offset: const Offset(0, 10),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Row(
-                children: <Widget>[
-                  _IconBadge(
-                    icon: widget.icon,
-                    selected: selected,
-                    isDark: isDark,
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Row(
-                          children: <Widget>[
-                            Flexible(
-                              child: Text(
-                                widget.title,
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  color: titleColor,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                _RoleIcon(icon: widget.icon),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Expanded(
+                            child: Text(
+                              widget.title,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(
+                                    color: ServioColors.navyDark,
+                                    fontFamily: 'Poppins',
+                                    fontWeight: FontWeight.w700,
+                                    height: 1.25,
+                                  ),
                             ),
-                            if (widget.badge != null) ...<Widget>[
-                              const SizedBox(width: 8),
-                              _BadgePill(
-                                label: widget.badge!,
-                                isDark: isDark,
-                              ),
-                            ],
-                          ],
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          widget.subtitle,
-                          style: theme.textTheme.bodySmall
-                              ?.copyWith(color: subtitleColor),
-                        ),
-                      ],
-                    ),
+                          ),
+                          const SizedBox(width: 12),
+                          _RadioIndicator(selected: selected),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        widget.subtitle,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: ServioColors.textSecondaryLight,
+                              fontFamily: 'Inter',
+                              height: 1.45,
+                            ),
+                      ),
+                    ],
                   ),
-                  _RadioRing(
-                    selected: selected,
-                    color: checkColor,
-                    isDark: isDark,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: <Widget>[
-                  for (final String f in widget.features)
-                    _FeatureChip(
-                      label: f,
-                      selected: selected,
-                      isDark: isDark,
-                    ),
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -530,140 +344,115 @@ class _RoleCardState extends State<_RoleCard>
   }
 }
 
-class _IconBadge extends StatelessWidget {
-  const _IconBadge({
-    required this.icon,
-    required this.selected,
-    required this.isDark,
-  });
+class _RoleIcon extends StatelessWidget {
+  const _RoleIcon({required this.icon});
 
   final IconData icon;
-  final bool selected;
-  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
-    final Color iconColor = selected
-        ? Colors.white
-        : (isDark ? ServioColors.accentLight : ServioColors.accent);
-
-    return AnimatedContainer(
-      duration: ServioMotion.normal,
-      curve: ServioMotion.spring,
+    return Container(
       width: 48,
       height: 48,
-      decoration: BoxDecoration(
-        gradient: selected
-            ? (isDark ? ServioGradients.brandDark : ServioGradients.brand)
-            : null,
-        color: selected
-            ? null
-            : (isDark
-                ? ServioColors.accentLight.withValues(alpha: 0.16)
-                : ServioColors.accent.withValues(alpha: 0.12)),
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: selected
-            ? <BoxShadow>[
-                BoxShadow(
-                  color: ServioColors.accent.withValues(alpha: 0.35),
-                  blurRadius: 14,
-                  offset: const Offset(0, 6),
-                ),
-              ]
-            : null,
+      decoration: const BoxDecoration(
+        color: Color(0xFFF3EDE7),
+        shape: BoxShape.circle,
       ),
-      child: Icon(icon, size: 24, color: iconColor),
+      child: Icon(
+        icon,
+        color: ServioColors.navyDark,
+        size: 28,
+      ),
     );
   }
 }
 
-class _RadioRing extends StatelessWidget {
-  const _RadioRing({
-    required this.selected,
-    required this.color,
-    required this.isDark,
-  });
+class _RadioIndicator extends StatelessWidget {
+  const _RadioIndicator({required this.selected});
 
   final bool selected;
-  final Color color;
-  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
     return AnimatedContainer(
       duration: ServioMotion.normal,
       curve: ServioMotion.spring,
-      width: 26,
-      height: 26,
+      width: 24,
+      height: 24,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: selected ? color : Colors.transparent,
+        color: selected ? ServioColors.navyDark : Colors.transparent,
         border: Border.all(
-          color: selected
-              ? color
-              : (isDark
-                  ? Colors.white.withValues(alpha: 0.22)
-                  : ServioColors.borderLight),
-          width: 1.5,
+          color: selected ? ServioColors.navyDark : const Color(0xFFC6C6CB),
+          width: 2,
         ),
       ),
       child: selected
-          ? const Icon(Icons.check_rounded, size: 16, color: Colors.white)
+          ? Center(
+              child: Container(
+                width: 10,
+                height: 10,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            )
           : null,
     );
   }
 }
 
-class _FeatureChip extends StatelessWidget {
-  const _FeatureChip({
-    required this.label,
-    required this.selected,
-    required this.isDark,
+class _BottomActions extends StatelessWidget {
+  const _BottomActions({
+    required this.onContinue,
+    required this.onLogin,
   });
 
-  final String label;
-  final bool selected;
-  final bool isDark;
+  final VoidCallback onContinue;
+  final VoidCallback onLogin;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final Color textColor = selected
-        ? (isDark ? ServioColors.accentLight : ServioColors.accent)
-        : (isDark
-            ? Colors.white.withValues(alpha: 0.6)
-            : ServioColors.textSecondaryLight);
-    final Color bg = selected
-        ? (isDark
-            ? ServioColors.accentLight.withValues(alpha: 0.14)
-            : ServioColors.accent.withValues(alpha: 0.10))
-        : (isDark
-            ? Colors.white.withValues(alpha: 0.06)
-            : ServioColors.backgroundSoftLight);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+    return DecoratedBox(
       decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(ServioRadius.full),
-        border: Border.all(
-          color: selected
-              ? (isDark ? ServioColors.accentLight : ServioColors.accent)
-                  .withValues(alpha: 0.25)
-              : Colors.transparent,
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: <Color>[
+            const Color(0xFFFBF9F6).withValues(alpha: 0),
+            const Color(0xFFFBF9F6),
+          ],
         ),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          Icon(Icons.check_rounded, size: 11, color: textColor),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: textColor,
-              fontWeight: FontWeight.w600,
-            ),
+          _ContinueButton(onPressed: onContinue),
+          const SizedBox(height: 16),
+          Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: <Widget>[
+              Text(
+                'Already have an account? ',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: ServioColors.textSecondaryLight,
+                      fontFamily: 'Inter',
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              TextButton(
+                onPressed: onLogin,
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  minimumSize: const Size(44, 32),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  foregroundColor: ServioColors.navyDark,
+                ),
+                child: const Text('Log in'),
+              ),
+            ],
           ),
         ],
       ),
@@ -671,29 +460,92 @@ class _FeatureChip extends StatelessWidget {
   }
 }
 
-class _BadgePill extends StatelessWidget {
-  const _BadgePill({required this.label, required this.isDark});
+class _ContinueButton extends StatefulWidget {
+  const _ContinueButton({required this.onPressed});
 
-  final String label;
-  final bool isDark;
+  final VoidCallback onPressed;
+
+  @override
+  State<_ContinueButton> createState() => _ContinueButtonState();
+}
+
+class _ContinueButtonState extends State<_ContinueButton> {
+  bool _pressed = false;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        gradient: isDark ? ServioGradients.brandDark : ServioGradients.accent,
-        borderRadius: BorderRadius.circular(ServioRadius.full),
-      ),
-      child: Text(
-        label.toUpperCase(),
-        style: theme.textTheme.labelSmall?.copyWith(
-          color: Colors.white,
-          fontSize: 9,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 0.6,
+    return GestureDetector(
+      onTap: widget.onPressed,
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapCancel: () => setState(() => _pressed = false),
+      onTapUp: (_) => setState(() => _pressed = false),
+      child: AnimatedScale(
+        scale: _pressed ? 0.98 : 1,
+        duration: ServioMotion.fast,
+        curve: ServioMotion.spring,
+        child: DecoratedBox(
+          decoration: const BoxDecoration(
+            color: ServioColors.navyDark,
+            borderRadius: BorderRadius.all(Radius.circular(999)),
+            boxShadow: <BoxShadow>[
+              BoxShadow(
+                color: Color.fromRGBO(26, 29, 35, 0.10),
+                blurRadius: 18,
+                offset: Offset(0, 8),
+              ),
+            ],
+          ),
+          child: SizedBox(
+            height: 56,
+            child: Center(
+              child: Text(
+                'Continue',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: Colors.white,
+                      fontFamily: 'Inter',
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+            ),
+          ),
         ),
+      ),
+    );
+  }
+}
+
+class _Reveal extends StatelessWidget {
+  const _Reveal({
+    required this.controller,
+    required this.intervalStart,
+    required this.child,
+  });
+
+  final AnimationController controller;
+  final double intervalStart;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.disableAnimationsOf(context)) return child;
+
+    final animation = CurvedAnimation(
+      parent: controller,
+      curve: Interval(
+        intervalStart,
+        (intervalStart + 0.45).clamp(0.0, 1.0).toDouble(),
+        curve: ServioMotion.spring,
+      ),
+    );
+
+    return FadeTransition(
+      opacity: animation,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 0.10),
+          end: Offset.zero,
+        ).animate(animation),
+        child: child,
       ),
     );
   }

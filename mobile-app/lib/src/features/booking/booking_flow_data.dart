@@ -30,6 +30,7 @@ class BookingFlowData {
     this.amount = '0 EGP',
     this.pin = '',
     this.createdAt,
+    this.paymentId = '',
   });
 
   final String serviceName;
@@ -60,6 +61,7 @@ class BookingFlowData {
   final String amount;
   final String pin;
   final DateTime? createdAt;
+  final String paymentId;
 
   BookingFlowData copyWith({
     String? serviceName,
@@ -90,6 +92,7 @@ class BookingFlowData {
     String? amount,
     String? pin,
     DateTime? createdAt,
+    String? paymentId,
   }) {
     return BookingFlowData(
       serviceName: serviceName ?? this.serviceName,
@@ -121,6 +124,7 @@ class BookingFlowData {
       amount: amount ?? this.amount,
       pin: pin ?? this.pin,
       createdAt: createdAt ?? this.createdAt,
+      paymentId: paymentId ?? this.paymentId,
     );
   }
 

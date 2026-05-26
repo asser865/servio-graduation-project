@@ -4,8 +4,10 @@ import 'dart:developer' as developer;
 import 'package:flutter/foundation.dart';
 
 import '../api/api_client.dart';
+import '../api/notifications_api.dart';
 import '../api/api_endpoints.dart';
 import '../api/bookings_api.dart';
+import '../api/token_storage.dart';
 import '../models/app_notification.dart';
 import '../models/backend_booking_model.dart';
 import '../models/user_account.dart';
@@ -33,7 +35,8 @@ const String _kSnapshotKey = 'servio_booking_snapshot';
 /// the provider falls back to the previous booking-snapshot approach so the
 /// UI never shows a permanently broken state.
 class NotificationsProvider extends ChangeNotifier {
-  NotificationsProvider(this._storage, this._client) {
+  NotificationsProvider(this._storage, this._client, {required TokenStorage tokenStorage})
+      : _tokenStorage = tokenStorage {
     _pollingTimer = Timer.periodic(const Duration(seconds: 20), (_) {
       _silentRefresh();
     });
@@ -41,11 +44,18 @@ class NotificationsProvider extends ChangeNotifier {
 
   final StorageService _storage;
   final ApiClient _client;
+  final TokenStorage _tokenStorage;
 
   List<AppNotification> _notifications = <AppNotification>[];
   bool _loading = false;
   String? _error;
   Timer? _pollingTimer;
+
+  NotificationPreference _preferences = const NotificationPreference();
+  bool _prefsLoading = false;
+
+  NotificationPreference get preferences => _preferences;
+  bool get prefsLoading => _prefsLoading;
 
   @override
   void dispose() {
@@ -81,8 +91,14 @@ class NotificationsProvider extends ChangeNotifier {
   /// UI never shows a broken state purely due to network issues.
   ///
   /// [role] and [workerId] are used only by the fallback path (same as before).
+  Future<bool> _hasToken() async {
+    final token = await _tokenStorage.getToken();
+    return token != null && token.isNotEmpty;
+  }
+
   Future<void> refresh(
       {UserRole role = UserRole.customer, String? workerId}) async {
+    if (!await _hasToken()) return;
     _loading = true;
     _error = null;
     notifyListeners();
@@ -151,6 +167,7 @@ class NotificationsProvider extends ChangeNotifier {
 
   Future<void> _silentRefresh(
       {UserRole role = UserRole.customer, String? workerId}) async {
+    if (!await _hasToken()) return;
     try {
       final data = _client.unwrapData(
         await _client.get(ApiEndpoints.notifications),
@@ -402,6 +419,29 @@ class NotificationsProvider extends ChangeNotifier {
         );
       default:
         return null;
+    }
+  }
+
+  Future<void> loadPreferences() async {
+    _prefsLoading = true;
+    notifyListeners();
+    try {
+      _preferences = await NotificationsApi(_client).getPreferences();
+    } catch (_) {
+      // keep defaults on error
+    } finally {
+      _prefsLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> updatePreferences(NotificationPreference prefs) async {
+    _preferences = prefs;
+    notifyListeners();
+    try {
+      await NotificationsApi(_client).updatePreferences(prefs);
+    } catch (_) {
+      // optimistic update — revert not needed for UX
     }
   }
 

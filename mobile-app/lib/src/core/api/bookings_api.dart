@@ -1,3 +1,5 @@
+import 'package:http_parser/http_parser.dart' show MediaType;
+
 import '../models/backend_booking_model.dart';
 import 'api_client.dart';
 import 'api_endpoints.dart';
@@ -110,13 +112,32 @@ class BookingsApi {
     );
   }
 
-  Future<void> reportDispute(String bookingId, {String reason = ''}) async {
-    await _client.patch(
-      ApiEndpoints.bookingStatus(bookingId),
-      <String, dynamic>{
-        'status': 'disputed',
-        if (reason.trim().isNotEmpty) 'cancellationReason': reason.trim(),
-      },
+  /// Start a job using the customer's verification PIN.
+  /// Backend: POST /bookings/:id/start  { pin: "..." }
+  Future<void> startJob(String bookingId, String pin) async {
+    await _client.post(
+      ApiEndpoints.bookingStart(bookingId),
+      <String, dynamic>{'pin': pin},
+    );
+  }
+
+  /// Report that a customer was absent. Requires a photo as proof.
+  /// Backend: POST /bookings/:id/no-show/customer (multipart)
+  Future<void> reportCustomerNoShow({
+    required String bookingId,
+    required String details,
+    required List<int> photoBytes,
+    required String photoFilename,
+  }) async {
+    await _client.postMultipart(
+      ApiEndpoints.bookingNoShowCustomer(bookingId),
+      fields: {'details': details},
+      fileField: MultipartFilePart(
+        field: 'evidence',
+        bytes: photoBytes,
+        filename: photoFilename,
+        contentType: MediaType('image', 'jpeg'),
+      ),
     );
   }
 
@@ -135,6 +156,59 @@ class BookingsApi {
     );
     final slots = (data['bookedSlots'] as List<dynamic>?) ?? <dynamic>[];
     return slots.whereType<String>().toList();
+  }
+
+  /// Accepts a pending booking. Optionally sets estimated duration in minutes (15–480).
+  Future<void> acceptBooking(String bookingId, {int? estimatedDurationMin}) async {
+    final body = <String, dynamic>{};
+    if (estimatedDurationMin != null) {
+      body['estimatedDurationMin'] = estimatedDurationMin;
+    }
+    await _client.post(ApiEndpoints.bookingAccept(bookingId), body);
+  }
+
+  /// Marks job complete (in_progress → awaiting_customer_confirmation).
+  /// If [imageBytes] provided, uploads image first to get URL.
+  /// [workerNotes] max 400 chars.
+  Future<void> completeJobWithImage({
+    required String bookingId,
+    String? workerNotes,
+    List<int>? imageBytes,
+    String? imageFilename,
+  }) async {
+    String? imageUrl;
+    if (imageBytes != null && imageBytes.isNotEmpty) {
+      final uploadResp = await _client.postMultipart(
+        ApiEndpoints.uploadFile,
+        fields: {'type': 'completion'},
+        fileField: MultipartFilePart(
+          field: 'file',
+          bytes: imageBytes,
+          filename: imageFilename ?? 'completion.jpg',
+          contentType: MediaType('image', 'jpeg'),
+        ),
+        timeoutOverride: const Duration(seconds: 60),
+      );
+      imageUrl = (uploadResp['url'] as String?) ??
+          (_client.unwrapData(uploadResp)['url'] as String?);
+    }
+
+    final body = <String, dynamic>{
+      'status': 'awaiting_customer_confirmation',
+      if (workerNotes != null && workerNotes.isNotEmpty)
+        'workerNotes': workerNotes,
+      if (imageUrl != null) 'workerCompletionImages': [imageUrl],
+    };
+    await _client.patch(ApiEndpoints.bookingStatus(bookingId), body);
+  }
+
+  /// Updates the estimated duration while a job is in-progress (no status change).
+  /// [estimatedDurationMin] must be between 15 and 480.
+  Future<void> updateEstimate(String bookingId, int estimatedDurationMin) async {
+    await _client.patch(ApiEndpoints.bookingStatus(bookingId), <String, dynamic>{
+      'status': 'in_progress',
+      'estimatedDurationMin': estimatedDurationMin,
+    });
   }
 }
 

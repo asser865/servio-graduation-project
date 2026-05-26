@@ -6,8 +6,10 @@ import 'package:provider/provider.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/api/bookings_api.dart';
+import '../../core/api/payments_api.dart';
 import '../../core/models/booking_model.dart';
 import '../../core/state/app_state.dart';
+import '../../core/state/disputes_provider.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
@@ -154,13 +156,15 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
       _actionError = null;
     });
     try {
-      await BookingsApi(_apiClient).confirmCompletion(_data.backendId);
+      await PaymentsApi(_apiClient).confirmEscrow(_data.backendId);
       if (!mounted) return;
       _pollTimer?.cancel();
       _countdownTimer?.cancel();
       setState(() {
-        _data =
-            _data.copyWith(statusCode: 'completed', statusLabel: 'Completed');
+        _data = _data.copyWith(
+          statusCode: 'pending_admin_review',
+          statusLabel: 'Under Review',
+        );
         _confirmLoading = false;
       });
       try {
@@ -176,6 +180,7 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
   }
 
   Future<void> _reportDispute() async {
+    final disputes = context.read<DisputesProvider>();
     final reason = await _showDisputeDialog();
     if (reason == null) return;
     setState(() {
@@ -183,8 +188,20 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
       _actionError = null;
     });
     try {
-      await BookingsApi(_apiClient)
-          .reportDispute(_data.backendId, reason: reason);
+      String paymentId = _data.paymentId;
+      if (paymentId.isEmpty) {
+        try {
+          final pd = await PaymentsApi(_apiClient)
+              .getPaymentByBooking(_data.backendId);
+          paymentId = pd['_id'] as String? ?? '';
+        } catch (_) {}
+      }
+      await disputes.openDispute(
+            bookingId: _data.backendId,
+            paymentId: paymentId,
+            reason: reason,
+            category: 'other',
+          );
       if (!mounted) return;
       _pollTimer?.cancel();
       _countdownTimer?.cancel();
@@ -208,34 +225,61 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
     final controller = TextEditingController();
     final result = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Report an Issue'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            const Text('Describe the issue with this service.'),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                hintText: 'Enter details…',
-                border: OutlineInputBorder(),
+      builder: (ctx) => Dialog(
+        insetPadding:
+            const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        child: Builder(
+          builder: (innerCtx) => Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.viewInsetsOf(innerCtx).bottom,
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text('Report an Issue',
+                      style:
+                          Theme.of(innerCtx).textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              )),
+                  const SizedBox(height: 12),
+                  const Text('Describe the issue with this service.'),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: controller,
+                    maxLines: 4,
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      hintText: 'Enter details…',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: <Widget>[
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        child: const Text('Cancel'),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: () {
+                          final text = controller.text.trim();
+                          if (text.isEmpty) return;
+                          Navigator.of(ctx).pop(text);
+                        },
+                        child: const Text('Submit'),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(ctx).pop(controller.text),
-            child: const Text('Submit'),
-          ),
-        ],
       ),
     );
     controller.dispose();
@@ -332,7 +376,7 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
     final servio = context.servio;
     final statusCode = _data.statusCode.toLowerCase();
     final baseRate = _moneyValue(_data.amount);
-    final platformFee = (baseRate * 0.05).round();
+    final platformFee = (baseRate * 0.10).round();
     final estimatedTotal = baseRate + platformFee;
     final estimatedTotalLabel = _moneyLabel(estimatedTotal);
 

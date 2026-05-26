@@ -356,6 +356,16 @@ void main() {
     await tester.tap(find.text('Decline'));
     await tester.pumpAndSettle();
 
+    // Select a reason in the bottom sheet
+    await tester.tap(find.text("I'm busy at this time"));
+    await tester.pumpAndSettle();
+
+    // Tap Decline inside the bottom sheet (which is the ElevatedButton)
+    await tester.ensureVisible(find.byType(ElevatedButton));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(ElevatedButton));
+    await tester.pumpAndSettle();
+
     expect(patchedStatus, 'rejected');
     expect(find.text('Could not update job status. Please try again.'),
         findsNothing);

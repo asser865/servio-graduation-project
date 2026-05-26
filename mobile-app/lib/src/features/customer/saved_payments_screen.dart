@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:ui';
 import 'package:provider/provider.dart';
 
 import '../../core/api/api_client.dart';
@@ -118,17 +119,6 @@ class _SavedPaymentsScreenState extends State<SavedPaymentsScreen>
     );
   }
 
-  IconData _getCardIcon(String type) {
-    switch (type.toLowerCase()) {
-      case 'visa':
-        return Icons.payment_rounded;
-      case 'mastercard':
-        return Icons.credit_card_rounded;
-      default:
-        return Icons.credit_card_outlined;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -136,7 +126,7 @@ class _SavedPaymentsScreenState extends State<SavedPaymentsScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Saved Payments'),
+        title: const Text('Payment Methods'),
         backgroundColor: theme.scaffoldBackgroundColor,
         elevation: 0,
       ),
@@ -153,14 +143,14 @@ class _SavedPaymentsScreenState extends State<SavedPaymentsScreen>
                     : Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: <Widget>[
-                          const SizedBox(height: 24),
+                          const SizedBox(height: 8),
                           if (_cards.isEmpty)
-                            // ── Empty-state card ─────────────────────────────────
+                            // ── Redesigned Empty-state card ───────────────────────────
                             ServioCard(
                               radius: ServioRadius.lg,
                               padding: const EdgeInsets.symmetric(
                                 horizontal: ServioSpacing.cardPadding,
-                                vertical: 36,
+                                vertical: 48,
                               ),
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
@@ -169,10 +159,8 @@ class _SavedPaymentsScreenState extends State<SavedPaymentsScreen>
                                     width: 72,
                                     height: 72,
                                     decoration: BoxDecoration(
-                                      color:
-                                          servio.accent.withValues(alpha: 0.10),
-                                      borderRadius: BorderRadius.circular(
-                                          ServioRadius.xl),
+                                      color: servio.accent.withValues(alpha: 0.10),
+                                      borderRadius: BorderRadius.circular(ServioRadius.xl),
                                     ),
                                     child: Icon(
                                       Icons.credit_card_rounded,
@@ -184,8 +172,7 @@ class _SavedPaymentsScreenState extends State<SavedPaymentsScreen>
                                   Text(
                                     'No saved payment methods yet',
                                     textAlign: TextAlign.center,
-                                    style:
-                                        theme.textTheme.titleMedium?.copyWith(
+                                    style: theme.textTheme.titleMedium?.copyWith(
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -195,129 +182,40 @@ class _SavedPaymentsScreenState extends State<SavedPaymentsScreen>
                                     child: Text(
                                       'Your saved cards and payment options will appear here.',
                                       textAlign: TextAlign.center,
-                                      style:
-                                          theme.textTheme.bodyMedium?.copyWith(
+                                      style: theme.textTheme.bodyMedium?.copyWith(
                                         color: servio.textSecondary,
                                         height: 1.5,
                                       ),
                                     ),
                                   ),
                                   const SizedBox(height: 28),
-                                  _AddPaymentButton(
-                                      servio: servio, onTap: _showAddCardModal),
+                                  _AddPaymentButton(onTap: _showAddCardModal),
                                 ],
                               ),
                             )
                           else
+                            // ── Cards List Redesign ───────────────────────────────────
                             Expanded(
                               child: ListView.separated(
                                 itemCount: _cards.length,
-                                separatorBuilder: (_, __) =>
-                                    const SizedBox(height: 16),
+                                separatorBuilder: (_, __) => const SizedBox(height: 16),
                                 itemBuilder: (context, index) {
                                   final card = _cards[index];
-                                  return ServioCard(
-                                    padding: const EdgeInsets.all(16),
-                                    child: Row(
-                                      children: [
-                                        Icon(_getCardIcon(card.cardType),
-                                            size: 36, color: servio.accent),
-                                        const SizedBox(width: 16),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                '•••• •••• •••• ${card.last4}',
-                                                style: const TextStyle(
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 16),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                'Exp ${card.expiry}',
-                                                style: TextStyle(
-                                                    color: servio.textSecondary,
-                                                    fontSize: 13),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        if (card.isDefault)
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 8, vertical: 4),
-                                            decoration: BoxDecoration(
-                                              color: servio.accent
-                                                  .withValues(alpha: 0.1),
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
-                                              border: Border.all(
-                                                  color: servio.accent
-                                                      .withValues(alpha: 0.3)),
-                                            ),
-                                            child: Text('Default',
-                                                style: TextStyle(
-                                                    color: servio.accent,
-                                                    fontSize: 10,
-                                                    fontWeight:
-                                                        FontWeight.bold)),
-                                          )
-                                        else
-                                          TextButton(
-                                            onPressed: () =>
-                                                _setDefault(card.id),
-                                            style: TextButton.styleFrom(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 8),
-                                              minimumSize: Size.zero,
-                                              tapTargetSize:
-                                                  MaterialTapTargetSize
-                                                      .shrinkWrap,
-                                            ),
-                                            child: const Text('Set Default',
-                                                style: TextStyle(fontSize: 12)),
-                                          ),
-                                        const SizedBox(width: 8),
-                                        IconButton(
-                                          icon: Icon(Icons.delete_outline,
-                                              color: servio.danger),
-                                          onPressed: () => _deleteCard(card.id),
-                                          padding: EdgeInsets.zero,
-                                          constraints: const BoxConstraints(),
-                                        ),
-                                      ],
-                                    ),
+                                  return _SavedCardWidget(
+                                    card: card,
+                                    onDelete: () => _deleteCard(card.id),
+                                    onSetDefault: () => _setDefault(card.id),
                                   );
                                 },
                               ),
                             ),
                           const SizedBox(height: 24),
                           if (_cards.isNotEmpty)
-                            _AddPaymentButton(
-                                servio: servio, onTap: _showAddCardModal),
-                          const SizedBox(height: 24),
-                          // ── Info hint ───────────────────────────────────────
-                          Row(
-                            children: <Widget>[
-                              Icon(
-                                Icons.lock_outline_rounded,
-                                size: 16,
-                                color: servio.textSecondary,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Your payment information is encrypted and secure.',
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: servio.textSecondary,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                            _AddPaymentButton(onTap: _showAddCardModal),
+                          const SizedBox(height: 32),
+                          // ── Trust Security Indicators ────────────────────────────
+                          const _SecurityTrustIndicators(),
+                          const SizedBox(height: 8),
                         ],
                       ),
           ),
@@ -327,43 +225,228 @@ class _SavedPaymentsScreenState extends State<SavedPaymentsScreen>
   }
 }
 
-class _AddPaymentButton extends StatelessWidget {
-  const _AddPaymentButton({required this.servio, required this.onTap});
+class _SavedCardWidget extends StatefulWidget {
+  const _SavedCardWidget({
+    required this.card,
+    required this.onDelete,
+    required this.onSetDefault,
+  });
 
-  final ServioThemeExtension servio;
-  final VoidCallback onTap;
+  final SavedCardModel card;
+  final VoidCallback onDelete;
+  final VoidCallback onSetDefault;
+
+  @override
+  State<_SavedCardWidget> createState() => _SavedCardWidgetState();
+}
+
+class _SavedCardWidgetState extends State<_SavedCardWidget> {
+  bool _isPressed = false;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(ServioRadius.full),
-        onTap: onTap,
-        child: Container(
-          height: 48,
+    final theme = Theme.of(context);
+    final servio = context.servio;
+    final isDark = theme.brightness == Brightness.dark;
+    final card = widget.card;
+
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapUp: (_) => setState(() => _isPressed = false),
+      onTapCancel: () => setState(() => _isPressed = false),
+      child: AnimatedScale(
+        scale: _isPressed ? 0.98 : 1.0,
+        duration: ServioMotion.fast,
+        curve: ServioMotion.spring,
+        child: AnimatedContainer(
+          duration: ServioMotion.normal,
+          curve: ServioMotion.spring,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(ServioRadius.full),
+            color: card.isDefault
+                ? (isDark ? theme.colorScheme.surface : Colors.white)
+                : (isDark ? servio.surfaceAlt : const Color(0xFFF3EDE7).withValues(alpha: 0.35)),
+            borderRadius: BorderRadius.circular(ServioRadius.lg),
             border: Border.all(
-              color: servio.accent.withValues(alpha: 0.45),
+              color: card.isDefault
+                  ? (_isPressed ? servio.accent : servio.accent.withValues(alpha: 0.6))
+                  : (_isPressed ? servio.accent.withValues(alpha: 0.4) : servio.accent.withValues(alpha: 0.15)),
+              width: card.isDefault ? 1.5 : 1,
             ),
+            boxShadow: card.isDefault
+                ? [
+                    BoxShadow(
+                      color: isDark 
+                          ? Colors.black.withValues(alpha: 0.30) 
+                          : servio.accent.withValues(alpha: 0.08),
+                      blurRadius: _isPressed ? 16 : 12,
+                      offset: Offset(0, _isPressed ? 6 : 4),
+                    ),
+                  ]
+                : null,
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              Icon(
-                Icons.add_rounded,
-                size: 20,
-                color: servio.accent,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Add payment method',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: servio.accent,
-                  letterSpacing: -0.1,
+          clipBehavior: Clip.antiAlias,
+          child: Stack(
+            children: [
+              // Cool Accent-Gradient verified star tag floating in top-right
+              if (card.isDefault)
+                Positioned(
+                  top: 14,
+                  right: 16,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      gradient: ServioGradients.accent,
+                      borderRadius: BorderRadius.circular(ServioRadius.full),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Colors.black12,
+                          blurRadius: 4,
+                          offset: Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.stars_rounded,
+                          size: 13,
+                          color: Colors.white,
+                        ),
+                        SizedBox(width: 4),
+                        Text(
+                          'DEFAULT',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              Padding(
+                padding: const EdgeInsets.all(ServioSpacing.cardPadding),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        _CardBrandBadge(cardType: card.cardType),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${card.cardType[0].toUpperCase()}${card.cardType.substring(1)} ending in ${card.last4}',
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Expires ${card.expiry}',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: servio.textSecondary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Divider(
+                      height: 1,
+                      thickness: 1,
+                      color: servio.border.withValues(alpha: 0.35),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // Simplified Secured checkmark badge
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: servio.success.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(ServioRadius.sm),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.verified_user_rounded,
+                                size: 13,
+                                color: servio.success,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Secured',
+                                style: TextStyle(
+                                  color: servio.success,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Row(
+                          children: [
+                            if (!card.isDefault) ...[
+                              TextButton(
+                                onPressed: widget.onSetDefault,
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 8),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: Text(
+                                  'Set as Default',
+                                  style: TextStyle(
+                                    color: theme.colorScheme.primary,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                            TextButton.icon(
+                              onPressed: widget.onDelete,
+                              icon: Icon(
+                                Icons.delete_outline_rounded,
+                                size: 16,
+                                color: servio.danger,
+                              ),
+                              label: Text(
+                                'Delete',
+                                style: TextStyle(
+                                  color: servio.danger,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 8),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -372,6 +455,339 @@ class _AddPaymentButton extends StatelessWidget {
       ),
     );
   }
+}
+
+class _CardBrandBadge extends StatelessWidget {
+  const _CardBrandBadge({required this.cardType});
+
+  final String cardType;
+
+  @override
+  Widget build(BuildContext context) {
+    final type = cardType.toLowerCase();
+
+    if (type == 'visa') {
+      return Container(
+        width: 60,
+        height: 40,
+        decoration: BoxDecoration(
+          color: const Color(0xFF1434CB),
+          borderRadius: BorderRadius.circular(6),
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black26,
+              blurRadius: 4,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              left: 6,
+              top: 15,
+              child: Container(
+                width: 12,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD4AF37),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.only(left: 12),
+                child: Text(
+                  'VISA',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontStyle: FontStyle.italic,
+                    fontSize: 12,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    } else if (type == 'mastercard') {
+      return Container(
+        width: 60,
+        height: 40,
+        decoration: BoxDecoration(
+          color: const Color(0xFF1A1D23),
+          borderRadius: BorderRadius.circular(6),
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black26,
+              blurRadius: 4,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Positioned(
+              left: 14,
+              child: Container(
+                width: 18,
+                height: 18,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFEB001B),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+            Positioned(
+              right: 14,
+              child: Container(
+                width: 18,
+                height: 18,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF79E1B).withValues(alpha: 0.85),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    } else {
+      return Container(
+        width: 60,
+        height: 40,
+        decoration: BoxDecoration(
+          color: const Color(0xFFE4E2DF),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: const Icon(
+          Icons.credit_card_rounded,
+          color: Color(0xFF76777B),
+          size: 20,
+        ),
+      );
+    }
+  }
+}
+
+class _AddPaymentButton extends StatefulWidget {
+  const _AddPaymentButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  State<_AddPaymentButton> createState() => _AddPaymentButtonState();
+}
+
+class _AddPaymentButtonState extends State<_AddPaymentButton> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+    final isDark = theme.brightness == Brightness.dark;
+
+    return GestureDetector(
+      onTap: widget.onTap,
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapCancel: () => setState(() => _isPressed = false),
+      onTapUp: (_) => setState(() => _isPressed = false),
+      child: AnimatedScale(
+        scale: _isPressed ? 0.97 : 1.0,
+        duration: ServioMotion.fast,
+        curve: ServioMotion.spring,
+        child: SizedBox(
+          height: 110,
+          child: CustomPaint(
+            painter: _DashedRectPainter(
+              color: servio.accent.withValues(alpha: 0.4),
+              strokeWidth: 1.5,
+              gap: 6.0,
+              radius: ServioRadius.lg,
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                color: _isPressed
+                    ? servio.accent.withValues(alpha: 0.08)
+                    : (isDark ? servio.surfaceAlt : theme.colorScheme.surface),
+                borderRadius: BorderRadius.circular(ServioRadius.lg),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: isDark ? theme.colorScheme.surface : servio.backgroundSoft,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.add_rounded,
+                      size: 24,
+                      color: isDark ? Colors.white : ServioColors.navyDark,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Add Payment Method',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SecurityTrustIndicators extends StatelessWidget {
+  const _SecurityTrustIndicators();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Opacity(
+      opacity: 0.6,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.shield_outlined,
+                  size: 28,
+                  color: isDark ? Colors.white : ServioColors.navyDark,
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '256-bit Encryption',
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11,
+                        ),
+                      ),
+                      Text(
+                        'Your data is safe',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: servio.textSecondary,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.gpp_good_outlined,
+                  size: 28,
+                  color: isDark ? Colors.white : ServioColors.navyDark,
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Fraud Protection',
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11,
+                        ),
+                      ),
+                      Text(
+                        '24/7 monitoring',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: servio.textSecondary,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DashedRectPainter extends CustomPainter {
+  const _DashedRectPainter({
+    required this.color,
+    required this.strokeWidth,
+    required this.gap,
+    required this.radius,
+  });
+
+  final Color color;
+  final double strokeWidth;
+  final double gap;
+  final double radius;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke;
+
+    final path = Path()
+      ..addRRect(RRect.fromRectAndRadius(
+        Rect.fromLTWH(0, 0, size.width, size.height),
+        Radius.circular(radius),
+      ));
+
+    final dashWidth = gap;
+    final dashSpace = gap;
+
+    final Path dashedPath = Path();
+    double distance = 0.0;
+    for (final PathMetric measure in path.computeMetrics()) {
+      while (distance < measure.length) {
+        dashedPath.addPath(
+          measure.extractPath(distance, distance + dashWidth),
+          Offset.zero,
+        );
+        distance += dashWidth + dashSpace;
+      }
+      distance = 0.0;
+    }
+
+    canvas.drawPath(dashedPath, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _AddCardSheet extends StatefulWidget {

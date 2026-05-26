@@ -42,6 +42,7 @@ class CustomerAddressesProvider extends ChangeNotifier {
     String city = '',
     String state = '',
     String zipCode = '',
+    String apartment = '',
     double? lat,
     double? lng,
   }) async {
@@ -52,6 +53,7 @@ class CustomerAddressesProvider extends ChangeNotifier {
         city: city,
         state: state,
         zipCode: zipCode,
+        apartment: apartment,
         lat: lat,
         lng: lng,
       );
@@ -67,6 +69,7 @@ class CustomerAddressesProvider extends ChangeNotifier {
     String city = '',
     String state = '',
     String zipCode = '',
+    String apartment = '',
     double? lat,
     double? lng,
   }) async {
@@ -78,12 +81,24 @@ class CustomerAddressesProvider extends ChangeNotifier {
         city: city,
         state: state,
         zipCode: zipCode,
+        apartment: apartment,
         lat: lat,
         lng: lng,
       );
       await _refresh();
       return saved;
     });
+  }
+
+  Future<bool> setDefaultAddress(String id) async {
+    final dummy = await _write(() async {
+      final fresh = await _usersApi.setDefaultAddress(id);
+      _addresses
+        ..clear()
+        ..addAll(fresh);
+      return const CustomerAddress(id: '');
+    });
+    return dummy != null;
   }
 
   Future<bool> deleteAddress(String id) async {

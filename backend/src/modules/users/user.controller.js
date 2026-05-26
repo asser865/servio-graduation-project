@@ -729,13 +729,13 @@ const toggleBlockedDate = async (req, res) => {
 };
 
 const addAddress = async (req, res) => {
-  const { label, street, city, state, zipCode, lat, lng } = req.body;
+  const { label, street, city, state, zipCode, lat, lng, apartment } = req.body;
   const isSmartMatchArea = (label || '').trim() === 'Smart Match Area';
   if (!isSmartMatchArea && !street) throw new ApiError(StatusCodes.BAD_REQUEST, 'Street is required.');
   if (!city) throw new ApiError(StatusCodes.BAD_REQUEST, 'City is required.');
   const user = await User.findById(req.user.id);
   if (!user) throw new ApiError(StatusCodes.NOT_FOUND, 'User not found.');
-  user.addresses.push({ label: label || 'Address', street, city, state, zipCode, lat, lng });
+  user.addresses.push({ label: label || 'Address', street, city, state, zipCode, lat, lng, apartment });
   await user.save({ validateModifiedOnly: true });
   const added = user.addresses[user.addresses.length - 1];
   return ApiResponse.success(res, StatusCodes.CREATED, 'Address added.', added);
@@ -743,7 +743,7 @@ const addAddress = async (req, res) => {
 
 const updateAddress = async (req, res) => {
   const { addrId } = req.params;
-  const { label, street, city, state, zipCode, lat, lng } = req.body;
+  const { label, street, city, state, zipCode, lat, lng, apartment } = req.body;
   const user = await User.findById(req.user.id);
   if (!user) throw new ApiError(StatusCodes.NOT_FOUND, 'User not found.');
   const addr = user.addresses.id(addrId);
@@ -755,8 +755,21 @@ const updateAddress = async (req, res) => {
   if (zipCode !== undefined) addr.zipCode = zipCode;
   if (lat     !== undefined) addr.lat     = lat;
   if (lng     !== undefined) addr.lng     = lng;
+  if (apartment !== undefined) addr.apartment = apartment;
   await user.save({ validateModifiedOnly: true });
   return ApiResponse.success(res, StatusCodes.OK, 'Address updated.', addr);
+};
+
+const setDefaultAddress = async (req, res) => {
+  const { addrId } = req.params;
+  const user = await User.findById(req.user.id);
+  if (!user) throw new ApiError(StatusCodes.NOT_FOUND, 'User not found.');
+  const idx = user.addresses.findIndex(a => a._id.toString() === addrId);
+  if (idx === -1) throw new ApiError(StatusCodes.NOT_FOUND, 'Address not found.');
+  const [addr] = user.addresses.splice(idx, 1);
+  user.addresses.unshift(addr);
+  await user.save({ validateModifiedOnly: true });
+  return ApiResponse.success(res, StatusCodes.OK, 'Default address set.', user.addresses);
 };
 
 const deleteAddress = async (req, res) => {
@@ -790,6 +803,7 @@ module.exports = {
   getPaymentAnalytics,
   addAddress,
   updateAddress,
+  setDefaultAddress,
   deleteAddress,
   decorateWithBusyState,
 };

@@ -26,6 +26,7 @@ class _MessagesScreenState extends State<MessagesScreen>
   MessagesProvider? _messagesProvider;
   bool _appInForeground = true;
   bool _tabActive = true;
+  int _selectedTab = 0; // 0: Active, 1: Archived, 2: Support
 
   @override
   void initState() {
@@ -94,39 +95,132 @@ class _MessagesScreenState extends State<MessagesScreen>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final servio = context.servio;
     final session = context.watch<SessionProvider>();
     final messagesProvider = context.watch<MessagesProvider>();
     final isTechnician = session.account?.role == UserRole.technician;
     final bottomInset = ServioTabShell.bottomOverlayInsetOf(context);
     final conversations = messagesProvider.conversations;
-    final filtered = _query.isEmpty
-        ? conversations
-        : conversations
+
+    // Split by archive flag first — use == true guard to be safe against
+    // null values in hot-reload scenarios or legacy cached objects.
+    final activeConversations =
+        conversations.where((c) => c.isArchived != true).toList();
+    final archivedConversations =
+        conversations.where((c) => c.isArchived == true).toList();
+
+    // Filter by search query within the active tab's list
+    List<ApiConversation> filteredActive = _query.isEmpty
+        ? activeConversations
+        : activeConversations
             .where((c) =>
                 c.contactName.toLowerCase().contains(_query.toLowerCase()) ||
                 c.lastMessage.toLowerCase().contains(_query.toLowerCase()))
             .toList();
 
+    List<ApiConversation> filteredArchived = _query.isEmpty
+        ? archivedConversations
+        : archivedConversations
+            .where((c) =>
+                c.contactName.toLowerCase().contains(_query.toLowerCase()) ||
+                c.lastMessage.toLowerCase().contains(_query.toLowerCase()))
+            .toList();
+
+    // The list used by _buildBody for the current tab (Support tab has its own widget)
+    final tabConversations = _selectedTab == 0 ? filteredActive : filteredArchived;
+
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        elevation: 0,
+        centerTitle: true,
+        leadingWidth: 56,
+        leading: Navigator.of(context).canPop()
+            ? IconButton(
+                icon: Icon(
+                  Icons.arrow_back_rounded,
+                  color: isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23),
+                ),
+                onPressed: () => _openDashboard(isTechnician),
+              )
+            : Padding(
+                padding: const EdgeInsets.only(left: 16, top: 10, bottom: 10),
+                child: CircleAvatar(
+                  radius: 16,
+                  backgroundColor: servio.accent.withValues(alpha: 0.16),
+                  child: Text(
+                    session.account?.initials ?? 'U',
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: servio.accent,
+                    ),
+                  ),
+                ),
+              ),
+        title: Text(
+          'SERVIO',
+          style: theme.textTheme.headlineMedium?.copyWith(
+            fontFamily: 'Poppins',
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            letterSpacing: -0.5,
+            color: isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23),
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: Icon(
+              Icons.notifications_none_rounded,
+              color: isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23),
+            ),
+            onPressed: () {},
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
+            // Title Header Section
             Padding(
               padding: const EdgeInsets.fromLTRB(
                 ServioSpacing.screenPadding,
-                ServioSpacing.screenPadding,
+                16,
                 ServioSpacing.screenPadding,
                 0,
               ),
-              child: _WorkspaceHeader(
-                isTechnician: isTechnician,
-                onDashboardTap: () => _openDashboard(isTechnician),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Messages',
+                    style: theme.textTheme.headlineMedium?.copyWith(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.bold,
+                      fontSize: 26,
+                      color: isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23),
+                    ),
+                  ),
+                  // const SizedBox(height: 2),
+                  // Text(
+                  //   'Connect with your clients and team.',
+                  //   style: TextStyle(
+                  //     fontFamily: 'Inter',
+                  //     fontSize: 14,
+                  //     color: servio.textSecondary,
+                  //   ),
+                  //),
+                ],
               ),
             ),
             const SizedBox(height: 20),
+
+            // Search input field
             Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: ServioSpacing.screenPadding,
@@ -136,10 +230,18 @@ class _MessagesScreenState extends State<MessagesScreen>
                 onChanged: (value) => setState(() => _query = value),
                 decoration: InputDecoration(
                   hintText: 'Search conversations...',
-                  prefixIcon: const Icon(Icons.search_rounded),
+                  hintStyle: TextStyle(
+                    color: servio.textSecondary.withValues(alpha: 0.6),
+                    fontFamily: 'Inter',
+                  ),
+                  prefixIcon: const Icon(
+                    Icons.search_rounded,
+                    size: 20,
+                    color: Color(0xFF9A8C73),
+                  ),
                   suffixIcon: _query.isNotEmpty
                       ? IconButton(
-                          icon: const Icon(Icons.close_rounded),
+                          icon: const Icon(Icons.close_rounded, size: 20),
                           onPressed: () {
                             _searchController.clear();
                             setState(() => _query = '');
@@ -147,51 +249,113 @@ class _MessagesScreenState extends State<MessagesScreen>
                         )
                       : null,
                   filled: true,
-                  fillColor: servio.surfaceAlt,
+                  fillColor: isDark ? const Color(0xFF1A1D23) : const Color(0xFFF3EDE7).withValues(alpha: 0.3),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
                   enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(ServioRadius.full),
-                    borderSide: BorderSide(color: servio.border),
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: const Color(0xFF9A8C73).withValues(alpha: 0.1), width: 1),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(ServioRadius.full),
-                    borderSide: BorderSide(color: servio.accent, width: 2),
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFF9A8C73), width: 1.5),
                   ),
                   contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 14,
+                    horizontal: 16,
+                    vertical: 12,
                   ),
                 ),
               ),
             ),
             const SizedBox(height: 16),
+
+            // Tab toggles (Active, Archived, Support)
             Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: ServioSpacing.screenPadding,
               ),
-              child: Text(
-                '${filtered.length} conversation${filtered.length == 1 ? '' : 's'}',
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: servio.textSecondary),
+              child: Row(
+                children: [
+                  _buildTabButton(
+                    label: 'Active (${filteredActive.length})',
+                    isSelected: _selectedTab == 0,
+                    onTap: () => setState(() => _selectedTab = 0),
+                    servio: servio,
+                    isDark: isDark,
+                  ),
+                  if (!isTechnician)
+                    _buildTabButton(
+                      label: 'Archived (${filteredArchived.length})',
+                      isSelected: _selectedTab == 1,
+                      onTap: () => setState(() => _selectedTab = 1),
+                      servio: servio,
+                      isDark: isDark,
+                    ),
+                  _buildTabButton(
+                    label: 'Support',
+                    isSelected: _selectedTab == 2,
+                    onTap: () => setState(() => _selectedTab = 2),
+                    servio: servio,
+                    isDark: isDark,
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
+
+            // Main messaging lists
             Expanded(
               child: AnimatedSwitcher(
                 duration: ServioMotion.normal,
-                child: _body(filtered, bottomInset, messagesProvider),
+                child: _buildBody(tabConversations, bottomInset, messagesProvider, isDark),
               ),
             ),
-            const SizedBox(height: 8),
           ],
         ),
       ),
     );
   }
 
-  Widget _body(
+  Widget _buildTabButton({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+    required ServioThemeExtension servio,
+    required bool isDark,
+  }) {
+    final activeColor = isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23);
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: isSelected ? activeColor : Colors.transparent,
+              width: 2,
+            ),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+            fontSize: 14,
+            color: isSelected ? activeColor : servio.textSecondary,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBody(
     List<ApiConversation> conversations,
     double bottomInset,
     MessagesProvider messagesProvider,
+    bool isDark,
   ) {
     if (messagesProvider.loading && messagesProvider.conversations.isEmpty) {
       return const Center(
@@ -208,7 +372,18 @@ class _MessagesScreenState extends State<MessagesScreen>
       );
     }
     if (conversations.isEmpty) {
-      return _EmptyState(key: const ValueKey<String>('empty'), query: _query);
+      return _EmptyState(
+        key: const ValueKey<String>('empty'),
+        query: _query,
+        tabIndex: _selectedTab,
+      );
+    }
+    if (_selectedTab == 2) {
+      return _EmptyState(
+        key: const ValueKey<String>('support'),
+        query: _query,
+        tabIndex: _selectedTab,
+      );
     }
     return RefreshIndicator(
       key: const ValueKey<String>('list'),
@@ -216,18 +391,19 @@ class _MessagesScreenState extends State<MessagesScreen>
       child: ListView.separated(
         padding: EdgeInsets.fromLTRB(
           ServioSpacing.screenPadding,
-          0,
+          4,
           ServioSpacing.screenPadding,
-          8 + bottomInset,
+          16 + bottomInset,
         ),
         itemCount: conversations.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        separatorBuilder: (_, __) => const SizedBox(height: 10),
         itemBuilder: (BuildContext context, int index) {
           final conversation = conversations[index];
           return _StaggeredEntry(
             index: index,
             child: _ConversationTile(
               conversation: conversation,
+              isDark: isDark,
               onTap: () async {
                 final messagesProvider = context.read<MessagesProvider>();
                 await Navigator.of(context).push(
@@ -250,140 +426,16 @@ class _MessagesScreenState extends State<MessagesScreen>
   }
 }
 
-class _WorkspaceHeader extends StatelessWidget {
-  const _WorkspaceHeader({
-    required this.isTechnician,
-    required this.onDashboardTap,
-  });
-
-  final bool isTechnician;
-  final VoidCallback onDashboardTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final servio = context.servio;
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        _BackIconButton(onTap: onDashboardTap),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                isTechnician ? 'MY CONVERSATIONS' : 'WORKSPACE',
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: servio.textSecondary,
-                  letterSpacing: 0.8,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'Messages',
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 12),
-        const _SecureBadge(),
-      ],
-    );
-  }
-}
-
-class _BackIconButton extends StatelessWidget {
-  const _BackIconButton({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final servio = context.servio;
-
-    return Semantics(
-      button: true,
-      label: 'Back to dashboard',
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(ServioRadius.full),
-          child: Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface,
-              shape: BoxShape.circle,
-              border: Border.all(color: servio.border),
-              boxShadow: ServioShadows.rest,
-            ),
-            alignment: Alignment.center,
-            child: Icon(
-              Icons.arrow_back_rounded,
-              size: 20,
-              color: servio.accent,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SecureBadge extends StatelessWidget {
-  const _SecureBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final servio = context.servio;
-
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 168),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: ServioColors.tint(servio.accent),
-        borderRadius: BorderRadius.circular(ServioRadius.full),
-        border: Border.all(color: servio.accent.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Icon(Icons.lock_outline_rounded, color: servio.accent, size: 13),
-          const SizedBox(width: 5),
-          Flexible(
-            child: Text(
-              'Saved securely',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: servio.accent,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _ConversationTile extends StatefulWidget {
   const _ConversationTile({
     required this.conversation,
     required this.onTap,
+    required this.isDark,
   });
 
   final ApiConversation conversation;
   final VoidCallback onTap;
+  final bool isDark;
 
   @override
   State<_ConversationTile> createState() => _ConversationTileState();
@@ -397,6 +449,34 @@ class _ConversationTileState extends State<_ConversationTile> {
     final theme = Theme.of(context);
     final servio = context.servio;
     final conversation = widget.conversation;
+    final isUnread = conversation.unreadCount > 0;
+
+    // Premium styling parameters
+    final cardBg = isUnread
+        ? (widget.isDark ? const Color(0xFF262B34) : const Color(0xFFF3EDE7))
+        : theme.cardColor;
+
+    final border = isUnread
+        ? Border.all(color: const Color(0xFF9A8C73).withValues(alpha: 0.15), width: 1)
+        : Border.all(color: servio.border.withValues(alpha: 0.3), width: 1);
+
+    final titleStyle = theme.textTheme.titleSmall?.copyWith(
+      fontFamily: 'Poppins',
+      fontWeight: isUnread ? FontWeight.bold : FontWeight.w600,
+      fontSize: 15,
+      color: widget.isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23),
+    );
+
+    final messageStyle = theme.textTheme.bodyMedium?.copyWith(
+      fontFamily: 'Inter',
+      fontWeight: isUnread ? FontWeight.w600 : FontWeight.normal,
+      fontSize: 13,
+      color: isUnread
+          ? (widget.isDark ? Colors.white : const Color(0xFF262B34))
+          : servio.textSecondary,
+    );
+
+    final isSupport = conversation.contactName.toLowerCase().contains('support');
 
     return GestureDetector(
       onTapDown: (_) => setState(() => _pressed = true),
@@ -407,91 +487,139 @@ class _ConversationTileState extends State<_ConversationTile> {
         duration: ServioMotion.micro,
         curve: ServioMotion.curve,
         transform: Matrix4.identity()..scale(_pressed ? 0.985 : 1.0),
-        padding: const EdgeInsets.all(ServioSpacing.cardPadding),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(ServioRadius.card),
-          border: Border.all(color: servio.border),
+          color: cardBg,
+          borderRadius: BorderRadius.circular(16),
+          border: border,
           boxShadow: _pressed ? ServioShadows.restDark : ServioShadows.rest,
         ),
         child: Row(
           children: <Widget>[
-            CircleAvatar(
-              radius: 25,
-              backgroundColor: servio.accent.withValues(alpha: 0.16),
-              foregroundImage: conversation.otherUser.avatar == null
-                  ? null
-                  : NetworkImage(conversation.otherUser.avatar!),
-              onForegroundImageError:
-                  conversation.otherUser.avatar == null ? null : (_, __) {},
-              child: Text(
-                conversation.contactInitials,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  color: servio.accent,
-                  fontWeight: FontWeight.w700,
+            // Avatar Stack with Unread dot indicator
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: servio.accent.withValues(alpha: 0.16),
+                  foregroundImage: conversation.otherUser.avatar == null
+                      ? null
+                      : NetworkImage(conversation.otherUser.avatar!),
+                  onForegroundImageError:
+                      conversation.otherUser.avatar == null ? null : (_, __) {},
+                  child: Text(
+                    conversation.contactInitials,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: servio.accent,
+                      fontWeight: FontWeight.w700,
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
                 ),
-              ),
+                if (isUnread)
+                  Positioned(
+                    bottom: -2,
+                    right: -2,
+                    child: Container(
+                      width: 14,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFED7D0), // Soft pinkish-red
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: cardBg,
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(width: 14),
+
+            // Content section
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Text(
-                    conversation.contactName,
-                    style: theme.textTheme.titleSmall
-                        ?.copyWith(fontWeight: FontWeight.w600),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          conversation.contactName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: titleStyle,
+                        ),
+                      ),
+                      if (isSupport) ...[
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.lock_rounded,
+                          size: 14,
+                          color: Color(0xFF9A8C73),
+                        ),
+                      ] else ...[
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.verified_user_rounded,
+                          size: 14,
+                          color: Color(0xFF9A8C73),
+                        ),
+                      ],
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Text(
                     conversation.lastMessage,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(color: servio.textSecondary),
+                    style: messageStyle,
                   ),
                 ],
               ),
             ),
             const SizedBox(width: 10),
+
+            // Time and Count
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               mainAxisAlignment: MainAxisAlignment.center,
               children: <Widget>[
                 Text(
                   _formatConversationTime(conversation.updatedAt),
-                  style: theme.textTheme.labelSmall
-                      ?.copyWith(color: servio.textSecondary),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    fontFamily: 'Inter',
+                    fontSize: 11,
+                    color: servio.textSecondary,
+                  ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 AnimatedSwitcher(
                   duration: ServioMotion.normal,
-                  transitionBuilder: (child, animation) => ScaleTransition(
-                    scale: animation,
-                    child: FadeTransition(opacity: animation, child: child),
-                  ),
-                  child: conversation.unreadCount > 0
+                  child: isUnread
                       ? Container(
                           key: ValueKey<int>(conversation.unreadCount),
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 7,
-                            vertical: 3,
+                            horizontal: 6,
+                            vertical: 2,
                           ),
                           decoration: BoxDecoration(
                             color: servio.accent,
-                            borderRadius:
-                                BorderRadius.circular(ServioRadius.full),
+                            borderRadius: BorderRadius.circular(ServioRadius.full),
                           ),
                           child: Text(
                             '${conversation.unreadCount}',
                             style: theme.textTheme.labelSmall?.copyWith(
+                              fontFamily: 'Inter',
+                              fontSize: 10,
                               color: Colors.white,
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         )
-                      : const SizedBox(
-                          key: ValueKey<String>('none'), width: 24),
+                      : const SizedBox(width: 24, height: 16),
                 ),
               ],
             ),
@@ -543,20 +671,34 @@ class _StaggeredEntry extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.query, super.key});
+  const _EmptyState({
+    required this.query,
+    required this.tabIndex,
+    super.key,
+  });
 
   final String query;
+  final int tabIndex;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
     final disabled = MediaQuery.disableAnimationsOf(context);
-    final icon = Icon(
-      query.isNotEmpty ? Icons.search_off_rounded : Icons.forum_outlined,
-      size: 56,
-      color: servio.border,
-    );
+
+    IconData iconData = Icons.forum_outlined;
+    String label = 'No messages yet';
+
+    if (query.isNotEmpty) {
+      iconData = Icons.search_off_rounded;
+      label = 'No conversations found for "$query"';
+    } else if (tabIndex == 1) {
+      iconData = Icons.archive_outlined;
+      label = 'No archived conversations';
+    } else if (tabIndex == 2) {
+      iconData = Icons.support_agent_rounded;
+      label = 'No active support cases';
+    }
 
     return Center(
       child: Padding(
@@ -572,14 +714,14 @@ class _EmptyState extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              icon,
+              Icon(iconData, size: 56, color: servio.border),
               const SizedBox(height: 16),
               Text(
-                query.isNotEmpty
-                    ? 'No conversations found for "$query"'
-                    : 'No messages yet',
-                style: theme.textTheme.titleMedium
-                    ?.copyWith(color: servio.textSecondary),
+                label,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontFamily: 'Inter',
+                  color: servio.textSecondary,
+                ),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -606,35 +748,32 @@ class _ErrorState extends StatelessWidget {
     final servio = context.servio;
 
     return Center(
-      child: FadeTransition(
-        opacity: const AlwaysStoppedAnimation<double>(1),
-        child: Padding(
-          padding: const EdgeInsets.all(ServioSpacing.screenPadding),
-          child: Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface,
-              borderRadius: BorderRadius.circular(ServioRadius.card),
-              border: Border.all(color: servio.border),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Icon(Icons.wifi_off_rounded, color: servio.accent),
-                const SizedBox(height: 10),
-                Text(
-                  message,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: onRetry,
-                  icon: const Icon(Icons.refresh_rounded),
-                  label: const Text('Retry'),
-                ),
-              ],
-            ),
+      child: Padding(
+        padding: const EdgeInsets.all(ServioSpacing.screenPadding),
+        child: Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(ServioRadius.card),
+            border: Border.all(color: servio.border),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Icon(Icons.wifi_off_rounded, color: servio.accent),
+              const SizedBox(height: 10),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(fontFamily: 'Inter'),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Retry', style: TextStyle(fontFamily: 'Inter')),
+              ),
+            ],
           ),
         ),
       ),
