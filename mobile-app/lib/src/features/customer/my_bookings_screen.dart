@@ -14,7 +14,6 @@ import 'raise_dispute_screen.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
-import '../../design_system/widgets/servio_primary_button.dart';
 import '../../design_system/widgets/servio_skeleton.dart';
 import '../../design_system/widgets/servio_status_chip.dart';
 import '../booking/booking_flow_data.dart';
@@ -96,54 +95,194 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     }
   }
 
+  Future<void> _cancelBooking(BookingModel booking) async {
+    final reasons = <String>[
+      'Change of plans',
+      'Found another provider',
+      'Technician did not respond',
+      'Scheduled time is no longer suitable',
+      'Other',
+    ];
+    String selectedReason = reasons.first;
+
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(ServioRadius.xl)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheet) {
+            final servio = ctx.servio;
+            final theme = Theme.of(ctx);
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 20),
+                        decoration: BoxDecoration(
+                          color: servio.border,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    Text(
+                      'Cancel Booking',
+                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Please tell us why you are cancelling.',
+                      style: theme.textTheme.bodyMedium?.copyWith(color: servio.textSecondary),
+                    ),
+                    const SizedBox(height: 20),
+                    ...reasons.map((reason) => RadioListTile<String>(
+                          title: Text(reason),
+                          value: reason,
+                          groupValue: selectedReason,
+                          onChanged: (val) {
+                            if (val != null) {
+                              setSheet(() => selectedReason = val);
+                            }
+                          },
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                        )),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.of(ctx).pop(false),
+                            child: const Text('Keep Booking'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: servio.danger,
+                              foregroundColor: Colors.white,
+                            ),
+                            onPressed: () => Navigator.of(ctx).pop(true),
+                            child: const Text('Confirm Cancel'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _loading = true);
+    final client = context.read<ApiClient>();
+    try {
+      await BookingsApi(client).updateStatus(
+        booking.id,
+        'cancelled',
+        reason: selectedReason,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Booking cancelled successfully.')),
+      );
+      _fetchBookings();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not cancel booking. Please try again.'),
+        ),
+      );
+      setState(() => _loading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final servio = context.servio;
     final theme = Theme.of(context);
-    const tabs = <String>['Active', 'History', 'Favourites'];
+    final isDark = theme.brightness == Brightness.dark;
+    const tabs = <String>['Active', 'History'];
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Bookings'),
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        backgroundColor: theme.scaffoldBackgroundColor,
+        elevation: 0,
+        centerTitle: false,
+        automaticallyImplyLeading: true,
+        actions: const <Widget>[],
+        titleTextStyle: theme.textTheme.headlineMedium?.copyWith(
+          fontFamily: 'Poppins',
+          fontSize: 24,
+          fontWeight: FontWeight.w600,
+          color: isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23),
+        ),
+        iconTheme: IconThemeData(
+          color: isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23),
+        ),
       ),
       body: RefreshIndicator(
-        color: context.servio.accent,
+        color: servio.accent,
         onRefresh: _pullRefresh,
         child: Padding(
-          padding: const EdgeInsets.all(ServioSpacing.screenPadding),
+          padding: const EdgeInsets.symmetric(
+            horizontal: ServioSpacing.screenPadding,
+            vertical: 16,
+          ),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               Container(
-                padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: servio.backgroundSoft,
-                  borderRadius: BorderRadius.circular(ServioRadius.full),
+                  border: Border(
+                    bottom: BorderSide(
+                      color: servio.border.withValues(alpha: 0.3),
+                      width: 1,
+                    ),
+                  ),
                 ),
                 child: Row(
                   children: List<Widget>.generate(tabs.length, (int index) {
                     final active = index == _tabIndex;
+                    final activeColor = isDark ? servio.neutralWarm : const Color(0xFF1A1D23);
 
                     return Expanded(
                       child: GestureDetector(
                         onTap: () => setState(() => _tabIndex = index),
-                        child: AnimatedContainer(
-                          duration: ServioMotion.micro,
-                          curve: ServioMotion.curve,
+                        child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           decoration: BoxDecoration(
-                            color: active
-                                ? Theme.of(context).colorScheme.surface
-                                : Colors.transparent,
-                            borderRadius:
-                                BorderRadius.circular(ServioRadius.full),
+                            border: Border(
+                              bottom: BorderSide(
+                                color: active ? activeColor : Colors.transparent,
+                                width: 2,
+                              ),
+                            ),
                           ),
                           child: Text(
                             tabs[index],
                             textAlign: TextAlign.center,
                             style: theme.textTheme.labelLarge?.copyWith(
-                              color:
-                                  active ? servio.accent : servio.textSecondary,
+                              fontFamily: 'Inter',
+                              fontWeight: active ? FontWeight.bold : FontWeight.w500,
+                              color: active ? activeColor : servio.textSecondary,
                             ),
                           ),
                         ),
@@ -185,6 +324,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
             return _LiveBookingCard(
               booking: booking,
               onRebook: () => _rebook(context, booking),
+              onCancel: () => _cancelBooking(booking),
               onViewDetails: () {
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
@@ -217,6 +357,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
             return _LiveBookingCard(
               booking: booking,
               onRebook: () => _rebook(context, booking),
+              onCancel: () => _cancelBooking(booking),
               onViewDetails: () {
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
@@ -237,11 +378,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
           },
         );
       default:
-        return _EmptyState(
-          icon: Icons.favorite_border_rounded,
-          message: 'Your favourite technicians will appear here\n'
-              'after you complete a booking and write a review.',
-        );
+        return const SizedBox.shrink();
     }
   }
 
@@ -260,8 +397,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
               : data.hourlyRate,
         );
       } catch (_) {
-        // The booking flow can still open; final booking validation remains
-        // enforced by the backend if availability cannot be refreshed here.
       }
     }
     if (!context.mounted) return;
@@ -276,10 +411,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.message, this.icon});
+  const _EmptyState({required this.message});
 
   final String message;
-  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
@@ -290,17 +424,12 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            if (icon != null) ...<Widget>[
-              Icon(icon, size: 40, color: servio.textSecondary),
-              const SizedBox(height: 12),
-            ],
             Text(
               message,
               textAlign: TextAlign.center,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: servio.textSecondary, height: 1.5),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: servio.textSecondary,
+                  ),
             ),
           ],
         ),
@@ -314,33 +443,15 @@ class _LiveBookingCard extends StatelessWidget {
     required this.booking,
     required this.onViewDetails,
     required this.onRebook,
+    required this.onCancel,
     this.onRaiseDispute,
   });
 
   final BookingModel booking;
   final VoidCallback onViewDetails;
   final VoidCallback onRebook;
+  final VoidCallback onCancel;
   final VoidCallback? onRaiseDispute;
-
-  static ServioStatusChipType _chipType(BookingStatus status) =>
-      switch (status) {
-        BookingStatus.pending => ServioStatusChipType.warning,
-        BookingStatus.confirmed => ServioStatusChipType.success,
-        BookingStatus.enRoute => ServioStatusChipType.info,
-        BookingStatus.arrived => ServioStatusChipType.info,
-        BookingStatus.inProgress => ServioStatusChipType.info,
-        BookingStatus.awaitingCustomerConfirmation =>
-          ServioStatusChipType.warning,
-        BookingStatus.pendingAdminReview => ServioStatusChipType.warning,
-        BookingStatus.completed => ServioStatusChipType.success,
-        BookingStatus.cancelled => ServioStatusChipType.danger,
-        BookingStatus.rejected => ServioStatusChipType.danger,
-        BookingStatus.disputed => ServioStatusChipType.warning,
-        BookingStatus.cancelledNoShow ||
-        BookingStatus.customerNoShow ||
-        BookingStatus.workerNoShow =>
-          ServioStatusChipType.danger,
-      };
 
   static String _chipLabel(BookingStatus status) => switch (status) {
         BookingStatus.pending => 'Pending',
@@ -359,93 +470,312 @@ class _LiveBookingCard extends StatelessWidget {
         BookingStatus.workerNoShow => 'Worker No-Show',
       };
 
-  Color _accentColor(ServioThemeExtension servio) => switch (booking.status) {
-        BookingStatus.cancelled ||
-        BookingStatus.rejected ||
-        BookingStatus.disputed =>
-          servio.danger,
-        BookingStatus.completed => servio.success,
-        _ => servio.info,
+  Color _statusBgColor(BookingStatus status, bool isDark) {
+    if (isDark) {
+      return switch (status) {
+        BookingStatus.pending => const Color(0xFF343A40),
+        BookingStatus.confirmed || BookingStatus.completed => const Color(0xFF0F5132).withValues(alpha: 0.3),
+        BookingStatus.cancelled || BookingStatus.rejected || BookingStatus.cancelledNoShow || BookingStatus.workerNoShow || BookingStatus.customerNoShow => const Color(0xFF842029).withValues(alpha: 0.3),
+        BookingStatus.disputed || BookingStatus.awaitingCustomerConfirmation || BookingStatus.pendingAdminReview => const Color(0xFF664D03).withValues(alpha: 0.3),
+        _ => const Color(0xFFF2E0C4).withValues(alpha: 0.2),
       };
+    } else {
+      return switch (status) {
+        BookingStatus.pending => const Color(0xFFE4E2DF),
+        BookingStatus.confirmed || BookingStatus.completed => const Color(0xFFD1E7DD),
+        BookingStatus.cancelled || BookingStatus.rejected || BookingStatus.cancelledNoShow || BookingStatus.workerNoShow || BookingStatus.customerNoShow => const Color(0xFFF8D7DA),
+        BookingStatus.disputed || BookingStatus.awaitingCustomerConfirmation || BookingStatus.pendingAdminReview => const Color(0xFFFFF3CD),
+        _ => const Color(0xFFF2E0C4),
+      };
+    }
+  }
+
+  Color _statusTextColor(BookingStatus status, bool isDark) {
+    if (isDark) {
+      return switch (status) {
+        BookingStatus.pending => const Color(0xFFE3D5CA),
+        BookingStatus.confirmed || BookingStatus.completed => const Color(0xFF75B798),
+        BookingStatus.cancelled || BookingStatus.rejected || BookingStatus.cancelledNoShow || BookingStatus.workerNoShow || BookingStatus.customerNoShow => const Color(0xFFEA868F),
+        BookingStatus.disputed || BookingStatus.awaitingCustomerConfirmation || BookingStatus.pendingAdminReview => const Color(0xFFFFDA6A),
+        _ => const Color(0xFFBFB09A),
+      };
+    } else {
+      return switch (status) {
+        BookingStatus.pending => const Color(0xFF45474B),
+        BookingStatus.confirmed || BookingStatus.completed => const Color(0xFF0F5132),
+        BookingStatus.cancelled || BookingStatus.rejected || BookingStatus.cancelledNoShow || BookingStatus.workerNoShow || BookingStatus.customerNoShow => const Color(0xFF842029),
+        BookingStatus.disputed || BookingStatus.awaitingCustomerConfirmation || BookingStatus.pendingAdminReview => const Color(0xFF664D03),
+        _ => const Color(0xFF9A8C73),
+      };
+    }
+  }
+
+  IconData _categoryIcon(String category) {
+    final lower = category.toLowerCase();
+    if (lower.contains('plumbing')) return Icons.plumbing_rounded;
+    if (lower.contains('electrical') || lower.contains('electricity')) return Icons.electrical_services_rounded;
+    if (lower.contains('cleaning') || lower.contains('clean')) return Icons.cleaning_services_rounded;
+    if (lower.contains('ac') || lower.contains('air conditioning') || lower.contains('hvac')) return Icons.ac_unit_rounded;
+    if (lower.contains('painting') || lower.contains('paint')) return Icons.format_paint_rounded;
+    if (lower.contains('carpentry') || lower.contains('wood')) return Icons.carpenter_rounded;
+    if (lower.contains('appliance') || lower.contains('washing')) return Icons.kitchen_rounded;
+    return Icons.handyman_rounded;
+  }
 
   @override
   Widget build(BuildContext context) {
-    final servio = context.servio;
     final theme = Theme.of(context);
-    final isActive = booking.status.isActive;
+    final isDark = theme.brightness == Brightness.dark;
+    final servio = context.servio;
 
-    return ServioCard(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Container(
-            width: 4,
-            height: 110,
-            decoration: BoxDecoration(
-              color: _accentColor(servio),
-              borderRadius: BorderRadius.circular(ServioRadius.full),
-            ),
+    final secondButton = _secondButton(context, isDark);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF262B34) : const Color(0xFFF3EDE7),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(
+            color: Color.fromRGBO(26, 29, 37, 0.04),
+            blurRadius: 12,
+            offset: Offset(0, 4),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(booking.serviceName, style: theme.textTheme.titleMedium),
-                const SizedBox(height: 6),
-                Text(
-                  '${booking.technicianName} • ${booking.date}',
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: servio.textSecondary),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1A1D23) : Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color.fromRGBO(26, 29, 37, 0.04),
+                      blurRadius: 8,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 10),
-                ServioStatusChip(
-                  label: _chipLabel(booking.status),
-                  type: _chipType(booking.status),
+                child: Icon(
+                  _categoryIcon(booking.serviceCategory),
+                  size: 22,
+                  color: isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23),
                 ),
-                const SizedBox(height: 14),
-                isActive
-                    ? ServioPrimaryButton(
-                        label: 'View Details', onPressed: onViewDetails)
-                    : Row(
-                        children: <Widget>[
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: onRebook,
-                              child: const Text('Re-book'),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF343A40) : const Color(0xFFE4E2DF),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            booking.serviceCategory.isNotEmpty ? booking.serviceCategory : booking.serviceName,
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? const Color(0xFFE3D5CA) : const Color(0xFF262B34),
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: onViewDetails,
-                              child: const Text('View Details'),
-                            ),
+                        ),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: _statusBgColor(booking.status, isDark),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                        ],
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 5,
+                                height: 5,
+                                decoration: BoxDecoration(
+                                  color: _statusTextColor(booking.status, isDark),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                _chipLabel(booking.status),
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: _statusTextColor(booking.status, isDark),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      booking.serviceName,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                        color: isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23),
                       ),
-                if (onRaiseDispute != null) ...[
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: onRaiseDispute,
-                      icon: const Icon(Icons.flag_outlined, size: 16),
-                      label: const Text('Report Problem'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.orange,
-                        side: const BorderSide(color: Colors.orange),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'with ${booking.technicianName}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontFamily: 'Inter',
+                        color: servio.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Icon(Icons.calendar_today_rounded, size: 14, color: servio.textSecondary),
+                        const SizedBox(width: 4),
+                        Text(
+                          booking.date,
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 12,
+                            color: servio.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Icon(Icons.schedule_rounded, size: 14, color: servio.textSecondary),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            booking.time,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 12,
+                              color: servio.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: onViewDetails,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23),
+                    foregroundColor: isDark ? const Color(0xFF1A1D23) : Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    'View Details',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ),
+              if (secondButton != null) ...[
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: secondButton.onPressed,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23),
+                      side: BorderSide(
+                        color: isDark ? const Color(0xFFE3D5CA).withValues(alpha: 0.5) : const Color(0xFF9A8C73),
+                        width: 1.5,
+                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                    child: Text(
+                      secondButton.label,
+                      style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
                       ),
                     ),
                   ),
-                ],
+                ),
               ],
-            ),
+            ],
           ),
         ],
       ),
     );
   }
+
+  _SecondButtonData? _secondButton(BuildContext context, bool isDark) {
+    if (booking.status == BookingStatus.pending) {
+      return _SecondButtonData(
+        label: 'Cancel',
+        onPressed: onCancel,
+      );
+    }
+    if (booking.status.isActive) {
+      return _SecondButtonData(
+        label: 'Chat',
+        onPressed: () {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => ChatScreen(
+                contactName: booking.technicianName,
+                bookingId: booking.id,
+                workerId: booking.technicianId,
+              ),
+            ),
+          );
+        },
+      );
+    }
+    if (booking.status.isPast) {
+      return _SecondButtonData(
+        label: 'Re-book',
+        onPressed: onRebook,
+      );
+    }
+    if (booking.status == BookingStatus.awaitingCustomerConfirmation && onRaiseDispute != null) {
+      return _SecondButtonData(
+        label: 'Report Problem',
+        onPressed: onRaiseDispute!,
+      );
+    }
+    return null;
+  }
+}
+
+class _SecondButtonData {
+  _SecondButtonData({required this.label, required this.onPressed});
+  final String label;
+  final VoidCallback onPressed;
 }
 
 class BookingDetailsScreen extends StatefulWidget {

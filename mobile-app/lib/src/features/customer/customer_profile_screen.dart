@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
-import '../../design_system/widgets/servio_card.dart';
-import '../../design_system/widgets/servio_tab_shell.dart';
 import '../auth/auth_landing_screen.dart';
 import '../marketing/about_screen.dart';
 import '../marketing/faq_screen.dart';
+import '../marketing/contact_screen.dart';
 import 'support_screen.dart';
 import '../marketing/privacy_policy_screen.dart';
 import '../marketing/terms_of_service_screen.dart';
@@ -24,536 +22,358 @@ class CustomerProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final account = context.watch<SessionProvider>().account;
     final bookingsCount = context.watch<BookingsProvider?>()?.all.length ?? 0;
-    final bottomInset = ServioTabShell.bottomOverlayInsetOf(context);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final servio = context.servio;
+
+    final activityBg = isDark ? const Color(0xFF262B34) : const Color(0xFFF3EDE7);
+    final activityIcon = isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23);
+
+    final appBg = isDark ? const Color(0xFF262B34) : const Color(0xFFE4E2DF).withValues(alpha: 0.5);
+    final appIcon = isDark ? const Color(0xFFE3D5CA) : const Color(0xFF45474B);
+
+    final supportBg = isDark ? const Color(0xFF7C2D12).withValues(alpha: 0.2) : const Color(0xFFFFF7ED);
+    final supportIcon = isDark ? const Color(0xFFFB923C) : const Color(0xFFF97316);
+
+    final legalBg = isDark ? const Color(0xFF1E3A8A).withValues(alpha: 0.2) : const Color(0xFFEFF6FF);
+    final legalIcon = isDark ? const Color(0xFF60A5FA) : const Color(0xFF3B82F6);
 
     return Scaffold(
-      body: AnnotatedRegion<SystemUiOverlayStyle>(
-        value: SystemUiOverlayStyle.light.copyWith(
-          statusBarColor: Colors.transparent,
-        ),
-        child: CustomScrollView(
-          slivers: <Widget>[
-            // Hero header.
-            SliverPersistentHeader(
-              pinned: true,
-              delegate: _ProfileHeaderDelegate(
-                topPadding: MediaQuery.paddingOf(context).top,
-                initials: account?.initials ?? 'U',
-                name: account?.name ?? 'Guest',
-                email: account?.email ?? '',
-                role: 'Customer',
-              ),
-            ),
-
-            // Scrollable content.
-            SliverPadding(
-              padding: EdgeInsets.fromLTRB(
-                ServioSpacing.screenPadding,
-                24,
-                ServioSpacing.screenPadding,
-                ServioSpacing.screenPadding + 24 + bottomInset,
-              ),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate(
-                  <Widget>[
-                    // Stats
-                    _StatsRow(stats: <_Stat>[
-                      _Stat(value: '$bookingsCount', label: 'Bookings'),
-                      const _Stat(value: '0', label: 'Reviews'),
-                      const _Stat(value: '2025', label: 'Since'),
-                    ]),
-                    const SizedBox(height: ServioSpacing.sectionGap),
-
-                    // ── Activity ─────────────────────────────────────────────
-                    const _SectionHeader(label: 'Activity'),
-                    _MenuGroup(
-                      children: <Widget>[
-                        _NavTile(
-                          icon: Icons.history_rounded,
-                          iconColor: context.servio.accent,
-                          label: 'Bookings',
-                          subtitle: 'Past and upcoming bookings',
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) =>
-                                  const MyBookingsScreen(initialTabIndex: 1),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: ServioSpacing.sectionGap),
-
-                    // ── App ───────────────────────────────────────────────────
-                    const _SectionHeader(label: 'App'),
-                    _MenuGroup(
-                      children: <Widget>[
-                        _NavTile(
-                          icon: Icons.settings_outlined,
-                          iconColor: context.servio.accent,
-                          label: 'Settings',
-                          subtitle: 'Profile, security, preferences',
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => const CustomerSettingsScreen(),
-                            ),
-                          ),
-                        ),
-                        _NavTile(
-                          icon: Icons.flag_outlined,
-                          iconColor: context.servio.warning,
-                          label: 'Report a Problem',
-                          subtitle: 'Send us feedback or issues',
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => const ReportProblemScreen(),
-                            ),
-                          ),
-                        ),
-                        _NavTile(
-                          icon: Icons.shield_outlined,
-                          iconColor: context.servio.info,
-                          label: 'Support',
-                          subtitle: 'Issues, disputes & resolved cases',
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => const SupportScreen(),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: ServioSpacing.sectionGap),
-
-                    // ── Legal ─────────────────────────────────────────────────
-                    const _SectionHeader(label: 'Legal'),
-                    _MenuGroup(
-                      children: <Widget>[
-                        _NavTile(
-                          icon: Icons.info_outline_rounded,
-                          iconColor: context.servio.accent,
-                          label: 'About SERVIO',
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => const AboutScreen(),
-                            ),
-                          ),
-                        ),
-                        _NavTile(
-                          icon: Icons.description_outlined,
-                          iconColor: context.servio.accent,
-                          label: 'Terms of Service',
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => const TermsOfServiceScreen(),
-                            ),
-                          ),
-                        ),
-                        _NavTile(
-                          icon: Icons.privacy_tip_outlined,
-                          iconColor: context.servio.accent,
-                          label: 'Privacy Policy',
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => const PrivacyPolicyScreen(),
-                            ),
-                          ),
-                        ),
-                        _NavTile(
-                          icon: Icons.quiz_outlined,
-                          iconColor: context.servio.accent,
-                          label: 'FAQ',
-                          subtitle: 'Frequently asked questions',
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => const FaqScreen(),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: ServioSpacing.sectionGap),
-
-                    // ── Logout ────────────────────────────────────────────────
-                    _LogoutButton(
-                      onTap: () async {
-                        await context.read<SessionProvider>().logout();
-                        if (context.mounted) {
-                          Navigator.of(context).pushAndRemoveUntil(
-                            MaterialPageRoute<void>(
-                              builder: (_) => const AuthLandingScreen(),
-                            ),
-                            (Route<dynamic> _) => false,
-                          );
-                        }
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
+      appBar: AppBar(
+        title: const Text('Profile'),
+        backgroundColor: theme.scaffoldBackgroundColor,
+        elevation: 0,
+        centerTitle: false,
+        automaticallyImplyLeading: false,
+        actions: const <Widget>[],
+        titleTextStyle: theme.textTheme.headlineMedium?.copyWith(
+          fontFamily: 'Poppins',
+          fontSize: 24,
+          fontWeight: FontWeight.w600,
+          color: isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23),
         ),
       ),
-    );
-  }
-}
-
-// ── Hero profile header ───────────────────────────────────────────────────────
-
-class _ProfileHeaderDelegate extends SliverPersistentHeaderDelegate {
-  const _ProfileHeaderDelegate({
-    required this.topPadding,
-    required this.initials,
-    required this.name,
-    required this.email,
-    required this.role,
-  });
-
-  final double topPadding;
-  final String initials;
-  final String name;
-  final String email;
-  final String role;
-
-  @override
-  double get maxExtent => topPadding + 300;
-
-  @override
-  double get minExtent => topPadding + 72;
-
-  @override
-  Widget build(
-    BuildContext context,
-    double shrinkOffset,
-    bool overlapsContent,
-  ) {
-    final progress =
-        (shrinkOffset / (maxExtent - minExtent)).clamp(0.0, 1.0).toDouble();
-    final eased = ServioMotion.reveal.transform(progress);
-    final expandedOpacity = (1 - progress * 1.45).clamp(0.0, 1.0).toDouble();
-    final compactOpacity =
-        ((progress - 0.34) / 0.66).clamp(0.0, 1.0).toDouble();
-
-    return Container(
-      width: double.infinity,
-      decoration: const BoxDecoration(gradient: ServioGradients.brand),
-      child: Stack(
-        clipBehavior: Clip.hardEdge,
-        fit: StackFit.expand,
-        children: <Widget>[
-          Positioned(
-            left: 0,
-            right: 0,
-            top: 0,
-            height: maxExtent,
-            child: Opacity(
-              opacity: expandedOpacity,
-              child: Transform.translate(
-                offset: Offset(0, -24 * eased),
-                child: _ExpandedProfileHeader(
-                  initials: initials,
-                  name: name,
-                  email: email,
-                  role: role,
-                  topPadding: topPadding,
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            left: ServioSpacing.screenPadding,
-            right: ServioSpacing.screenPadding,
-            top: topPadding + 10,
-            child: Opacity(
-              opacity: compactOpacity,
-              child: Transform.translate(
-                offset: Offset(0, 14 * (1 - eased)),
-                child: _CompactProfileHeader(
-                  initials: initials,
-                  name: name,
-                  role: role,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  bool shouldRebuild(covariant _ProfileHeaderDelegate oldDelegate) {
-    return topPadding != oldDelegate.topPadding ||
-        initials != oldDelegate.initials ||
-        name != oldDelegate.name ||
-        email != oldDelegate.email ||
-        role != oldDelegate.role;
-  }
-}
-
-class _ExpandedProfileHeader extends StatelessWidget {
-  const _ExpandedProfileHeader({
-    required this.initials,
-    required this.name,
-    required this.email,
-    required this.role,
-    required this.topPadding,
-  });
-
-  final String initials;
-  final String name;
-  final String email;
-  final String role;
-  final double topPadding;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(24, topPadding + 14, 24, 30),
-      child: Column(
-        children: <Widget>[
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'Profile',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-          ),
-          const Spacer(),
-          _ProfileAvatar(initials: initials, size: 92, iconSize: 30),
-          const SizedBox(height: 14),
-          Text(
-            name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                ),
-            textAlign: TextAlign.center,
-          ),
-          if (email.isNotEmpty) ...<Widget>[
-            const SizedBox(height: 4),
-            Text(
-              email,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.70),
-                  ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-          const SizedBox(height: 12),
-          _ProfileRoleChip(role: role),
-        ],
-      ),
-    );
-  }
-}
-
-class _CompactProfileHeader extends StatelessWidget {
-  const _CompactProfileHeader({
-    required this.initials,
-    required this.name,
-    required this.role,
-  });
-
-  final String initials;
-  final String name;
-  final String role;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Row(
-      children: <Widget>[
-        _ProfileAvatar(initials: initials, size: 40, iconSize: 0),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.only(
+          left: ServioSpacing.screenPadding,
+          right: ServioSpacing.screenPadding,
+          top: 16,
+          bottom: 100,
         ),
-        const SizedBox(width: 10),
-        _ProfileRoleChip(role: role),
-      ],
-    );
-  }
-}
-
-class _ProfileAvatar extends StatelessWidget {
-  const _ProfileAvatar({
-    required this.initials,
-    required this.size,
-    required this.iconSize,
-  });
-
-  final String initials;
-  final double size;
-  final double iconSize;
-
-  @override
-  Widget build(BuildContext context) {
-    final borderWidth = size >= 80 ? 2.5 : 1.5;
-    final textStyle = size >= 80
-        ? Theme.of(context).textTheme.headlineLarge
-        : Theme.of(context).textTheme.titleMedium;
-
-    return Stack(
-      clipBehavior: Clip.none,
-      children: <Widget>[
-        Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.15),
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.4),
-              width: borderWidth,
-            ),
-          ),
-          child: Center(
-            child: Text(
-              initials,
-              style: textStyle?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ),
-        if (iconSize > 0)
-          Positioned(
-            right: 0,
-            bottom: 0,
-            child: Container(
-              width: iconSize,
-              height: iconSize,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Container(
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: ServioColors.accent,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2),
+                color: isDark ? const Color(0xFF262B34) : const Color(0xFFF3EDE7),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: servio.border.withValues(alpha: 0.15),
+                  width: 1,
+                ),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color.fromRGBO(26, 29, 37, 0.03),
+                    blurRadius: 16,
+                    offset: Offset(0, 4),
+                  ),
+                ],
               ),
-              child: const Icon(
-                Icons.camera_alt_outlined,
-                color: Colors.white,
-                size: 14,
+              child: Column(
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Stack(
+                        children: [
+                          Container(
+                            width: 72,
+                            height: 72,
+                            decoration: BoxDecoration(
+                              color: servio.accent,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: isDark ? const Color(0xFF262B34) : Colors.white,
+                                width: 3,
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                account?.initials ?? 'U',
+                                style: const TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: Container(
+                              width: 22,
+                              height: 22,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF9A8C73),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: isDark ? const Color(0xFF262B34) : Colors.white,
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.verified_rounded,
+                                size: 12,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              account?.name ?? 'Guest User',
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                fontFamily: 'Poppins',
+                                fontWeight: FontWeight.bold,
+                                fontSize: 20,
+                                color: isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.calendar_month_rounded,
+                                  size: 14,
+                                  color: servio.textSecondary,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Member since 2025',
+                                  style: TextStyle(
+                                    fontFamily: 'Inter',
+                                    fontSize: 12,
+                                    color: servio.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      _buildStatItem('Bookings', '$bookingsCount', isDark, context),
+                      const SizedBox(width: 10),
+                      _buildStatItem('Reviews', '0', isDark, context),
+                      const SizedBox(width: 10),
+                      _buildStatItem('Spent', '1.2k EGP', isDark, context),
+                    ],
+                  ),
+                ],
               ),
             ),
-          ),
-      ],
-    );
-  }
-}
-
-class _ProfileRoleChip extends StatelessWidget {
-  const _ProfileRoleChip({required this.role});
-
-  final String role;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(ServioRadius.full),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
-      ),
-      child: Text(
-        role,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: Colors.white,
-              letterSpacing: 0.5,
+            const SizedBox(height: 20),
+            const _SectionHeader(label: 'Activity'),
+            _MenuGroup(
+              children: <Widget>[
+                _NavTile(
+                  icon: Icons.history_rounded,
+                  iconColor: activityIcon,
+                  backgroundColor: activityBg,
+                  label: 'Bookings',
+                  subtitle: 'Past and upcoming bookings',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const MyBookingsScreen(initialTabIndex: 1),
+                    ),
+                  ),
+                ),
+              ],
             ),
-      ),
-    );
-  }
-}
-
-// ── Stats row ─────────────────────────────────────────────────────────────────
-
-class _Stat {
-  const _Stat({required this.value, required this.label});
-  final String value;
-  final String label;
-}
-
-class _StatsRow extends StatelessWidget {
-  const _StatsRow({required this.stats});
-
-  final List<_Stat> stats;
-
-  @override
-  Widget build(BuildContext context) {
-    final servio = context.servio;
-    final dividerColor = servio.border.withValues(alpha: 0.6);
-
-    return ServioCard(
-      radius: ServioRadius.lg,
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      child: Row(
-        children: <Widget>[
-          for (var i = 0; i < stats.length; i++) ...<Widget>[
-            Expanded(child: _StatItem(stat: stats[i])),
-            if (i != stats.length - 1)
-              SizedBox(
-                height: 36,
-                child: VerticalDivider(color: dividerColor, width: 1),
-              ),
+            const SizedBox(height: 12),
+            const _SectionHeader(label: 'App'),
+            _MenuGroup(
+              children: <Widget>[
+                _NavTile(
+                  icon: Icons.settings_rounded,
+                  iconColor: appIcon,
+                  backgroundColor: appBg,
+                  label: 'Settings',
+                  subtitle: 'Profile, security, preferences',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const CustomerSettingsScreen(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const _SectionHeader(label: 'Support'),
+            _MenuGroup(
+              children: <Widget>[
+                _NavTile(
+                  icon: Icons.report_problem_rounded,
+                  iconColor: supportIcon,
+                  backgroundColor: supportBg,
+                  label: 'Report a Problem',
+                  subtitle: 'Send us feedback or issues',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const ReportProblemScreen(),
+                    ),
+                  ),
+                ),
+                _NavTile(
+                  icon: Icons.shield_rounded,
+                  iconColor: supportIcon,
+                  backgroundColor: supportBg,
+                  label: 'Support & Cases',
+                  subtitle: 'Disputes & resolved cases',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const SupportScreen(),
+                    ),
+                  ),
+                ),
+                _NavTile(
+                  icon: Icons.contact_support_rounded,
+                  iconColor: supportIcon,
+                  backgroundColor: supportBg,
+                  label: 'Contact Us',
+                  subtitle: 'Get help from our team',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const ContactScreen(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const _SectionHeader(label: 'Legal'),
+            _MenuGroup(
+              children: <Widget>[
+                _NavTile(
+                  icon: Icons.info_rounded,
+                  iconColor: legalIcon,
+                  backgroundColor: legalBg,
+                  label: 'About SERVIO',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const AboutScreen(),
+                    ),
+                  ),
+                ),
+                _NavTile(
+                  icon: Icons.description_rounded,
+                  iconColor: legalIcon,
+                  backgroundColor: legalBg,
+                  label: 'Terms of Service',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const TermsOfServiceScreen(),
+                    ),
+                  ),
+                ),
+                _NavTile(
+                  icon: Icons.privacy_tip_rounded,
+                  iconColor: legalIcon,
+                  backgroundColor: legalBg,
+                  label: 'Privacy Policy',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const PrivacyPolicyScreen(),
+                    ),
+                  ),
+                ),
+                _NavTile(
+                  icon: Icons.quiz_rounded,
+                  iconColor: legalIcon,
+                  backgroundColor: legalBg,
+                  label: 'FAQ',
+                  subtitle: 'Frequently asked questions',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const FaqScreen(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            _LogoutButton(
+              onTap: () async {
+                await context.read<SessionProvider>().logout();
+                if (context.mounted) {
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const AuthLandingScreen(),
+                    ),
+                    (Route<dynamic> _) => false,
+                  );
+                }
+              },
+            ),
+            const SizedBox(height: 12),
           ],
-        ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatItem(String label, String value, bool isDark, BuildContext context) {
+    final servio = context.servio;
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1A1D23) : Colors.white.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: servio.border.withValues(alpha: 0.15),
+          ),
+        ),
+        child: Column(
+          children: [
+            Text(
+              value,
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23),
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label.toUpperCase(),
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 9,
+                letterSpacing: 1.0,
+                fontWeight: FontWeight.w600,
+                color: servio.textSecondary,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
-
-class _StatItem extends StatelessWidget {
-  const _StatItem({required this.stat});
-
-  final _Stat stat;
-
-  @override
-  Widget build(BuildContext context) {
-    final servio = context.servio;
-    return Column(
-      children: <Widget>[
-        Text(
-          stat.value,
-          style: Theme.of(context)
-              .textTheme
-              .titleLarge
-              ?.copyWith(color: servio.accent, fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          stat.label,
-          style: Theme.of(context)
-              .textTheme
-              .bodySmall
-              ?.copyWith(color: servio.textSecondary),
-        ),
-      ],
-    );
-  }
-}
-
-// ── Section header ────────────────────────────────────────────────────────────
 
 class _SectionHeader extends StatelessWidget {
   const _SectionHeader({required this.label});
@@ -563,20 +383,20 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 10),
+      padding: const EdgeInsets.only(left: 4, bottom: 6, top: 4),
       child: Text(
         label.toUpperCase(),
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: context.servio.textSecondary,
-              letterSpacing: 1.0,
-              fontWeight: FontWeight.w700,
-            ),
+        style: TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 11,
+          color: context.servio.textSecondary.withValues(alpha: 0.7),
+          letterSpacing: 1.5,
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }
 }
-
-// ── Menu group (card container) ───────────────────────────────────────────────
 
 class _MenuGroup extends StatelessWidget {
   const _MenuGroup({required this.children});
@@ -585,19 +405,39 @@ class _MenuGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dividerColor = context.servio.border.withValues(alpha: 0.5);
+    final servio = context.servio;
+    final theme = Theme.of(context);
+    final dividerColor = servio.border.withValues(alpha: 0.2);
 
-    return ServioCard(
-      radius: ServioRadius.lg,
-      padding: EdgeInsets.zero,
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: servio.border.withValues(alpha: 0.3),
+          width: 1,
+        ),
+        boxShadow: const <BoxShadow>[
+          BoxShadow(
+            color: Color.fromRGBO(34, 40, 49, 0.04),
+            blurRadius: 16,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(ServioRadius.lg),
+        borderRadius: BorderRadius.circular(16),
         child: Column(
           children: <Widget>[
             for (var i = 0; i < children.length; i++) ...<Widget>[
               children[i],
               if (i != children.length - 1)
-                Divider(height: 1, indent: 56, color: dividerColor),
+                Divider(
+                  height: 1,
+                  indent: 64,
+                  endIndent: 16,
+                  color: dividerColor,
+                ),
             ],
           ],
         ),
@@ -606,8 +446,6 @@ class _MenuGroup extends StatelessWidget {
   }
 }
 
-// ── Nav tile ──────────────────────────────────────────────────────────────────
-
 class _NavTile extends StatelessWidget {
   const _NavTile({
     required this.icon,
@@ -615,6 +453,7 @@ class _NavTile extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.subtitle,
+    this.backgroundColor,
   });
 
   final IconData icon;
@@ -622,11 +461,13 @@ class _NavTile extends StatelessWidget {
   final String label;
   final String? subtitle;
   final VoidCallback onTap;
+  final Color? backgroundColor;
 
   @override
   Widget build(BuildContext context) {
     final servio = context.servio;
     final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
 
     return Semantics(
       button: true,
@@ -635,13 +476,17 @@ class _NavTile extends StatelessWidget {
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(
-            horizontal: ServioSpacing.cardPadding,
-            vertical: 13,
+            horizontal: 16,
+            vertical: 10,
           ),
           child: Row(
             children: <Widget>[
-              _IconBox(icon: icon, color: iconColor),
-              const SizedBox(width: 14),
+              _IconBox(
+                icon: icon,
+                color: iconColor,
+                backgroundColor: backgroundColor,
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -649,23 +494,30 @@ class _NavTile extends StatelessWidget {
                   children: <Widget>[
                     Text(
                       label,
-                      style: theme.textTheme.bodyMedium
-                          ?.copyWith(fontWeight: FontWeight.w500),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontFamily: 'Inter',
+                        fontWeight: FontWeight.w600,
+                        color: isDarkMode ? null : const Color(0xFF262B34),
+                      ),
                     ),
                     if (subtitle != null) ...<Widget>[
                       const SizedBox(height: 2),
                       Text(
                         subtitle!,
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(color: servio.textSecondary),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: servio.textSecondary,
+                        ),
                       ),
                     ],
                   ],
                 ),
               ),
               const SizedBox(width: 8),
-              Icon(Icons.chevron_right_rounded,
-                  color: servio.textSecondary, size: 20),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: servio.textSecondary.withValues(alpha: 0.7),
+                size: 20,
+              ),
             ],
           ),
         ),
@@ -674,29 +526,31 @@ class _NavTile extends StatelessWidget {
   }
 }
 
-// ── Icon box ──────────────────────────────────────────────────────────────────
-
 class _IconBox extends StatelessWidget {
-  const _IconBox({required this.icon, required this.color});
+  const _IconBox({
+    required this.icon,
+    required this.color,
+    this.backgroundColor,
+  });
 
   final IconData icon;
   final Color color;
+  final Color? backgroundColor;
 
   @override
   Widget build(BuildContext context) {
+    final bg = backgroundColor ?? color.withValues(alpha: 0.12);
     return Container(
       width: 36,
       height: 36,
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
+        color: bg,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Icon(icon, size: 18, color: color),
     );
   }
 }
-
-// ── Logout button ─────────────────────────────────────────────────────────────
 
 class _LogoutButton extends StatelessWidget {
   const _LogoutButton({required this.onTap});

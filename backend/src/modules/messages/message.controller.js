@@ -32,4 +32,10 @@ const startConversation = async (req, res) => {
   return ApiResponse.success(res, StatusCodes.OK, 'Conversation ready', { conversation });
 };
 
-module.exports = { send, list, unread, conversations, deleteConversation, startConversation };
+const archiveConversation = async (req, res) => {
+  const archive = req.body.archive !== false; // default true
+  const result = await messageService.archiveConversation(req.user.id, req.params.id, archive);
+  return ApiResponse.success(res, StatusCodes.OK, archive ? 'Conversation archived' : 'Conversation unarchived', { conversation: result });
+};
+
+module.exports = { send, list, unread, conversations, deleteConversation, startConversation, archiveConversation };

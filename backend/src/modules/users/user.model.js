@@ -39,6 +39,7 @@ const userSchema = new mongoose.Schema(
       city:   { type: String, trim: true },
       state:  { type: String, trim: true },
       zipCode:{ type: String, trim: true },
+      apartment: { type: String, trim: true },
     },
 
     addresses: [
@@ -50,6 +51,7 @@ const userSchema = new mongoose.Schema(
         zipCode: { type: String, trim: true },
         lat:     { type: Number, default: null, min: -90,  max: 90  },
         lng:     { type: Number, default: null, min: -180, max: 180 },
+        apartment: { type: String, trim: true },
       },
     ],
 

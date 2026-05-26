@@ -46,6 +46,8 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _loading = true;
   bool _sending = false;
   bool _deleting = false;
+  bool _archiving = false;
+  bool _isArchived = false; // local mirror of backend flag
   bool _polling = false; // true during a background poll tick
   String? _error;
 
@@ -143,6 +145,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _contactName = detail.conversation.contactName == 'Unknown'
             ? widget.contactName
             : detail.conversation.contactName;
+        _isArchived = detail.conversation.isArchived;
         _messages = detail.messages;
       });
       _scrollToBottom();
@@ -269,6 +272,39 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> _archiveChat({required bool archive}) async {
+    final conversationId = _conversationId;
+    if (conversationId == null || conversationId.isEmpty || _archiving) return;
+    setState(() => _archiving = true);
+    try {
+      final api = MessagesApi(context.read<ApiClient>());
+      await context
+          .read<MessagesProvider>()
+          .archiveConversation(api, conversationId, archive: archive);
+      if (!mounted) return;
+      setState(() => _isArchived = archive);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(archive ? 'Chat archived.' : 'Chat unarchived.'),
+          action: archive
+              ? SnackBarAction(
+                  label: 'Undo',
+                  onPressed: () => _archiveChat(archive: false),
+                )
+              : null,
+        ),
+      );
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      _showError(error.message);
+    } catch (_) {
+      if (!mounted) return;
+      _showError(archive ? 'Failed to archive chat.' : 'Failed to unarchive chat.');
+    } finally {
+      if (mounted) setState(() => _archiving = false);
+    }
+  }
+
   void _showError(String message) {
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));
@@ -289,70 +325,194 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     final servio = context.servio;
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final canSend = _controller.text.trim().isNotEmpty && !_sending;
     final isCustomer =
         context.watch<SessionProvider>().account?.role == UserRole.customer;
 
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        backgroundColor: isDark ? const Color(0xFF1A1D23) : const Color(0xFFF3EDE7).withValues(alpha: 0.95),
+        elevation: 0,
+        leadingWidth: 48,
+        leading: Navigator.of(context).canPop()
+            ? IconButton(
+                icon: Icon(
+                  Icons.arrow_back_rounded,
+                  color: isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23),
+                ),
+                onPressed: () => Navigator.of(context).maybePop(),
+              )
+            : null,
+        titleSpacing: 0,
+        title: Row(
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: servio.accent.withValues(alpha: 0.16),
+                  child: Text(
+                    _contactName.trim().isEmpty ? '?' : _contactName.trim()[0].toUpperCase(),
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: servio.accent,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  bottom: -1,
+                  right: -1,
+                  child: Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4CAF50), // Premium Green
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isDark ? const Color(0xFF1A1D23) : const Color(0xFFF3EDE7),
+                        width: 1.5,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _contactName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23),
+                    ),
+                  ),
+                  Text(
+                    _polling ? 'Lead Artisan • Updating...' : 'Lead Artisan • Online',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 11,
+                      color: servio.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: Icon(
+              Icons.phone_outlined,
+              color: isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23),
+            ),
+            onPressed: () {},
+          ),
+          if (isCustomer) ...[
+            _ChatActionButton(
+              canDelete: _conversationId != null && !_deleting,
+              isDeleting: _deleting || _archiving,
+              isArchived: _isArchived,
+              onReport: _reportChat,
+              onDelete: _confirmDeleteChat,
+              onArchive: () => _archiveChat(archive: !_isArchived),
+            ),
+          ],
+          const SizedBox(width: 8),
+        ],
+      ),
       body: SafeArea(
         child: Column(
           children: <Widget>[
-            _ChatHeader(
-              contactName: _contactName,
-              isLive: _polling,
-              showActions: isCustomer,
-              canDelete: _conversationId != null && !_deleting,
-              isDeleting: _deleting,
-              onReport: _reportChat,
-              onDelete: _confirmDeleteChat,
-            ),
             Expanded(
               child: AnimatedSwitcher(
                 duration: ServioMotion.normal,
-                child: _body(),
+                child: _body(isDark),
               ),
             ),
             SafeArea(
               top: false,
               child: Container(
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
-                color: theme.colorScheme.surface,
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                color: theme.scaffoldBackgroundColor,
                 child: Row(
                   children: <Widget>[
+                    // Attach File Button
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF262B34) : const Color(0xFFF3EDE7),
+                        shape: BoxShape.circle,
+                      ),
+                      child: IconButton(
+                        icon: const Icon(
+                          Icons.add_rounded,
+                          color: Color(0xFF9A8C73),
+                          size: 24,
+                        ),
+                        onPressed: () {},
+                      ),
+                    ),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: TextField(
                         controller: _controller,
                         minLines: 1,
                         maxLines: 4,
                         enabled: !_sending,
+                        style: TextStyle(
+                          color: isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23),
+                          fontFamily: 'Inter',
+                          fontSize: 14,
+                        ),
                         decoration: InputDecoration(
                           hintText: 'Type a message...',
+                          hintStyle: TextStyle(
+                            color: servio.textSecondary.withValues(alpha: 0.6),
+                            fontFamily: 'Inter',
+                          ),
                           filled: true,
-                          fillColor: servio.surfaceAlt,
+                          fillColor: isDark ? const Color(0xFF1A1D23) : Colors.white,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(24),
+                            borderSide: BorderSide.none,
+                          ),
                           enabledBorder: OutlineInputBorder(
-                            borderRadius:
-                                BorderRadius.circular(ServioRadius.full),
-                            borderSide: BorderSide(color: servio.border),
+                            borderRadius: BorderRadius.circular(24),
+                            borderSide: BorderSide(color: const Color(0xFF9A8C73).withValues(alpha: 0.15), width: 1),
                           ),
                           focusedBorder: OutlineInputBorder(
-                            borderRadius:
-                                BorderRadius.circular(ServioRadius.full),
-                            borderSide:
-                                BorderSide(color: servio.accent, width: 2),
+                            borderRadius: BorderRadius.circular(24),
+                            borderSide: const BorderSide(color: Color(0xFF9A8C73), width: 1.5),
                           ),
                         ),
                       ),
                     ),
                     const SizedBox(width: 10),
+                    // Send Button
                     AnimatedContainer(
                       duration: ServioMotion.micro,
                       curve: ServioMotion.curve,
-                      width: 42,
-                      height: 42,
+                      width: 44,
+                      height: 44,
                       decoration: BoxDecoration(
-                        gradient: canSend ? ServioGradients.brand : null,
-                        color: canSend ? null : servio.border,
+                        color: canSend ? const Color(0xFF1A1D23) : servio.border.withValues(alpha: 0.4),
                         shape: BoxShape.circle,
+                        boxShadow: canSend ? ServioShadows.restDark : null,
                       ),
                       child: IconButton(
                         onPressed: canSend ? _sendMessage : null,
@@ -370,9 +530,9 @@ class _ChatScreenState extends State<ChatScreen> {
                                 )
                               : const Icon(
                                   key: ValueKey<String>('send'),
-                                  Icons.arrow_upward_rounded,
+                                  Icons.send_rounded,
                                   color: Colors.white,
-                                  size: 20,
+                                  size: 18,
                                 ),
                         ),
                       ),
@@ -387,7 +547,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _body() {
+  Widget _body(bool isDark) {
     if (_loading) {
       return const Center(
         key: ValueKey<String>('loading'),
@@ -404,21 +564,33 @@ class _ChatScreenState extends State<ChatScreen> {
     if (_messages.isEmpty) {
       return const _EmptyThread(key: ValueKey<String>('empty'));
     }
+
+    final showContextCard = widget.bookingId != null || _conversationId != null;
+    final totalItems = _messages.length + (showContextCard ? 1 : 0);
+
     return RefreshIndicator(
       key: const ValueKey<String>('messages'),
       onRefresh: _poll,
       child: ListView.builder(
         controller: _scrollController,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-        itemCount: _messages.length,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        itemCount: totalItems,
         itemBuilder: (BuildContext context, int index) {
-          final message = _messages[index];
+          if (showContextCard && index == 0) {
+            return _ServiceContextCard(
+              bookingId: widget.bookingId ?? _conversationId ?? 'SV-8924',
+              contactName: _contactName,
+            );
+          }
+          final msgIndex = showContextCard ? index - 1 : index;
+          final message = _messages[msgIndex];
           final isMe = message.senderId == _currentUserId;
           return _MessageBubble(
-            key: ValueKey<String>(message.id.isEmpty ? '$index' : message.id),
+            key: ValueKey<String>(message.id.isEmpty ? '$msgIndex' : message.id),
             message: message,
             isMe: isMe,
-            index: index,
+            index: msgIndex,
+            contactName: _contactName,
           );
         },
       ),
@@ -426,137 +598,120 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 }
 
-class _ChatHeader extends StatelessWidget {
-  const _ChatHeader({
+class _ServiceContextCard extends StatelessWidget {
+  const _ServiceContextCard({
+    required this.bookingId,
     required this.contactName,
-    required this.showActions,
-    required this.canDelete,
-    required this.isDeleting,
-    required this.onReport,
-    required this.onDelete,
-    this.isLive = false,
   });
 
+  final String bookingId;
   final String contactName;
-  final bool showActions;
-  final bool canDelete;
-  final bool isDeleting;
-  final bool isLive;
-  final VoidCallback onReport;
-  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
-    final servio = context.servio;
     final theme = Theme.of(context);
-    final initial = contactName.trim().isEmpty ? '?' : contactName.trim()[0];
+    final isDark = theme.brightness == Brightness.dark;
+    final servio = context.servio;
+
+    final shortId = bookingId.length > 8 ? bookingId.substring(bookingId.length - 8).toUpperCase() : bookingId.toUpperCase();
+    final refText = 'Reference: #SV-$shortId';
 
     return Container(
-      margin: const EdgeInsets.all(20),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+      margin: const EdgeInsets.only(bottom: 24, top: 8),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(ServioRadius.xl),
+        color: isDark ? const Color(0xFF262B34) : const Color(0xFFF3EDE7),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFF9A8C73).withValues(alpha: 0.15),
+          width: 1,
+        ),
         boxShadow: ServioShadows.rest,
       ),
-      child: Row(
-        children: <Widget>[
-          IconButton(
-            onPressed: () => Navigator.of(context).maybePop(),
-            icon: const Icon(Icons.arrow_back_rounded),
-          ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
           Container(
-            width: 32,
-            height: 32,
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              gradient: ServioGradients.warm,
+              color: isDark ? Colors.black.withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.6),
               shape: BoxShape.circle,
-              border: Border.all(color: servio.accent, width: 2),
             ),
-            child: Center(child: Text(initial)),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  contactName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelLarge,
-                ),
-                const SizedBox(height: 2),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 300),
-                  child: isLive
-                      ? Row(
-                          key: const ValueKey<String>('live'),
-                          children: <Widget>[
-                            SizedBox(
-                              width: 8,
-                              height: 8,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 1.5,
-                                color: servio.accent,
-                              ),
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              'Updating...',
-                              style: theme.textTheme.bodySmall
-                                  ?.copyWith(color: servio.accent),
-                            ),
-                          ],
-                        )
-                      : Text(
-                          key: const ValueKey<String>('idle'),
-                          'Conversation history',
-                          style: theme.textTheme.bodySmall
-                              ?.copyWith(color: servio.textSecondary),
-                        ),
-                ),
-              ],
+            child: Icon(
+              Icons.handyman_rounded,
+              color: servio.accent,
+              size: 28,
             ),
           ),
-          if (showActions) ...<Widget>[
-            const SizedBox(width: 8),
-            _ChatActionButton(
-              canDelete: canDelete,
-              isDeleting: isDeleting,
-              onReport: onReport,
-              onDelete: onDelete,
+          const SizedBox(height: 12),
+          Text(
+            'Custom Cabinetry Consultation',
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23),
             ),
-          ],
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            refText,
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 13,
+              color: servio.textSecondary,
+            ),
+            textAlign: TextAlign.center,
+          ),
         ],
       ),
     );
   }
 }
 
-enum _ChatAction { report, delete }
-
 class _ChatActionButton extends StatelessWidget {
   const _ChatActionButton({
     required this.canDelete,
     required this.isDeleting,
+    required this.isArchived,
     required this.onReport,
     required this.onDelete,
+    required this.onArchive,
   });
 
   final bool canDelete;
   final bool isDeleting;
+  final bool isArchived;
   final VoidCallback onReport;
   final VoidCallback onDelete;
+  final VoidCallback onArchive;
 
   @override
   Widget build(BuildContext context) {
     final servio = context.servio;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return PopupMenuButton<_ChatAction>(
       enabled: !isDeleting,
       tooltip: 'Chat actions',
       offset: const Offset(0, 44),
+      icon: AnimatedSwitcher(
+        duration: ServioMotion.micro,
+        child: isDeleting
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                ),
+              )
+            : Icon(
+                Icons.more_vert_rounded,
+                color: isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23),
+                size: 22,
+              ),
+      ),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(ServioRadius.md),
       ),
@@ -564,6 +719,9 @@ class _ChatActionButton extends StatelessWidget {
         switch (action) {
           case _ChatAction.report:
             onReport();
+            break;
+          case _ChatAction.archive:
+            onArchive();
             break;
           case _ChatAction.delete:
             onDelete();
@@ -578,6 +736,21 @@ class _ChatActionButton extends StatelessWidget {
               Icon(Icons.flag_outlined, size: 20),
               SizedBox(width: 10),
               Text('Report chat'),
+            ],
+          ),
+        ),
+        PopupMenuItem<_ChatAction>(
+          value: _ChatAction.archive,
+          child: Row(
+            children: <Widget>[
+              Icon(
+                isArchived
+                    ? Icons.unarchive_outlined
+                    : Icons.archive_outlined,
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Text(isArchived ? 'Unarchive chat' : 'Archive chat'),
             ],
           ),
         ),
@@ -602,94 +775,130 @@ class _ChatActionButton extends StatelessWidget {
           ),
         ),
       ],
-      child: Semantics(
-        button: true,
-        label: 'Chat actions',
-        child: Container(
-          width: ServioSpacing.tapTarget,
-          height: ServioSpacing.tapTarget,
-          decoration: BoxDecoration(
-            color: ServioColors.tint(servio.warning),
-            shape: BoxShape.circle,
-            border: Border.all(color: servio.warning.withValues(alpha: 0.28)),
-          ),
-          alignment: Alignment.center,
-          child: AnimatedSwitcher(
-            duration: ServioMotion.micro,
-            child: isDeleting
-                ? SizedBox(
-                    key: const ValueKey<String>('deleting'),
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: servio.warning,
-                    ),
-                  )
-                : Icon(
-                    key: const ValueKey<String>('actions'),
-                    Icons.priority_high_rounded,
-                    color: servio.warning,
-                    size: 22,
-                  ),
-          ),
-        ),
-      ),
     );
   }
 }
+
+enum _ChatAction { report, archive, delete }
 
 class _MessageBubble extends StatelessWidget {
   const _MessageBubble({
     required this.message,
     required this.isMe,
     required this.index,
+    required this.contactName,
     super.key,
   });
 
   final ApiMessage message;
   final bool isMe;
   final int index;
+  final String contactName;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final servio = context.servio;
     final disabled = MediaQuery.disableAnimationsOf(context);
+
+    // Asymmetric styles
+    final bubbleBg = isMe
+        ? (isDark ? const Color(0xFF1A1D23) : const Color(0xFF1A1D23))
+        : (isDark ? const Color(0xFF262B34) : const Color(0xFFF3EDE7));
+
+    final textColor = isMe
+        ? Colors.white
+        : (isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23));
+
+    final borderRadius = BorderRadius.only(
+      topLeft: const Radius.circular(16),
+      topRight: const Radius.circular(16),
+      bottomLeft: Radius.circular(!isMe ? 0 : 16),
+      bottomRight: Radius.circular(!isMe ? 16 : 0),
+    );
+
+    final bubbleBorder = Border.all(
+      color: isMe
+          ? Colors.transparent
+          : const Color(0xFF9A8C73).withValues(alpha: 0.15),
+      width: 1,
+    );
+
+    final initial = contactName.trim().isEmpty ? '?' : contactName.trim()[0].toUpperCase();
 
     final bubble = Align(
       alignment: !isMe ? Alignment.centerLeft : Alignment.centerRight,
       child: Padding(
-        padding: const EdgeInsets.only(bottom: 14),
-        child: Column(
-          crossAxisAlignment:
-              !isMe ? CrossAxisAlignment.start : CrossAxisAlignment.end,
-          children: <Widget>[
-            Container(
-              constraints: const BoxConstraints(maxWidth: 280),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                gradient: !isMe ? null : ServioGradients.brand,
-                color: !isMe ? servio.surfaceRaised : null,
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(ServioRadius.xl),
-                  topRight: const Radius.circular(ServioRadius.xl),
-                  bottomLeft: Radius.circular(!isMe ? 8 : ServioRadius.xl),
-                  bottomRight: Radius.circular(!isMe ? ServioRadius.xl : 8),
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            if (!isMe) ...[
+              CircleAvatar(
+                radius: 16,
+                backgroundColor: servio.accent.withValues(alpha: 0.16),
+                child: Text(
+                  initial,
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: servio.accent,
+                  ),
                 ),
               ),
-              child: Text(
-                message.text,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: !isMe ? theme.colorScheme.onSurface : Colors.white,
-                ),
+              const SizedBox(width: 8),
+            ],
+            Flexible(
+              child: Column(
+                crossAxisAlignment:
+                    !isMe ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+                children: <Widget>[
+                  Container(
+                    constraints: const BoxConstraints(maxWidth: 260),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: bubbleBg,
+                      borderRadius: borderRadius,
+                      border: bubbleBorder,
+                      boxShadow: isMe ? ServioShadows.restDark : ServioShadows.rest,
+                    ),
+                    child: Text(
+                      message.text,
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 14,
+                        color: textColor,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        DateFormat('HH:mm').format(message.createdAt.toLocal()),
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 11,
+                          color: servio.textSecondary,
+                        ),
+                      ),
+                      if (isMe) ...[
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.done_all_rounded,
+                          size: 14,
+                          color: Color(0xFF9A8C73),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              DateFormat('HH:mm').format(message.createdAt),
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: servio.textSecondary),
             ),
           ],
         ),

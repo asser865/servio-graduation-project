@@ -174,6 +174,33 @@ void main() {
     expect(find.text('No saved addresses yet.'), findsOneWidget);
     expect(backend.addresses, isEmpty);
   });
+
+  testWidgets('sets address as default successfully', (tester) async {
+    final backend = _AddressBackend(
+      <Map<String, dynamic>>[
+        _address(id: 'addr1', street: 'Street 1'),
+        _address(id: 'addr2', street: 'Street 2'),
+      ],
+    );
+
+    await tester.pumpWidget(
+      await _wrapWithBackend(const MyAddressesScreen(), backend.client()),
+    );
+    await tester.pumpAndSettle();
+
+    // Verify first has Default badge, second does not (only one default)
+    expect(find.text('Default'), findsOneWidget);
+
+    // Tap "Set as Default" on the second address
+    final btnSetDefault = find.byKey(const ValueKey<String>('set-default-address-addr2'));
+    await tester.ensureVisible(btnSetDefault);
+    await tester.tap(btnSetDefault);
+    await tester.pumpAndSettle();
+
+    // Verify state updated
+    expect(find.text('Default'), findsOneWidget);
+    expect(backend.addresses[0]['_id'], 'addr2');
+  });
 }
 
 Future<Widget> _wrapWithBackend(
@@ -248,6 +275,23 @@ class _AddressBackend {
 
         if (request.method == 'PATCH' &&
             request.url.path.startsWith('/users/me/addresses/')) {
+          if (request.url.path.endsWith('/default')) {
+            final segments = request.url.pathSegments;
+            final id = segments[segments.length - 2];
+            final index = addresses.indexWhere((a) => a['_id'] == id);
+            if (index == -1) {
+              return _json(<String, dynamic>{
+                'success': false,
+                'message': 'Address not found.',
+              }, statusCode: 404);
+            }
+            final removed = addresses.removeAt(index);
+            addresses.insert(0, removed);
+            return _json(<String, dynamic>{
+              'success': true,
+              'data': addresses,
+            });
+          }
           final id = request.url.pathSegments.last;
           final body = jsonDecode(request.body) as Map<String, dynamic>;
           final index = addresses.indexWhere((a) => a['_id'] == id);

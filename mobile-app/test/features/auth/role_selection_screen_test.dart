@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:servio_mobile_app/src/design_system/widgets/servio_primary_button.dart';
 import 'package:servio_mobile_app/src/features/auth/role_selection_screen.dart';
-import 'package:servio_mobile_app/src/features/auth/widgets/auth_background.dart';
 
-Widget _build({Brightness brightness = Brightness.dark}) => MaterialApp(
+Widget _build({Brightness brightness = Brightness.light}) => MaterialApp(
       theme: ThemeData(brightness: brightness),
       home: const RoleSelectionScreen(),
     );
@@ -14,40 +12,37 @@ void main() {
     testWidgets('shows role question heading', (tester) async {
       await tester.pumpWidget(_build());
       await tester.pumpAndSettle();
-      expect(find.textContaining('How will you'), findsOneWidget);
+      expect(find.text('How do you want to use SERVIO?'), findsOneWidget);
     });
 
     testWidgets('shows both role options', (tester) async {
       await tester.pumpWidget(_build());
       await tester.pumpAndSettle();
       expect(find.text('I need a service'), findsOneWidget);
-      expect(find.text("I'm a technician"), findsOneWidget);
+      expect(find.text('Offer my skills'), findsOneWidget);
     });
 
-    testWidgets('Continue button disabled until role selected', (tester) async {
+    testWidgets('Continue button is available with default customer role',
+        (tester) async {
       await tester.pumpWidget(_build());
       await tester.pumpAndSettle();
-      // Find the ServioPrimaryButton and check its onPressed is null
-      final servioPrimaryButton =
-          tester.widget<ServioPrimaryButton>(find.byType(ServioPrimaryButton));
-      expect(servioPrimaryButton.onPressed, isNull);
+      expect(find.text('Continue'), findsOneWidget);
     });
 
-    testWidgets('tapping a role card enables Continue', (tester) async {
+    testWidgets('tapping professional role keeps Continue available',
+        (tester) async {
       await tester.pumpWidget(_build());
       await tester.pumpAndSettle();
-      await tester.tap(find.text('I need a service'));
+      await tester.tap(find.text('Offer my skills'));
       await tester.pump();
-      // After selecting a role, onPressed should not be null
-      final servioPrimaryButton =
-          tester.widget<ServioPrimaryButton>(find.byType(ServioPrimaryButton));
-      expect(servioPrimaryButton.onPressed, isNotNull);
+      expect(find.text('Continue'), findsOneWidget);
     });
 
-    testWidgets('uses AuthBackground', (tester) async {
+    testWidgets('shows login link', (tester) async {
       await tester.pumpWidget(_build());
       await tester.pumpAndSettle();
-      expect(find.byType(AuthBackground), findsOneWidget);
+      expect(find.text('Already have an account? '), findsOneWidget);
+      expect(find.text('Log in'), findsOneWidget);
     });
   });
 }

@@ -189,6 +189,23 @@ class SessionProvider extends ChangeNotifier {
     }
   }
 
+  Future<String?> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      await _usersApi.changePassword(
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      );
+      return null;
+    } on ApiException catch (e) {
+      return e.message;
+    } catch (_) {
+      return 'Could not change password. Check your connection.';
+    }
+  }
+
   Future<String?> loadCurrentWorkerProfile() async {
     try {
       await _refreshAccount();
@@ -475,7 +492,11 @@ class MessagesProvider extends ChangeNotifier {
       List<ApiConversation>.unmodifiable(_conversations);
 
   void startAutoRefresh() {
-    refresh(silent: _loaded);
+    // Defer the initial load to after the current build frame so we never
+    // call notifyListeners() synchronously during didChangeDependencies.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      refresh(silent: _loaded);
+    });
     _pollingTimer?.cancel();
     _pollingTimer = Timer.periodic(_pollInterval, (_) {
       refresh(silent: true);
@@ -557,6 +578,43 @@ class MessagesProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Optimistically toggles the [isArchived] flag for [conversationId], then
+  /// calls the backend and silently refreshes on success.  On failure the
+  /// optimistic change is rolled back.
+  Future<void> archiveConversation(
+    MessagesApi api,
+    String conversationId, {
+    bool archive = true,
+  }) async {
+    // Optimistic local update so the UI tab-filter responds immediately.
+    final idx = _conversations.indexWhere((c) => c.id == conversationId);
+    ApiConversation? previous;
+    if (idx != -1) {
+      previous = _conversations[idx];
+      _conversations[idx] = ApiConversation(
+        id: previous.id,
+        otherUser: previous.otherUser,
+        lastMessage: previous.lastMessage,
+        updatedAt: previous.updatedAt,
+        unreadCount: previous.unreadCount,
+        bookingId: previous.bookingId,
+        isArchived: archive,
+      );
+      notifyListeners();
+    }
+
+    try {
+      await api.archiveConversation(conversationId, archive: archive);
+      await refresh(silent: true);
+    } catch (_) {
+      // Roll back optimistic update on failure.
+      if (idx != -1 && previous != null) {
+        _conversations[idx] = previous;
+        notifyListeners();
+      }
+    }
+  }
+
   @override
   void dispose() {
     stopAutoRefresh();
@@ -579,6 +637,7 @@ bool _sameConversations(
         oldConversation.otherUser.avatar != newConversation.otherUser.avatar ||
         oldConversation.lastMessage != newConversation.lastMessage ||
         oldConversation.unreadCount != newConversation.unreadCount ||
+        oldConversation.isArchived != newConversation.isArchived ||
         !oldConversation.updatedAt
             .isAtSameMomentAs(newConversation.updatedAt)) {
       return false;

@@ -232,6 +232,26 @@ async function deleteConversation(userId, conversationId) {
   };
 }
 
+async function archiveConversation(userId, conversationId, archive = true) {
+  assertObjectId(conversationId, 'conversation ID');
+  const conversation = await Conversation.findById(conversationId);
+  if (!conversation) throw new ApiError(StatusCodes.NOT_FOUND, 'Conversation not found');
+  await ensureParticipant(conversation, userId);
+
+  const uid = userId.toString();
+  const alreadyArchived = conversation.archivedBy.some((id) => id.toString() === uid);
+
+  if (archive && !alreadyArchived) {
+    conversation.archivedBy.push(userId);
+    await conversation.save();
+  } else if (!archive && alreadyArchived) {
+    conversation.archivedBy = conversation.archivedBy.filter((id) => id.toString() !== uid);
+    await conversation.save();
+  }
+
+  return serializeConversationById(conversation._id, userId);
+}
+
 function userSummary(user) {
   if (!user) return null;
   return {
@@ -300,6 +320,7 @@ function serializeConversation(conversation, viewerId) {
     lastMessageAt: conversation.lastMessageAt || lastMessage?.createdAt || conversation.updatedAt,
     updatedAt: conversation.lastMessageAt || conversation.updatedAt,
     unreadCount: unreadValue(conversation, viewerId),
+    isArchived: (conversation.archivedBy || []).some((id) => id.toString() === viewerId.toString()),
     createdAt: conversation.createdAt,
   };
 }
@@ -311,5 +332,6 @@ module.exports = {
   getUnreadCount,
   getConversations,
   deleteConversation,
+  archiveConversation,
   findOrCreateConversation,
 };

@@ -64,6 +64,7 @@ class UsersApi {
     String city = '',
     String state = '',
     String zipCode = '',
+    String apartment = '',
     double? lat,
     double? lng,
   }) async {
@@ -75,6 +76,7 @@ class UsersApi {
         'city': city.trim(),
         'state': state.trim(),
         'zipCode': zipCode.trim(),
+        'apartment': apartment.trim(),
         if (lat != null) 'lat': lat,
         if (lng != null) 'lng': lng,
       },
@@ -89,6 +91,7 @@ class UsersApi {
     String city = '',
     String state = '',
     String zipCode = '',
+    String apartment = '',
     double? lat,
     double? lng,
   }) async {
@@ -100,11 +103,25 @@ class UsersApi {
         'city': city.trim(),
         'state': state.trim(),
         'zipCode': zipCode.trim(),
+        'apartment': apartment.trim(),
         if (lat != null) 'lat': lat,
         if (lng != null) 'lng': lng,
       },
     );
     return CustomerAddress.fromBackend(_client.unwrapData(response));
+  }
+
+  Future<List<CustomerAddress>> setDefaultAddress(String id) async {
+    final response = await _client.patch(
+      '${ApiEndpoints.usersMeAddresses}/$id/default',
+      <String, dynamic>{},
+    );
+    final data = _client.unwrapData(response);
+    final list = (data as List<dynamic>?) ?? <dynamic>[];
+    return list
+        .whereType<Map<String, dynamic>>()
+        .map(CustomerAddress.fromBackend)
+        .toList();
   }
 
   Future<void> deleteAddress(String id) async {
@@ -222,6 +239,19 @@ class UsersApi {
       'newEmail': newEmail,
       'currentPassword': currentPassword,
     });
+  }
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await _client.patch(
+      ApiEndpoints.usersMePassword,
+      <String, dynamic>{
+        'currentPassword': currentPassword,
+        'newPassword': newPassword,
+      },
+    );
   }
 
   Future<void> deleteMe() async {

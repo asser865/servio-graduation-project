@@ -33,6 +33,7 @@ class ApiConversation {
     required this.updatedAt,
     required this.unreadCount,
     this.bookingId,
+    this.isArchived = false,
   });
 
   final String id;
@@ -41,23 +42,33 @@ class ApiConversation {
   final DateTime updatedAt;
   final int unreadCount;
   final String? bookingId;
+  final bool isArchived;
 
   String get contactName => otherUser.name;
   String get contactInitials => _initials(otherUser.name);
 
   factory ApiConversation.fromJson(Map<String, dynamic> json) {
     final other = json['otherUser'] as Map<String, dynamic>?;
-    final last = json['lastMessage'] as Map<String, dynamic>?;
+    final lastObj = json['lastMessage'];
+    final lastMap = lastObj is Map<String, dynamic> ? lastObj : null;
+    final lastStr = lastObj is String ? lastObj : null;
+
+    // Safely coerce isArchived — backend may send bool, null, or other types.
+    final rawArchived = json['isArchived'];
+    final isArchived =
+        rawArchived == true || rawArchived == 1 || rawArchived == '1';
+
     return ApiConversation(
       id: _string(json['conversationId'] ?? json['id'] ?? json['_id']),
       otherUser: ApiParticipant.fromJson(other),
       lastMessage: _string(
-        json['lastMessageText'] ?? last?['content'] ?? last?['text'],
+        json['lastMessageText'] ?? lastStr ?? lastMap?['content'] ?? lastMap?['text'],
         fallback: 'New conversation',
       ),
       updatedAt: _date(json['lastMessageAt'] ?? json['updatedAt']),
       unreadCount: ((json['unreadCount'] as num?) ?? 0).toInt(),
       bookingId: _nullableString(json['bookingId']),
+      isArchived: isArchived,
     );
   }
 }
@@ -187,6 +198,13 @@ class MessagesApi {
           .whereType<Map<String, dynamic>>()
           .map(ApiMessage.fromJson)
           .toList(),
+    );
+  }
+
+  Future<void> archiveConversation(String conversationId, {bool archive = true}) async {
+    await _client.patch(
+      ApiEndpoints.conversationArchive(conversationId),
+      <String, dynamic>{'archive': archive},
     );
   }
 

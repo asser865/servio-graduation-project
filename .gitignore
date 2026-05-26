@@ -72,3 +72,5 @@ AI_SERVICE_AUDIT_REPORT.md
 .graphify_detect.json
 .graphify_python
 
+# Stitch downloads
+stitch-downloads/

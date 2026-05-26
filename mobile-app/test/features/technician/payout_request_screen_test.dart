@@ -27,6 +27,8 @@ void main() {
 
     // Enter amount below minimum
     await tester.enterText(find.byType(TextField).first, '30');
+    await tester.ensureVisible(find.text('Submit Request'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Submit Request'));
     await tester.pump();
 
@@ -63,6 +65,8 @@ void main() {
 
     // Enter valid amount but leave phone empty (Vodafone Cash default)
     await tester.enterText(find.byType(TextField).first, '100');
+    await tester.ensureVisible(find.text('Submit Request'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Submit Request'));
     await tester.pump();
 
@@ -82,6 +86,8 @@ void main() {
 
     // Enter valid amount but leave IBAN empty
     await tester.enterText(find.byType(TextField).first, '100');
+    await tester.ensureVisible(find.text('Submit Request'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Submit Request'));
     await tester.pump();
 

@@ -316,55 +316,57 @@ class _JobQueueScreenState extends State<JobQueueScreen>
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) => Padding(
           padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                'Decline Job',
-                style: Theme.of(ctx)
-                    .textTheme
-                    .titleLarge
-                    ?.copyWith(fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 16),
-              ...([
-                "I'm busy at this time",
-                'Location is too far',
-                'Outside my skill set',
-                'Personal emergency',
-                'Other',
-              ].map((reason) => RadioListTile<String>(
-                    title: Text(reason),
-                    value: reason,
-                    groupValue: selectedReason,
-                    onChanged: (v) => setS(() => selectedReason = v),
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                  ))),
-              const SizedBox(height: 12),
-              Row(
-                children: <Widget>[
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.of(ctx).pop(),
-                      child: const Text('Cancel'),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Decline Job',
+                  style: Theme.of(ctx)
+                      .textTheme
+                      .titleLarge
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 16),
+                ...([
+                  "I'm busy at this time",
+                  'Location is too far',
+                  'Outside my skill set',
+                  'Personal emergency',
+                  'Other',
+                ].map((reason) => RadioListTile<String>(
+                      title: Text(reason),
+                      value: reason,
+                      groupValue: selectedReason,
+                      onChanged: (v) => setS(() => selectedReason = v),
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ))),
+                const SizedBox(height: 12),
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        child: const Text('Cancel'),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: selectedReason == null
-                          ? null
-                          : () => Navigator.of(ctx).pop(selectedReason),
-                      style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red),
-                      child: const Text('Decline'),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: selectedReason == null
+                            ? null
+                            : () => Navigator.of(ctx).pop(selectedReason),
+                        style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red),
+                        child: const Text('Decline'),
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
