@@ -54,8 +54,9 @@ class ApiClient {
   }) async {
     final uri = Uri.parse('$_baseUrl$path');
     final token = await _tokenStorage.getToken();
+    final didSendToken = token != null && token.isNotEmpty;
     final request = http.MultipartRequest('POST', uri);
-    if (token != null && token.isNotEmpty) {
+    if (didSendToken) {
       request.headers['Authorization'] = 'Bearer $token';
     }
     request.fields.addAll(fields);
@@ -92,7 +93,7 @@ class ApiClient {
       throw const ApiException(message: 'Invalid server response.');
     }
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      if (response.statusCode == 401) {
+      if (response.statusCode == 401 && didSendToken) {
         await _tokenStorage.clearToken();
       }
       final errors = decoded['errors'];
@@ -123,7 +124,8 @@ class ApiClient {
     final uri = Uri.parse('$_baseUrl$path');
     final headers = <String, String>{'Content-Type': 'application/json'};
     final token = await _tokenStorage.getToken();
-    if (token != null && token.isNotEmpty) {
+    final didSendToken = token != null && token.isNotEmpty;
+    if (didSendToken) {
       headers['Authorization'] = 'Bearer $token';
     }
 
@@ -156,7 +158,10 @@ class ApiClient {
       throw const ApiException(message: 'Invalid server response.');
     }
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      if (response.statusCode == 401) {
+      // Only clear token when server explicitly rejected a token we sent.
+      // If we sent no token, there's nothing to clear and we must not wipe
+      // a valid token that lives in storage for other requests.
+      if (response.statusCode == 401 && didSendToken) {
         await _tokenStorage.clearToken();
       }
       final errors = decoded['errors'];
@@ -186,8 +191,9 @@ class ApiClient {
     final base = Uri.parse('$_baseUrl$path');
     final uri = queryParams != null ? base.replace(queryParameters: queryParams) : base;
     final token = await _tokenStorage.getToken();
+    final didSendToken = token != null && token.isNotEmpty;
     final headers = <String, String>{'Content-Type': contentType};
-    if (token != null && token.isNotEmpty) {
+    if (didSendToken) {
       headers['Authorization'] = 'Bearer $token';
     }
 
@@ -210,7 +216,7 @@ class ApiClient {
       throw const ApiException(message: 'Invalid server response.');
     }
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      if (response.statusCode == 401) await _tokenStorage.clearToken();
+      if (response.statusCode == 401 && didSendToken) await _tokenStorage.clearToken();
       final errors = decoded['errors'];
       throw ApiException(
         statusCode: response.statusCode,

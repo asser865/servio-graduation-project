@@ -337,9 +337,14 @@ class _ServiceChips extends StatelessWidget {
   final AnimationController controller;
 
   static const List<_ChipData> _items = <_ChipData>[
-    _ChipData(Icons.plumbing_rounded, 'Plumbing', 0.22),
-    _ChipData(Icons.electrical_services_rounded, 'Electrical', 0.32),
-    _ChipData(Icons.hvac_rounded, 'HVAC', 0.42),
+    _ChipData(Icons.plumbing_rounded, 'Plumbing', 0.20),
+    _ChipData(Icons.electrical_services_rounded, 'Electrical', 0.27),
+    _ChipData(Icons.hvac_rounded, 'HVAC', 0.34),
+    _ChipData(Icons.cleaning_services_rounded, 'Cleaning', 0.40),
+    _ChipData(Icons.format_paint_rounded, 'Painting', 0.46),
+    _ChipData(Icons.handyman_rounded, 'Carpentry', 0.52),
+    _ChipData(Icons.pest_control_rounded, 'Pest Control', 0.58),
+    _ChipData(Icons.local_shipping_rounded, 'Moving', 0.66),
   ];
 
   @override
@@ -387,16 +392,14 @@ class _ServiceChipState extends State<_ServiceChip> {
       onTapCancel: () => setState(() => _pressed = false),
       onTapUp: (_) => setState(() => _pressed = false),
       child: AnimatedScale(
-        scale: _pressed ? 0.96 : 1,
+        scale: _pressed ? 0.94 : 1,
         duration: ServioMotion.fast,
         curve: ServioMotion.spring,
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: const Color(0xFFF3EDE7),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: ServioColors.accent.withValues(alpha: 0.20),
-            ),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: ServioColors.accent.withValues(alpha: 0.20)),
           ),
           child: SizedBox(
             height: ServioSpacing.tapTarget,
@@ -405,12 +408,8 @@ class _ServiceChipState extends State<_ServiceChip> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
-                  Icon(
-                    widget.item.icon,
-                    color: ServioColors.navyDark,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 6),
+                  Icon(widget.item.icon, color: ServioColors.navyDark, size: 20),
+                  const SizedBox(width: 7),
                   Text(
                     widget.item.label,
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -561,19 +560,32 @@ class _Reveal extends StatelessWidget {
     if (reduceMotion) return child;
 
     final end = (intervalStart + 0.34).clamp(0.0, 1.0).toDouble();
-    final animation = CurvedAnimation(
+
+    // Fade + slide: spring curve for smooth entry
+    final entranceAnim = CurvedAnimation(
       parent: controller,
       curve: Interval(intervalStart, end, curve: ServioMotion.spring),
     );
 
+    // Scale: elasticOut for a satisfying pop-bounce
+    final scaleAnim = Tween<double>(begin: 0.65, end: 1.0).animate(
+      CurvedAnimation(
+        parent: controller,
+        curve: Interval(intervalStart, end, curve: Curves.elasticOut),
+      ),
+    );
+
     return FadeTransition(
-      opacity: animation,
-      child: SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(0, 0.10),
-          end: Offset.zero,
-        ).animate(animation),
-        child: child,
+      opacity: entranceAnim,
+      child: ScaleTransition(
+        scale: scaleAnim,
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 0.18),
+            end: Offset.zero,
+          ).animate(entranceAnim),
+          child: child,
+        ),
       ),
     );
   }

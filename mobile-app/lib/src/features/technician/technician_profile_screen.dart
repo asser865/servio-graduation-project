@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/api/api_client.dart';
@@ -11,7 +10,6 @@ import '../../core/models/backend_booking_model.dart';
 import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
-import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_tab_shell.dart';
 import '../auth/auth_landing_screen.dart';
 import '../marketing/about_screen.dart';
@@ -154,245 +152,384 @@ class _TechnicianSettingsProfileScreenState
   Widget build(BuildContext context) {
     final account = context.watch<SessionProvider>().account;
     final bottomInset = ServioTabShell.bottomOverlayInsetOf(context);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final servio = context.servio;
 
     final jobs = account?.completedJobs ?? 0;
     final rating = account?.averageRating ?? 0.0;
     final minRate = account?.hourlyRate ?? 0.0;
 
+    final createdAt = account?.createdAt;
+    final sinceYear = createdAt != null ? createdAt.year.toString() : '2025';
+
+    final appBg = isDark ? const Color(0xFF262B34) : const Color(0xFFE4E2DF).withValues(alpha: 0.5);
+    final appIcon = isDark ? const Color(0xFFE3D5CA) : const Color(0xFF45474B);
+
+    final supportBg = isDark ? const Color(0xFF7C2D12).withValues(alpha: 0.2) : const Color(0xFFFFF7ED);
+    final supportIcon = isDark ? const Color(0xFFFB923C) : const Color(0xFFF97316);
+
+    final legalBg = isDark ? const Color(0xFF1E3A8A).withValues(alpha: 0.2) : const Color(0xFFEFF6FF);
+    final legalIcon = isDark ? const Color(0xFF60A5FA) : const Color(0xFF3B82F6);
+
     return Scaffold(
-      body: AnnotatedRegion<SystemUiOverlayStyle>(
-        value: SystemUiOverlayStyle.light
-            .copyWith(statusBarColor: Colors.transparent),
-        child: CustomScrollView(
-          slivers: <Widget>[
-            SliverPersistentHeader(
-              pinned: true,
-              delegate: _ProfileHeaderDelegate(
-                topPadding: MediaQuery.paddingOf(context).top,
-                initials: account?.initials ?? 'T',
-                name: account?.name ?? 'Technician',
-                email: account?.email ?? '',
-                role: 'Technician',
-              ),
-            ),
-            SliverPadding(
-              padding: EdgeInsets.fromLTRB(
-                ServioSpacing.screenPadding,
-                24,
-                ServioSpacing.screenPadding,
-                ServioSpacing.screenPadding + 24 + bottomInset,
-              ),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate(<Widget>[
-                  // ── Stats ────────────────────────────────────────────────
-                  _FadeSlide(
-                    animation: _section0,
-                    child: _StatsRow(
+      appBar: AppBar(
+        title: const Text('Profile'),
+        backgroundColor: theme.scaffoldBackgroundColor,
+        elevation: 0,
+        centerTitle: false,
+        automaticallyImplyLeading: false,
+        titleTextStyle: theme.textTheme.headlineMedium?.copyWith(
+          fontFamily: 'Poppins',
+          fontSize: 24,
+          fontWeight: FontWeight.w600,
+          color: isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23),
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: EdgeInsets.only(
+          left: ServioSpacing.screenPadding,
+          right: ServioSpacing.screenPadding,
+          top: 16,
+          bottom: bottomInset + ServioSpacing.screenPadding + 24,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            // ── Top profile card ────────────────────────────────────────────────
+            _FadeSlide(
+              animation: _section0,
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF262B34) : const Color(0xFFF3EDE7),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: servio.border.withValues(alpha: 0.15),
+                    width: 1,
+                  ),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color.fromRGBO(26, 29, 37, 0.03),
+                      blurRadius: 16,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Stack(
+                          children: [
+                            Container(
+                              width: 72,
+                              height: 72,
+                              decoration: BoxDecoration(
+                                color: servio.accent,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: isDark ? const Color(0xFF262B34) : Colors.white,
+                                  width: 3,
+                                ),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  account?.initials ?? 'T',
+                                  style: const TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            if (account?.isVerified ?? false)
+                              Positioned(
+                                bottom: 0,
+                                right: 0,
+                                child: Container(
+                                  width: 22,
+                                  height: 22,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF9A8C73),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: isDark ? const Color(0xFF262B34) : Colors.white,
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                  child: const Icon(
+                                    Icons.verified_rounded,
+                                    size: 12,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                account?.name ?? 'Technician',
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  fontFamily: 'Poppins',
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 20,
+                                  color: isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.calendar_month_rounded,
+                                    size: 14,
+                                    color: servio.textSecondary,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Member since $sinceYear',
+                                    style: TextStyle(
+                                      fontFamily: 'Inter',
+                                      fontSize: 12,
+                                      color: servio.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    _StatsRow(
                       statsCtrl: _statsCtrl,
                       jobs: jobs,
                       rating: rating,
                       minRate: minRate,
+                      isDark: isDark,
                     ),
-                  ),
-                  const SizedBox(height: ServioSpacing.sectionGap),
-
-                  // ── Professional Summary ─────────────────────────────────
-                  _FadeSlide(
-                    animation: _section1,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        const _SectionHeader(label: 'Professional'),
-                        _ProfessionalCard(account: account),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: ServioSpacing.sectionGap),
-
-                  // ── Recent Jobs Portfolio ────────────────────────────────
-                  _FadeSlide(
-                    animation: _section3,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        const _SectionHeader(label: 'Recent Jobs'),
-                        _PortfolioSection(
-                          jobs: _portfolio,
-                          loading: _extraLoading,
-                          error: _extraError,
-                          onRetry: _fetchExtraData,
-                          onViewAll: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) =>
-                                  _AllJobsScreen(jobs: _portfolio),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: ServioSpacing.sectionGap),
-
-                  // ── Reviews ──────────────────────────────────────────────
-                  _FadeSlide(
-                    animation: _section4,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        const _SectionHeader(label: 'Reviews'),
-                        _ReviewsSection(
-                          reviews: _reviews,
-                          loading: _extraLoading,
-                          error: _extraError,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: ServioSpacing.sectionGap),
-
-                  // ── App ───────────────────────────────────────────────────
-                  _FadeSlide(
-                    animation: _section5,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        const _SectionHeader(label: 'App'),
-                        _MenuGroup(children: <Widget>[
-                          _NavTile(
-                            icon: Icons.verified_user_outlined,
-                            iconColor: context.servio.accent,
-                            label: 'Verification',
-                            subtitle: 'Manage your identity documents',
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) =>
-                                    const WorkerVerificationScreen(),
-                              ),
-                            ),
-                          ),
-                          _NavTile(
-                            icon: Icons.schedule_rounded,
-                            iconColor: context.servio.success,
-                            label: 'Availability',
-                            subtitle: 'Manage your working hours',
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) =>
-                                    const AvailabilityManagerScreen(),
-                              ),
-                            ),
-                          ),
-                          _NavTile(
-                            icon: Icons.settings_outlined,
-                            iconColor: context.servio.accent,
-                            label: 'Settings',
-                            subtitle: 'Profile, security, preferences',
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) =>
-                                    const TechnicianSettingsScreen(),
-                              ),
-                            ),
-                          ),
-                          _NavTile(
-                            icon: Icons.flag_outlined,
-                            iconColor: context.servio.warning,
-                            label: 'Report a Problem',
-                            subtitle: 'Send us feedback or issues',
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => const ReportProblemScreen(),
-                              ),
-                            ),
-                          ),
-                          _NavTile(
-                            icon: Icons.headset_mic_outlined,
-                            iconColor: context.servio.info,
-                            label: 'Contact Us',
-                            subtitle: 'Get help from our team',
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => const ContactScreen(),
-                              ),
-                            ),
-                          ),
-                        ]),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: ServioSpacing.sectionGap),
-
-                  // ── Legal ─────────────────────────────────────────────────
-                  _FadeSlide(
-                    animation: _section5,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        const _SectionHeader(label: 'Legal'),
-                        _MenuGroup(children: <Widget>[
-                          _NavTile(
-                            icon: Icons.info_outline_rounded,
-                            iconColor: context.servio.accent,
-                            label: 'About SERVIO',
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                  builder: (_) => const AboutScreen()),
-                            ),
-                          ),
-                          _NavTile(
-                            icon: Icons.description_outlined,
-                            iconColor: context.servio.accent,
-                            label: 'Terms of Service',
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                  builder: (_) => const TermsOfServiceScreen()),
-                            ),
-                          ),
-                          _NavTile(
-                            icon: Icons.privacy_tip_outlined,
-                            iconColor: context.servio.accent,
-                            label: 'Privacy Policy',
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                  builder: (_) => const PrivacyPolicyScreen()),
-                            ),
-                          ),
-                          _NavTile(
-                            icon: Icons.quiz_outlined,
-                            iconColor: context.servio.accent,
-                            label: 'FAQ',
-                            subtitle: 'Frequently asked questions',
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                  builder: (_) => const FaqScreen()),
-                            ),
-                          ),
-                        ]),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: ServioSpacing.sectionGap),
-
-                  // ── Logout ────────────────────────────────────────────────
-                  _FadeSlide(
-                    animation: _section5,
-                    child: _LogoutButton(
-                      onTap: () async {
-                        await context.read<SessionProvider>().logout();
-                        if (context.mounted) {
-                          Navigator.of(context).pushAndRemoveUntil(
-                            MaterialPageRoute<void>(
-                              builder: (_) => const AuthLandingScreen(),
-                            ),
-                            (Route<dynamic> _) => false,
-                          );
-                        }
-                      },
-                    ),
-                  ),
-                ]),
+                  ],
+                ),
               ),
             ),
+            const SizedBox(height: 20),
+
+            // ── Professional summary ──────────────────────────────────────────
+            _FadeSlide(
+              animation: _section1,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  const _SectionHeader(label: 'Professional'),
+                  _ProfessionalCard(account: account),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // ── Recent Jobs portfolio ────────────────────────────────────────
+            _FadeSlide(
+              animation: _section3,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  const _SectionHeader(label: 'Recent Jobs'),
+                  _PortfolioSection(
+                    jobs: _portfolio,
+                    loading: _extraLoading,
+                    error: _extraError,
+                    onRetry: _fetchExtraData,
+                    onViewAll: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => _AllJobsScreen(jobs: _portfolio),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // ── Reviews ──────────────────────────────────────────────────────
+            _FadeSlide(
+              animation: _section4,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  const _SectionHeader(label: 'Reviews'),
+                  _ReviewsSection(
+                    reviews: _reviews,
+                    loading: _extraLoading,
+                    error: _extraError,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // ── App ──────────────────────────────────────────────────────────
+            _FadeSlide(
+              animation: _section5,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  const _SectionHeader(label: 'App'),
+                  _MenuGroup(
+                    children: <Widget>[
+                      _NavTile(
+                        icon: Icons.verified_user_rounded,
+                        iconColor: appIcon,
+                        backgroundColor: appBg,
+                        label: 'Verification',
+                        subtitle: 'Manage your identity documents',
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const WorkerVerificationScreen(),
+                          ),
+                        ),
+                      ),
+                      _NavTile(
+                        icon: Icons.schedule_rounded,
+                        iconColor: appIcon,
+                        backgroundColor: appBg,
+                        label: 'Availability',
+                        subtitle: 'Manage your working hours',
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const AvailabilityManagerScreen(),
+                          ),
+                        ),
+                      ),
+                      _NavTile(
+                        icon: Icons.settings_rounded,
+                        iconColor: appIcon,
+                        backgroundColor: appBg,
+                        label: 'Settings',
+                        subtitle: 'Profile, security, preferences',
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const TechnicianSettingsScreen(),
+                          ),
+                        ),
+                      ),
+                      _NavTile(
+                        icon: Icons.report_problem_rounded,
+                        iconColor: supportIcon,
+                        backgroundColor: supportBg,
+                        label: 'Report a Problem',
+                        subtitle: 'Send us feedback or issues',
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const ReportProblemScreen(),
+                          ),
+                        ),
+                      ),
+                      _NavTile(
+                        icon: Icons.contact_support_rounded,
+                        iconColor: supportIcon,
+                        backgroundColor: supportBg,
+                        label: 'Contact Us',
+                        subtitle: 'Get help from our team',
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const ContactScreen(),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // ── Legal ────────────────────────────────────────────────────────
+            _FadeSlide(
+              animation: _section5,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  const _SectionHeader(label: 'Legal'),
+                  _MenuGroup(
+                    children: <Widget>[
+                      _NavTile(
+                        icon: Icons.info_rounded,
+                        iconColor: legalIcon,
+                        backgroundColor: legalBg,
+                        label: 'About SERVIO',
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const AboutScreen(),
+                          ),
+                        ),
+                      ),
+                      _NavTile(
+                        icon: Icons.description_rounded,
+                        iconColor: legalIcon,
+                        backgroundColor: legalBg,
+                        label: 'Terms of Service',
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const TermsOfServiceScreen(),
+                          ),
+                        ),
+                      ),
+                      _NavTile(
+                        icon: Icons.privacy_tip_rounded,
+                        iconColor: legalIcon,
+                        backgroundColor: legalBg,
+                        label: 'Privacy Policy',
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const PrivacyPolicyScreen(),
+                          ),
+                        ),
+                      ),
+                      _NavTile(
+                        icon: Icons.quiz_rounded,
+                        iconColor: legalIcon,
+                        backgroundColor: legalBg,
+                        label: 'FAQ',
+                        subtitle: 'Frequently asked questions',
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const FaqScreen(),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // ── Logout ───────────────────────────────────────────────────────
+            _FadeSlide(
+              animation: _section5,
+              child: _LogoutButton(
+                onTap: () async {
+                  await context.read<SessionProvider>().logout();
+                  if (context.mounted) {
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const AuthLandingScreen(),
+                      ),
+                      (Route<dynamic> _) => false,
+                    );
+                  }
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
           ],
         ),
       ),
@@ -432,56 +569,44 @@ class _StatsRow extends StatelessWidget {
     required this.jobs,
     required this.rating,
     required this.minRate,
+    required this.isDark,
   });
 
   final AnimationController statsCtrl;
   final int jobs;
   final double rating;
   final double minRate;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
-    final servio = context.servio;
-    final dividerColor = servio.border.withValues(alpha: 0.6);
-
-    return ServioCard(
-      radius: ServioRadius.lg,
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      child: Row(
-        children: <Widget>[
-          Expanded(
-            child: _AnimatedStatItem(
-              controller: statsCtrl,
-              targetValue: jobs.toDouble(),
-              label: 'Jobs',
-              format: (v) => v.toInt().toString(),
-            ),
-          ),
-          SizedBox(
-              height: 36,
-              child: VerticalDivider(color: dividerColor, width: 1)),
-          Expanded(
-            child: _AnimatedStatItem(
-              controller: statsCtrl,
-              targetValue: rating,
-              label: 'Rating',
-              format: (v) => v.toStringAsFixed(1),
-              suffix: '★',
-            ),
-          ),
-          SizedBox(
-              height: 36,
-              child: VerticalDivider(color: dividerColor, width: 1)),
-          Expanded(
-            child: _AnimatedStatItem(
-              controller: statsCtrl,
-              targetValue: minRate,
-              label: 'Min Rate',
-              format: (v) => '${v.toInt()} EGP',
-            ),
-          ),
-        ],
-      ),
+    return Row(
+      children: <Widget>[
+        _AnimatedStatItem(
+          controller: statsCtrl,
+          targetValue: jobs.toDouble(),
+          label: 'Jobs',
+          format: (v) => v.toInt().toString(),
+          isDark: isDark,
+        ),
+        const SizedBox(width: 10),
+        _AnimatedStatItem(
+          controller: statsCtrl,
+          targetValue: rating,
+          label: 'Rating',
+          format: (v) => v.toStringAsFixed(1),
+          suffix: ' ★',
+          isDark: isDark,
+        ),
+        const SizedBox(width: 10),
+        _AnimatedStatItem(
+          controller: statsCtrl,
+          targetValue: minRate,
+          label: 'Min Rate',
+          format: (v) => '${v.toInt()} EGP',
+          isDark: isDark,
+        ),
+      ],
     );
   }
 }
@@ -492,6 +617,7 @@ class _AnimatedStatItem extends StatelessWidget {
     required this.targetValue,
     required this.label,
     required this.format,
+    required this.isDark,
     this.suffix = '',
   });
 
@@ -500,6 +626,7 @@ class _AnimatedStatItem extends StatelessWidget {
   final String label;
   final String Function(double) format;
   final String suffix;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -509,30 +636,48 @@ class _AnimatedStatItem extends StatelessWidget {
       curve: Curves.easeOutCubic,
     );
 
-    return AnimatedBuilder(
-      animation: anim,
-      builder: (BuildContext context, Widget? _) {
-        final current = targetValue * anim.value;
-        return Column(
-          children: <Widget>[
-            Text(
-              format(current),
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: servio.accent,
-                    fontWeight: FontWeight.w700,
+    return Expanded(
+      child: AnimatedBuilder(
+        animation: anim,
+        builder: (BuildContext context, Widget? _) {
+          final current = targetValue * anim.value;
+          final valueStr = '${format(current)}$suffix';
+          return Container(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1A1D23) : Colors.white.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: servio.border.withValues(alpha: 0.15),
+              ),
+            ),
+            child: Column(
+              children: [
+                Text(
+                  valueStr,
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23),
                   ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  label.toUpperCase(),
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 9,
+                    letterSpacing: 1.0,
+                    fontWeight: FontWeight.w600,
+                    color: servio.textSecondary,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: servio.textSecondary),
-            ),
-          ],
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }
@@ -564,8 +709,23 @@ class _ProfessionalCard extends StatelessWidget {
 
     final sinceYear = createdAt != null ? createdAt.year.toString() : '';
 
-    return ServioCard(
-      radius: ServioRadius.lg,
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: servio.border.withValues(alpha: 0.3),
+          width: 1,
+        ),
+        boxShadow: const <BoxShadow>[
+          BoxShadow(
+            color: Color.fromRGBO(34, 40, 49, 0.04),
+            blurRadius: 16,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -573,13 +733,19 @@ class _ProfessionalCard extends StatelessWidget {
           if (bio.isNotEmpty) ...<Widget>[
             Text(
               'About',
-              style: theme.textTheme.labelLarge
-                  ?.copyWith(color: servio.textSecondary),
+              style: theme.textTheme.labelLarge?.copyWith(
+                fontFamily: 'Inter',
+                fontWeight: FontWeight.w600,
+                color: servio.textSecondary,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               bio,
-              style: theme.textTheme.bodyMedium?.copyWith(height: 1.55),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontFamily: 'Inter',
+                height: 1.55,
+              ),
             ),
             const SizedBox(height: 16),
           ],
@@ -588,8 +754,11 @@ class _ProfessionalCard extends StatelessWidget {
           if (allTags.isNotEmpty) ...<Widget>[
             Text(
               'Specialties',
-              style: theme.textTheme.labelLarge
-                  ?.copyWith(color: servio.textSecondary),
+              style: theme.textTheme.labelLarge?.copyWith(
+                fontFamily: 'Inter',
+                fontWeight: FontWeight.w600,
+                color: servio.textSecondary,
+              ),
             ),
             const SizedBox(height: 10),
             Wrap(
@@ -655,7 +824,7 @@ class _PortfolioSection extends StatelessWidget {
     }
 
     if (jobs.isEmpty) {
-      return _EmptyCard(
+      return const _EmptyCard(
         icon: Icons.work_history_outlined,
         message: 'No completed jobs yet.',
       );
@@ -703,79 +872,108 @@ class _PortfolioCard extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: ServioCard(
-        radius: ServioRadius.lg,
-        onTap: () => showTransactionDetailsSheet(context, job: job),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                gradient: ServioGradients.warm,
-                borderRadius: BorderRadius.circular(ServioRadius.md),
-              ),
-              child: const Icon(Icons.build_rounded,
-                  color: ServioColors.deepBrown, size: 20),
+      child: Container(
+        decoration: BoxDecoration(
+          color: theme.cardColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: servio.border.withValues(alpha: 0.3),
+            width: 1,
+          ),
+          boxShadow: const <BoxShadow>[
+            BoxShadow(
+              color: Color.fromRGBO(34, 40, 49, 0.04),
+              blurRadius: 16,
+              offset: Offset(0, 4),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: InkWell(
+            onTap: () => showTransactionDetailsSheet(context, job: job),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Text(
-                    job.serviceName.isNotEmpty ? job.serviceName : 'Service',
-                    style: theme.textTheme.titleSmall
-                        ?.copyWith(fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 4),
-                  if (location.isNotEmpty)
-                    Text(
-                      location,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: servio.textSecondary),
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      gradient: ServioGradients.warm,
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                  Text(
-                    dateStr,
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(color: servio.textSecondary),
+                    child: const Icon(Icons.build_rounded,
+                        color: ServioColors.deepBrown, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          job.serviceName.isNotEmpty ? job.serviceName : 'Service',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontFamily: 'Poppins',
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        if (location.isNotEmpty)
+                          Text(
+                            location,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontFamily: 'Inter',
+                              color: servio.textSecondary,
+                            ),
+                          ),
+                        Text(
+                          dateStr,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontFamily: 'Inter',
+                            color: servio.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: <Widget>[
+                      Text(
+                        '${(job.totalAmount * 0.95).toInt()} EGP',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontFamily: 'Poppins',
+                          color: servio.accent,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: ServioColors.tint(ServioColors.success),
+                          borderRadius: BorderRadius.circular(ServioRadius.full),
+                        ),
+                        child: Text(
+                          'Completed',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: ServioColors.success,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: <Widget>[
-                Text(
-                  '${(job.totalAmount * 0.95).toInt()} EGP',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: servio.accent,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: ServioColors.tint(ServioColors.success),
-                    borderRadius: BorderRadius.circular(ServioRadius.full),
-                  ),
-                  child: Text(
-                    'Completed',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: ServioColors.success,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -799,8 +997,12 @@ class _ReviewsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     if (loading) return const _ShimmerList(count: 2, height: 96);
 
+    if (error != null && reviews.isEmpty) {
+      return Container(); // Shimmer takes care or empty card
+    }
+
     if (reviews.isEmpty) {
-      return _EmptyCard(
+      return const _EmptyCard(
         icon: Icons.star_outline_rounded,
         message: 'No reviews yet.',
       );
@@ -841,8 +1043,23 @@ class _RatingDistribution extends StatelessWidget {
     final theme = Theme.of(context);
     final servio = context.servio;
 
-    return ServioCard(
-      radius: ServioRadius.lg,
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: servio.border.withValues(alpha: 0.3),
+          width: 1,
+        ),
+        boxShadow: const <BoxShadow>[
+          BoxShadow(
+            color: Color.fromRGBO(34, 40, 49, 0.04),
+            blurRadius: 16,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: <Widget>[
@@ -851,6 +1068,7 @@ class _RatingDistribution extends StatelessWidget {
               Text(
                 avg.toStringAsFixed(1),
                 style: theme.textTheme.displaySmall?.copyWith(
+                  fontFamily: 'Poppins',
                   color: servio.accent,
                   fontWeight: FontWeight.w800,
                 ),
@@ -868,8 +1086,10 @@ class _RatingDistribution extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 '$total ${total == 1 ? 'review' : 'reviews'}',
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: servio.textSecondary),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontFamily: 'Inter',
+                  color: servio.textSecondary,
+                ),
               ),
             ],
           ),
@@ -885,8 +1105,10 @@ class _RatingDistribution extends StatelessWidget {
                   child: Row(
                     children: <Widget>[
                       Text('$star',
-                          style: theme.textTheme.labelSmall
-                              ?.copyWith(color: servio.textSecondary)),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            fontFamily: 'Inter',
+                            color: servio.textSecondary,
+                          )),
                       const SizedBox(width: 4),
                       Icon(Icons.star_rounded,
                           size: 10, color: ServioColors.warning),
@@ -921,8 +1143,10 @@ class _RatingDistribution extends StatelessWidget {
                         width: 20,
                         child: Text(
                           '$count',
-                          style: theme.textTheme.labelSmall
-                              ?.copyWith(color: servio.textSecondary),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            fontFamily: 'Inter',
+                            color: servio.textSecondary,
+                          ),
                         ),
                       ),
                     ],
@@ -953,8 +1177,23 @@ class _ReviewCard extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: ServioCard(
-        radius: ServioRadius.lg,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: theme.cardColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: servio.border.withValues(alpha: 0.3),
+            width: 1,
+          ),
+          boxShadow: const <BoxShadow>[
+            BoxShadow(
+              color: Color.fromRGBO(34, 40, 49, 0.04),
+              blurRadius: 16,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -973,6 +1212,7 @@ class _ReviewCard extends StatelessWidget {
                           ? review.reviewerName[0].toUpperCase()
                           : 'A',
                       style: theme.textTheme.titleSmall?.copyWith(
+                        fontFamily: 'Poppins',
                         color: ServioColors.accent,
                         fontWeight: FontWeight.w700,
                       ),
@@ -986,13 +1226,17 @@ class _ReviewCard extends StatelessWidget {
                     children: <Widget>[
                       Text(
                         review.reviewerName,
-                        style: theme.textTheme.titleSmall
-                            ?.copyWith(fontWeight: FontWeight.w600),
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontFamily: 'Poppins',
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       Text(
                         date,
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(color: servio.textSecondary),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontFamily: 'Inter',
+                          color: servio.textSecondary,
+                        ),
                       ),
                     ],
                   ),
@@ -1013,8 +1257,11 @@ class _ReviewCard extends StatelessWidget {
               const SizedBox(height: 10),
               Text(
                 review.comment,
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(height: 1.5, color: servio.textSecondary),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontFamily: 'Inter',
+                  height: 1.5,
+                  color: servio.textSecondary,
+                ),
               ),
             ],
           ],
@@ -1089,8 +1336,15 @@ class _ErrorCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final servio = context.servio;
-    return ServioCard(
-      radius: ServioRadius.lg,
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: servio.border.withValues(alpha: 0.3),
+        ),
+      ),
       child: Column(
         children: <Widget>[
           Icon(Icons.wifi_off_rounded, color: servio.textSecondary, size: 28),
@@ -1099,7 +1353,7 @@ class _ErrorCard extends StatelessWidget {
               style: Theme.of(context)
                   .textTheme
                   .bodySmall
-                  ?.copyWith(color: servio.textSecondary),
+                  ?.copyWith(fontFamily: 'Inter', color: servio.textSecondary),
               textAlign: TextAlign.center),
           const SizedBox(height: 10),
           TextButton(onPressed: onRetry, child: const Text('Retry')),
@@ -1117,8 +1371,16 @@ class _EmptyCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final servio = context.servio;
-    return ServioCard(
-      radius: ServioRadius.lg,
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: servio.border.withValues(alpha: 0.3),
+        ),
+      ),
       child: Column(
         children: <Widget>[
           Icon(icon, color: servio.textSecondary, size: 28),
@@ -1128,290 +1390,9 @@ class _EmptyCard extends StatelessWidget {
             style: Theme.of(context)
                 .textTheme
                 .bodySmall
-                ?.copyWith(color: servio.textSecondary),
+                ?.copyWith(fontFamily: 'Inter', color: servio.textSecondary),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// ── Hero profile header ───────────────────────────────────────────────────────
-
-class _ProfileHeaderDelegate extends SliverPersistentHeaderDelegate {
-  const _ProfileHeaderDelegate({
-    required this.topPadding,
-    required this.initials,
-    required this.name,
-    required this.email,
-    required this.role,
-  });
-
-  final double topPadding;
-  final String initials;
-  final String name;
-  final String email;
-  final String role;
-
-  @override
-  double get maxExtent => topPadding + 300;
-
-  @override
-  double get minExtent => topPadding + 72;
-
-  @override
-  Widget build(
-    BuildContext context,
-    double shrinkOffset,
-    bool overlapsContent,
-  ) {
-    final progress =
-        (shrinkOffset / (maxExtent - minExtent)).clamp(0.0, 1.0).toDouble();
-    final eased = ServioMotion.reveal.transform(progress);
-    final expandedOpacity = (1 - progress * 1.45).clamp(0.0, 1.0).toDouble();
-    final compactOpacity =
-        ((progress - 0.34) / 0.66).clamp(0.0, 1.0).toDouble();
-
-    return Container(
-      width: double.infinity,
-      decoration: const BoxDecoration(gradient: ServioGradients.brand),
-      child: Stack(
-        clipBehavior: Clip.hardEdge,
-        fit: StackFit.expand,
-        children: <Widget>[
-          Positioned(
-            left: 0,
-            right: 0,
-            top: 0,
-            height: maxExtent,
-            child: Opacity(
-              opacity: expandedOpacity,
-              child: Transform.translate(
-                offset: Offset(0, -24 * eased),
-                child: _ExpandedProfileHeader(
-                  initials: initials,
-                  name: name,
-                  email: email,
-                  role: role,
-                  topPadding: topPadding,
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            left: ServioSpacing.screenPadding,
-            right: ServioSpacing.screenPadding,
-            top: topPadding + 10,
-            child: Opacity(
-              opacity: compactOpacity,
-              child: Transform.translate(
-                offset: Offset(0, 14 * (1 - eased)),
-                child: _CompactProfileHeader(
-                  initials: initials,
-                  name: name,
-                  role: role,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  bool shouldRebuild(covariant _ProfileHeaderDelegate oldDelegate) {
-    return topPadding != oldDelegate.topPadding ||
-        initials != oldDelegate.initials ||
-        name != oldDelegate.name ||
-        email != oldDelegate.email ||
-        role != oldDelegate.role;
-  }
-}
-
-class _ExpandedProfileHeader extends StatelessWidget {
-  const _ExpandedProfileHeader({
-    required this.initials,
-    required this.name,
-    required this.email,
-    required this.role,
-    required this.topPadding,
-  });
-
-  final String initials;
-  final String name;
-  final String email;
-  final String role;
-  final double topPadding;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(24, topPadding + 14, 24, 30),
-      child: Column(
-        children: <Widget>[
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'Profile',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-          ),
-          const Spacer(),
-          _ProfileAvatar(initials: initials, size: 92, iconSize: 30),
-          const SizedBox(height: 14),
-          Text(
-            name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                ),
-            textAlign: TextAlign.center,
-          ),
-          if (email.isNotEmpty) ...<Widget>[
-            const SizedBox(height: 4),
-            Text(
-              email,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.70),
-                  ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-          const SizedBox(height: 12),
-          _ProfileRoleChip(role: role),
-        ],
-      ),
-    );
-  }
-}
-
-class _CompactProfileHeader extends StatelessWidget {
-  const _CompactProfileHeader({
-    required this.initials,
-    required this.name,
-    required this.role,
-  });
-
-  final String initials;
-  final String name;
-  final String role;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: <Widget>[
-        _ProfileAvatar(initials: initials, size: 40, iconSize: 0),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        _ProfileRoleChip(role: role),
-      ],
-    );
-  }
-}
-
-class _ProfileAvatar extends StatelessWidget {
-  const _ProfileAvatar({
-    required this.initials,
-    required this.size,
-    required this.iconSize,
-  });
-
-  final String initials;
-  final double size;
-  final double iconSize;
-
-  @override
-  Widget build(BuildContext context) {
-    final borderWidth = size >= 80 ? 2.5 : 1.5;
-    final textStyle = size >= 80
-        ? Theme.of(context).textTheme.headlineLarge
-        : Theme.of(context).textTheme.titleMedium;
-
-    return Stack(
-      clipBehavior: Clip.none,
-      children: <Widget>[
-        Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.15),
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.4),
-              width: borderWidth,
-            ),
-          ),
-          child: Center(
-            child: Text(
-              initials,
-              style: textStyle?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ),
-        if (iconSize > 0)
-          Positioned(
-            right: 0,
-            bottom: 0,
-            child: Container(
-              width: iconSize,
-              height: iconSize,
-              decoration: BoxDecoration(
-                color: ServioColors.accent,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2),
-              ),
-              child: const Icon(Icons.camera_alt_outlined,
-                  color: Colors.white, size: 14),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _ProfileRoleChip extends StatelessWidget {
-  const _ProfileRoleChip({required this.role});
-  final String role;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(ServioRadius.full),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
-      ),
-      child: Text(
-        role,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: Colors.white,
-              letterSpacing: 0.5,
-            ),
       ),
     );
   }
@@ -1426,14 +1407,16 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 10),
+      padding: const EdgeInsets.only(left: 4, bottom: 6, top: 4),
       child: Text(
         label.toUpperCase(),
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: context.servio.textSecondary,
-              letterSpacing: 1.0,
-              fontWeight: FontWeight.w700,
-            ),
+        style: TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 11,
+          color: context.servio.textSecondary.withValues(alpha: 0.7),
+          letterSpacing: 1.5,
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }
@@ -1447,18 +1430,39 @@ class _MenuGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dividerColor = context.servio.border.withValues(alpha: 0.5);
-    return ServioCard(
-      radius: ServioRadius.lg,
-      padding: EdgeInsets.zero,
+    final servio = context.servio;
+    final theme = Theme.of(context);
+    final dividerColor = servio.border.withValues(alpha: 0.2);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: servio.border.withValues(alpha: 0.3),
+          width: 1,
+        ),
+        boxShadow: const <BoxShadow>[
+          BoxShadow(
+            color: Color.fromRGBO(34, 40, 49, 0.04),
+            blurRadius: 16,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(ServioRadius.lg),
+        borderRadius: BorderRadius.circular(16),
         child: Column(
           children: <Widget>[
             for (var i = 0; i < children.length; i++) ...<Widget>[
               children[i],
               if (i != children.length - 1)
-                Divider(height: 1, indent: 56, color: dividerColor),
+                Divider(
+                  height: 1,
+                  indent: 64,
+                  endIndent: 16,
+                  color: dividerColor,
+                ),
             ],
           ],
         ),
@@ -1476,6 +1480,7 @@ class _NavTile extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.subtitle,
+    this.backgroundColor,
   });
 
   final IconData icon;
@@ -1483,11 +1488,13 @@ class _NavTile extends StatelessWidget {
   final String label;
   final String? subtitle;
   final VoidCallback onTap;
+  final Color? backgroundColor;
 
   @override
   Widget build(BuildContext context) {
     final servio = context.servio;
     final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
 
     return Semantics(
       button: true,
@@ -1496,33 +1503,48 @@ class _NavTile extends StatelessWidget {
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(
-            horizontal: ServioSpacing.cardPadding,
-            vertical: 13,
+            horizontal: 16,
+            vertical: 10,
           ),
           child: Row(
             children: <Widget>[
-              _IconBox(icon: icon, color: iconColor),
-              const SizedBox(width: 14),
+              _IconBox(
+                icon: icon,
+                color: iconColor,
+                backgroundColor: backgroundColor,
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
-                    Text(label,
-                        style: theme.textTheme.bodyMedium
-                            ?.copyWith(fontWeight: FontWeight.w500)),
+                    Text(
+                      label,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontFamily: 'Inter',
+                        fontWeight: FontWeight.w600,
+                        color: isDarkMode ? null : const Color(0xFF262B34),
+                      ),
+                    ),
                     if (subtitle != null) ...<Widget>[
                       const SizedBox(height: 2),
-                      Text(subtitle!,
-                          style: theme.textTheme.bodySmall
-                              ?.copyWith(color: servio.textSecondary)),
+                      Text(
+                        subtitle!,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: servio.textSecondary,
+                        ),
+                      ),
                     ],
                   ],
                 ),
               ),
               const SizedBox(width: 8),
-              Icon(Icons.chevron_right_rounded,
-                  color: servio.textSecondary, size: 20),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: servio.textSecondary.withValues(alpha: 0.7),
+                size: 20,
+              ),
             ],
           ),
         ),
@@ -1532,17 +1554,24 @@ class _NavTile extends StatelessWidget {
 }
 
 class _IconBox extends StatelessWidget {
-  const _IconBox({required this.icon, required this.color});
+  const _IconBox({
+    required this.icon,
+    required this.color,
+    this.backgroundColor,
+  });
+
   final IconData icon;
   final Color color;
+  final Color? backgroundColor;
 
   @override
   Widget build(BuildContext context) {
+    final bg = backgroundColor ?? color.withValues(alpha: 0.12);
     return Container(
       width: 36,
       height: 36,
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
+        color: bg,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Icon(icon, size: 18, color: color),
@@ -1571,7 +1600,7 @@ class _MiniChip extends StatelessWidget {
         style: Theme.of(context)
             .textTheme
             .labelSmall
-            ?.copyWith(color: servio.accent),
+            ?.copyWith(fontFamily: 'Inter', color: servio.accent),
       ),
     );
   }
@@ -1592,14 +1621,17 @@ class _DetailRow extends StatelessWidget {
       child: Row(
         children: <Widget>[
           Expanded(
-            child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontFamily: 'Inter'),
+            ),
           ),
           Text(
             value,
             style: Theme.of(context)
                 .textTheme
                 .bodySmall
-                ?.copyWith(color: servio.textSecondary),
+                ?.copyWith(fontFamily: 'Inter', color: servio.textSecondary),
           ),
         ],
       ),
@@ -1634,11 +1666,13 @@ class _AllJobsScreen extends StatelessWidget {
 
 class _LogoutButton extends StatelessWidget {
   const _LogoutButton({required this.onTap});
+
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final servio = context.servio;
+
     return Semantics(
       button: true,
       label: 'Log Out',

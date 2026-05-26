@@ -20,6 +20,7 @@ class _LoginScreenState extends State<LoginScreen>
     with SingleTickerProviderStateMixin {
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
+  final _passwordFocusNode = FocusNode();
 
   bool _obscurePassword = true;
   bool _rememberMe = false;
@@ -49,6 +50,7 @@ class _LoginScreenState extends State<LoginScreen>
   void dispose() {
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
+    _passwordFocusNode.dispose();
     _entranceController.dispose();
     super.dispose();
   }
@@ -179,6 +181,7 @@ class _LoginScreenState extends State<LoginScreen>
                           child: _LoginCard(
                             emailCtrl: _emailCtrl,
                             passwordCtrl: _passwordCtrl,
+                            passwordFocusNode: _passwordFocusNode,
                             obscurePassword: _obscurePassword,
                             rememberMe: _rememberMe,
                             loading: _loading,
@@ -215,6 +218,7 @@ class _LoginCard extends StatelessWidget {
   const _LoginCard({
     required this.emailCtrl,
     required this.passwordCtrl,
+    required this.passwordFocusNode,
     required this.obscurePassword,
     required this.rememberMe,
     required this.loading,
@@ -228,6 +232,7 @@ class _LoginCard extends StatelessWidget {
 
   final TextEditingController emailCtrl;
   final TextEditingController passwordCtrl;
+  final FocusNode passwordFocusNode;
   final bool obscurePassword;
   final bool rememberMe;
   final bool loading;
@@ -273,10 +278,12 @@ class _LoginCard extends StatelessWidget {
               icon: Icons.mail_outline_rounded,
               keyboardType: TextInputType.emailAddress,
               textInputAction: TextInputAction.next,
+              onSubmitted: (_) => passwordFocusNode.requestFocus(),
             ),
             const SizedBox(height: 18),
             _InputField(
               controller: passwordCtrl,
+              focusNode: passwordFocusNode,
               label: 'Password',
               hintText: '••••••••',
               icon: Icons.lock_outline_rounded,
@@ -369,6 +376,7 @@ class _InputField extends StatelessWidget {
     required this.label,
     required this.hintText,
     required this.icon,
+    this.focusNode,
     this.keyboardType,
     this.textInputAction,
     this.obscureText = false,
@@ -378,6 +386,7 @@ class _InputField extends StatelessWidget {
   });
 
   final TextEditingController controller;
+  final FocusNode? focusNode;
   final String label;
   final String hintText;
   final IconData icon;
@@ -411,6 +420,7 @@ class _InputField extends StatelessWidget {
         const SizedBox(height: 6),
         TextField(
           controller: controller,
+          focusNode: focusNode,
           keyboardType: keyboardType,
           textInputAction: textInputAction,
           obscureText: obscureText,

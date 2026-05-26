@@ -79,6 +79,7 @@ class ServioApp extends StatelessWidget {
           create: (ctx) => NotificationsProvider(
             storage,
             ctx.read<ApiClient>(),
+            tokenStorage: ctx.read<TokenStorage>(),
           ),
         ),
         ChangeNotifierProvider<RoomFinishingProvider>(

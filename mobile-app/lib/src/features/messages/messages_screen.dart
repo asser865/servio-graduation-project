@@ -285,13 +285,14 @@ class _MessagesScreenState extends State<MessagesScreen>
                     servio: servio,
                     isDark: isDark,
                   ),
-                  _buildTabButton(
-                    label: 'Archived (${filteredArchived.length})',
-                    isSelected: _selectedTab == 1,
-                    onTap: () => setState(() => _selectedTab = 1),
-                    servio: servio,
-                    isDark: isDark,
-                  ),
+                  if (!isTechnician)
+                    _buildTabButton(
+                      label: 'Archived (${filteredArchived.length})',
+                      isSelected: _selectedTab == 1,
+                      onTap: () => setState(() => _selectedTab = 1),
+                      servio: servio,
+                      isDark: isDark,
+                    ),
                   _buildTabButton(
                     label: 'Support',
                     isSelected: _selectedTab == 2,
