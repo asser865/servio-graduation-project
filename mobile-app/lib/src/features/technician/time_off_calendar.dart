@@ -519,9 +519,9 @@ class _DateCell extends StatelessWidget {
         border = servio.accent.withValues(alpha: 0.36);
         text = theme.colorScheme.onSurface;
       case _CellState.timeOff:
-        bg = ServioColors.tint(servio.warning);
-        border = servio.warning.withValues(alpha: 0.28);
-        text = servio.warning;
+        bg = const Color(0xFFF1C40F);
+        border = const Color(0xFFF1C40F);
+        text = Colors.white;
     }
 
     return GestureDetector(
@@ -533,6 +533,15 @@ class _DateCell extends StatelessWidget {
           color: bg,
           borderRadius: BorderRadius.circular(ServioRadius.sm),
           border: Border.all(color: border),
+          boxShadow: state == _CellState.timeOff
+              ? const <BoxShadow>[
+                  BoxShadow(
+                    color: Color.fromRGBO(241, 196, 15, 0.3),
+                    blurRadius: 6,
+                    offset: Offset(0, 3),
+                  ),
+                ]
+              : null,
         ),
         child: Stack(
           alignment: Alignment.center,
@@ -555,7 +564,7 @@ class _DateCell extends StatelessWidget {
                   strokeWidth: 1.5,
                   valueColor: AlwaysStoppedAnimation<Color>(
                     // spinner color reflects the transition direction
-                    isBlocked ? servio.warning : servio.accent,
+                    isBlocked ? const Color(0xFFF1C40F) : servio.accent,
                   ),
                 ),
               ),

@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
+<title>Servio - Pick a Date &amp; Time</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Theme Configuration -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                "background": "#fbf9f6",
+                "surface-container-highest": "#e4e2df",
+                "surface-warm": "#F3EDE7",
+                "on-secondary-fixed-variant": "#5b403c",
+                "on-tertiary-fixed": "#231a09",
+                "inverse-primary": "#c4c6ce",
+                "on-tertiary-container": "#91836b",
+                "on-primary-fixed": "#191c22",
+                "secondary-container": "#fed7d0",
+                "surface": "#fbf9f6",
+                "tertiary": "#050200",
+                "on-background": "#1b1c1a",
+                "on-primary-container": "#82858c",
+                "text-muted": "#6B6560",
+                "on-primary-fixed-variant": "#44474d",
+                "outline": "#76777b",
+                "on-tertiary-fixed-variant": "#504530",
+                "surface-dim": "#dbdad7",
+                "primary-fixed": "#e1e2ea",
+                "text-main": "#262B34",
+                "inverse-surface": "#30312f",
+                "on-secondary": "#ffffff",
+                "error": "#ba1a1a",
+                "brown-anchor": "#3E2723",
+                "primary": "#010306",
+                "navy-anchor": "#1A1D23",
+                "secondary-fixed": "#ffdad4",
+                "outline-variant": "#c6c6cb",
+                "primary-fixed-dim": "#c4c6ce",
+                "inverse-on-surface": "#f2f0ed",
+                "secondary-fixed-dim": "#e3beb8",
+                "on-error-container": "#93000a",
+                "on-surface-variant": "#45474b",
+                "taupe-accent": "#9A8C73",
+                "secondary": "#745853",
+                "surface-container-low": "#f5f3f0",
+                "surface-variant": "#e4e2df",
+                "on-secondary-container": "#795c57",
+                "on-secondary-fixed": "#2b1613",
+                "tertiary-container": "#241c0a",
+                "surface-container-lowest": "#ffffff",
+                "on-error": "#ffffff",
+                "error-container": "#ffdad6",
+                "surface-container": "#efeeeb",
+                "tertiary-fixed-dim": "#d5c5a9",
+                "tertiary-fixed": "#f2e0c4",
+                "on-primary": "#ffffff",
+                "on-tertiary": "#ffffff",
+                "surface-bright": "#fbf9f6",
+                "primary-container": "#1a1d23",
+                "on-surface": "#1b1c1a",
+                "surface-tint": "#5c5e65",
+                "surface-container-high": "#eae8e5"
+            },
+            "borderRadius": {
+                "DEFAULT": "0.25rem",
+                "lg": "18px",
+                "md": "14px",
+                "xl": "24px",
+                "full": "9999px"
+            },
+            "spacing": {
+                "sm": "8px",
+                "lg": "24px",
+                "gutter": "16px",
+                "md": "16px",
+                "xl": "32px",
+                "safe-margin": "20px",
+                "unit": "4px",
+                "xxl": "48px",
+                "xs": "4px",
+                "tap-target-min": "44px"
+            },
+            "fontFamily": {
+                "title-lg": ["Poppins"],
+                "display-lg": ["Poppins"],
+                "headline-lg-mobile": ["Poppins"],
+                "label-sm": ["Inter"],
+                "label-md": ["Inter"],
+                "headline-md": ["Poppins"],
+                "body-md": ["Inter"],
+                "headline-lg": ["Poppins"],
+                "body-lg": ["Inter"]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        
+        .active-date-gradient {
+            background: linear-gradient(135deg, #1A1D23 0%, #3E2723 100%);
+        }
+
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        .servio-motion-spring {
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        
+        .servio-motion-spring:active {
+            transform: scale(0.96);
+        }
+        
+        .glass-nav {
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-text-main font-body-md min-h-screen pb-32">
+<!-- Top AppBar -->
+<header class="w-full sticky top-0 z-50 bg-surface/90 glass-nav border-b border-outline-variant/20 flex items-center justify-between px-gutter h-tap-target-min">
+<button class="w-11 h-11 flex items-center justify-center text-primary active:scale-95 duration-150 rounded-full hover:bg-surface-container-low transition-colors">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<h1 class="font-title-lg text-title-lg text-primary">Pick a Date &amp; Time</h1>
+<button class="w-11 h-11 flex items-center justify-center text-primary active:scale-95 duration-150 rounded-full hover:bg-surface-container-low transition-colors">
+<span class="material-symbols-outlined">help</span>
+</button>
+</header>
+<main class="px-safe-margin pt-6 flex flex-col gap-8">
+<!-- Date Selection Section -->
+<section class="flex flex-col gap-4">
+<div class="flex justify-between items-center">
+<h2 class="font-headline-md text-headline-md text-navy-anchor">May 2026</h2>
+<div class="flex gap-2">
+<button class="w-8 h-8 flex items-center justify-center rounded-full border border-outline-variant/30 text-navy-anchor opacity-50">
+<span class="material-symbols-outlined text-[20px]">chevron_left</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center rounded-full border border-outline-variant/30 text-navy-anchor">
+<span class="material-symbols-outlined text-[20px]">chevron_right</span>
+</button>
+</div>
+</div>
+<!-- Horizontal Date Carousel -->
+<div class="flex gap-3 overflow-x-auto no-scrollbar py-2 -mx-2 px-2">
+<!-- Date Bubbles -->
+<button class="flex-shrink-0 w-[46px] h-[68px] rounded-full flex flex-col items-center justify-center gap-1 bg-surface-container text-text-muted opacity-40 cursor-not-allowed">
+<span class="font-label-sm text-[10px] uppercase">Mon</span>
+<span class="font-title-lg text-title-lg">11</span>
+</button>
+<button class="flex-shrink-0 w-[46px] h-[68px] rounded-full flex flex-col items-center justify-center gap-1 bg-surface-container-lowest border border-taupe-accent/20 text-navy-anchor servio-motion-spring">
+<span class="font-label-sm text-[10px] uppercase">Tue</span>
+<span class="font-title-lg text-title-lg">12</span>
+</button>
+<!-- Active Date -->
+<button class="flex-shrink-0 w-[46px] h-[68px] rounded-full flex flex-col items-center justify-center gap-1 active-date-gradient text-white shadow-lg shadow-navy-anchor/10 servio-motion-spring">
+<span class="font-label-sm text-[10px] uppercase">Wed</span>
+<span class="font-title-lg text-title-lg">13</span>
+</button>
+<button class="flex-shrink-0 w-[46px] h-[68px] rounded-full flex flex-col items-center justify-center gap-1 bg-surface-container-lowest border border-taupe-accent/20 text-navy-anchor servio-motion-spring">
+<span class="font-label-sm text-[10px] uppercase">Thu</span>
+<span class="font-title-lg text-title-lg">14</span>
+</button>
+<button class="flex-shrink-0 w-[46px] h-[68px] rounded-full flex flex-col items-center justify-center gap-1 bg-surface-container-lowest border border-taupe-accent/20 text-navy-anchor servio-motion-spring">
+<span class="font-label-sm text-[10px] uppercase">Fri</span>
+<span class="font-title-lg text-title-lg">15</span>
+</button>
+<button class="flex-shrink-0 w-[46px] h-[68px] rounded-full flex flex-col items-center justify-center gap-1 bg-surface-container-lowest border border-taupe-accent/20 text-navy-anchor servio-motion-spring">
+<span class="font-label-sm text-[10px] uppercase">Sat</span>
+<span class="font-title-lg text-title-lg">16</span>
+</button>
+<button class="flex-shrink-0 w-[46px] h-[68px] rounded-full flex flex-col items-center justify-center gap-1 bg-surface-container text-text-muted opacity-40 cursor-not-allowed">
+<span class="font-label-sm text-[10px] uppercase">Sun</span>
+<span class="font-title-lg text-title-lg">17</span>
+</button>
+</div>
+</section>
+<!-- Time Slots Section -->
+<section class="flex flex-col gap-4">
+<div class="flex items-center gap-2">
+<h2 class="font-headline-md text-headline-md text-navy-anchor">Time Slots</h2>
+<span class="px-2 py-0.5 rounded-full bg-surface-warm text-taupe-accent font-label-sm text-[10px]">EST</span>
+</div>
+<!-- Technician Availability Notice (Conditional Mock) -->
+<div class="hidden bg-error-container/40 border border-error/10 p-4 rounded-md flex items-start gap-3">
+<span class="material-symbols-outlined text-error text-[20px]">info</span>
+<p class="font-label-md text-on-error-container">Technician is unavailable for selected morning slots. Please choose an afternoon time.</p>
+</div>
+<div class="flex flex-wrap gap-3">
+<!-- Time Chips -->
+<button class="min-w-[100px] h-tap-target-min rounded-md border border-taupe-accent/30 flex items-center justify-center font-label-md text-navy-anchor servio-motion-spring hover:bg-surface-warm">09:00 AM</button>
+<button class="min-w-[100px] h-tap-target-min rounded-md border border-taupe-accent/30 flex items-center justify-center font-label-md text-navy-anchor servio-motion-spring hover:bg-surface-warm">10:30 AM</button>
+<!-- Active Time -->
+<button class="min-w-[100px] h-tap-target-min rounded-md bg-navy-anchor text-white flex items-center justify-center font-label-md servio-motion-spring shadow-md">01:00 PM</button>
+<button class="min-w-[100px] h-tap-target-min rounded-md border border-taupe-accent/30 flex items-center justify-center font-label-md text-navy-anchor servio-motion-spring hover:bg-surface-warm">02:30 PM</button>
+<button class="min-w-[100px] h-tap-target-min rounded-md border border-taupe-accent/30 flex items-center justify-center font-label-md text-navy-anchor servio-motion-spring hover:bg-surface-warm">04:00 PM</button>
+<button class="min-w-[100px] h-tap-target-min rounded-md border border-taupe-accent/30 flex items-center justify-center font-label-md text-navy-anchor opacity-40 cursor-not-allowed">05:30 PM</button>
+</div>
+</section>
+<!-- Service Address Section -->
+<section class="flex flex-col gap-4">
+<h2 class="font-headline-md text-headline-md text-navy-anchor">Service Address</h2>
+<div class="space-y-4">
+<!-- Address Card Active -->
+<div class="p-lg rounded-lg border border-taupe-accent/40 bg-surface-warm/50 flex gap-4 items-start relative overflow-hidden">
+<div class="absolute top-0 right-0 p-2">
+<span class="material-symbols-outlined text-taupe-accent" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<div class="w-12 h-12 rounded-md bg-white flex items-center justify-center text-navy-anchor flex-shrink-0 shadow-sm">
+<span class="material-symbols-outlined">home</span>
+</div>
+<div class="flex-grow">
+<h3 class="font-label-md text-navy-anchor font-bold">Home</h3>
+<p class="font-body-md text-text-muted text-sm mt-1">124 Artisans Lane, West Village<br/>New York, NY 10014</p>
+</div>
+</div>
+<!-- Mini Map -->
+<div class="w-full h-32 rounded-lg overflow-hidden border border-outline-variant/30 relative">
+<img alt="Map" class="w-full h-full object-cover grayscale-[0.3]" data-alt="A high-quality minimalist digital map of a city neighborhood showing clean architectural lines and soft parchment-colored streets. A single prominent navy-blue pin marker indicates a specific location in a quiet residential area. The overall aesthetic is professional, architectural, and aligned with a premium home concierge service brand, using muted taupe and warm bone tones." data-location="West Village, New York" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCKUNjMULYXbmj2u9lHeqXplAREuvEYgeHfn8uZQI0lGPvUZ-MyGMHdUdM4gpQuksk3_KNvE6mK5AZYpxHhNeamnemfbMbZBUqHG4kGJoTAiZnj8UVTW2g3_8lEoG8w-Kd3_OTl-YW2Vb4hG2h2Jr6wSi1C4tJTxJb6ewGfX3GPyngfMRUP8xELwtf3rOMvDZP0Bk0AzVdhAo6G6ywGNOcUMjRJ77pWTYE6Zr5fVSbDaqqoJQzxGj7yHJk7mVRFjkoh65dAmCQprr0"/>
+<div class="absolute inset-0 bg-navy-anchor/5 pointer-events-none"></div>
+<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+<div class="w-8 h-8 bg-navy-anchor rounded-full flex items-center justify-center shadow-lg border-2 border-white">
+<span class="material-symbols-outlined text-white text-[18px]" style="font-variation-settings: 'FILL' 1;">location_on</span>
+</div>
+</div>
+</div>
+<!-- Other Address -->
+<div class="p-lg rounded-lg border border-outline-variant/30 bg-white flex gap-4 items-start servio-motion-spring cursor-pointer">
+<div class="w-12 h-12 rounded-md bg-surface-container-low flex items-center justify-center text-text-muted flex-shrink-0">
+<span class="material-symbols-outlined">business</span>
+</div>
+<div class="flex-grow">
+<h3 class="font-label-md text-navy-anchor font-bold">Office</h3>
+<p class="font-body-md text-text-muted text-sm mt-1">45 Corporate Plaza, Suite 400<br/>Midtown, NY 10103</p>
+</div>
+</div>
+<!-- Add New Address Button -->
+<button class="w-full h-tap-target-min border-2 border-dashed border-taupe-accent/40 rounded-lg flex items-center justify-center gap-2 text-taupe-accent font-label-md servio-motion-spring">
+<span class="material-symbols-outlined text-[20px]">add</span>
+                    Add New Address
+                </button>
+</div>
+</section>
+</main>
+<!-- Fixed Bottom CTA Container -->
+<div class="fixed bottom-0 left-0 w-full z-50 bg-background/80 backdrop-blur-md px-safe-margin pb-xl pt-4 shadow-[0_-8px_24px_rgba(26,29,37,0.06)]">
+<div class="flex flex-col gap-4 max-w-lg mx-auto">
+<div class="flex justify-between items-center px-2">
+<span class="font-label-md text-text-muted">Estimated Arrival</span>
+<span class="font-label-md text-navy-anchor font-bold">Wed, May 13 • 01:00 PM</span>
+</div>
+<button class="w-full h-14 active-date-gradient text-white rounded-full font-title-lg text-lg servio-motion-spring shadow-xl shadow-navy-anchor/20 flex items-center justify-center gap-3">
+                Continue
+                <span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- Hidden Navigation (BottomNavBar) as per instructions for sub-pages -->
+<!-- Suppression logic applied: Navigation hidden to prioritize task focus -->
+<script>
+        // Micro-interaction for selecting dates and times
+        document.querySelectorAll('.servio-motion-spring').forEach(button => {
+            button.addEventListener('click', function() {
+                // Simplified UI toggle logic
+                if (this.parentElement.classList.contains('flex-wrap')) {
+                    // Time slots selection
+                    this.parentElement.querySelectorAll('button').forEach(btn => {
+                        btn.classList.remove('bg-navy-anchor', 'text-white');
+                        btn.classList.add('border-taupe-accent/30', 'text-navy-anchor');
+                    });
+                    this.classList.remove('border-taupe-accent/30', 'text-navy-anchor');
+                    this.classList.add('bg-navy-anchor', 'text-white');
+                }
+            });
+        });
+
+        // Add a subtle parallax effect to the map on scroll
+        window.addEventListener('scroll', () => {
+            const map = document.querySelector('img[data-location]');
+            if (map) {
+                const scrollValue = window.scrollY;
+                map.style.transform = `translateY(${scrollValue * 0.05}px)`;
+            }
+        });
+    </script>
+</body></html>

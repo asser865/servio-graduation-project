@@ -1,0 +1,284 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Booking Confirmation - SERVIO</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-primary-container": "#82858c",
+                    "secondary-fixed": "#ffdad4",
+                    "on-tertiary-fixed": "#231a09",
+                    "inverse-on-surface": "#f2f0ed",
+                    "secondary-fixed-dim": "#e3beb8",
+                    "on-error-container": "#93000a",
+                    "navy-anchor": "#1A1D23",
+                    "surface-container-low": "#f5f3f0",
+                    "on-background": "#1b1c1a",
+                    "on-secondary-container": "#795c57",
+                    "surface-container": "#efeeeb",
+                    "on-primary": "#ffffff",
+                    "surface-container-high": "#eae8e5",
+                    "on-tertiary": "#ffffff",
+                    "on-secondary-fixed": "#2b1613",
+                    "surface": "#fbf9f6",
+                    "inverse-surface": "#30312f",
+                    "text-main": "#262B34",
+                    "primary-fixed-dim": "#c4c6ce",
+                    "surface-variant": "#e4e2df",
+                    "on-tertiary-fixed-variant": "#504530",
+                    "on-primary-fixed": "#191c22",
+                    "text-muted": "#6B6560",
+                    "outline": "#76777b",
+                    "tertiary": "#050200",
+                    "inverse-primary": "#c4c6ce",
+                    "error-container": "#ffdad6",
+                    "tertiary-fixed": "#f2e0c4",
+                    "on-secondary": "#ffffff",
+                    "on-primary-fixed-variant": "#44474d",
+                    "on-error": "#ffffff",
+                    "outline-variant": "#c6c6cb",
+                    "taupe-accent": "#9A8C73",
+                    "surface-container-highest": "#e4e2df",
+                    "primary-container": "#1a1d23",
+                    "tertiary-fixed-dim": "#d5c5a9",
+                    "tertiary-container": "#241c0a",
+                    "primary-fixed": "#e1e2ea",
+                    "surface-tint": "#5c5e65",
+                    "on-surface-variant": "#45474b",
+                    "brown-anchor": "#3E2723",
+                    "surface-bright": "#fbf9f6",
+                    "on-tertiary-container": "#91836b",
+                    "on-secondary-fixed-variant": "#5b403c",
+                    "surface-container-lowest": "#ffffff",
+                    "error": "#ba1a1a",
+                    "surface-dim": "#dbdad7",
+                    "secondary-container": "#fed7d0",
+                    "primary": "#010306",
+                    "on-surface": "#1b1c1a",
+                    "background": "#fbf9f6",
+                    "surface-warm": "#F3EDE7",
+                    "secondary": "#745853"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "tap-target-min": "44px",
+                    "xs": "4px",
+                    "lg": "24px",
+                    "safe-margin": "20px",
+                    "md": "16px",
+                    "gutter": "16px",
+                    "xxl": "48px",
+                    "sm": "8px",
+                    "unit": "4px",
+                    "xl": "32px"
+            },
+            "fontFamily": {
+                    "title-lg": [
+                            "Poppins"
+                    ],
+                    "display-lg": [
+                            "Poppins"
+                    ],
+                    "headline-lg-mobile": [
+                            "Poppins"
+                    ],
+                    "label-md": [
+                            "Inter"
+                    ],
+                    "headline-md": [
+                            "Poppins"
+                    ],
+                    "body-lg": [
+                            "Inter"
+                    ],
+                    "body-md": [
+                            "Inter"
+                    ],
+                    "headline-lg": [
+                            "Poppins"
+                    ],
+                    "label-sm": [
+                            "Inter"
+                    ]
+            },
+            "fontSize": {
+                    "title-lg": [
+                            "20px",
+                            {
+                                    "lineHeight": "28px",
+                                    "fontWeight": "500"
+                            }
+                    ],
+                    "display-lg": [
+                            "48px",
+                            {
+                                    "lineHeight": "56px",
+                                    "letterSpacing": "-0.02em",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "headline-lg-mobile": [
+                            "28px",
+                            {
+                                    "lineHeight": "36px",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "label-md": [
+                            "14px",
+                            {
+                                    "lineHeight": "20px",
+                                    "letterSpacing": "0.01em",
+                                    "fontWeight": "500"
+                            }
+                    ],
+                    "headline-md": [
+                            "24px",
+                            {
+                                    "lineHeight": "32px",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "body-lg": [
+                            "18px",
+                            {
+                                    "lineHeight": "28px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "body-md": [
+                            "16px",
+                            {
+                                    "lineHeight": "24px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "headline-lg": [
+                            "32px",
+                            {
+                                    "lineHeight": "40px",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "label-sm": [
+                            "12px",
+                            {
+                                    "lineHeight": "16px",
+                                    "fontWeight": "600"
+                            }
+                    ]
+            }
+    },
+        },
+      }
+    </script>
+<style>
+        body {
+            background-color: theme('colors.background');
+            color: theme('colors.text-main');
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="antialiased min-h-screen flex flex-col items-center justify-center p-safe-margin bg-surface-container-lowest">
+<main class="w-full max-w-2xl mx-auto flex flex-col gap-lg pb-xxl">
+<!-- Header / Success Animation Area -->
+<header class="flex flex-col items-center text-center mt-xl mb-md">
+<div class="w-24 h-24 bg-surface-warm rounded-full flex items-center justify-center mb-md border border-taupe-accent/20 shadow-[0_8px_24px_rgba(26,29,37,0.08)]">
+<span class="material-symbols-outlined text-[48px] text-navy-anchor" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<h1 class="font-headline-lg text-headline-lg text-navy-anchor mb-sm">Booking Confirmed</h1>
+<p class="font-body-md text-body-md text-text-muted">Your artisan is scheduled and ready.</p>
+</header>
+<!-- PIN Card -->
+<section class="bg-navy-anchor text-on-primary rounded-xl p-lg relative overflow-hidden shadow-[0_12px_32px_rgba(26,29,37,0.15)] flex flex-col items-center text-center">
+<!-- Decorative background pattern -->
+<div class="absolute inset-0 opacity-10 pointer-events-none" style="background-image: radial-gradient(circle at 2px 2px, white 1px, transparent 0); background-size: 24px 24px;"></div>
+<h2 class="font-label-sm text-label-sm text-taupe-accent uppercase tracking-widest mb-xs z-10">Job PIN Code</h2>
+<div class="font-display-lg text-display-lg tracking-[0.2em] z-10 my-sm font-mono">4829</div>
+<p class="font-body-md text-body-md text-primary-fixed-dim z-10 max-w-sm">Share this PIN with your artisan upon arrival to verify the service.</p>
+</section>
+<!-- Tracker -->
+<section class="bg-surface-warm/50 rounded-xl p-lg border border-taupe-accent/20">
+<h3 class="font-title-lg text-title-lg text-navy-anchor mb-lg">Status</h3>
+<div class="relative pl-8">
+<!-- Track Line -->
+<div class="absolute left-[11px] top-2 bottom-2 w-0.5 bg-taupe-accent/30"></div>
+<!-- Step 1: Confirmed -->
+<div class="relative mb-lg">
+<div class="absolute -left-8 top-1 w-6 h-6 rounded-full bg-navy-anchor flex items-center justify-center z-10 shadow-sm border-2 border-surface-warm">
+<span class="material-symbols-outlined text-[14px] text-on-primary" style="font-variation-settings: 'FILL' 1;">check</span>
+</div>
+<div class="font-label-md text-label-md text-navy-anchor mb-xs">Awaiting Confirmation</div>
+<div class="font-body-md text-body-md text-text-muted">Artisan has received your request.</div>
+</div>
+<!-- Step 2: In Progress -->
+<div class="relative mb-lg">
+<div class="absolute -left-8 top-1 w-6 h-6 rounded-full bg-surface-warm border-2 border-taupe-accent flex items-center justify-center z-10">
+<div class="w-2 h-2 rounded-full bg-taupe-accent"></div>
+</div>
+<div class="font-label-md text-label-md text-text-main mb-xs">Job In Progress</div>
+<div class="font-body-md text-body-md text-text-muted">Artisan is en route or working.</div>
+</div>
+<!-- Step 3: Completed -->
+<div class="relative">
+<div class="absolute -left-8 top-1 w-6 h-6 rounded-full bg-surface-container border-2 border-outline-variant flex items-center justify-center z-10">
+</div>
+<div class="font-label-md text-label-md text-text-muted mb-xs">Completed</div>
+<div class="font-body-md text-body-md text-text-muted">Service finished successfully.</div>
+</div>
+</div>
+</section>
+<!-- Summary Details -->
+<section class="bg-surface rounded-xl p-lg border border-taupe-accent/20 shadow-sm">
+<h3 class="font-title-lg text-title-lg text-navy-anchor mb-md border-b border-taupe-accent/10 pb-sm">Service Summary</h3>
+<div class="flex flex-col gap-sm">
+<div class="flex justify-between items-center py-sm border-b border-taupe-accent/5">
+<span class="font-body-md text-body-md text-text-muted">Service</span>
+<span class="font-label-md text-label-md text-navy-anchor">Premium Plumbing Repair</span>
+</div>
+<div class="flex justify-between items-center py-sm border-b border-taupe-accent/5">
+<span class="font-body-md text-body-md text-text-muted">Date &amp; Time</span>
+<span class="font-label-md text-label-md text-navy-anchor">Oct 24, 2023 - 10:00 AM</span>
+</div>
+<div class="flex justify-between items-center py-sm border-b border-taupe-accent/5">
+<span class="font-body-md text-body-md text-text-muted">Artisan</span>
+<div class="flex items-center gap-xs">
+<span class="material-symbols-outlined text-[18px] text-taupe-accent">person</span>
+<span class="font-label-md text-label-md text-navy-anchor">Alex Rivera</span>
+</div>
+</div>
+<div class="flex justify-between items-center pt-sm">
+<span class="font-body-md text-body-md text-text-muted">Total Paid</span>
+<span class="font-title-lg text-title-lg text-navy-anchor font-bold">$145.00</span>
+</div>
+</div>
+</section>
+<!-- Actions -->
+<section class="flex flex-col sm:flex-row gap-md mt-sm">
+<button class="flex-1 bg-surface-warm text-navy-anchor border-2 border-taupe-accent/50 font-label-md text-label-md h-tap-target-min rounded-lg flex items-center justify-center gap-sm hover:bg-taupe-accent/10 transition-colors">
+<span class="material-symbols-outlined text-[20px]">chat_bubble</span>
+                Message Technician
+            </button>
+<button class="flex-1 bg-navy-anchor text-on-primary font-label-md text-label-md h-tap-target-min rounded-lg flex items-center justify-center hover:bg-navy-anchor/90 transition-colors shadow-[0_4px_12px_rgba(26,29,37,0.1)]">
+                Go Home
+            </button>
+</section>
+</main>
+</body></html>

@@ -19,7 +19,7 @@ import 'ai_smart_match_screen.dart';
 import 'customer_profile_screen.dart';
 import 'my_bookings_screen.dart';
 import 'service_detail_screen.dart';
-import 'services_marketplace_screen.dart';
+import '../shared/search_results_screen.dart';
 import 'technician_listing_screen.dart';
 import 'technician_profile_screen.dart';
 import '../shared/notifications_screen.dart';
@@ -771,7 +771,7 @@ class _PopularServicesSection extends StatelessWidget {
               GestureDetector(
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) => const ServicesMarketplaceScreen(),
+                    builder: (_) => const SearchResultsScreen(query: ''),
                   ),
                 ),
                 child: Text(

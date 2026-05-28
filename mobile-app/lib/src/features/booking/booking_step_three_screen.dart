@@ -3,7 +3,6 @@ import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/api/api_client.dart';
-import '../../core/state/payments_provider.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/api/bookings_api.dart';
 import '../../core/api/payments_api.dart';
@@ -16,6 +15,8 @@ import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
 import 'booking_confirmation_screen.dart';
 import 'booking_flow_data.dart';
+import 'booking_strings.dart';
+import 'widgets/booking_progress_indicator.dart';
 
 class BookingStepThreeScreen extends StatefulWidget {
   const BookingStepThreeScreen({
@@ -31,16 +32,13 @@ class BookingStepThreeScreen extends StatefulWidget {
 
 class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
   bool _termsAccepted = false;
-  bool _useCredits = false;
   bool _loading = false;
   String? _error;
   late String _paymentMethodCode;
   String? _selectedCardId;
   List<SavedCardModel> _savedCards = <SavedCardModel>[];
   bool _cardsLoading = false;
-  bool _savingCard = false;
   String? _cardsError;
-  bool _showAddCardForm = false;
   late ApiClient _apiClient;
   late final TextEditingController _cardNumberController;
   late final TextEditingController _cardExpiryController;
@@ -58,9 +56,6 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
     _cardLabelController = TextEditingController();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _loadSavedCards();
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<PaymentsProvider>().loadCredits();
     });
   }
 
@@ -112,7 +107,6 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
           }
           _selectedCardId = (defaultCard ?? cards.first).id;
         }
-        _showAddCardForm = _paymentMethodCode == 'card' && cards.isEmpty;
       });
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -125,49 +119,235 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
     }
   }
 
-  Future<void> _saveCard() async {
-    final digits = _cardNumberController.text.replaceAll(RegExp(r'\D'), '');
-    final expiry = _cardExpiryController.text.replaceAll(' ', '');
-    if (digits.length < 12 || !RegExp(r'^\d+$').hasMatch(digits)) {
-      setState(() => _cardsError = 'Enter a valid card number.');
-      return;
-    }
-    if (!RegExp(r'^\d{2}/\d{2}$').hasMatch(expiry)) {
-      setState(() => _cardsError = 'Enter expiry as MM/YY.');
-      return;
-    }
+  Future<void> _showAddCardDialog() async {
+    _cardNumberController.clear();
+    _cardExpiryController.clear();
+    _cardLabelController.text = 'Personal';
 
-    setState(() {
-      _savingCard = true;
-      _cardsError = null;
-    });
-    try {
-      final card = await SavedCardsApi(_apiClient).addCard(
-        last4: digits.substring(digits.length - 4),
-        expiry: expiry,
-        cardType: _detectCardType(digits),
-        label: _cardLabelController.text.trim(),
-      );
-      if (!mounted) return;
-      final cards = await SavedCardsApi(_apiClient).getSavedCards();
-      if (!mounted) return;
-      setState(() {
-        _savedCards = cards;
-        _selectedCardId = card.id;
-        _showAddCardForm = false;
-        _cardNumberController.clear();
-        _cardExpiryController.clear();
-        _cardLabelController.clear();
-      });
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() => _cardsError = e.message);
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _cardsError = 'Could not save card.');
-    } finally {
-      if (mounted) setState(() => _savingCard = false);
-    }
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        String labelSelection = 'Personal';
+        bool dialogSaving = false;
+        String? dialogError;
+
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            Future<void> handleSave() async {
+              final digits =
+                  _cardNumberController.text.replaceAll(RegExp(r'\D'), '');
+              final expiry =
+                  _cardExpiryController.text.replaceAll(' ', '');
+              if (digits.length < 12 ||
+                  !RegExp(r'^\d+$').hasMatch(digits)) {
+                setDialogState(
+                    () => dialogError = 'Enter a valid card number.');
+                return;
+              }
+              if (!RegExp(r'^\d{2}/\d{2}$').hasMatch(expiry)) {
+                setDialogState(
+                    () => dialogError = 'Enter expiry as MM/YY.');
+                return;
+              }
+              setDialogState(() {
+                dialogSaving = true;
+                dialogError = null;
+              });
+              try {
+                final card = await SavedCardsApi(_apiClient).addCard(
+                  last4: digits.substring(digits.length - 4),
+                  expiry: expiry,
+                  cardType: _detectCardType(digits),
+                  label: labelSelection,
+                );
+                if (!mounted) return;
+                final cards =
+                    await SavedCardsApi(_apiClient).getSavedCards();
+                if (!mounted) return;
+                setState(() {
+                  _savedCards = cards;
+                  _selectedCardId = card.id;
+                });
+                if (dialogContext.mounted) {
+                  Navigator.of(dialogContext).pop();
+                }
+              } on ApiException catch (e) {
+                setDialogState(() {
+                  dialogSaving = false;
+                  dialogError = e.message;
+                });
+              } catch (_) {
+                setDialogState(() {
+                  dialogSaving = false;
+                  dialogError = 'Could not save card. Try again.';
+                });
+              }
+            }
+
+            final isDark =
+                Theme.of(context).brightness == Brightness.dark;
+
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(ServioRadius.lg),
+              ),
+              backgroundColor:
+                  isDark ? ServioColors.backgroundSoftDark : Colors.white,
+              title: const Text(
+                'Add New Card',
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    TextField(
+                      key: const ValueKey<String>(
+                          'booking-card-number-field'),
+                      controller: _cardNumberController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'Card Number',
+                        hintText: '•••• •••• •••• ••••',
+                        prefixIcon:
+                            const Icon(Icons.credit_card_rounded),
+                        border: OutlineInputBorder(
+                          borderRadius:
+                              BorderRadius.circular(ServioRadius.md),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      key: const ValueKey<String>(
+                          'booking-card-expiry-field'),
+                      controller: _cardExpiryController,
+                      keyboardType: TextInputType.datetime,
+                      decoration: InputDecoration(
+                        labelText: 'Expiry',
+                        hintText: 'MM/YY',
+                        border: OutlineInputBorder(
+                          borderRadius:
+                              BorderRadius.circular(ServioRadius.md),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: <String>['Personal', 'Work']
+                          .map((label) {
+                        final isSelected = labelSelection == label;
+                        return Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.only(
+                                left: label == 'Work' ? 8 : 0),
+                            child: GestureDetector(
+                              onTap: () {
+                                setDialogState(
+                                    () => labelSelection = label);
+                                _cardLabelController.text = label;
+                              },
+                              child: AnimatedContainer(
+                                duration: ServioMotion.fast,
+                                curve: ServioMotion.spring,
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? const Color(0xFFF3EDE7)
+                                          .withValues(alpha: 0.7)
+                                      : (isDark
+                                          ? const Color(0xFF1E2229)
+                                          : const Color(0xFFF5F5F5)),
+                                  borderRadius: BorderRadius.circular(
+                                      ServioRadius.md),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? const Color(0xFF9A8C73)
+                                        : const Color(0xFF9A8C73)
+                                            .withValues(alpha: 0.3),
+                                    width: isSelected ? 1.5 : 1,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    label,
+                                    style: TextStyle(
+                                      fontFamily: 'Inter',
+                                      fontSize: 13,
+                                      fontWeight: isSelected
+                                          ? FontWeight.w600
+                                          : FontWeight.w400,
+                                      color: isSelected
+                                          ? const Color(0xFF9A8C73)
+                                          : (isDark
+                                              ? ServioColors
+                                                  .textPrimaryDark
+                                              : ServioColors
+                                                  .backgroundDark),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    if (dialogError != null) ...<Widget>[
+                      const SizedBox(height: 12),
+                      Text(
+                        dialogError!,
+                        style: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 13,
+                          color: ServioColors.danger,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: <Widget>[
+                TextButton(
+                  onPressed: dialogSaving
+                      ? null
+                      : () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Cancel'),
+                ),
+                dialogSaving
+                    ? const Padding(
+                        padding: EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2),
+                        ),
+                      )
+                    : TextButton(
+                        key: const ValueKey<String>(
+                            'booking-save-card-button'),
+                        onPressed: handleSave,
+                        child: const Text(
+                          'Save Card',
+                          style:
+                              TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _confirmBooking() async {
@@ -175,16 +355,11 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
 
     final data = widget.data;
     if (!data.isScheduledDateAvailable) {
-      setState(() {
-        _error = 'Technician is not available on this day';
-      });
+      setState(() => _error = 'Technician is not available on this day');
       return;
     }
     if (_paymentMethodCode == 'card' && (_selectedCardId ?? '').isEmpty) {
-      setState(() {
-        _error = 'Select or add a saved card to continue.';
-        _showAddCardForm = _savedCards.isEmpty;
-      });
+      setState(() => _error = 'Select or add a saved card to continue.');
       return;
     }
 
@@ -202,10 +377,8 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
     );
 
     if (!canCreateBackendBooking) {
-      setState(() {
-        _error =
-            'Cannot create booking without a valid technician and service.';
-      });
+      setState(() => _error =
+          'Cannot create booking without a valid technician and service.');
       return;
     }
 
@@ -229,10 +402,7 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
         paymentMethod: _paymentMethodCode,
         savedCardId: _paymentMethodCode == 'card' ? _selectedCardId : null,
       );
-      confirmationData = _confirmationDataFromBackend(
-        confirmationData,
-        booking,
-      );
+      confirmationData = _confirmationDataFromBackend(confirmationData, booking);
       if (!mounted) return;
 
       if (_paymentMethodCode == 'card') {
@@ -240,7 +410,6 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
           final paymentData = await PaymentsApi(_apiClient).holdPayment(
             bookingId: booking.id,
             savedCardId: _selectedCardId,
-            useCredit: _useCredits,
           );
           final paymentId = paymentData['_id'] as String? ?? '';
           confirmationData = confirmationData.copyWith(paymentId: paymentId);
@@ -285,7 +454,7 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
     );
   }
 
-  // ── build ────────────────────────────────────────────────────────────────────
+  // ── build helpers ────────────────────────────────────────────────────────────
 
   SavedCardModel? get _selectedCard {
     final id = _selectedCardId;
@@ -296,9 +465,6 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
     return null;
   }
 
-  String get _paymentLabel =>
-      _paymentMethodCode == 'card' ? 'Credit Card' : 'Cash';
-
   String _detectCardType(String digits) {
     if (digits.startsWith('4')) return 'visa';
     if (digits.startsWith('5')) return 'mastercard';
@@ -306,7 +472,8 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
     return 'other';
   }
 
-  Widget _buildPaymentSelector(ThemeData theme, ServioThemeExtension servio) {
+  Widget _buildPaymentSelector(
+      ThemeData theme, ServioThemeExtension servio) {
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
 
     return ServioCard(
@@ -316,8 +483,8 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
         children: <Widget>[
           Text(
             'Payment Method',
-            style: theme.textTheme.titleSmall
-                ?.copyWith(fontWeight: FontWeight.w700),
+            style:
+                theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 12),
           Row(
@@ -341,7 +508,6 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
                   selected: _paymentMethodCode == 'card',
                   onTap: () => setState(() {
                     _paymentMethodCode = 'card';
-                    _showAddCardForm = _savedCards.isEmpty;
                     _error = null;
                   }),
                 ),
@@ -358,7 +524,8 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
                     padding: const EdgeInsets.only(top: 16),
                     child: _buildCardPicker(theme, servio),
                   )
-                : const SizedBox.shrink(key: ValueKey<String>('cash-panel')),
+                : const SizedBox.shrink(
+                    key: ValueKey<String>('cash-panel')),
           ),
         ],
       ),
@@ -376,7 +543,6 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
     }
 
     final error = _cardsError;
-    final showForm = _savedCards.isEmpty || _showAddCardForm;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -386,10 +552,23 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
             error,
             style: theme.textTheme.bodySmall?.copyWith(color: servio.danger),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: _loadSavedCards,
+            child: const Text('Retry'),
+          ),
+          const SizedBox(height: 8),
         ],
-        if (showForm)
-          _buildAddCardForm(theme, servio)
+        if (_savedCards.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text(
+              'No saved cards.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: servio.textSecondary),
+            ),
+          )
         else ...<Widget>[
           ...List<Widget>.generate(_savedCards.length, (int index) {
             final card = _savedCards[index];
@@ -399,15 +578,13 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
                   ? Duration.zero
                   : Duration(milliseconds: 320 + (index * 70)),
               curve: ServioMotion.curve,
-              builder: (context, value, child) {
-                return Opacity(
-                  opacity: value,
-                  child: Transform.translate(
-                    offset: Offset(0, (1 - value) * 12),
-                    child: child,
-                  ),
-                );
-              },
+              builder: (context, value, child) => Opacity(
+                opacity: value,
+                child: Transform.translate(
+                  offset: Offset(0, (1 - value) * 12),
+                  child: child,
+                ),
+              ),
               child: Padding(
                 padding: EdgeInsets.only(
                   bottom: index == _savedCards.length - 1 ? 0 : 10,
@@ -424,98 +601,22 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
             );
           }),
           const SizedBox(height: 12),
-          OutlinedButton.icon(
-            key: const ValueKey<String>('booking-add-card-button'),
-            onPressed: () => setState(() => _showAddCardForm = true),
-            icon: const Icon(Icons.add_card_rounded),
-            label: const Text('Add New Card'),
-          ),
         ],
-        if (!showForm && error != null)
-          TextButton(
-            onPressed: _loadSavedCards,
-            child: const Text('Retry'),
+        OutlinedButton.icon(
+          key: const ValueKey<String>('booking-add-card-button'),
+          onPressed: _showAddCardDialog,
+          icon: const Icon(Icons.add_card_rounded),
+          label: const Text('Add New Card'),
+          style: OutlinedButton.styleFrom(
+            minimumSize:
+                const Size(double.infinity, ServioSpacing.tapTarget),
+            side: const BorderSide(
+              color: Color.fromRGBO(154, 140, 115, 0.4),
+            ),
+            foregroundColor: const Color(0xFF9A8C73),
           ),
+        ),
       ],
-    );
-  }
-
-  Widget _buildAddCardForm(ThemeData theme, ServioThemeExtension servio) {
-    return AnimatedContainer(
-      duration: MediaQuery.disableAnimationsOf(context)
-          ? Duration.zero
-          : ServioMotion.normal,
-      curve: ServioMotion.curve,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: servio.surfaceAlt,
-        borderRadius: BorderRadius.circular(ServioRadius.md),
-        border: Border.all(color: servio.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          Text(
-            'Add Card',
-            style: theme.textTheme.labelLarge
-                ?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            key: const ValueKey<String>('booking-card-number-field'),
-            controller: _cardNumberController,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Card number',
-              hintText: '4242 4242 4242 4242',
-            ),
-          ),
-          const SizedBox(height: 10),
-          TextField(
-            key: const ValueKey<String>('booking-card-expiry-field'),
-            controller: _cardExpiryController,
-            keyboardType: TextInputType.datetime,
-            decoration: const InputDecoration(
-              labelText: 'Expiry',
-              hintText: 'MM/YY',
-            ),
-          ),
-          const SizedBox(height: 10),
-          TextField(
-            key: const ValueKey<String>('booking-card-label-field'),
-            controller: _cardLabelController,
-            decoration: const InputDecoration(
-              labelText: 'Label',
-              hintText: 'Personal',
-            ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: <Widget>[
-              if (_savedCards.isNotEmpty) ...<Widget>[
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _savingCard
-                        ? null
-                        : () => setState(() => _showAddCardForm = false),
-                    child: const Text('Back'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-              ],
-              Expanded(
-                flex: 2,
-                child: ServioPrimaryButton(
-                  key: const ValueKey<String>('booking-save-card-button'),
-                  label: _savingCard ? 'Saving...' : 'Save Card',
-                  isLoading: _savingCard,
-                  onPressed: _savingCard ? null : _saveCard,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 
@@ -523,6 +624,9 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
+    final isDark = theme.brightness == Brightness.dark;
+    final navyAnchor =
+        isDark ? ServioColors.textPrimaryDark : ServioColors.backgroundDark;
 
     final baseRate = _moneyValue(widget.data.amount);
     final platformFee = (baseRate * 0.10).round();
@@ -537,443 +641,286 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
     final canConfirm =
         _termsAccepted && !_loading && availabilityError == null && cardReady;
 
-    final bgColor = Theme.of(context).scaffoldBackgroundColor;
-
     return Scaffold(
-      backgroundColor: bgColor,
+      extendBody: true,
+      backgroundColor:
+          isDark ? ServioColors.backgroundDark : const Color(0xFFFAF8F5),
       appBar: AppBar(
-        backgroundColor: bgColor,
+        backgroundColor: isDark
+            ? ServioColors.backgroundDark.withValues(alpha: 0.95)
+            : const Color(0xFFFBF9F6).withValues(alpha: 0.95),
         elevation: 0,
+        scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
+          icon: Icon(Icons.arrow_back_rounded, color: navyAnchor),
           onPressed: () => Navigator.of(context).pop(),
-          tooltip: 'Back to step 2',
         ),
-        title: const Text('Review & Confirm'),
+        title: Text(
+          'Review & Confirm',
+          style: TextStyle(
+            fontFamily: 'Poppins',
+            fontSize: 20,
+            fontWeight: FontWeight.w500,
+            color: navyAnchor,
+          ),
+        ),
+        centerTitle: true,
+        actions: <Widget>[
+          IconButton(
+            icon: Icon(Icons.help_outline_rounded, color: navyAnchor),
+            onPressed: () {},
+          ),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(
+            height: 1,
+            thickness: 1,
+            color: const Color(0xFF9A8C73).withValues(alpha: 0.2),
+          ),
+        ),
+      ),
+      bottomNavigationBar: _BottomConfirmBar(
+        loading: _loading,
+        onPressed: canConfirm ? _confirmBooking : null,
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(ServioSpacing.screenPadding),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              // ── Step indicator ───────────────────────────────────────────────
-              _StepIndicator(currentStep: 3),
-              const SizedBox(height: 24),
-
-              // ── Service Details review ───────────────────────────────────────
-              _SectionCard(
-                title: 'Service Details',
-                onEdit: _editServiceDetails,
-                children: <Widget>[
-                  _ReviewRow(
-                      label: 'Technician', value: widget.data.technicianName),
-                  _ReviewRow(label: 'Service', value: widget.data.serviceName),
-                  _ReviewRow(label: 'Date', value: widget.data.date),
-                  _ReviewRow(label: 'Time', value: widget.data.time),
-                  _ReviewRow(
-                      label: 'Address',
-                      value: widget.data.location,
-                      isLast: true),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // ── Payment review ───────────────────────────────────────────────
-              _buildPaymentSelector(theme, servio),
-              const SizedBox(height: 16),
-
-              _SectionCard(
-                title: 'Payment',
-                children: <Widget>[
-                  _ReviewRow(label: 'Method', value: _paymentLabel),
-                  if (_paymentMethodCode == 'card' &&
-                      (_selectedCard?.displayLabel ?? '').isNotEmpty)
-                    _ReviewRow(
-                      label: 'Card',
-                      value: _selectedCard!.displayLabel,
-                    ),
-                  _ReviewRow(label: 'Base Rate', value: '$baseRate EGP'),
-                  _ReviewRow(
-                      label: 'Platform Fee', value: '$platformFee EGP (10%)'),
-                  _ReviewRow(
-                    label: 'Est. Total',
-                    value: estimatedTotalLabel,
-                    valueColor: servio.accent,
-                    isBold: true,
-                    isLast: true,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // ── Order Summary card ───────────────────────────────────────────
-              ServioCard(
-                radius: ServioRadius.lg,
+        bottom: false,
+        child: Column(
+          children: <Widget>[
+            BookingProgressIndicator(
+              currentStep: 3,
+              totalSteps: 3,
+              stepLabels: BookingStrings.stepLabels,
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(
+                  ServioSpacing.screenPadding,
+                  8,
+                  ServioSpacing.screenPadding,
+                  100,
+                ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: <Widget>[
-                    Text(
-                      'Order Summary',
-                      style: theme.textTheme.titleMedium
-                          ?.copyWith(fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 16),
-                    // Technician mini-profile
-                    Row(
+                    // ── Service details review ────────────────────────────────
+                    _SectionCard(
+                      title: 'Service Details',
+                      onEdit: _editServiceDetails,
                       children: <Widget>[
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            gradient: ServioGradients.warm,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: servio.accent, width: 2),
-                          ),
-                          child: Center(
-                            child: Text(
-                              widget.data.technicianName
-                                  .trim()
-                                  .split(' ')
-                                  .where((w) => w.isNotEmpty)
-                                  .take(2)
-                                  .map((w) => w[0])
-                                  .join()
-                                  .toUpperCase(),
-                              style: theme.textTheme.labelLarge?.copyWith(
-                                color: ServioColors.deepBrown,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: <Widget>[
-                              Text(
-                                widget.data.technicianName,
-                                style: theme.textTheme.titleSmall
-                                    ?.copyWith(fontWeight: FontWeight.w600),
-                              ),
-                              Text(
-                                widget.data.specialty,
-                                style: theme.textTheme.bodySmall
-                                    ?.copyWith(color: servio.textSecondary),
-                              ),
-                            ],
-                          ),
-                        ),
+                        _ReviewRow(
+                            label: 'Technician',
+                            value: widget.data.technicianName),
+                        _ReviewRow(
+                            label: 'Service',
+                            value: widget.data.serviceName),
+                        _ReviewRow(
+                            label: 'Date', value: widget.data.date),
+                        _ReviewRow(
+                            label: 'Time', value: widget.data.time),
+                        _ReviewRow(
+                            label: 'Address',
+                            value: widget.data.location,
+                            isLast: true),
                       ],
                     ),
                     const SizedBox(height: 16),
-                    const Divider(height: 1),
+
+                    // ── Payment selector ──────────────────────────────────────
+                    _buildPaymentSelector(theme, servio),
                     const SizedBox(height: 16),
-                    // Pricing rows
-                    _PriceLine(
-                        label: 'Base rate (1 hr min)', value: '$baseRate EGP'),
-                    const SizedBox(height: 8),
-                    _PriceLine(
-                        label: 'Platform fee (10%)', value: '$platformFee EGP'),
-                    const SizedBox(height: 8),
-                    _PriceLine(label: 'Parts & materials', value: 'As quoted'),
-                    const SizedBox(height: 12),
-                    const Divider(height: 1),
-                    const SizedBox(height: 12),
-                    _PriceLine(
-                      label: 'Estimated Total',
-                      value: estimatedTotalLabel,
-                      isBold: true,
-                      valueColor: servio.accent,
-                    ),
-                    const SizedBox(height: 20),
-                    // Trust signals
-                    ...<_TrustItem>[
-                      const _TrustItem(
-                          'Free cancellation up to 2 hours before'),
-                      const _TrustItem('SERVIO Service Guarantee'),
-                      const _TrustItem('Identity & licence verified'),
-                      const _TrustItem('No hidden fees'),
-                    ].map((_TrustItem item) => Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: Row(
-                            children: <Widget>[
-                              Container(
-                                width: 20,
-                                height: 20,
-                                decoration: BoxDecoration(
-                                  color:
-                                      ServioColors.tint(ServioColors.success),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(Icons.check_rounded,
-                                    color: ServioColors.success, size: 12),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  item.text,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: servio.textSecondary,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        )),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
 
-              // ── Error banner ────────────────────────────────────────────────
-              if (visibleError != null) ...<Widget>[
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: ServioColors.tint(ServioColors.danger),
-                    borderRadius: BorderRadius.circular(ServioRadius.md),
-                  ),
-                  child: Row(
-                    children: <Widget>[
-                      Icon(Icons.error_outline_rounded,
-                          color: ServioColors.danger, size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          visibleError,
-                          style: theme.textTheme.bodySmall
-                              ?.copyWith(color: ServioColors.danger),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-
-              // ── Credits toggle ───────────────────────────────────────────────
-              Consumer<PaymentsProvider>(
-                builder: (context, payments, _) {
-                  final balance = payments.totalCreditBalance;
-                  if (balance <= 0) return const SizedBox.shrink();
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: ServioCard(
-                      child: Row(
+                    // ── Summary ───────────────────────────────────────────────
+                    ServioCard(
+                      radius: ServioRadius.lg,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
-                          const Icon(Icons.wallet_rounded, size: 20),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: <Widget>[
-                                const Text('Use Credits', style: TextStyle(fontWeight: FontWeight.w600)),
-                                Text(
-                                  'Balance: EGP ${balance.toStringAsFixed(2)}',
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                              ],
-                            ),
+                          Text(
+                            'Summary',
+                            style: theme.textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w700),
                           ),
-                          Switch(
-                            value: _useCredits,
-                            onChanged: (v) => setState(() => _useCredits = v),
+                          const SizedBox(height: 16),
+                          _PriceLine(
+                              label: 'Base Rate',
+                              value: '$baseRate EGP'),
+                          const SizedBox(height: 8),
+                          _PriceLine(
+                              label: 'Platform Fee (10%)',
+                              value: '$platformFee EGP'),
+                          const SizedBox(height: 12),
+                          const Divider(height: 1),
+                          const SizedBox(height: 12),
+                          _PriceLine(
+                            label: 'Estimated Total',
+                            value: estimatedTotalLabel,
+                            isBold: true,
+                            valueColor: servio.accent,
+                          ),
+                          const SizedBox(height: 20),
+                          ...<_TrustItem>[
+                            const _TrustItem(
+                                'Free cancellation up to 2 hours before'),
+                            const _TrustItem('SERVIO Service Guarantee'),
+                            const _TrustItem(
+                                'Identity & licence verified'),
+                            const _TrustItem('No hidden fees'),
+                          ].map(
+                            (_TrustItem item) => Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: Row(
+                                children: <Widget>[
+                                  Container(
+                                    width: 20,
+                                    height: 20,
+                                    decoration: BoxDecoration(
+                                      color: ServioColors.tint(
+                                          ServioColors.success),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                        Icons.check_rounded,
+                                        color: ServioColors.success,
+                                        size: 12),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      item.text,
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(
+                                              color: servio.textSecondary),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ],
                       ),
                     ),
-                  );
-                },
-              ),
+                    const SizedBox(height: 16),
 
-              // ── Terms & Conditions consent ────────────────────────────────────
-              ServioCard(
-                radius: ServioRadius.md,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: Checkbox(
-                        value: _termsAccepted,
-                        onChanged: (bool? v) =>
-                            setState(() => _termsAccepted = v ?? false),
-                        activeColor: servio.accent,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(4),
+                    // ── Error banner ──────────────────────────────────────────
+                    if (visibleError != null) ...<Widget>[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: ServioColors.tint(ServioColors.danger),
+                          borderRadius:
+                              BorderRadius.circular(ServioRadius.md),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: RichText(
-                        text: TextSpan(
-                          style: theme.textTheme.bodySmall
-                              ?.copyWith(color: servio.textSecondary),
-                          children: <InlineSpan>[
-                            const TextSpan(text: 'I agree to the '),
-                            TextSpan(
-                              text: 'Terms of Service',
-                              recognizer: TapGestureRecognizer()
-                                ..onTap =
-                                    () => _showLegalNotice('Terms of Service'),
-                              style: TextStyle(
-                                color: servio.accent,
-                                fontWeight: FontWeight.w600,
-                                decoration: TextDecoration.underline,
+                        child: Row(
+                          children: <Widget>[
+                            Icon(Icons.error_outline_rounded,
+                                color: ServioColors.danger, size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                visibleError,
+                                style: theme.textTheme.bodySmall
+                                    ?.copyWith(color: ServioColors.danger),
                               ),
-                            ),
-                            const TextSpan(text: ' and '),
-                            TextSpan(
-                              text: 'Privacy Policy',
-                              recognizer: TapGestureRecognizer()
-                                ..onTap =
-                                    () => _showLegalNotice('Privacy Policy'),
-                              style: TextStyle(
-                                color: servio.accent,
-                                fontWeight: FontWeight.w600,
-                                decoration: TextDecoration.underline,
-                              ),
-                            ),
-                            const TextSpan(
-                              text:
-                                  '. By confirming this booking you authorise the escrow hold.',
                             ),
                           ],
                         ),
                       ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // ── Terms & conditions ────────────────────────────────────
+                    ServioCard(
+                      radius: ServioRadius.md,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: Checkbox(
+                              value: _termsAccepted,
+                              onChanged: (bool? v) => setState(
+                                  () => _termsAccepted = v ?? false),
+                              activeColor: servio.accent,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: RichText(
+                              text: TextSpan(
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                    color: servio.textSecondary),
+                                children: <InlineSpan>[
+                                  const TextSpan(text: 'I agree to the '),
+                                  TextSpan(
+                                    text: 'Terms of Service',
+                                    recognizer: TapGestureRecognizer()
+                                      ..onTap = () => _showLegalNotice(
+                                          'Terms of Service'),
+                                    style: TextStyle(
+                                      color: servio.accent,
+                                      fontWeight: FontWeight.w600,
+                                      decoration:
+                                          TextDecoration.underline,
+                                    ),
+                                  ),
+                                  const TextSpan(
+                                    text:
+                                        ' and confirm that I am present at the service location for the technician\'s arrival.',
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
+                    const SizedBox(height: 8),
                   ],
                 ),
               ),
-              const SizedBox(height: 28),
-
-              // ── Bottom action row ────────────────────────────────────────────
-              Row(
-                children: <Widget>[
-                  Expanded(
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: servio.border),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(ServioRadius.md),
-                        ),
-                      ),
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Back'),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    flex: 2,
-                    child: Opacity(
-                      opacity: canConfirm ? 1.0 : 0.5,
-                      child: ServioPrimaryButton(
-                        label: _loading ? 'Confirming…' : 'Confirm Booking',
-                        onPressed: canConfirm ? _confirmBooking : null,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
+            ),
+          ],
         ),
+      ),
+    );
+  }
+}
+
+// ── Bottom action bar ──────────────────────────────────────────────────────────
+
+class _BottomConfirmBar extends StatelessWidget {
+  const _BottomConfirmBar({this.onPressed, this.loading = false});
+
+  final VoidCallback? onPressed;
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        ServioSpacing.screenPadding,
+        0,
+        ServioSpacing.screenPadding,
+        16 + bottomPadding,
+      ),
+      child: ServioPrimaryButton(
+        label: loading ? 'Confirming…' : 'Confirm Booking',
+        isLoading: loading,
+        onPressed: onPressed,
       ),
     );
   }
 }
 
 // ── Sub-widgets ────────────────────────────────────────────────────────────────
-
-class _StepIndicator extends StatelessWidget {
-  const _StepIndicator({required this.currentStep});
-
-  final int currentStep;
-
-  @override
-  Widget build(BuildContext context) {
-    final servio = context.servio;
-    const labels = <String>['Details', 'Date & Time', 'Confirm'];
-
-    return Row(
-      children: List<Widget>.generate(3, (int i) {
-        final step = i + 1;
-        final isDone = step < currentStep;
-        final isActive = step == currentStep;
-
-        return Expanded(
-          child: Row(
-            children: <Widget>[
-              // Circle
-              Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  gradient: isActive || isDone ? ServioGradients.brand : null,
-                  color: isActive || isDone ? null : servio.surfaceAlt,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color:
-                        isActive || isDone ? Colors.transparent : servio.border,
-                  ),
-                ),
-                child: Center(
-                  child: isDone
-                      ? const Icon(Icons.check_rounded,
-                          color: Colors.white, size: 14)
-                      : Text(
-                          '$step',
-                          style:
-                              Theme.of(context).textTheme.labelSmall?.copyWith(
-                                    color: isActive
-                                        ? Colors.white
-                                        : servio.textSecondary,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                        ),
-                ),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      labels[i],
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: isActive
-                                ? Theme.of(context).colorScheme.onSurface
-                                : servio.textSecondary,
-                            fontWeight:
-                                isActive ? FontWeight.w700 : FontWeight.w400,
-                          ),
-                    ),
-                    if (i < 2)
-                      Container(
-                        margin: const EdgeInsets.only(top: 8),
-                        height: 2,
-                        decoration: BoxDecoration(
-                          gradient: isDone ? ServioGradients.accent : null,
-                          color: isDone ? null : servio.border,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      }),
-    );
-  }
-}
 
 class _PaymentChoice extends StatelessWidget {
   const _PaymentChoice({
@@ -1003,8 +950,9 @@ class _PaymentChoice extends StatelessWidget {
         curve: ServioMotion.curve,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
         decoration: BoxDecoration(
-          color:
-              selected ? ServioColors.tint(servio.accent) : servio.surfaceAlt,
+          color: selected
+              ? ServioColors.tint(servio.accent)
+              : servio.surfaceAlt,
           borderRadius: BorderRadius.circular(ServioRadius.md),
           border: Border.all(
             color: selected ? servio.accent : servio.border,
@@ -1013,7 +961,9 @@ class _PaymentChoice extends StatelessWidget {
         ),
         child: Row(
           children: <Widget>[
-            Icon(icon, color: selected ? servio.accent : servio.textSecondary),
+            Icon(icon,
+                color:
+                    selected ? servio.accent : servio.textSecondary),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
@@ -1021,8 +971,11 @@ class _PaymentChoice extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.labelLarge?.copyWith(
-                  color: selected ? servio.accent : theme.colorScheme.onSurface,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: selected
+                      ? servio.accent
+                      : theme.colorScheme.onSurface,
+                  fontWeight:
+                      selected ? FontWeight.w700 : FontWeight.w500,
                 ),
               ),
             ),
@@ -1079,16 +1032,14 @@ class _SavedCardChoice extends StatelessWidget {
                     card.displayLabel,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(fontWeight: FontWeight.w700),
                   ),
                   if (card.expiry.isNotEmpty)
                     Text(
                       'Expires ${card.expiry}',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: servio.textSecondary,
-                      ),
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: servio.textSecondary),
                     ),
                 ],
               ),
@@ -1169,15 +1120,11 @@ class _ReviewRow extends StatelessWidget {
   const _ReviewRow({
     required this.label,
     required this.value,
-    this.valueColor,
-    this.isBold = false,
     this.isLast = false,
   });
 
   final String label;
   final String value;
-  final Color? valueColor;
-  final bool isBold;
   final bool isLast;
 
   @override
@@ -1202,8 +1149,8 @@ class _ReviewRow extends StatelessWidget {
             child: Text(
               value,
               style: theme.textTheme.bodySmall?.copyWith(
-                color: valueColor ?? theme.colorScheme.onSurface,
-                fontWeight: isBold ? FontWeight.w700 : FontWeight.w500,
+                color: theme.colorScheme.onSurface,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ),
@@ -1236,9 +1183,8 @@ class _PriceLine extends StatelessWidget {
         Expanded(
           child: Text(
             label,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: servio.textSecondary,
-            ),
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: servio.textSecondary),
           ),
         ),
         Text(
@@ -1258,6 +1204,8 @@ class _TrustItem {
   final String text;
 }
 
+// ── Private helpers ────────────────────────────────────────────────────────────
+
 BookingFlowData _confirmationDataFromBackend(
   BookingFlowData original,
   BackendBooking booking,
@@ -1272,8 +1220,9 @@ BookingFlowData _confirmationDataFromBackend(
         ? '${booking.totalAmount.toStringAsFixed(0)} EGP'
         : original.amount,
     pin: booking.pin,
-    paymentMethod:
-        booking.paymentMethod.toLowerCase() == 'card' ? 'Credit Card' : 'Cash',
+    paymentMethod: booking.paymentMethod.toLowerCase() == 'card'
+        ? 'Credit Card'
+        : 'Cash',
     paymentMethodCode:
         booking.paymentMethod.toLowerCase() == 'card' ? 'card' : 'cash',
     savedCardLabel: booking.paymentCardLabel.isNotEmpty
@@ -1306,8 +1255,9 @@ String _statusLabelFromBackend(String status) {
 }
 
 String _backendSlotFromLabel(String label) {
-  final match = RegExp(r'(\d{1,2})(?::\d{2})?\s*(AM|PM)?', caseSensitive: false)
-      .firstMatch(label);
+  final match =
+      RegExp(r'(\d{1,2})(?::\d{2})?\s*(AM|PM)?', caseSensitive: false)
+          .firstMatch(label);
   if (match == null) return '10:00';
 
   var hour = int.tryParse(match.group(1) ?? '') ?? 10;
