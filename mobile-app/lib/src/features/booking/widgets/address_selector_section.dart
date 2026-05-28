@@ -75,7 +75,7 @@ class AddressSelectorSection extends StatelessWidget {
                   center: addressLatLng!,
                   zoom: 15,
                   interactive: false,
-                  markers: <dynamic>[buildPinMarker(addressLatLng!)],
+                  markers: [buildPinMarker(addressLatLng!)],
                 ),
               ),
             ),
