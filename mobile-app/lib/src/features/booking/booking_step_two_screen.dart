@@ -233,6 +233,7 @@ class _BookingStepTwoScreenState extends State<BookingStepTwoScreen> {
         !addressProvider.loading;
 
     return Scaffold(
+      extendBody: true,
       backgroundColor: isDark
           ? ServioColors.backgroundDark
           : const Color(0xFFFAF8F5),
@@ -287,7 +288,7 @@ class _BookingStepTwoScreenState extends State<BookingStepTwoScreen> {
                 ServioSpacing.screenPadding,
                 8,
                 ServioSpacing.screenPadding,
-                32,
+                100,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -348,27 +349,15 @@ class _BottomContinueBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool isDark =
-        Theme.of(context).brightness == Brightness.dark;
     final double bottomPadding =
         MediaQuery.of(context).padding.bottom;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark
-            ? ServioColors.backgroundDark.withValues(alpha: 0.95)
-            : Colors.white.withValues(alpha: 0.95),
-        border: Border(
-          top: BorderSide(
-            color: const Color(0xFF9A8C73).withValues(alpha: 0.12),
-          ),
-        ),
-      ),
+    return Padding(
       padding: EdgeInsets.fromLTRB(
         ServioSpacing.screenPadding,
-        12,
+        0,
         ServioSpacing.screenPadding,
-        12 + bottomPadding,
+        16 + bottomPadding,
       ),
       child: ServioPrimaryButton(
         label: BookingStrings.continueLabel,

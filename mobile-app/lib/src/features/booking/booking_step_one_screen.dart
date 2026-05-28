@@ -47,6 +47,7 @@ class _BookingStepOneScreenState extends State<BookingStepOneScreen> {
         const Color(0xFF9A8C73).withValues(alpha: isDark ? 0.15 : 0.1);
 
     return Scaffold(
+      extendBody: true,
       backgroundColor: isDark
           ? ServioColors.backgroundDark
           : const Color(0xFFFAF8F5),
@@ -95,7 +96,7 @@ class _BookingStepOneScreenState extends State<BookingStepOneScreen> {
                 ServioSpacing.screenPadding,
                 24,
                 ServioSpacing.screenPadding,
-                32,
+                100,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -155,23 +156,14 @@ class _BottomContinueBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E2229) : Colors.white,
-        border: Border(
-          top: BorderSide(
-            color: const Color(0xFF9A8C73).withValues(alpha: 0.1),
-          ),
-        ),
-      ),
+    return Padding(
       padding: EdgeInsets.fromLTRB(
         ServioSpacing.screenPadding,
-        12,
+        0,
         ServioSpacing.screenPadding,
-        12 + bottomPadding,
+        16 + bottomPadding,
       ),
       child: SizedBox(
         height: ServioSpacing.tapTarget + 8,
