@@ -21,7 +21,7 @@ class BookingProgressIndicator extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final navyAnchor =
-        isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23);
+        isDark ? ServioColors.textPrimaryDark : ServioColors.backgroundDark;
     final servio = context.servio;
 
     return Padding(
@@ -131,6 +131,7 @@ class _StepCircle extends StatelessWidget {
       height: 30,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
+        // Gradient transitions hard-cut (Flutter cannot interpolate null↔Gradient).
         gradient: isActive ? ServioGradients.brand : null,
         color: isCompleted ? navyAnchor : isActive ? null : Colors.transparent,
         border: Border.all(
