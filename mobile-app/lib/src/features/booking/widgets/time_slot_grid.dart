@@ -68,11 +68,19 @@ class TimeSlotGrid extends StatelessWidget {
         if (!isDateAvailable || slots.isEmpty)
           _AvailabilityNotice(servio: servio)
         else
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: slots.map((String slot) {
-              final selected = slot == selectedSlot;
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              mainAxisExtent: ServioSpacing.tapTarget,
+            ),
+            itemCount: slots.length,
+            itemBuilder: (BuildContext context, int index) {
+              final String slot = slots[index];
+              final bool selected = slot == selectedSlot;
               return _TimeChip(
                 slot: slot,
                 selected: selected,
@@ -81,7 +89,7 @@ class TimeSlotGrid extends StatelessWidget {
                 servio: servio,
                 isDark: isDark,
               );
-            }).toList(),
+            },
           ),
       ],
     );

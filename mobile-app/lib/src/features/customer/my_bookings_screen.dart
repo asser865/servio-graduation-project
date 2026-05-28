@@ -682,21 +682,32 @@ class _LiveBookingCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: ElevatedButton(
-                  onPressed: onViewDetails,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23),
-                    foregroundColor: isDark ? const Color(0xFF1A1D23) : Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    elevation: 0,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: ServioGradients.brand,
+                    borderRadius: BorderRadius.circular(ServioRadius.full),
+                    boxShadow: ServioShadows.rest,
                   ),
-                  child: const Text(
-                    'View Details',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
+                  child: ElevatedButton(
+                    onPressed: onViewDetails,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      foregroundColor: Colors.white,
+                      shadowColor: Colors.transparent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(ServioRadius.full),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 11),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'View Details',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),
@@ -712,8 +723,10 @@ class _LiveBookingCard extends StatelessWidget {
                         color: isDark ? const Color(0xFFE3D5CA).withValues(alpha: 0.5) : const Color(0xFF9A8C73),
                         width: 1.5,
                       ),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(ServioRadius.full),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 11),
                     ),
                     child: Text(
                       secondButton.label,

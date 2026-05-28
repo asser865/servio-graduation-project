@@ -503,19 +503,29 @@ class _ConversationTileState extends State<_ConversationTile> {
                 CircleAvatar(
                   radius: 24,
                   backgroundColor: servio.accent.withValues(alpha: 0.16),
-                  foregroundImage: conversation.otherUser.avatar == null
-                      ? null
-                      : NetworkImage(conversation.otherUser.avatar!),
-                  onForegroundImageError:
-                      conversation.otherUser.avatar == null ? null : (_, __) {},
-                  child: Text(
-                    conversation.contactInitials,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      color: servio.accent,
-                      fontWeight: FontWeight.w700,
-                      fontFamily: 'Poppins',
-                    ),
-                  ),
+                  child: conversation.otherUser.avatar != null
+                      ? Image.network(
+                          conversation.otherUser.avatar!,
+                          width: 48,
+                          height: 48,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Text(
+                            conversation.contactInitials,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              color: servio.accent,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: 'Poppins',
+                            ),
+                          ),
+                        )
+                      : Text(
+                          conversation.contactInitials,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            color: servio.accent,
+                            fontWeight: FontWeight.w700,
+                            fontFamily: 'Poppins',
+                          ),
+                        ),
                 ),
                 if (isUnread)
                   Positioned(

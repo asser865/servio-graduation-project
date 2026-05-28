@@ -21,7 +21,7 @@ import 'ai_finishing_estimator_screen.dart';
 import 'customer_profile_screen.dart';
 import 'my_bookings_screen.dart';
 
-import 'services_marketplace_screen.dart';
+import '../shared/search_results_screen.dart';
 
 enum _DashboardSection { overview, bookings, history }
 
@@ -490,7 +490,7 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
   void _openBooking() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => const ServicesMarketplaceScreen(),
+        builder: (_) => const SearchResultsScreen(query: ''),
       ),
     );
   }

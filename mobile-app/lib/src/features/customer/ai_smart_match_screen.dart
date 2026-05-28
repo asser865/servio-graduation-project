@@ -10,7 +10,7 @@ import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
 import '../../design_system/widgets/servio_status_chip.dart';
 import '../../design_system/widgets/servio_tab_shell.dart';
-import 'services_marketplace_screen.dart';
+import '../shared/search_results_screen.dart';
 import 'technician_profile_screen.dart';
 
 class AiSmartMatchScreen extends StatefulWidget {
@@ -430,7 +430,7 @@ class _AiSmartMatchScreenState extends State<AiSmartMatchScreen> {
                   onPressed: () {
                     Navigator.of(context).push(
                       MaterialPageRoute<void>(
-                        builder: (_) => const ServicesMarketplaceScreen(),
+                        builder: (_) => const SearchResultsScreen(query: ''),
                       ),
                     );
                   },
@@ -440,7 +440,7 @@ class _AiSmartMatchScreenState extends State<AiSmartMatchScreen> {
                   onPressed: () {
                     Navigator.of(context).push(
                       MaterialPageRoute<void>(
-                        builder: (_) => const ServicesMarketplaceScreen(),
+                        builder: (_) => const SearchResultsScreen(query: ''),
                       ),
                     );
                   },

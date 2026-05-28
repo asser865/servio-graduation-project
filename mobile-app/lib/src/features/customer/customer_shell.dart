@@ -5,10 +5,10 @@ import '../../core/state/app_state.dart';
 import '../../design_system/widgets/servio_bottom_navigation_bar.dart';
 import '../../design_system/widgets/servio_tab_shell.dart';
 import '../messages/messages_screen.dart';
+import '../shared/search_results_screen.dart';
 import 'ai_smart_match_screen.dart';
 import 'customer_home_screen.dart';
 import 'customer_profile_screen.dart';
-import 'services_marketplace_screen.dart';
 
 /// Top-level shell for the customer section.
 ///
@@ -21,7 +21,7 @@ class CustomerShell extends StatelessWidget {
 
   static const List<ServioBottomNavItem> _items = <ServioBottomNavItem>[
     ServioBottomNavItem(icon: Icons.home_rounded, label: 'Home'),
-    ServioBottomNavItem(icon: Icons.grid_view_rounded, label: 'Services'),
+    ServioBottomNavItem(icon: Icons.search_rounded, label: 'Search'),
     ServioBottomNavItem(
       icon: Icons.auto_awesome_rounded,
       label: 'Smart Match',
@@ -55,7 +55,7 @@ class CustomerShell extends StatelessWidget {
       initialIndex: initialIndex,
       pages: const <Widget>[
         CustomerHomeScreen(),
-        ServicesMarketplaceScreen(),
+        SearchResultsScreen(),
         AiSmartMatchScreen(),
         MessagesScreen(),
         CustomerProfileScreen(),

@@ -12,6 +12,7 @@ import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_tab_shell.dart';
 import 'job_details_screen.dart';
+import 'availability_manager_screen.dart';
 import 'widgets/duration_estimation_sheet.dart';
 
 class JobQueueScreen extends StatefulWidget {
@@ -438,12 +439,74 @@ class _JobQueueScreenState extends State<JobQueueScreen>
           fontWeight: FontWeight.bold,
           color: navyAnchor,
         ),
-        actions: [
+        actions: <Widget>[
+          Builder(
+            builder: (context) {
+              final account = context.watch<SessionProvider>().account;
+              final isAvailable = account?.isAvailable ?? false;
+              final statusColor = isAvailable ? const Color(0xFF1B8A5A) : const Color(0xFFD32F2F); // Green vs Red
+
+              return Tooltip(
+                message: isAvailable ? 'Available - Tap to manage schedule' : 'Offline/Busy - Tap to manage schedule',
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const AvailabilityManagerScreen(),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: statusColor.withValues(alpha: 0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: statusColor,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: statusColor.withValues(alpha: 0.4),
+                                  blurRadius: 4,
+                                  spreadRadius: 1,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Icon(
+                            Icons.calendar_month_rounded,
+                            size: 18,
+                            color: navyAnchor,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.notifications_outlined),
             color: navyAnchor,
             onPressed: () {},
           ),
+          const SizedBox(width: 4),
         ],
       ),
       body: RefreshIndicator(
@@ -802,23 +865,35 @@ class _JobQueueScreenState extends State<JobQueueScreen>
                   children: [
                     Icon(Icons.location_on_outlined, size: 16, color: servio.textSecondary),
                     const SizedBox(width: 4),
-                    Text(
-                      job.addressCity,
-                      style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: servio.textSecondary),
+                    Flexible(
+                      child: Text(
+                        job.addressCity,
+                        style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: servio.textSecondary),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
                     ),
                     const SizedBox(width: 16),
                     Icon(Icons.schedule_outlined, size: 16, color: servio.textSecondary),
                     const SizedBox(width: 4),
-                    Text(
-                      job.scheduledTime.isNotEmpty ? job.scheduledTime : 'ASAP',
-                      style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: servio.textSecondary),
+                    Flexible(
+                      child: Text(
+                        job.scheduledTime.isNotEmpty ? job.scheduledTime : 'ASAP',
+                        style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: servio.textSecondary),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
                     ),
                     const SizedBox(width: 16),
                     Icon(Icons.person_outline, size: 16, color: servio.textSecondary),
                     const SizedBox(width: 4),
-                    Text(
-                      job.customerName,
-                      style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: servio.textSecondary),
+                    Flexible(
+                      child: Text(
+                        job.customerName,
+                        style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: servio.textSecondary),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
                     ),
                   ],
                 ),
