@@ -16,6 +16,8 @@ import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
 import 'booking_confirmation_screen.dart';
 import 'booking_flow_data.dart';
+import 'booking_strings.dart';
+import 'widgets/booking_progress_indicator.dart';
 
 class BookingStepThreeScreen extends StatefulWidget {
   const BookingStepThreeScreen({
@@ -552,11 +554,19 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
         title: const Text('Review & Confirm'),
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(ServioSpacing.screenPadding),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
+        child: Column(
+          children: <Widget>[
+            BookingProgressIndicator(
+              currentStep: 3,
+              totalSteps: 3,
+              stepLabels: BookingStrings.stepLabels,
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(ServioSpacing.screenPadding),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
               // ── Step indicator ───────────────────────────────────────────────
               _StepIndicator(currentStep: 3),
               const SizedBox(height: 24),
@@ -881,8 +891,11 @@ class _BookingStepThreeScreenState extends State<BookingStepThreeScreen> {
                 ],
               ),
               const SizedBox(height: 8),
-            ],
-          ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
