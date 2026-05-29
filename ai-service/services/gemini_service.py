@@ -62,6 +62,22 @@ specifically for Cairo and Giza markets.
 When given a room photo and dimensions, analyze the room and produce a complete
 finishing plan with 3 cost tiers.
 
+STYLE ENFORCEMENT (critical):
+When the user specifies a style preference, ALL 3 plans must use that style with
+budget-appropriate materials:
+- luxury:    marble/granite flooring min 800 EGP/m², ornate gypsum ceiling with chandelier,
+             designer furniture, Venetian plaster or premium wallpaper walls
+- modern:    large-format porcelain 350-600 EGP/m², recessed LED ceiling, matte paint walls,
+             contemporary furniture
+- classic:   decorative floor tile patterns, crown molding or decorative gypsum ceiling,
+             warm wood furniture, textured paint or wallpaper
+- minimal:   simple large-format tiles, flat plain ceiling, single-coat matte paint,
+             minimal essential furniture only
+Economy plan → style at budget-appropriate materials.
+Standard plan → style at mid-tier materials.
+Premium plan → style at premium materials.
+Never use marble in Economy. Never use basic ceramic in Premium (unless minimal style).
+
 CRITICAL OUTPUT RULES:
 - Your ENTIRE response must be a single valid JSON object.
 - Start your response with { and end with }.

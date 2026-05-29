@@ -248,12 +248,16 @@ class RoomAnalysisResponse {
     required this.plans,
     required this.recommendedPlanName,
     required this.generatedImageBase64,
+    this.recommendationReason = '',
+    this.consistencyEnvelope = ConsistencyEnvelope.empty,
   });
 
   final RoomAnalysis roomAnalysis;
   final List<FinishingPlan> plans;
   final String recommendedPlanName;
   final String? generatedImageBase64;
+  final String recommendationReason;
+  final ConsistencyEnvelope consistencyEnvelope;
 
   FinishingPlan get recommendedPlan {
     return plans.firstWhere(
@@ -277,6 +281,26 @@ class RoomAnalysisResponse {
       .where((FinishingPlan p) => p.name != recommendedPlanName)
       .toList(growable: false);
 
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'room_analysis': roomAnalysis.toJson(),
+        'finishing_plans': plans.map((FinishingPlan p) => p.toJson()).toList(),
+        'recommended_plan': recommendedPlanName,
+        'recommendation_reason': recommendationReason,
+        'generated_room_image': generatedImageBase64,
+        'consistency_envelope': consistencyEnvelope.toJson(),
+      };
+
+  /// Re-hydrate a response previously saved via [toJson].
+  factory RoomAnalysisResponse.fromSavedJson(Map<String, dynamic> json) {
+    return RoomAnalysisResponse.fromJson(<String, dynamic>{
+      'data': <String, dynamic>{
+        'data': json,
+        'generated_room_image': json['generated_room_image'],
+        'consistency_envelope': json['consistency_envelope'],
+      },
+    });
+  }
+
   factory RoomAnalysisResponse.fromJson(Map<String, dynamic> json) {
     final wrapped = (json['data'] is Map<String, dynamic>)
         ? json['data'] as Map<String, dynamic>
@@ -290,6 +314,8 @@ class RoomAnalysisResponse {
 
     final roomAnalysisJson = inner['room_analysis'];
     final plansJson = inner['finishing_plans'];
+
+    final envelopeJson = wrapped['consistency_envelope'];
 
     return RoomAnalysisResponse(
       roomAnalysis: roomAnalysisJson is Map<String, dynamic>
@@ -313,6 +339,13 @@ class RoomAnalysisResponse {
               inner['generated_room_image'],
               json['generated_room_image'],
             ]),
+      recommendationReason: _firstString(<dynamic>[
+        inner['recommendation_reason'],
+        inner['reason'],
+      ]),
+      consistencyEnvelope: envelopeJson is Map<String, dynamic>
+          ? ConsistencyEnvelope.fromJson(envelopeJson)
+          : ConsistencyEnvelope.empty,
     );
   }
 }
@@ -324,31 +357,119 @@ class RoomAnalysis {
     required this.currentCondition,
     required this.detectedFeatures,
     required this.style,
+    this.wallCondition = '',
+    this.estimatedCeilingHeightM = 0.0,
+    this.specialNotes = '',
   });
 
   const RoomAnalysis.empty()
       : roomType = '',
         currentCondition = '',
         detectedFeatures = const <String>[],
-        style = '';
+        style = '',
+        wallCondition = '',
+        estimatedCeilingHeightM = 0.0,
+        specialNotes = '';
 
   final String roomType;
   final String currentCondition;
   final List<String> detectedFeatures;
   final String style;
+  final String wallCondition;
+  final double estimatedCeilingHeightM;
+  final String specialNotes;
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'room_type': roomType,
+        'wall_condition': wallCondition,
+        'current_condition': currentCondition,
+        'detected_features': detectedFeatures,
+        'style': style,
+        'estimated_ceiling_height_m': estimatedCeilingHeightM,
+        'special_notes': specialNotes,
+      };
 
   factory RoomAnalysis.fromJson(Map<String, dynamic> json) {
     final features = json['detected_features'];
+    final wallCond = _firstString(<dynamic>[
+      json['wall_condition'],
+      json['current_condition'],
+      json['condition'],
+    ]);
     return RoomAnalysis(
       roomType: _firstString(<dynamic>[json['room_type'], json['type']]),
-      currentCondition: _firstString(<dynamic>[
-        json['current_condition'],
-        json['condition'],
-      ]),
+      currentCondition: wallCond,
+      wallCondition: wallCond,
       detectedFeatures: features is List
           ? features.map((dynamic e) => e.toString()).toList(growable: false)
           : const <String>[],
       style: _firstString(<dynamic>[json['style'], json['detected_style']]),
+      estimatedCeilingHeightM: _firstNum(<dynamic>[
+        json['estimated_ceiling_height_m'],
+        json['ceiling_height_m'],
+        json['ceiling_height'],
+      ]).toDouble(),
+      specialNotes: _firstString(<dynamic>[
+        json['special_notes'],
+        json['notes'],
+        json['observations'],
+      ]),
+    );
+  }
+}
+
+/// Consistency metadata linking Gemini output ↔ SD prompt ↔ cost estimates.
+class ConsistencyEnvelope {
+  const ConsistencyEnvelope({
+    this.styleUsed = '',
+    this.budgetTier = '',
+    this.floorAreaM2 = 0.0,
+    this.primaryFlooring = '',
+    this.primaryWall = '',
+    this.sdPromptUsed = '',
+    this.geminiTotalCost = 0,
+    this.vendorAdjustedCost = 0,
+    this.consistencyWarnings = const <String>[],
+  });
+
+  static const ConsistencyEnvelope empty = ConsistencyEnvelope();
+
+  final String styleUsed;
+  final String budgetTier;
+  final double floorAreaM2;
+  final String primaryFlooring;
+  final String primaryWall;
+  final String sdPromptUsed;
+  final num geminiTotalCost;
+  final num vendorAdjustedCost;
+  final List<String> consistencyWarnings;
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'style_used': styleUsed,
+        'budget_tier': budgetTier,
+        'floor_area_m2': floorAreaM2,
+        'primary_flooring': primaryFlooring,
+        'primary_wall': primaryWall,
+        'sd_prompt_used': sdPromptUsed,
+        'gemini_total_cost': geminiTotalCost,
+        'vendor_adjusted_cost': vendorAdjustedCost,
+        'consistency_warnings': consistencyWarnings,
+      };
+
+  factory ConsistencyEnvelope.fromJson(Map<String, dynamic> json) {
+    final warnings = json['consistency_warnings'];
+    return ConsistencyEnvelope(
+      styleUsed: _firstString(<dynamic>[json['style_used']]),
+      budgetTier: _firstString(<dynamic>[json['budget_tier']]),
+      floorAreaM2: _firstNum(<dynamic>[json['floor_area_m2']]).toDouble(),
+      primaryFlooring: _firstString(<dynamic>[json['primary_flooring']]),
+      primaryWall: _firstString(<dynamic>[json['primary_wall']]),
+      sdPromptUsed: _firstString(<dynamic>[json['sd_prompt_used']]),
+      geminiTotalCost: _firstNum(<dynamic>[json['gemini_total_cost']]),
+      vendorAdjustedCost: _firstNum(<dynamic>[json['vendor_adjusted_cost']]),
+      consistencyWarnings: warnings is List
+          ? warnings.map((dynamic e) => e.toString()).toList(growable: false)
+          : const <String>[],
     );
   }
 }
@@ -365,6 +486,8 @@ class FinishingPlan {
     required this.labor,
     required this.palette,
     required this.durationDays,
+    this.planStyle = '',
+    this.vendorAdjustedTotalEgp = 0,
   });
 
   final String name;
@@ -375,6 +498,22 @@ class FinishingPlan {
   final List<PlanLabor> labor;
   final List<String> palette;
   final int durationDays;
+  final String planStyle;
+  final num vendorAdjustedTotalEgp;
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'plan_name': name,
+        'style': planStyle,
+        'description': summary,
+        'total_cost_egp': totalCostEgp,
+        'materials_subtotal_egp': breakdown['materials'] ?? 0,
+        'labor_subtotal_egp': breakdown['labor'] ?? 0,
+        'vendor_adjusted_total_egp': vendorAdjustedTotalEgp,
+        'timeline_days': durationDays,
+        'color_palette': palette,
+        'materials': materials.map((PlanMaterial m) => m.toJson()).toList(),
+        'labor': labor.map((PlanLabor l) => l.toJson()).toList(),
+      };
 
   factory FinishingPlan.fromJson(Map<String, dynamic> json) {
     final materialsJson = json['materials'];
@@ -432,6 +571,28 @@ class FinishingPlan {
         json['duration_days'],
         json['durationDays'],
       ]).toInt(),
+      planStyle: _firstString(<dynamic>[json['style'], json['plan_style']]),
+      vendorAdjustedTotalEgp: _firstNum(<dynamic>[
+        json['vendor_adjusted_total_egp'],
+        json['vendor_adjusted_cost'],
+      ]),
+    );
+  }
+}
+
+/// A vendor/supplier suggested for a material by the enrichment service.
+class MaterialVendor {
+  const MaterialVendor({required this.name, this.source = ''});
+
+  final String name;
+  final String source;
+
+  Map<String, dynamic> toJson() => <String, dynamic>{'name': name, 'source': source};
+
+  factory MaterialVendor.fromJson(Map<String, dynamic> json) {
+    return MaterialVendor(
+      name: _firstString(<dynamic>[json['name']]),
+      source: _firstString(<dynamic>[json['source']]),
     );
   }
 }
@@ -443,23 +604,57 @@ class PlanMaterial {
     required this.quantity,
     required this.unit,
     required this.estimatedCostEgp,
+    this.category = '',
+    this.unitPriceEgp = 0,
+    this.notes = '',
+    this.vendors = const <MaterialVendor>[],
   });
 
   final String name;
   final String quantity;
   final String unit;
   final num estimatedCostEgp;
+  final String category;
+  final num unitPriceEgp;
+  final String notes;
+  final List<MaterialVendor> vendors;
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'category': category,
+        'name': name,
+        'quantity': quantity,
+        'unit': unit,
+        'unit_price_egp': unitPriceEgp,
+        'total_egp': estimatedCostEgp,
+        'notes': notes,
+        'vendors': vendors.map((MaterialVendor v) => v.toJson()).toList(),
+      };
 
   factory PlanMaterial.fromJson(Map<String, dynamic> json) {
+    final vendorsJson = json['vendors'];
     return PlanMaterial(
       name: _firstString(<dynamic>[json['name'], json['material']]),
       quantity: _firstString(<dynamic>[json['quantity'], json['qty']]),
       unit: _firstString(<dynamic>[json['unit']]),
+      // AI returns total_egp; fall back to other keys for legacy compat
       estimatedCostEgp: _firstNum(<dynamic>[
+        json['total_egp'],
         json['estimated_cost_egp'],
         json['estimated_cost'],
         json['cost'],
       ]),
+      category: _firstString(<dynamic>[json['category']]),
+      unitPriceEgp: _firstNum(<dynamic>[
+        json['unit_price_egp'],
+        json['unit_price'],
+      ]),
+      notes: _firstString(<dynamic>[json['notes'], json['note']]),
+      vendors: vendorsJson is List
+          ? vendorsJson
+              .whereType<Map<String, dynamic>>()
+              .map(MaterialVendor.fromJson)
+              .toList(growable: false)
+          : const <MaterialVendor>[],
     );
   }
 }
@@ -479,6 +674,14 @@ class PlanLabor {
   final int days;
   final num dailyRateEgp;
   final num totalEgp;
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'trade': trade,
+        'description': description,
+        'days': days,
+        'daily_rate_egp': dailyRateEgp,
+        'total_egp': totalEgp,
+      };
 
   factory PlanLabor.fromJson(Map<String, dynamic> json) {
     return PlanLabor(

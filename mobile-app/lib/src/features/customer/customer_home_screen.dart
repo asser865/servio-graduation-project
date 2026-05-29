@@ -13,7 +13,6 @@ import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_section_heading.dart';
 import '../../design_system/widgets/servio_status_chip.dart';
 import '../../design_system/widgets/servio_tab_shell.dart';
-import 'ai_finishing_estimator_screen.dart';
 import 'ai_room_finisher_screen.dart';
 import 'ai_smart_match_screen.dart';
 import 'customer_profile_screen.dart';
@@ -508,21 +507,6 @@ class _IntelligentToolsSection extends StatelessWidget {
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => const AiSmartMatchScreen(),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              _AIToolCard(
-                icon: Icons.calculate_rounded,
-                title: locale == 'ar' ? 'تقدير التكلفة' : 'Cost Estimator',
-                description: locale == 'ar'
-                    ? 'احصل على تقدير فوري ودقيق لمشروعك.'
-                    : 'Upload a photo for an instant, accurate project quote.',
-                isDark: isDark,
-                variant: _AIToolVariant.light,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const AiFinishingEstimatorScreen(),
                   ),
                 ),
               ),
