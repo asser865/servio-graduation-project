@@ -1,12 +1,16 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:http_parser/http_parser.dart' show MediaType;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/ai_api.dart';
 import '../api/api_exception.dart';
 import '../knowledge/finishing_knowledge_graph.dart';
 import 'ai_performance_tracker.dart';
+
+const String _kSavedPlanKey = 'ai_last_plan_v1';
 
 /// Lifecycle phases of an AI finishing run. The view picks a UI per phase;
 /// no business logic lives in widgets.
@@ -49,6 +53,9 @@ class RoomFinishingProvider extends ChangeNotifier {
   // ── Last recorded timing (for callers who want raw metrics) ─────────────
   AiGenerationTiming? _lastTiming;
 
+  // ── Persistence ─────────────────────────────────────────────────────────
+  bool _planSaved = false;
+
   // ── Public getters ───────────────────────────────────────────────────────
   RoomFinishingPhase get phase => _phase;
   RoomAnalysisResponse? get response => _response;
@@ -64,6 +71,7 @@ class RoomFinishingProvider extends ChangeNotifier {
       _phase == RoomFinishingPhase.analyzing;
   int get elapsedSeconds => _elapsedSeconds;
   AiGenerationTiming? get lastTiming => _lastTiming;
+  bool get planSaved => _planSaved;
 
   // ── Image helpers ────────────────────────────────────────────────────────
   void setImage({
@@ -97,6 +105,46 @@ class RoomFinishingProvider extends ChangeNotifier {
     _selectedImageName = '';
     _elapsedSeconds = 0;
     notifyListeners();
+  }
+
+  // ── Persistence helpers ──────────────────────────────────────────────────
+
+  /// Attempts to restore the most recent saved plan. Safe to call on startup;
+  /// silently ignores missing or corrupt data.
+  Future<void> loadSavedPlan() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_kSavedPlanKey);
+      if (raw == null) return;
+      final data = jsonDecode(raw) as Map<String, dynamic>;
+      final restored = RoomAnalysisResponse.fromSavedJson(data);
+      if (restored.plans.isEmpty) return;
+      _response = restored;
+      _graph = FinishingKnowledgeGraph.fromAnalysis(restored);
+      _phase = RoomFinishingPhase.success;
+      _planSaved = true;
+      notifyListeners();
+    } catch (_) {
+      // Corrupt saved data — silently discard.
+    }
+  }
+
+  Future<void> clearSavedPlan() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_kSavedPlanKey);
+    } catch (_) {}
+    _planSaved = false;
+    notifyListeners();
+  }
+
+  Future<void> _saveToPrefs(RoomAnalysisResponse response) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_kSavedPlanKey, jsonEncode(response.toJson()));
+      _planSaved = true;
+      // notifyListeners is called by the caller immediately after.
+    } catch (_) {}
   }
 
   /// Cancels any in-flight analysis and returns to idle. The HTTP request
@@ -204,6 +252,7 @@ class RoomFinishingProvider extends ChangeNotifier {
       _response = result;
       _graph = FinishingKnowledgeGraph.fromAnalysis(result);
       _phase = RoomFinishingPhase.success;
+      await _saveToPrefs(result);
       notifyListeners();
     } on ApiException catch (e) {
       if (_operationId != opId) return;

@@ -17,7 +17,6 @@ import '../../design_system/widgets/servio_status_chip.dart';
 import '../booking/booking_flow_data.dart';
 import '../messages/chat_screen.dart';
 import '../shared/notifications_screen.dart';
-import 'ai_finishing_estimator_screen.dart';
 import 'customer_profile_screen.dart';
 import 'my_bookings_screen.dart';
 
@@ -632,8 +631,6 @@ class _OverviewSection extends StatelessWidget {
       children: <Widget>[
         _WelcomeCard(userName: userName, onBookService: onBookService),
         const SizedBox(height: 18),
-        const _EstimatorPromptCard(),
-        const SizedBox(height: 18),
         _StatsGrid(
           totalBookings: bookings.length,
           activeCount: active.length,
@@ -973,66 +970,6 @@ class _WelcomeCard extends StatelessWidget {
           const SizedBox(height: 18),
           ServioPrimaryButton(
               label: 'Book a Service', onPressed: onBookService),
-        ],
-      ),
-    );
-  }
-}
-
-class _EstimatorPromptCard extends StatelessWidget {
-  const _EstimatorPromptCard();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final servio = context.servio;
-
-    return ServioCard(
-      radius: ServioRadius.lg,
-      child: Row(
-        children: <Widget>[
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: ServioColors.tint(servio.accent),
-              borderRadius: BorderRadius.circular(ServioRadius.md),
-            ),
-            child: Icon(
-              Icons.calculate_rounded,
-              color: servio.accent,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text('AI Cost Estimator', style: theme.textTheme.titleMedium),
-                const SizedBox(height: 4),
-                Text(
-                  'Get a room finishing budget before you book.',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: servio.textSecondary,
-                    height: 1.35,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          IconButton(
-            tooltip: 'Open estimator',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const AiFinishingEstimatorScreen(),
-              ),
-            ),
-            icon: Icon(
-              Icons.arrow_forward_rounded,
-              color: servio.accent,
-            ),
-          ),
         ],
       ),
     );

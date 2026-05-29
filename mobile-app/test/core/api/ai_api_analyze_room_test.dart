@@ -27,15 +27,13 @@ void main() {
     final api = await _api((http.Request request) async {
       capturedPath = request.url.path;
       capturedMethod = request.method;
-      // Use latin1 to avoid UTF-8 decoding errors on raw image bytes
-      // embedded inside the multipart envelope.
       capturedBody = String.fromCharCodes(request.bodyBytes);
       capturedContentType = request.headers['content-type'];
       return _json(_successPayload());
     });
 
     final res = await api.analyzeRoom(
-      imageBytes: const <int>[0x69, 0x6D, 0x67], // ASCII "img"
+      imageBytes: const <int>[0x69, 0x6D, 0x67],
       filename: 'room.jpg',
       contentType: MediaType('image', 'jpeg'),
       lengthM: 4.5,
@@ -50,7 +48,6 @@ void main() {
     expect(capturedContentType, isNotNull);
     expect(capturedContentType!.startsWith('multipart/form-data'), isTrue);
 
-    // Multipart body is raw — assert string fragments instead of parsing.
     expect(capturedBody, contains('name="length_m"'));
     expect(capturedBody, contains('4.5'));
     expect(capturedBody, contains('name="width_m"'));
@@ -71,15 +68,12 @@ void main() {
     expect(recommended.totalCostEgp, 14000);
     expect(recommended.durationDays, 7);
 
-    // Breakdown built from materials_subtotal_egp / labor_subtotal_egp
     expect(recommended.breakdown['materials'], 6500);
     expect(recommended.breakdown['labor'], 6000);
 
-    // Materials
     expect(recommended.materials, hasLength(2));
     expect(recommended.materials.first.name, 'Ceramic floor tiles');
 
-    // Labor
     expect(recommended.labor, hasLength(2));
     expect(recommended.labor.first.trade, 'Tiler');
     expect(recommended.labor.first.days, 3);
@@ -92,6 +86,135 @@ void main() {
     expect(res.alternatePlans, hasLength(1));
     expect(res.alternatePlans.first.name, 'Budget Refresh');
   });
+
+  // ── New field: wall_condition / estimatedCeilingHeightM / specialNotes ──────
+
+  test('RoomAnalysis parses wall_condition, ceiling height, special_notes', () async {
+    final api = await _api((_) async => _json(_successPayload()));
+    final res = await _analyze(api);
+
+    expect(res.roomAnalysis.wallCondition, 'bare brick');
+    expect(res.roomAnalysis.currentCondition, 'bare brick');
+    expect(res.roomAnalysis.estimatedCeilingHeightM, closeTo(2.8, 0.001));
+    expect(res.roomAnalysis.specialNotes, contains('large window'));
+  });
+
+  // ── New field: recommendation_reason ────────────────────────────────────────
+
+  test('RoomAnalysisResponse parses recommendation_reason', () async {
+    final api = await _api((_) async => _json(_successPayload()));
+    final res = await _analyze(api);
+
+    expect(res.recommendationReason, contains('suitable'));
+  });
+
+  // ── New field: consistency_envelope ─────────────────────────────────────────
+
+  test('ConsistencyEnvelope parsed correctly', () async {
+    final api = await _api((_) async => _json(_successPayload()));
+    final res = await _analyze(api);
+
+    final env = res.consistencyEnvelope;
+    expect(env.styleUsed, 'modern');
+    expect(env.budgetTier, 'standard');
+    expect(env.floorAreaM2, closeTo(15.75, 0.01));
+    expect(env.primaryFlooring, contains('Ceramic'));
+    expect(env.primaryWall, contains('Paint'));
+    expect(env.sdPromptUsed, contains('porcelain'));
+    expect(env.geminiTotalCost, 14000);
+    expect(env.vendorAdjustedCost, 13500);
+    expect(env.consistencyWarnings, isEmpty);
+  });
+
+  test('ConsistencyEnvelope.empty is the default when field missing', () async {
+    final payload = _successPayload();
+    (payload['data'] as Map<String, dynamic>).remove('consistency_envelope');
+    final api = await _api((_) async => _json(payload));
+    final res = await _analyze(api);
+
+    expect(res.consistencyEnvelope, equals(ConsistencyEnvelope.empty));
+    expect(res.consistencyEnvelope.budgetTier, isEmpty);
+    expect(res.consistencyEnvelope.consistencyWarnings, isEmpty);
+  });
+
+  test('ConsistencyEnvelope warnings list parsed', () async {
+    final payload = _successPayload();
+    final env = ((payload['data'] as Map<String, dynamic>)['consistency_envelope']
+        as Map<String, dynamic>);
+    env['consistency_warnings'] = <String>['Flooring not in render', 'Style mismatch'];
+    final api = await _api((_) async => _json(payload));
+    final res = await _analyze(api);
+
+    expect(res.consistencyEnvelope.consistencyWarnings, hasLength(2));
+    expect(res.consistencyEnvelope.consistencyWarnings.first, contains('Flooring'));
+  });
+
+  // ── New PlanMaterial fields ──────────────────────────────────────────────────
+
+  test('PlanMaterial parses category, unit_price_egp, notes, vendors', () async {
+    final api = await _api((_) async => _json(_successPayload()));
+    final res = await _analyze(api);
+
+    final mat = res.recommendedPlan.materials.first;
+    expect(mat.category, 'flooring');
+    expect(mat.unitPriceEgp, 200);
+    expect(mat.notes, contains('waste'));
+    expect(mat.vendors, hasLength(2));
+    expect(mat.vendors.first.name, 'Ceramica Cleopatra');
+    expect(mat.vendors.first.source, 'fallback');
+    expect(mat.vendors[1].name, 'RAK Ceramics');
+  });
+
+  test('PlanMaterial prefers total_egp over estimated_cost_egp', () async {
+    final payload = _successPayload();
+    final plans = ((payload['data'] as Map<String, dynamic>)['data']
+        as Map<String, dynamic>)['finishing_plans'] as List<dynamic>;
+    final mat = (plans[0]['materials'] as List<dynamic>)[0] as Map<String, dynamic>;
+    mat['total_egp'] = 9999;
+    mat['estimated_cost_egp'] = 1111;
+
+    final api = await _api((_) async => _json(payload));
+    final res = await _analyze(api);
+
+    expect(res.recommendedPlan.materials.first.estimatedCostEgp, 9999);
+  });
+
+  test('PlanMaterial vendors empty list when field absent', () async {
+    final payload = _successPayload();
+    final plans = ((payload['data'] as Map<String, dynamic>)['data']
+        as Map<String, dynamic>)['finishing_plans'] as List<dynamic>;
+    final mat = (plans[0]['materials'] as List<dynamic>)[0] as Map<String, dynamic>;
+    mat.remove('vendors');
+
+    final api = await _api((_) async => _json(payload));
+    final res = await _analyze(api);
+
+    expect(res.recommendedPlan.materials.first.vendors, isEmpty);
+  });
+
+  // ── New FinishingPlan fields ─────────────────────────────────────────────────
+
+  test('FinishingPlan parses planStyle and vendorAdjustedTotalEgp', () async {
+    final api = await _api((_) async => _json(_successPayload()));
+    final res = await _analyze(api);
+
+    expect(res.recommendedPlan.planStyle, 'Contemporary modern');
+    expect(res.recommendedPlan.vendorAdjustedTotalEgp, 13500);
+  });
+
+  test('FinishingPlan.vendorAdjustedTotalEgp defaults to 0 when absent', () async {
+    final payload = _successPayload();
+    final plans = ((payload['data'] as Map<String, dynamic>)['data']
+        as Map<String, dynamic>)['finishing_plans'] as List<dynamic>;
+    (plans[0] as Map<String, dynamic>).remove('vendor_adjusted_total_egp');
+
+    final api = await _api((_) async => _json(payload));
+    final res = await _analyze(api);
+
+    expect(res.recommendedPlan.vendorAdjustedTotalEgp, 0);
+  });
+
+  // ── Backend error propagation ────────────────────────────────────────────────
 
   test('analyzeRoom surfaces backend error as ApiException', () async {
     final api = await _api((http.Request request) async {
@@ -124,6 +247,8 @@ void main() {
   });
 }
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
 Future<AiApi> _api(
   Future<http.Response> Function(http.Request request) handler,
 ) async {
@@ -135,6 +260,17 @@ Future<AiApi> _api(
   );
   return AiApi(client);
 }
+
+Future<RoomAnalysisResponse> _analyze(AiApi api) => api.analyzeRoom(
+      imageBytes: const <int>[0xFF, 0xD8, 0xFF],
+      filename: 'room.jpg',
+      contentType: MediaType('image', 'jpeg'),
+      lengthM: 4.5,
+      widthM: 3.5,
+      heightM: 2.8,
+      budgetEgp: 15000,
+      style: 'modern',
+    );
 
 http.Response _json(Map<String, dynamic> body, {int statusCode = 200}) {
   return http.Response(
@@ -153,31 +289,48 @@ Map<String, dynamic> _successPayload() {
       'data': <String, dynamic>{
         'room_analysis': <String, dynamic>{
           'room_type': 'living-room',
-          'current_condition': 'bare concrete walls',
+          'wall_condition': 'bare brick',
           'detected_features': <String>['window', 'door'],
           'style': 'modern',
+          'estimated_ceiling_height_m': 2.8,
+          'special_notes': 'Room has a large window on the north wall.',
         },
         'finishing_plans': <Map<String, dynamic>>[
           <String, dynamic>{
             'plan_name': 'Modern Mid-Range',
+            'style': 'Contemporary modern',
             'description': 'Balanced finish',
             'total_cost_egp': 14000,
             'materials_subtotal_egp': 6500,
             'labor_subtotal_egp': 6000,
+            'vendor_adjusted_total_egp': 13500,
             'timeline_days': 7,
             'color_palette': <String>['#FAF8F5', '#9A8C73'],
             'materials': <Map<String, dynamic>>[
               <String, dynamic>{
+                'category': 'flooring',
                 'name': 'Ceramic floor tiles',
                 'quantity': '16',
                 'unit': 'm²',
-                'estimated_cost_egp': 3200,
+                'unit_price_egp': 200,
+                'total_egp': 3200,
+                'notes': 'Include 10% waste factor. Ceramica Cleopatra recommended.',
+                'vendors': <Map<String, dynamic>>[
+                  <String, dynamic>{'name': 'Ceramica Cleopatra', 'source': 'fallback'},
+                  <String, dynamic>{'name': 'RAK Ceramics', 'source': 'fallback'},
+                ],
               },
               <String, dynamic>{
+                'category': 'painting',
                 'name': 'Latex wall paint',
                 'quantity': '20',
                 'unit': 'L',
-                'estimated_cost_egp': 1800,
+                'unit_price_egp': 90,
+                'total_egp': 1800,
+                'notes': 'Two coats required.',
+                'vendors': <Map<String, dynamic>>[
+                  <String, dynamic>{'name': 'Jotun Egypt', 'source': 'fallback'},
+                ],
               },
             ],
             'labor': <Map<String, dynamic>>[
@@ -199,6 +352,7 @@ Map<String, dynamic> _successPayload() {
           },
           <String, dynamic>{
             'plan_name': 'Budget Refresh',
+            'style': 'Simple modern',
             'description': 'Lower-cost option',
             'total_cost_egp': 8000,
             'cost_breakdown': <String, dynamic>{
@@ -212,8 +366,21 @@ Map<String, dynamic> _successPayload() {
           },
         ],
         'recommended_plan': 'Modern Mid-Range',
+        'recommendation_reason':
+            'This plan is suitable for the budget and room size.',
       },
       'generated_room_image': 'aGVsbG8=',
+      'consistency_envelope': <String, dynamic>{
+        'style_used': 'modern',
+        'budget_tier': 'standard',
+        'floor_area_m2': 15.75,
+        'primary_flooring': 'Ceramic floor tiles',
+        'primary_wall': 'Latex Paint',
+        'sd_prompt_used': 'modern living room porcelain tile recessed LED',
+        'gemini_total_cost': 14000,
+        'vendor_adjusted_cost': 13500,
+        'consistency_warnings': <String>[],
+      },
     },
   };
 }
