@@ -15,14 +15,28 @@ import { openSettleDebtModal } from '../components/settle-debt-form.js';
 import { openPayoutRequestModal } from '../components/payout-request-form.js';
 import { getNotifications as apiGetTechNotifs, markOneRead as apiMarkTechNotifRead, markAllRead as apiMarkTechAllRead, getNotificationPreferences, updateNotificationPreferences } from '../api/notifications.js';
 import { getHierarchy as getLocationHierarchy, resolveSlug as resolveLocationSlug, labelForSlug as locationLabel, getDescendants as locationDescendants } from '../data/locations.js';
+import { calculateBookingFee, DEFAULT_PLATFORM_FEE_RATE, money } from '../utils/fee.js';
+
+// Per-booking fee snapshot. Uses booking's recorded fee if backend stamped it,
+// else recomputes via platform default. Returns { gross, fee, net, feeRate }.
+function bookingFeeSnapshot(b) {
+  const gross = money(b?.totalPrice ?? 0);
+  const rate = Number.isFinite(Number(b?.platformFeeRate))
+    ? Number(b.platformFeeRate)
+    : DEFAULT_PLATFORM_FEE_RATE;
+  const fee = b?.platformFeeAmount != null
+    ? money(b.platformFeeAmount)
+    : calculateBookingFee(gross, rate).feeAmount;
+  return { gross, fee, net: money(gross - fee), feeRate: rate };
+}
 
 const TAB_KEY = 'servio_activeTab_technician';
 
 // Holds uploaded avatar URL between file-select and form-save
 let _pendingPhotoUrl = null;
-const DAYS_KEYS = ['avail_day_mon','avail_day_tue','avail_day_wed','avail_day_thu','avail_day_fri','avail_day_sat','avail_day_sun'];
-const SKILLS_KEYS = ['skill_plumbing','skill_electrical','skill_hvac','skill_painting','skill_carpentry',
-  'skill_cleaning','skill_roofing','skill_flooring','skill_appliance','skill_landscaping','skill_general'];
+const DAYS_KEYS = ['avail_day_mon', 'avail_day_tue', 'avail_day_wed', 'avail_day_thu', 'avail_day_fri', 'avail_day_sat', 'avail_day_sun'];
+const SKILLS_KEYS = ['skill_plumbing', 'skill_electrical', 'skill_hvac', 'skill_painting', 'skill_carpentry',
+  'skill_cleaning', 'skill_roofing', 'skill_flooring', 'skill_appliance', 'skill_landscaping', 'skill_general'];
 
 // Legacy flat list — superseded by the hierarchical picker built from the
 // shared locations taxonomy. Kept as a tiny safety net for environments where
@@ -61,23 +75,178 @@ function getSelectedCoverageAreas(container) {
   return normalizeAreaList([...container.querySelectorAll('[data-area][aria-pressed="true"]')].map(btn => btn.dataset.area));
 }
 
+function getCustomCoverageAreas(customInput) {
+  return normalizeAreaList(customInput?.value || '');
+}
+
+function splitCoverageAreasByTaxonomy(areas) {
+  const known = [];
+  const custom = [];
+  normalizeAreaList(areas).forEach((area) => {
+    if (resolveLocationSlug(area)) known.push(area);
+    else custom.push(area);
+  });
+  return { known: normalizeAreaList(known), custom: normalizeAreaList(custom) };
+}
+
+function coverageKey(area) {
+  return resolveLocationSlug(area) || String(area || '').trim().toLowerCase();
+}
+
+function sameCoverageList(a = [], b = []) {
+  const left = normalizeAreaList(a).map(coverageKey).sort();
+  const right = normalizeAreaList(b).map(coverageKey).sort();
+  return left.length === right.length && left.every((key, index) => key === right[index]);
+}
+
+function getCoverageDirtyState(container, customInput) {
+  if (!container?.__coverageBaselineReady) return false;
+  return !sameCoverageList(getSelectedCoverageAreas(container), container.__savedCoverageAreas || [])
+    || !sameCoverageList(getCustomCoverageAreas(customInput), container.__savedCustomAreas || []);
+}
+
 function updateCoverageSummary(summaryEl, areas) {
   if (!summaryEl) return;
   const count = areas.length;
+  const countEl = document.getElementById('coverage-selected-count');
+  if (countEl) countEl.textContent = `${count} area${count === 1 ? '' : 's'}`;
   summaryEl.textContent = count
-    ? `Covers ${count} area${count === 1 ? '' : 's'}: ${areas.join(', ')}`
+    ? areas.slice(0, 4).join(', ') + (count > 4 ? ` + ${count - 4} more` : '')
     : 'No coverage areas selected.';
+}
+
+function syncCoverageCompactCard(container, customInput) {
+  const countEl = document.getElementById('coverage-card-count');
+  const summaryEl = document.getElementById('coverage-card-summary');
+  const strip = document.getElementById('coverage-card-strip');
+  if (!container || (!countEl && !summaryEl && !strip)) return;
+
+  const selected = getSelectedCoverageAreas(container);
+  const customAreas = getCustomCoverageAreas(customInput);
+  const combined = normalizeAreaList([...selected, ...customAreas]);
+  const isDirty = getCoverageDirtyState(container, customInput);
+  const clearBtn = document.getElementById('coverage-card-clear');
+  const saveBtn = document.getElementById('coverage-card-save');
+  const dirtyEl = document.getElementById('coverage-card-dirty-state');
+
+  if (countEl) countEl.textContent = `${combined.length} area${combined.length === 1 ? '' : 's'}`;
+  if (summaryEl) {
+    summaryEl.textContent = combined.length
+      ? combined.slice(0, 4).join(', ') + (combined.length > 4 ? ` + ${combined.length - 4} more` : '')
+      : 'No coverage areas selected. Customers cannot book you by location yet.';
+  }
+  if (clearBtn) clearBtn.disabled = combined.length === 0;
+  if (saveBtn) saveBtn.disabled = !isDirty;
+  if (dirtyEl) dirtyEl.hidden = !isDirty;
+
+  if (!strip) return;
+  strip.innerHTML = '';
+  if (!combined.length) {
+    const empty = document.createElement('span');
+    empty.className = 'coverage-selected-strip__empty';
+    empty.textContent = 'Open Manage coverage to add districts.';
+    strip.appendChild(empty);
+    return;
+  }
+
+  combined.slice(0, 6).forEach((area) => {
+    const chip = document.createElement('span');
+    chip.className = 'coverage-selected-chip coverage-selected-chip--readonly';
+    chip.textContent = area;
+    strip.appendChild(chip);
+  });
+  if (combined.length > 6) {
+    const more = document.createElement('span');
+    more.className = 'coverage-selected-chip coverage-selected-chip--more';
+    more.textContent = `+ ${combined.length - 6} more`;
+    strip.appendChild(more);
+  }
+}
+
+function syncCoverageControls(container, summaryEl, customInput) {
+  if (!container) return;
+  const selected = getSelectedCoverageAreas(container);
+  const customAreas = getCustomCoverageAreas(customInput);
+  const combined = normalizeAreaList([...selected, ...customAreas]);
+  const isDirty = getCoverageDirtyState(container, customInput);
+  const clearBtn = document.getElementById('coverage-clear');
+  const resetBtn = document.getElementById('coverage-reset');
+  const modalResetBtn = document.getElementById('coverage-modal-reset');
+  const saveBtn = document.getElementById('save-coverage');
+  const dirtyEl = document.getElementById('coverage-dirty-state');
+  const customDetails = document.querySelector('.coverage-custom-details');
+
+  updateCoverageSummary(summaryEl, combined);
+  if (clearBtn) clearBtn.disabled = combined.length === 0;
+  if (resetBtn) resetBtn.disabled = !isDirty;
+  if (modalResetBtn) modalResetBtn.disabled = !isDirty;
+  if (saveBtn) saveBtn.disabled = !isDirty;
+  if (dirtyEl) dirtyEl.hidden = !isDirty;
+  if (customDetails && customAreas.length) customDetails.open = true;
+  updateCoverageSelectedStrip(container, summaryEl, customInput);
+  syncCoverageCompactCard(container, customInput);
+}
+
+function updateCoverageSelectedStrip(container, summaryEl, customInput) {
+  const strip = document.getElementById('coverage-selected-strip');
+  if (!strip || !container) return;
+  const selected = getSelectedCoverageAreas(container);
+  const customAreas = getCustomCoverageAreas(customInput);
+  strip.innerHTML = '';
+
+  if (!selected.length && !customAreas.length) {
+    const empty = document.createElement('span');
+    empty.className = 'coverage-selected-strip__empty';
+    empty.textContent = 'No districts selected yet.';
+    strip.appendChild(empty);
+    return;
+  }
+
+  selected.forEach((area) => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'coverage-selected-chip';
+    chip.dataset.area = area;
+    chip.setAttribute('aria-label', `Remove ${area}`);
+    chip.innerHTML = `<span></span><b aria-hidden="true">x</b>`;
+    chip.querySelector('span').textContent = area;
+    chip.addEventListener('click', () => {
+      const areaSlug = resolveLocationSlug(area);
+      commitSelection(
+        container,
+        summaryEl,
+        customInput,
+        getSelectedCoverageAreas(container).filter((item) => resolveLocationSlug(item) !== areaSlug)
+      );
+    });
+    strip.appendChild(chip);
+  });
+
+  customAreas.forEach((area) => {
+    const tag = document.createElement('span');
+    tag.className = 'coverage-selected-chip coverage-selected-chip--custom';
+    tag.textContent = `Custom: ${area}`;
+    strip.appendChild(tag);
+  });
 }
 
 // Hierarchical picker: governorate → districts. Selecting a governorate is
 // shorthand for covering every district inside it — the backend's
 // `coverageMatchSlugs` expansion handles the matching, but we keep the UI
 // explicit so technicians see exactly what they accept.
-function renderCoverageEditor({ container, searchInput, summaryEl, selectedAreas = [], customInput }) {
+function renderCoverageEditor({ container, searchInput, summaryEl, selectedAreas = null, customInput }) {
   if (!container) return;
-  const selectedList = normalizeAreaList(selectedAreas.length ? selectedAreas : (container.__selectedCoverageAreas || []));
+  const selectedList = normalizeAreaList(Array.isArray(selectedAreas)
+    ? selectedAreas
+    : (container.__selectedCoverageAreas || []));
   container.__selectedCoverageAreas = selectedList;
-  container.__coverageSearchInput   = searchInput || container.__coverageSearchInput || null;
+  container.__coverageSearchInput = searchInput || container.__coverageSearchInput || null;
+  if (!container.__expandedCoverageGovs) container.__expandedCoverageGovs = new Set(['cairo-gov', 'giza-gov']);
+  if (!container.__coverageBaselineReady) {
+    container.__savedCoverageAreas = normalizeAreaList(selectedList);
+    container.__savedCustomAreas = getCustomCoverageAreas(customInput);
+    container.__coverageBaselineReady = true;
+  }
 
   // Map any current selections to their canonical slugs so a governorate-level
   // selection is recognised even if it was stored as "Cairo" instead of the
@@ -86,6 +255,8 @@ function renderCoverageEditor({ container, searchInput, summaryEl, selectedAreas
     selectedList.map(resolveLocationSlug).filter(Boolean)
   );
   const query = String(searchInput?.value || '').trim().toLowerCase();
+  const hasQuery = query.length > 0;
+  const querySlug = hasQuery ? resolveLocationSlug(query) : '';
 
   let hierarchy = [];
   try { hierarchy = getLocationHierarchy(); } catch { hierarchy = []; }
@@ -99,17 +270,19 @@ function renderCoverageEditor({ container, searchInput, summaryEl, selectedAreas
         toggleSelection(container, summaryEl, customInput, area));
       container.appendChild(btn);
     });
-    updateCoverageSummary(summaryEl, normalizeAreaList([
-      ...(container.__selectedCoverageAreas || []),
-      ...(customInput ? normalizeAreaList(customInput.value) : []),
-    ]));
+    syncCoverageControls(container, summaryEl, customInput);
     return;
   }
 
+  let renderedGroups = 0;
   hierarchy.forEach((gov) => {
-    const govMatches = !query || gov.name.toLowerCase().includes(query);
+    const descendants = locationDescendants(gov.slug);
+    const directGovMatches = !query
+      || gov.name.toLowerCase().includes(query)
+      || gov.slug === querySlug;
+    const govMatches = directGovMatches || descendants.includes(querySlug);
     const visibleDistricts = gov.districts.filter((d) =>
-      govMatches || d.name.toLowerCase().includes(query)
+      directGovMatches || d.name.toLowerCase().includes(query) || d.slug === querySlug
     );
     if (!govMatches && !visibleDistricts.length) return;
 
@@ -120,55 +293,88 @@ function renderCoverageEditor({ container, searchInput, summaryEl, selectedAreas
     header.className = 'coverage-group__header';
 
     const govSelected = selectedSlugs.has(gov.slug);
+    const hasSelectedDistrict = gov.districts.some((d) => selectedSlugs.has(d.slug));
+    const isExpanded = hasQuery || govSelected || hasSelectedDistrict || container.__expandedCoverageGovs.has(gov.slug);
+    group.classList.toggle('coverage-group--selected', govSelected || hasSelectedDistrict);
+    group.classList.toggle('coverage-group--collapsed', !isExpanded);
+
+    const toggleBtn = document.createElement('button');
+    toggleBtn.type = 'button';
+    toggleBtn.className = 'coverage-group__toggle';
+    toggleBtn.setAttribute('aria-expanded', String(isExpanded));
+    const chevron = document.createElement('span');
+    chevron.className = 'coverage-group__chevron';
+    chevron.setAttribute('aria-hidden', 'true');
+    const nameEl = document.createElement('span');
+    nameEl.textContent = gov.name;
+    const countEl = document.createElement('small');
+    countEl.textContent = gov.districts.length
+      ? `${gov.districts.length} districts`
+      : 'Governorate level';
+    toggleBtn.append(chevron, nameEl, countEl);
+    toggleBtn.addEventListener('click', () => {
+      if (container.__expandedCoverageGovs.has(gov.slug)) container.__expandedCoverageGovs.delete(gov.slug);
+      else container.__expandedCoverageGovs.add(gov.slug);
+      renderCoverageEditor({
+        container,
+        searchInput: container.__coverageSearchInput,
+        summaryEl,
+        selectedAreas: container.__selectedCoverageAreas,
+        customInput,
+      });
+    });
+    header.appendChild(toggleBtn);
+
     const govChip = buildChip(`${gov.name} (all)`, govSelected, () => {
       // Selecting a governorate clears its districts to keep the list tidy —
       // the slug-expansion on the backend already implies coverage of all of them.
       const next = govSelected
         ? (container.__selectedCoverageAreas || []).filter((a) => resolveLocationSlug(a) !== gov.slug)
         : [
-            ...(container.__selectedCoverageAreas || []).filter((a) => {
-              const slug = resolveLocationSlug(a);
-              return !slug || !locationDescendants(gov.slug).includes(slug);
-            }),
-            gov.name,
-          ];
+          ...(container.__selectedCoverageAreas || []).filter((a) => {
+            const slug = resolveLocationSlug(a);
+            return !slug || !descendants.includes(slug);
+          }),
+          gov.name,
+        ];
       commitSelection(container, summaryEl, customInput, next);
     });
     govChip.classList.add('coverage-chip--gov');
     header.appendChild(govChip);
     group.appendChild(header);
 
-    const districtRow = document.createElement('div');
-    districtRow.className = 'coverage-group__districts';
+    if (isExpanded && govSelected) {
+      const note = document.createElement('p');
+      note.className = 'coverage-group__covered-note';
+      const preview = gov.districts.slice(0, 5).map((d) => d.name).join(', ');
+      note.textContent = gov.districts.length
+        ? `All ${gov.districts.length} districts are covered, including ${preview}${gov.districts.length > 5 ? ', and more' : ''}.`
+        : `${gov.name} is covered.`;
+      group.appendChild(note);
+    } else if (isExpanded && visibleDistricts.length) {
+      const districtRow = document.createElement('div');
+      districtRow.className = 'coverage-group__districts';
 
-    visibleDistricts.forEach((d) => {
-      const isSelected = selectedSlugs.has(d.slug);
-      // If the parent governorate is already selected, the district is implicitly
-      // covered — show it as pressed + disabled to make this obvious.
-      const implicit = govSelected;
-      const chip = buildChip(d.name, isSelected || implicit, () => {
-        if (implicit) return; // governorate already covers it
-        const next = isSelected
-          ? (container.__selectedCoverageAreas || []).filter((a) => resolveLocationSlug(a) !== d.slug)
-          : [...(container.__selectedCoverageAreas || []), d.name];
-        commitSelection(container, summaryEl, customInput, next);
+      visibleDistricts.forEach((d) => {
+        const isSelected = selectedSlugs.has(d.slug);
+        const chip = buildChip(d.name, isSelected, () => {
+          const next = isSelected
+            ? (container.__selectedCoverageAreas || []).filter((a) => resolveLocationSlug(a) !== d.slug)
+            : [...(container.__selectedCoverageAreas || []), d.name];
+          commitSelection(container, summaryEl, customInput, next);
+        });
+        districtRow.appendChild(chip);
       });
-      if (implicit) {
-        chip.classList.add('coverage-chip--implicit');
-        chip.setAttribute('aria-disabled', 'true');
-        chip.title = `Covered by ${gov.name}`;
-      }
-      districtRow.appendChild(chip);
-    });
 
-    if (visibleDistricts.length) group.appendChild(districtRow);
+      group.appendChild(districtRow);
+    }
     container.appendChild(group);
+    renderedGroups += 1;
   });
 
-  updateCoverageSummary(summaryEl, normalizeAreaList([
-    ...(container.__selectedCoverageAreas || []),
-    ...(customInput ? normalizeAreaList(customInput.value) : []),
-  ]));
+  const emptyState = document.getElementById('coverage-empty-state');
+  if (emptyState) emptyState.hidden = renderedGroups > 0;
+  syncCoverageControls(container, summaryEl, customInput);
 }
 
 function buildChip(label, pressed, onClick) {
@@ -184,17 +390,46 @@ function buildChip(label, pressed, onClick) {
 
 function commitSelection(container, summaryEl, customInput, nextList) {
   container.__selectedCoverageAreas = normalizeAreaList(nextList);
-  const merged = normalizeAreaList([
-    ...(container.__selectedCoverageAreas || []),
-    ...(customInput ? normalizeAreaList(customInput.value) : []),
-  ]);
-  updateCoverageSummary(summaryEl, merged);
   // Re-render so the implicit-coverage chips update when a governorate toggles.
   renderCoverageEditor({
     container,
     searchInput: container.__coverageSearchInput,
     summaryEl,
     selectedAreas: container.__selectedCoverageAreas,
+    customInput,
+  });
+}
+
+function setCoverageSavedBaseline(container, customInput) {
+  if (!container) return;
+  container.__savedCoverageAreas = getSelectedCoverageAreas(container);
+  container.__savedCustomAreas = getCustomCoverageAreas(customInput);
+  container.__coverageBaselineReady = true;
+  syncCoverageControls(container, document.getElementById('coverage-summary'), customInput);
+}
+
+function resetCoverageToSaved(container, summaryEl, customInput) {
+  if (!container) return;
+  container.__selectedCoverageAreas = normalizeAreaList(container.__savedCoverageAreas || []);
+  if (customInput) customInput.value = normalizeAreaList(container.__savedCustomAreas || []).join(', ');
+  renderCoverageEditor({
+    container,
+    searchInput: container.__coverageSearchInput,
+    summaryEl,
+    selectedAreas: container.__selectedCoverageAreas,
+    customInput,
+  });
+}
+
+function clearCoverageSelection(container, summaryEl, customInput) {
+  if (!container) return;
+  container.__selectedCoverageAreas = [];
+  if (customInput) customInput.value = '';
+  renderCoverageEditor({
+    container,
+    searchInput: container.__coverageSearchInput,
+    summaryEl,
+    selectedAreas: [],
     customInput,
   });
 }
@@ -208,18 +443,50 @@ function toggleSelection(container, summaryEl, customInput, area) {
   commitSelection(container, summaryEl, customInput, next);
 }
 
+function openCoverageModal() {
+  const modal = document.getElementById('coverage-modal');
+  if (!modal) return;
+  modal.classList.add('is-open');
+  modal.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('coverage-modal-open');
+  const searchInput = document.getElementById('coverage-search');
+  const container = document.getElementById('coverage-area-chips');
+  const customInput = document.getElementById('service-area');
+  renderCoverageEditor({
+    container,
+    searchInput,
+    summaryEl: document.getElementById('coverage-summary'),
+    selectedAreas: getSelectedCoverageAreas(container),
+    customInput,
+  });
+  window.setTimeout(() => searchInput?.focus(), 40);
+}
+
+function closeCoverageModal({ reset = false } = {}) {
+  const modal = document.getElementById('coverage-modal');
+  const container = document.getElementById('coverage-area-chips');
+  const customInput = document.getElementById('service-area');
+  const summaryEl = document.getElementById('coverage-summary');
+  if (reset) resetCoverageToSaved(container, summaryEl, customInput);
+  modal?.classList.remove('is-open');
+  modal?.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('coverage-modal-open');
+  document.getElementById('coverage-open-modal')?.focus();
+}
+
 // Tab label map for topbar title (keys resolved via t() at render time)
 const TAB_LABEL_KEYS = {
-  'overview':      'tech_nav_overview',
-  'job-queue':     'tech_nav_job_queue',
-  'earnings':      'tech_nav_earnings',
-  'availability':  'tech_nav_availability',
-  'reviews':       'tech_nav_reviews',
-  'verification':  'tech_nav_verification',
-  'settings':      'tech_nav_settings',
-  'job-board':     'tech_nav_job_board',
-  'my-proposals':  'tech_nav_proposals',
-  'disputes':      'tech_nav_disputes',
+  'overview': 'tech_nav_overview',
+  'job-queue': 'tech_nav_job_queue',
+  'earnings': 'tech_nav_earnings',
+  'transactions': 'tech_nav_transactions',
+  'availability': 'tech_nav_availability',
+  'reviews': 'tech_nav_reviews',
+  'verification': 'tech_nav_verification',
+  'settings': 'tech_nav_settings',
+  'job-board': 'tech_nav_job_board',
+  'my-proposals': 'tech_nav_proposals',
+  'disputes': 'tech_nav_disputes',
 };
 
 function getSession() {
@@ -253,22 +520,21 @@ function getNavSeen() {
   try { return JSON.parse(localStorage.getItem(NAV_SEEN_KEY) || '{}'); } catch { return {}; }
 }
 function setNavSeen(map) {
-  try { localStorage.setItem(NAV_SEEN_KEY, JSON.stringify(map)); } catch {}
+  try { localStorage.setItem(NAV_SEEN_KEY, JSON.stringify(map)); } catch { }
 }
 function setNavBadge(tabId, count) {
-  const el = document.querySelector(`[data-nav-badge="${tabId}"]`);
-  if (!el) return;
-  if (count > 0) {
-    el.hidden = false;
-    el.textContent = count > 9 ? '9+' : String(count);
-  } else {
-    el.hidden = true;
-  }
-}
-function setNavDot(tabId, show) {
-  const el = document.querySelector(`[data-nav-dot="${tabId}"]`);
-  if (!el) return;
-  el.hidden = !show;
+  const badges = document.querySelectorAll(`[data-nav-badge="${tabId}"]`);
+  if (!badges.length) return;
+  badges.forEach(el => {
+    if (count > 0) {
+      el.hidden = false;
+      el.textContent = count > 9 ? '9+' : String(count);
+      el.setAttribute('aria-label', `${count} new update${count === 1 ? '' : 's'}`);
+    } else {
+      el.hidden = true;
+      el.removeAttribute('aria-label');
+    }
+  });
 }
 function updateSidebarIndicators(bookings) {
   const seen = getNavSeen();
@@ -285,7 +551,17 @@ function updateSidebarIndicators(bookings) {
     const t = new Date(b.completedAt || b.updatedAt || b.scheduledDate).getTime();
     return t > lastSeenEarnings;
   }).length;
-  setNavDot('earnings', newCompleted > 0);
+  setNavBadge('earnings', newCompleted);
+}
+function updateReviewIndicator(reviews) {
+  const seen = getNavSeen();
+  const lastSeenReviews = seen.reviews || 0;
+  const list = Array.isArray(reviews) ? reviews : [];
+  const newReviews = list.filter(r => {
+    const t = new Date(r.createdAt || r.updatedAt).getTime();
+    return Number.isFinite(t) && t > lastSeenReviews;
+  }).length;
+  setNavBadge('reviews', newReviews);
 }
 function markTabSeen(tabId) {
   const seen = getNavSeen();
@@ -293,7 +569,6 @@ function markTabSeen(tabId) {
   setNavSeen(seen);
   // Clear that tab's indicator immediately
   setNavBadge(tabId, 0);
-  setNavDot(tabId, false);
 }
 
 /* ── Topbar avatar ──────────────────────────────────────── */
@@ -303,7 +578,7 @@ function initTopbarAvatar() {
     const initial = (session.name || 'T')[0].toUpperCase();
     const el = document.getElementById('topbar-avatar');
     if (el) el.textContent = initial;
-  } catch {}
+  } catch { }
 }
 
 /* ── Topbar theme toggle ────────────────────────────────── */
@@ -317,8 +592,17 @@ function initTabs() {
       const btn = document.createElement('button');
       btn.className = 'dash-mobile-tab';
       btn.type = 'button';
-      btn.textContent = tab.textContent.trim();
+      const label = tab.querySelector('.dash-nav__label')?.textContent.trim() || tab.textContent.trim();
+      btn.append(document.createTextNode(label));
       btn.dataset.mobileTab = tab.dataset.tab;
+      if (tab.querySelector('[data-nav-badge]')) {
+        const badge = document.createElement('span');
+        badge.className = 'dash-mobile-tab__badge';
+        badge.dataset.navBadge = tab.dataset.tab;
+        badge.hidden = true;
+        badge.textContent = '0';
+        btn.appendChild(badge);
+      }
       mobileTabs.appendChild(btn);
     });
   }
@@ -364,15 +648,15 @@ function initTabs() {
     if (stale && tabLastRefresh[id] !== undefined) {
       tabLastRefresh[id] = now;
       if (id === 'job-queue') {
-        initJobQueue().catch(() => {});
+        initJobQueue().catch(() => { });
       } else if (id === 'overview' || id === 'earnings') {
-        populateStats().catch(() => {});
+        populateStats().catch(() => { });
       } else if (id === 'disputes') {
-        loadTechDisputes().catch(() => {});
+        loadTechDisputes().catch(() => { });
       }
     } else if (tabLastRefresh[id] === undefined) {
       if (id === 'disputes') {
-        loadTechDisputes().catch(() => {});
+        loadTechDisputes().catch(() => { });
       }
       // Mark as seen so next visit triggers refresh
       tabLastRefresh[id] = now;
@@ -407,12 +691,12 @@ function initTabs() {
 function populateProfile() {
   const session = getSession();
   const account = getAccount();
-  if (!session) { 
+  if (!session) {
     const currentPath = window.location.pathname;
     const currentPage = currentPath.substring(currentPath.lastIndexOf('/') + 1) || 'index.html';
     const redirectParam = encodeURIComponent('./' + currentPage + window.location.search);
     window.location.href = './login.html?redirect=' + redirectParam;
-    return; 
+    return;
   }
 
   const name = session.name || account?.fullName || 'Technician';
@@ -434,17 +718,17 @@ function populateProfile() {
 
   // Build an effective account by merging session fields as fallback for missing account data
   const effectiveAccount = {
-    fullName:        session.name || '',
-    name:            session.name || '',
-    email:           session.email || '',
-    phone:           session.phone || '',
-    skills:          session.skills || [],
-    specialty:       Array.isArray(session.skills) ? session.skills.join(', ') : '',
-    hourlyRate:      session.hourlyRate ?? '',
+    fullName: session.name || '',
+    name: session.name || '',
+    email: session.email || '',
+    phone: session.phone || '',
+    skills: session.skills || [],
+    specialty: Array.isArray(session.skills) ? session.skills.join(', ') : '',
+    hourlyRate: session.hourlyRate ?? '',
     yearsExperience: session.yearsExperience ?? '',
-    experience:      session.yearsExperience ?? '',
-    bio:             session.bio || '',
-    ...( account || {} ),
+    experience: session.yearsExperience ?? '',
+    bio: session.bio || '',
+    ...(account || {}),
   };
 
   // Normalise field aliases
@@ -462,28 +746,29 @@ function populateProfile() {
   });
   const initialCoverage = getCoverageAreasFromAccount(effectiveAccount);
   const serviceAreaInput = document.getElementById('service-area');
+  const initialCoverageSplit = splitCoverageAreasByTaxonomy(initialCoverage);
   if (serviceAreaInput) {
-    serviceAreaInput.value = Array.isArray(effectiveAccount.coverageAreas) && effectiveAccount.coverageAreas.length
-      ? ''
-      : (effectiveAccount.serviceArea || '');
+    serviceAreaInput.value = initialCoverageSplit.custom.join(', ');
   }
   renderCoverageEditor({
     container: document.getElementById('coverage-area-chips'),
     searchInput: document.getElementById('coverage-search'),
     summaryEl: document.getElementById('coverage-summary'),
-    selectedAreas: initialCoverage,
+    selectedAreas: initialCoverageSplit.known,
     customInput: serviceAreaInput,
   });
+  setCoverageSavedBaseline(document.getElementById('coverage-area-chips'), serviceAreaInput);
   document.getElementById('coverage-search')?.addEventListener('input', () => renderCoverageEditor({
     container: document.getElementById('coverage-area-chips'),
     searchInput: document.getElementById('coverage-search'),
     summaryEl: document.getElementById('coverage-summary'),
-    selectedAreas: normalizeAreaList([...getSelectedCoverageAreas(document.getElementById('coverage-area-chips')), ...normalizeAreaList(serviceAreaInput?.value || '')]),
+    selectedAreas: getSelectedCoverageAreas(document.getElementById('coverage-area-chips')),
     customInput: serviceAreaInput,
   }));
-  serviceAreaInput?.addEventListener('input', () => updateCoverageSummary(
+  serviceAreaInput?.addEventListener('input', () => syncCoverageControls(
+    document.getElementById('coverage-area-chips'),
     document.getElementById('coverage-summary'),
-    normalizeAreaList([...getSelectedCoverageAreas(document.getElementById('coverage-area-chips')), ...normalizeAreaList(serviceAreaInput.value)])
+    serviceAreaInput
   ));
 
   // Render avatar — photo takes priority over initials
@@ -492,8 +777,8 @@ function populateProfile() {
   const serverImg = session.profileImage || '';
   const serverImgUsable = serverImg && (serverImg.startsWith('http') || serverImg.startsWith('/'));
   const photoUrl = serverImgUsable ? serverImg : (localStorage.getItem('servio_avatar_cache') || null);
-  const preview  = document.querySelector('[data-avatar-preview]');
-  const topbar   = document.getElementById('topbar-avatar');
+  const preview = document.querySelector('[data-avatar-preview]');
+  const topbar = document.getElementById('topbar-avatar');
 
   if (preview) {
     if (photoUrl) {
@@ -544,16 +829,16 @@ function populateProfile() {
 
     // Populate settings form fields from live API data
     const fieldMap = {
-      fullName:   user.name,
-      email:      user.email,
-      phone:      user.phone,
-      specialty:  Array.isArray(user.skills) ? user.skills.join(', ') : (user.specialty || ''),
+      fullName: user.name,
+      email: user.email,
+      phone: user.phone,
+      specialty: Array.isArray(user.skills) ? user.skills.join(', ') : (user.specialty || ''),
       hourlyRate: user.hourlyRate,
       experience: user.yearsExperience,
-      bio:        user.bio,
-      facebook:   user.facebook,
-      instagram:  user.instagram,
-      portfolio:  user.portfolioUrl,
+      bio: user.bio,
+      facebook: user.facebook,
+      instagram: user.instagram,
+      portfolio: user.portfolioUrl,
     };
     Object.entries(fieldMap).forEach(([field, val]) => {
       if (val == null || val === '') return;
@@ -572,17 +857,17 @@ function populateProfile() {
     // Persist updated data locally for offline use
     try {
       const acc = getAccount() || {};
-      if (user.name)            { acc.fullName = user.name; acc.name = user.name; }
-      if (user.phone)           acc.phone       = user.phone;
-      if (user.skills)          { acc.skills = user.skills; acc.specialty = user.skills.join(', '); }
-      if (user.hourlyRate)      acc.hourlyRate   = user.hourlyRate;
+      if (user.name) { acc.fullName = user.name; acc.name = user.name; }
+      if (user.phone) acc.phone = user.phone;
+      if (user.skills) { acc.skills = user.skills; acc.specialty = user.skills.join(', '); }
+      if (user.hourlyRate) acc.hourlyRate = user.hourlyRate;
       if (user.yearsExperience != null) { acc.yearsExperience = user.yearsExperience; acc.experience = user.yearsExperience; }
-      if (user.bio)             acc.bio          = user.bio;
-      if (user.facebook)        acc.facebook     = user.facebook;
-      if (user.instagram)       acc.instagram    = user.instagram;
-      if (user.portfolioUrl)    acc.portfolio    = user.portfolioUrl;
+      if (user.bio) acc.bio = user.bio;
+      if (user.facebook) acc.facebook = user.facebook;
+      if (user.instagram) acc.instagram = user.instagram;
+      if (user.portfolioUrl) acc.portfolio = user.portfolioUrl;
       localStorage.setItem('servio_account', JSON.stringify(acc));
-    } catch (_) {}
+    } catch (_) { }
 
     // Wire "View Profile" link so tech sees their own public profile (read-only)
     const techId = user._id || user.id;
@@ -591,7 +876,7 @@ function populateProfile() {
         link.href = `./technician-profile.html?id=${techId}&preview=1`;
       });
     }
-  }).catch(() => {});
+  }).catch(() => { });
 }
 
 function updateWelcomeText() {
@@ -649,12 +934,12 @@ function renderCachedTechStats() {
   try {
     const c = JSON.parse(localStorage.getItem(TECH_STATS_CACHE_KEY) || 'null');
     if (!c) return;
-    if (c.totalJobs != null)       setStatTextEl('total-jobs', c.totalJobs);
-    if (c.totalJobsMonthSub)       setStatSubTextEl('total-jobs-month', c.totalJobsMonthSub);
-    if (c.monthEarningsLabel)      setStatTextEl('month-earnings', c.monthEarningsLabel);
-    if (c.monthEarningsChange)     setStatSubTextEl('month-earnings-change', c.monthEarningsChange);
+    if (c.totalJobs != null) setStatTextEl('total-jobs', c.totalJobs);
+    if (c.totalJobsMonthSub) setStatSubTextEl('total-jobs-month', c.totalJobsMonthSub);
+    if (c.monthEarningsLabel) setStatTextEl('month-earnings', c.monthEarningsLabel);
+    if (c.monthEarningsChange) setStatSubTextEl('month-earnings-change', c.monthEarningsChange);
     if (c.pendingRequests != null) setStatTextEl('pending-requests', c.pendingRequests);
-    if (c.pendingRequestsNote)     setStatSubTextEl('pending-requests-note', c.pendingRequestsNote);
+    if (c.pendingRequestsNote) setStatSubTextEl('pending-requests-note', c.pendingRequestsNote);
     if (c.outstandingHtml) {
       const el = document.querySelector('[data-stat="outstanding-balance"]');
       if (el) el.innerHTML = c.outstandingHtml;
@@ -675,40 +960,60 @@ async function populateStats() {
     const res = await getWorkerBookings({ limit: 200 });
     bookings = res?.bookings || [];
     totalCount = res?.pagination?.total ?? bookings.length;
-  } catch (_) {}
+  } catch (_) { }
+
+  let earnings = null;
+  try {
+    earnings = await getWorkerEarnings();
+  } catch (err) {
+    console.warn('[tech] Failed to fetch canonical earnings breakdown', err);
+  }
 
   updateSidebarIndicators(bookings);
 
   const now = new Date();
   const thisMonth = now.getMonth();
-  const thisYear  = now.getFullYear();
+  const thisYear = now.getFullYear();
   const lastMonth = thisMonth === 0 ? 11 : thisMonth - 1;
-  const lastYear  = thisMonth === 0 ? thisYear - 1 : thisYear;
+  const lastYear = thisMonth === 0 ? thisYear - 1 : thisYear;
 
   const completed = bookings.filter(b => b.status === 'completed');
-  const pending   = bookings.filter(b => b.status === 'pending');
+  const pending = bookings.filter(b => b.status === 'pending');
+  const cashCompleted = completed.filter(b => b.paymentMethod === 'cash');
+  const breakdown = earnings?.breakdown || null;
 
-  // Month earnings = sum of totalPrice for completed bookings this month
-  const monthEarnings = completed.reduce((sum, b) => {
+  // Legacy fallback when the canonical earnings breakdown is unavailable.
+  let monthEarningsGross = 0;
+  const fallbackMonthEarnings = completed.reduce((sum, b) => {
     const d = new Date(b.scheduledDate || b.createdAt);
     if (d.getMonth() === thisMonth && d.getFullYear() === thisYear) {
-      return sum + (b.totalPrice || 0);
+      const { gross, net } = bookingFeeSnapshot(b);
+      monthEarningsGross += gross;
+      return sum + net;
     }
     return sum;
   }, 0);
 
-  // Last month earnings for delta
-  const lastMonthEarnings = completed.reduce((sum, b) => {
+  // Last month earnings for delta (net, same basis)
+  const fallbackLastMonthEarnings = completed.reduce((sum, b) => {
     const d = new Date(b.scheduledDate || b.createdAt);
     if (d.getMonth() === lastMonth && d.getFullYear() === lastYear) {
-      return sum + (b.totalPrice || 0);
+      return sum + bookingFeeSnapshot(b).net;
     }
     return sum;
   }, 0);
 
-  // Outstanding cash: cash bookings that are completed but not yet settled
-  const cashCompleted = completed.filter(b => b.paymentMethod === 'cash');
-  const outstandingAmount = cashCompleted.reduce((sum, b) => sum + (b.totalPrice || 0), 0);
+  const monthEarnings = Number.isFinite(Number(breakdown?.thisMonthTakeHome))
+    ? Number(breakdown.thisMonthTakeHome)
+    : fallbackMonthEarnings;
+  const lastMonthEarnings = Number.isFinite(Number(breakdown?.lastMonthTakeHome))
+    ? Number(breakdown.lastMonthTakeHome)
+    : fallbackLastMonthEarnings;
+  const outstandingAmount = money(
+    Number.isFinite(Number(breakdown?.outstandingCashFees))
+      ? Number(breakdown.outstandingCashFees)
+      : cashCompleted.reduce((sum, b) => sum + bookingFeeSnapshot(b).fee, 0)
+  );
 
   // This month's job count
   const monthJobs = bookings.filter(b => {
@@ -772,8 +1077,34 @@ async function populateStats() {
     el.textContent = subText;
   });
 
-  // Populate earnings panel
-  populateEarnings(bookings, completed, monthEarnings, lastMonthEarnings, cashCompleted, outstandingAmount);
+  // Populate earnings panel.
+  // Dual-writer guard: renderCanonicalEarningsPanel and populateEarningsLegacy
+  // both write to the SAME DOM ids (walletAvailable, walletPending,
+  // liabilityAmount, etc.). Exactly ONE renderer may run per cycle, otherwise
+  // the second write clobbers the first and produces inconsistent UI.
+  // The canonical breakdown (earnings.breakdown) is the source of truth when
+  // present; absence indicates the /workers/me/earnings endpoint failed or
+  // returned a partial payload, so fall back to the legacy reducer path.
+  if (earnings?.breakdown) {
+    renderCanonicalEarningsPanel({
+      bookings,
+      completed,
+      cashCompleted,
+      monthEarnings,
+      lastMonthEarnings,
+      outstandingAmount,
+      earnings,
+    });
+  } else {
+    populateEarningsLegacy(
+      bookings,
+      completed,
+      monthEarnings,
+      lastMonthEarnings,
+      cashCompleted,
+      outstandingAmount
+    );
+  }
 
   // Populate overview panels
   populateOverviewIncoming(pending);
@@ -788,11 +1119,31 @@ async function populateStats() {
 
 // ── Available Now Toggle ──────────────────────────────────────────────────────
 // Connects the toggle to PATCH /users/me/available with debounce + UI feedback
+function updateSidebarAvailabilityStatus(isOn) {
+  const safeT = (key, fallback) => {
+    const value = typeof window.t === 'function' ? window.t(key) : null;
+    return value && value !== key ? value : fallback;
+  };
+  const label = isOn
+    ? safeT('tech_dash_available', 'Available')
+    : safeT('tech_dash_unavailable', 'Offline');
+  const labelKey = isOn ? 'tech_dash_available' : 'tech_dash_unavailable';
+  document.querySelectorAll('[data-sidebar-availability]').forEach(chip => {
+    chip.classList.toggle('is-available', !!isOn);
+    chip.classList.toggle('is-offline', !isOn);
+    chip.setAttribute('aria-label', label);
+  });
+  document.querySelectorAll('[data-sidebar-availability-label]').forEach(el => {
+    el.setAttribute('data-i18n', labelKey);
+    el.textContent = label;
+  });
+}
+
 function initAvailableNowToggle(initialState) {
-  const toggle  = document.getElementById('avail-now-toggle');
-  const card    = document.getElementById('avail-now-card');
-  const pill    = document.getElementById('avail-now-pill');
-  const icon    = document.getElementById('avail-now-icon');
+  const toggle = document.getElementById('avail-now-toggle');
+  const card = document.getElementById('avail-now-card');
+  const pill = document.getElementById('avail-now-pill');
+  const icon = document.getElementById('avail-now-icon');
   if (!toggle) return;
 
   const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
@@ -803,7 +1154,8 @@ function initAvailableNowToggle(initialState) {
       return (r === k || !r) ? def : r;
     };
     toggle.checked = isOn;
-    if (card)  card.classList.toggle('is-active', isOn);
+    updateSidebarAvailabilityStatus(isOn);
+    if (card) card.classList.toggle('is-active', isOn);
     if (pill) {
       pill.textContent = isOn ? safeT('avail_status_online', 'Online') : safeT('avail_status_offline', 'Offline');
       pill.classList.toggle('is-online', isOn);
@@ -848,10 +1200,15 @@ function initAvailableNowToggle(initialState) {
           const s = JSON.parse(localStorage.getItem('servio_session') || '{}');
           s.isAvailable = isOn;
           localStorage.setItem('servio_session', JSON.stringify(s));
-        } catch (_) {}
+        } catch (_) { }
+        try {
+          const acc = JSON.parse(localStorage.getItem('servio_account') || '{}');
+          acc.isAvailable = isOn;
+          localStorage.setItem('servio_account', JSON.stringify(acc));
+        } catch (_) { }
         const _tSafe2 = (k, def) => { const v = _t(k); return (v && v !== k) ? v : def; };
         const msg = isOn
-          ? _tSafe2('toast_avail_on',  'You are now visible and accepting bookings.')
+          ? _tSafe2('toast_avail_on', 'You are now visible and accepting bookings.')
           : _tSafe2('toast_avail_off', 'You are now offline. New bookings are paused.');
         showToast(msg, isOn ? 'success' : 'info');
       } catch (err) {
@@ -873,13 +1230,13 @@ function initAvailabilitySchedule(savedSlots) {
   const T = typeof window.t === 'function' ? window.t.bind(window) : (k) => k;
 
   const DAY_CONFIGS = [
-    { key: 'monday',    label: T('avail_day_mon') || 'Monday',    abbr: 'MON', defaultFrom: '09:00', defaultTo: '17:00' },
-    { key: 'tuesday',   label: T('avail_day_tue') || 'Tuesday',   abbr: 'TUE', defaultFrom: '09:00', defaultTo: '17:00' },
+    { key: 'monday', label: T('avail_day_mon') || 'Monday', abbr: 'MON', defaultFrom: '09:00', defaultTo: '17:00' },
+    { key: 'tuesday', label: T('avail_day_tue') || 'Tuesday', abbr: 'TUE', defaultFrom: '09:00', defaultTo: '17:00' },
     { key: 'wednesday', label: T('avail_day_wed') || 'Wednesday', abbr: 'WED', defaultFrom: '09:00', defaultTo: '17:00' },
-    { key: 'thursday',  label: T('avail_day_thu') || 'Thursday',  abbr: 'THU', defaultFrom: '09:00', defaultTo: '17:00' },
-    { key: 'friday',    label: T('avail_day_fri') || 'Friday',    abbr: 'FRI', defaultFrom: '09:00', defaultTo: '17:00' },
-    { key: 'saturday',  label: T('avail_day_sat') || 'Saturday',  abbr: 'SAT', defaultFrom: '10:00', defaultTo: '15:00' },
-    { key: 'sunday',    label: T('avail_day_sun') || 'Sunday',    abbr: 'SUN', defaultFrom: '10:00', defaultTo: '15:00' },
+    { key: 'thursday', label: T('avail_day_thu') || 'Thursday', abbr: 'THU', defaultFrom: '09:00', defaultTo: '17:00' },
+    { key: 'friday', label: T('avail_day_fri') || 'Friday', abbr: 'FRI', defaultFrom: '09:00', defaultTo: '17:00' },
+    { key: 'saturday', label: T('avail_day_sat') || 'Saturday', abbr: 'SAT', defaultFrom: '10:00', defaultTo: '15:00' },
+    { key: 'sunday', label: T('avail_day_sun') || 'Sunday', abbr: 'SUN', defaultFrom: '10:00', defaultTo: '15:00' },
   ];
 
   // Build half-hour time options for dropdown
@@ -887,11 +1244,11 @@ function initAvailabilitySchedule(savedSlots) {
     const opts = [];
     for (let h = 6; h <= 23; h++) {
       for (const m of [0, 30]) {
-        const pad  = n => String(n).padStart(2, '0');
-        const val  = `${pad(h)}:${pad(m)}`;
-        const h12  = h === 0 ? 12 : h > 12 ? h - 12 : h;
+        const pad = n => String(n).padStart(2, '0');
+        const val = `${pad(h)}:${pad(m)}`;
+        const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
         const ampm = h >= 12 ? 'PM' : 'AM';
-        const lbl  = `${h12}:${pad(m)} ${ampm}`;
+        const lbl = `${h12}:${pad(m)} ${ampm}`;
         opts.push({ val, lbl });
       }
     }
@@ -916,7 +1273,7 @@ function initAvailabilitySchedule(savedSlots) {
 
   function validateRow(fromSel, toSel) {
     const fromVal = fromSel.value;
-    const toVal   = toSel.value;
+    const toVal = toSel.value;
     const isValid = toVal > fromVal;
     toSel.classList.toggle('is-error', !isValid);
     return isValid;
@@ -926,9 +1283,9 @@ function initAvailabilitySchedule(savedSlots) {
 
   DAY_CONFIGS.forEach(day => {
     const savedSlot = (savedSlots || []).find(s => s.day === day.key);
-    const isActive  = !!savedSlot;
-    const fromVal   = savedSlot?.from || day.defaultFrom;
-    const toVal     = savedSlot?.to   || day.defaultTo;
+    const isActive = !!savedSlot;
+    const fromVal = savedSlot?.from || day.defaultFrom;
+    const toVal = savedSlot?.to || day.defaultTo;
 
     const row = document.createElement('div');
     row.className = `avail-day-row${isActive ? '' : ' is-off'}`;
@@ -944,7 +1301,7 @@ function initAvailabilitySchedule(savedSlots) {
     const timesDiv = document.createElement('div');
     timesDiv.className = 'avail-day-row__times';
     const fromSel = makeSelect(`avail-from-${day.key}`, fromVal);
-    const sep     = document.createElement('span');
+    const sep = document.createElement('span');
     sep.className = 'avail-day-row__sep';
     sep.textContent = T('avail_to') || 'to';
     const toSel = makeSelect(`avail-to-${day.key}`, toVal);
@@ -957,9 +1314,9 @@ function initAvailabilitySchedule(savedSlots) {
 
     // On/Off chip
     const chip = document.createElement('button');
-    const safeT = (k, def) => { 
-      const v = T(k); 
-      return (v === k || !v) ? def : v; 
+    const safeT = (k, def) => {
+      const v = T(k);
+      return (v === k || !v) ? def : v;
     };
     chip.type = 'button';
     chip.className = `avail-day-toggle-chip${isActive ? ' is-on' : ''}`;
@@ -981,9 +1338,9 @@ function initAvailabilitySchedule(savedSlots) {
 
   // Clear All handler
   document.getElementById('avail-clear-schedule')?.addEventListener('click', () => {
-    const safeT = (k, def) => { 
-      const v = T(k); 
-      return (v === k || !v) ? def : v; 
+    const safeT = (k, def) => {
+      const v = T(k);
+      return (v === k || !v) ? def : v;
     };
     container.querySelectorAll('.avail-day-row').forEach(row => {
       row.classList.add('is-off');
@@ -1001,49 +1358,49 @@ function initAvailabilitySchedule(savedSlots) {
 
 function initBlockedDatesCalendar(workerAvailability, initialBlockedDates) {
   let blockedDates = new Set(initialBlockedDates || []);
-  let currentYear  = new Date().getFullYear();
+  let currentYear = new Date().getFullYear();
   let currentMonth = new Date().getMonth();
 
-  const DAY_NAMES  = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
-  const avDays     = (workerAvailability || []).map(a => a.day);
+  const DAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  const avDays = (workerAvailability || []).map(a => a.day);
 
   function renderBlockedCal() {
-    const grid  = document.getElementById('blockedCalGrid');
+    const grid = document.getElementById('blockedCalGrid');
     const label = document.getElementById('blockedCalLabel');
-    const prev  = document.getElementById('blockedCalPrev');
-    const next  = document.getElementById('blockedCalNext');
+    const prev = document.getElementById('blockedCalPrev');
+    const next = document.getElementById('blockedCalNext');
     if (!grid) return;
 
-    const today     = new Date(); today.setHours(0,0,0,0);
-    const maxDate   = new Date(); maxDate.setDate(maxDate.getDate() + 60); maxDate.setHours(0,0,0,0);
-    const firstDay  = new Date(currentYear, currentMonth, 1);
-    const lastDay   = new Date(currentYear, currentMonth + 1, 0);
-    const prevEnd   = new Date(currentYear, currentMonth, 0);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const maxDate = new Date(); maxDate.setDate(maxDate.getDate() + 60); maxDate.setHours(0, 0, 0, 0);
+    const firstDay = new Date(currentYear, currentMonth, 1);
+    const lastDay = new Date(currentYear, currentMonth + 1, 0);
+    const prevEnd = new Date(currentYear, currentMonth, 0);
     const nextStart = new Date(currentYear, currentMonth + 1, 1);
 
     if (label) label.textContent = firstDay.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-    if (prev)  prev.disabled  = prevEnd < today;
-    if (next)  next.disabled  = nextStart > maxDate;
+    if (prev) prev.disabled = prevEnd < today;
+    if (next) next.disabled = nextStart > maxDate;
 
     let html = '';
     for (let i = 0; i < firstDay.getDay(); i++) html += '<div class="bcal-day bcal-day--empty"></div>';
 
     for (let d = 1; d <= lastDay.getDate(); d++) {
-      const date    = new Date(currentYear, currentMonth, d);
-      const dateStr = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-      const isPast     = date < today;
-      const isFar      = date > maxDate;
-      const isToday    = date.getTime() === today.getTime();
-      const dayName    = DAY_NAMES[date.getDay()];
+      const date = new Date(currentYear, currentMonth, d);
+      const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const isPast = date < today;
+      const isFar = date > maxDate;
+      const isToday = date.getTime() === today.getTime();
+      const dayName = DAY_NAMES[date.getDay()];
       const isOffSched = avDays.length > 0 && !avDays.includes(dayName);
-      const isBlocked  = blockedDates.has(dateStr);
+      const isBlocked = blockedDates.has(dateStr);
 
       let cls = 'bcal-day';
-      if (isToday)    cls += ' bcal-day--today';
+      if (isToday) cls += ' bcal-day--today';
       if (isPast || isFar) cls += ' bcal-day--past';
       else if (isOffSched) cls += ' bcal-day--off-schedule';
-      else if (isBlocked)  cls += ' bcal-day--blocked';
-      else                 cls += ' bcal-day--working';
+      else if (isBlocked) cls += ' bcal-day--blocked';
+      else cls += ' bcal-day--working';
 
       const canClick = !isPast && !isFar && !isOffSched;
       html += `<div class="${cls}" ${canClick ? `data-date="${dateStr}"` : ''}>${d}</div>`;
@@ -1083,47 +1440,6 @@ function initBlockedDatesCalendar(workerAvailability, initialBlockedDates) {
   renderBlockedCal();
 }
 
-function initCategories(savedSkills) {
-  const grid = document.getElementById('categories-grid');
-  if (!grid) return;
-  grid.innerHTML = '';
-  const savedSet = new Set((savedSkills || []).map(s => s.toLowerCase()));
-  const T2 = typeof window.t === 'function' ? window.t.bind(window) : (k) => k;
-  const SKILL_DATA = [
-    { key: 'skill_plumbing',     icon: '🔧' },
-    { key: 'skill_electrical',   icon: '⚡' },
-    { key: 'skill_hvac',         icon: '❄️' },
-    { key: 'skill_painting',     icon: '🖌️' },
-    { key: 'skill_carpentry',    icon: '🪚' },
-    { key: 'skill_cleaning',     icon: '🧹' },
-    { key: 'skill_roofing',      icon: '🏠' },
-    { key: 'skill_flooring',     icon: '🪵' },
-    { key: 'skill_appliance',    icon: '🔌' },
-    { key: 'skill_landscaping',  icon: '🌿' },
-    { key: 'skill_renovation',   icon: '🏗️' },
-    { key: 'skill_handyman',     icon: '🔨' },
-    { key: 'skill_drywall',      icon: '🧱' },
-    { key: 'skill_pest_control', icon: '🦟' },
-    { key: 'skill_installation', icon: '📺' },
-    { key: 'skill_general',      icon: '🛠️' },
-  ];
-  SKILL_DATA.forEach(({ key, icon }) => {
-    const label = T2(key);
-    const isSelected = savedSet.has(label.toLowerCase()) || savedSet.has(key.replace('skill_', '').toLowerCase());
-    const chip = document.createElement('label');
-    chip.className = `avail-category-chip${isSelected ? ' is-selected' : ''}`;
-    chip.dataset.skill = label;
-    chip.innerHTML = `<input type="checkbox" ${isSelected ? 'checked' : ''} /><span>${icon} ${label}</span>`;
-    chip.addEventListener('click', (e) => {
-      e.preventDefault();
-      chip.classList.toggle('is-selected');
-      const cb = chip.querySelector('input[type="checkbox"]');
-      if (cb) cb.checked = chip.classList.contains('is-selected');
-    });
-    grid.appendChild(chip);
-  });
-}
-
 async function initJobQueue(restoreTab = null) {
   const container = document.getElementById('job-queue-list');
   if (!container) return;
@@ -1131,7 +1447,7 @@ async function initJobQueue(restoreTab = null) {
   const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
 
   const showMsg = (text, color = '#6b7280') =>
-    (container.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;padding:48px 24px;gap:12px;text-align:center;">
+  (container.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;padding:48px 24px;gap:12px;text-align:center;">
       <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
       <p style="color:${color};font-size:0.95rem;margin:0;">${text}</p>
     </div>`);
@@ -1156,13 +1472,14 @@ async function initJobQueue(restoreTab = null) {
     return;
   }
 
-  const pending    = bookings.filter(b => b.status === 'pending');
-  const ongoing    = bookings.filter(b => ['accepted','en_route','arrived','in_progress','awaiting_customer_confirmation'].includes(b.status));
-  const done       = bookings.filter(b => b.status === 'completed');
-  const cancelled  = bookings.filter(b => ['cancelled','rejected'].includes(b.status));
+  const pending = bookings.filter(b => b.status === 'pending');
+  const ongoing = bookings.filter(b => ['accepted', 'en_route', 'arrived', 'in_progress'].includes(b.status));
+  const waiting = bookings.filter(b => ['awaiting_customer_confirmation', 'pending_admin_review'].includes(b.status));
+  const done = bookings.filter(b => b.status === 'completed');
+  const cancelled = bookings.filter(b => ['cancelled', 'rejected'].includes(b.status));
 
-  // Default tab: preserve caller's active sub-tab, else show active > pending > done
-  const defaultTab = restoreTab || (ongoing.length ? 'active' : pending.length ? 'pending' : 'done');
+  // Default tab: preserve caller's active sub-tab, else show active > pending > waiting > done
+  const defaultTab = restoreTab || (ongoing.length ? 'active' : pending.length ? 'pending' : waiting.length ? 'waiting' : done.length ? 'done' : 'cancelled');
 
   function badgeHtml(n) {
     return n > 0 ? `<span class="jq-tab-badge">${n}</span>` : '';
@@ -1207,22 +1524,28 @@ async function initJobQueue(restoreTab = null) {
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="13 2 13 9 20 9"/><path d="M21 3L13 11l-4-4L2 14"/></svg>
       Active Jobs${badgeHtml(ongoing.length)}
     </button>
+    <button class="stab-btn${defaultTab === 'waiting' ? ' stab-btn--active' : ''}" role="tab"
+      aria-selected="${defaultTab === 'waiting'}" data-stab="jq-waiting">
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/><path d="M8 3.5 6 6M16 3.5 18 6"/></svg>
+      Waiting${badgeHtml(waiting.length)}
+    </button>
     <button class="stab-btn${defaultTab === 'done' ? ' stab-btn--active' : ''}" role="tab"
       aria-selected="${defaultTab === 'done'}" data-stab="jq-done">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg>
       Completed${badgeHtml(done.length)}
     </button>
-    <button class="stab-btn" role="tab"
-      aria-selected="false" data-stab="jq-cancelled">
+    <button class="stab-btn${defaultTab === 'cancelled' ? ' stab-btn--active' : ''}" role="tab"
+      aria-selected="${defaultTab === 'cancelled'}" data-stab="jq-cancelled">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
       Cancelled${badgeHtml(cancelled.length)}
     </button>`;
   container.appendChild(tabBar);
 
   // ── Panes ──
-  container.appendChild(makePane('pending',   pending,   'No pending requests.'));
-  container.appendChild(makePane('active',    ongoing,   'No active jobs right now.'));
-  container.appendChild(makePane('done',      done,      'No completed jobs yet.'));
+  container.appendChild(makePane('pending', pending, 'No pending requests.'));
+  container.appendChild(makePane('active', ongoing, 'No active jobs right now.'));
+  container.appendChild(makePane('waiting', waiting, 'No jobs are waiting on customer confirmation or release.'));
+  container.appendChild(makePane('done', done, 'No completed jobs yet.'));
   container.appendChild(makePane('cancelled', cancelled, 'No cancelled jobs.'));
 
   // ── Tab switching ──
@@ -1277,7 +1600,7 @@ const DURATION_PRESETS = [30, 60, 90, 120, 180, 240];
 function openAcceptModal({ defaultDurationMin, onConfirm, jobContext = {} }) {
   const { service = '', notes = '' } = jobContext;
   const presetsHtml = DURATION_PRESETS.map(m => {
-    const label = m < 60 ? `${m}m` : m % 60 === 0 ? `${m/60}h` : `${Math.floor(m/60)}h${m%60}m`;
+    const label = m < 60 ? `${m}m` : m % 60 === 0 ? `${m / 60}h` : `${Math.floor(m / 60)}h${m % 60}m`;
     return `<button type="button" class="accept-modal__preset${m === defaultDurationMin ? ' is-active' : ''}" data-preset="${m}">${label}</button>`;
   }).join('');
 
@@ -1343,7 +1666,7 @@ function openAcceptModal({ defaultDurationMin, onConfirm, jobContext = {} }) {
 /* ── Update estimate modal (usable after accepting, any active state) ─────── */
 function openUpdateEstimateModal({ currentMin, onConfirm }) {
   const presetsHtml = DURATION_PRESETS.map(m => {
-    const label = m < 60 ? `${m}m` : m % 60 === 0 ? `${m/60}h` : `${Math.floor(m/60)}h${m%60}m`;
+    const label = m < 60 ? `${m}m` : m % 60 === 0 ? `${m / 60}h` : `${Math.floor(m / 60)}h${m % 60}m`;
     return `<button type="button" class="accept-modal__preset${m === currentMin ? ' is-active' : ''}" data-preset="${m}">${label}</button>`;
   }).join('');
 
@@ -1396,21 +1719,21 @@ function openUpdateEstimateModal({ currentMin, onConfirm }) {
 /* ── Progress Stepper ────────────────────────────────────────────────────── */
 function buildStepperHtml(localState) {
   const steps = ['Accepted', 'En Route', 'Arrived', 'Working', 'Done'];
-  const idx   = { accepted: 0, 'en-route': 1, arrived: 2, 'in-progress': 3, 'complete-confirm': 3, done: 4 };
-  const cur   = idx[localState] ?? 0;
+  const idx = { accepted: 0, 'en-route': 1, arrived: 2, 'in-progress': 3, 'complete-confirm': 3, done: 4 };
+  const cur = idx[localState] ?? 0;
   const checkSvg = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
-  
+
   return `
     <div class="jq-stepper-container">
       <div class="jq-stepper">
         ${steps.map((label, i) => {
-          const done   = i < cur;
-          const active = i === cur;
-          let stateClass = '';
-          if (done) stateClass = 'is-done';
-          else if (active) stateClass = 'is-active';
-          
-          return `
+    const done = i < cur;
+    const active = i === cur;
+    let stateClass = '';
+    if (done) stateClass = 'is-done';
+    else if (active) stateClass = 'is-active';
+
+    return `
             <div class="jq-step ${stateClass}">
               <div class="jq-step__indicator">
                 ${done ? checkSvg : `<span>${i + 1}</span>`}
@@ -1419,7 +1742,7 @@ function buildStepperHtml(localState) {
             </div>
             ${i < steps.length - 1 ? `<div class="jq-step-line ${done ? 'is-done' : (i === cur ? 'is-active' : '')}"></div>` : ''}
           `;
-        }).join('')}
+  }).join('')}
       </div>
     </div>
   `;
@@ -1427,20 +1750,20 @@ function buildStepperHtml(localState) {
 
 /* ─────────────────────────────────────────────────────────────────────────── */
 function buildJobCard(b, _t) {
-  const id       = b._id;
-  const shortId  = id.slice(-6).toUpperCase();
-  const service  = b.serviceName || b.service?.title || b.serviceCategory || 'Service';
-  const badge    = (b.serviceCategory || b.service?.category || 'service').replace(/_/g,' ').toUpperCase();
-  const customer = b.user?.name  || '—';
-  const address  = b.address || '—';
-  const mapsUrl  = `https://maps.google.com/?q=${encodeURIComponent(address)}`;
-  const date     = b.scheduledDate
-    ? new Date(b.scheduledDate).toLocaleDateString('en-US', { weekday:'short', day:'numeric', month:'short' })
+  const id = b._id;
+  const shortId = id.slice(-6).toUpperCase();
+  const service = b.serviceName || b.service?.title || b.serviceCategory || 'Service';
+  const badge = (b.serviceCategory || b.service?.category || 'service').replace(/_/g, ' ').toUpperCase();
+  const customer = b.user?.name || '—';
+  const address = b.address || '—';
+  const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(address)}`;
+  const date = b.scheduledDate
+    ? new Date(b.scheduledDate).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' })
     : '—';
-  const time    = b.scheduledTime || '';
-  const price   = b.totalPrice != null ? `${Number(b.totalPrice).toLocaleString('en-US')} EGP` : '—';
+  const time = b.scheduledTime || '';
+  const price = b.totalPrice != null ? `${Number(b.totalPrice).toLocaleString('en-US')} EGP` : '—';
   const payment = b.paymentMethod === 'cash' ? 'Cash' : 'Credit Card';
-  const pin     = b.pin || '';
+  const pin = b.pin || '';
   const category = b.serviceCategory || b.service?.category || 'other';
   const _rawIconSvg = (CATEGORY_ICONS[category] || CATEGORY_ICONS.other || '');
   const notesRaw = String(b.description || '').trim();
@@ -1455,18 +1778,19 @@ function buildJobCard(b, _t) {
     </div>`;
 
   const statusCfg = {
-    pending:     { label:'Pending Acceptance', dot:'amber'  },
-    accepted:    { label:'Accepted',           dot:'blue'   },
-    en_route:    { label:'En Route',           dot:'blue'   },
-    arrived:     { label:'Arrived',            dot:'amber'  },
-    in_progress: { label:'In Progress',        dot:'purple' },
-    awaiting_customer_confirmation: { label:'Awaiting Customer', dot:'amber' },
-    completed:   { label:'Completed',          dot:'green'  },
-    cancelled:   { label:'Cancelled',          dot:'grey'   },
-    rejected:    { label:'Declined',           dot:'grey'   },
+    pending: { label: 'Pending Acceptance', dot: 'amber' },
+    accepted: { label: 'Accepted', dot: 'blue' },
+    en_route: { label: 'En Route', dot: 'blue' },
+    arrived: { label: 'Arrived', dot: 'amber' },
+    in_progress: { label: 'In Progress', dot: 'purple' },
+    awaiting_customer_confirmation: { label: 'Waiting for Customer', dot: 'amber' },
+    pending_admin_review: { label: 'Pending Release', dot: 'blue' },
+    completed: { label: 'Completed', dot: 'green' },
+    cancelled: { label: 'Cancelled', dot: 'grey' },
+    rejected: { label: 'Declined', dot: 'grey' },
   };
-  const { label: statusLabel, dot: dotColor } = statusCfg[b.status] || { label: b.status, dot:'grey' };
-  const isActive = ['accepted','en_route','arrived','in_progress'].includes(b.status);
+  const { label: statusLabel, dot: dotColor } = statusCfg[b.status] || { label: b.status, dot: 'grey' };
+  const isActive = ['accepted', 'en_route', 'arrived', 'in_progress'].includes(b.status);
 
   let flowHtml = '';
   if (b.status === 'pending') {
@@ -1487,7 +1811,7 @@ function buildJobCard(b, _t) {
           </div>
         </div>
       </div>`;
-  } else if (['accepted','en_route','arrived','in_progress'].includes(b.status)) {
+  } else if (['accepted', 'en_route', 'arrived', 'in_progress'].includes(b.status)) {
     flowHtml = `
       <div class="jq-flow" data-booking-id="${id}" data-pin="${pin}" data-customer="${customer}" data-address="${address}" data-estimated-duration-min="${b.estimatedDurationMin || 60}">
         <div class="jq-section" data-section="accepted">
@@ -1623,11 +1947,28 @@ function buildJobCard(b, _t) {
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="4,12 9,17 20,6"/></svg>
         </div>
         <div class="jq-done-info">
-          <p class="jq-done-label">Awaiting Customer Confirmation</p>
-          <p class="jq-done-sub">${customer}</p>
+          <p class="jq-done-label">Waiting for customer confirmation</p>
+          <p class="jq-done-sub">${customer} has not confirmed the job yet.</p>
         </div>
         <div class="jq-done-earnings">${price}</div>
       </div>
+      ${workerNotesText ? `<div class="jq-done-notes"><div class="jq-notes-label">Work done:</div><p>${workerNotesText}</p></div>` : ''}
+      ${proofImg ? `<div class="jq-done-image"><img src="${proofImg}" alt="Completed work photo"></div>` : ''}`;
+  } else if (b.status === 'pending_admin_review') {
+    const workerNotesText = escapeHtml(b.workerNotes || b.completionNotes || '');
+    const proofImg = (Array.isArray(b.workerCompletionImages) && b.workerCompletionImages[0]) || (Array.isArray(b.completionPhotos) && b.completionPhotos[0]) || '';
+    flowHtml = `
+      <div class="jq-done-banner jq-done-banner--pending-release">
+        <div class="jq-done-icon jq-done-icon--pending-release">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        </div>
+        <div class="jq-done-info">
+          <p class="jq-done-label">Pending Release</p>
+          <p class="jq-done-sub">Customer confirmed. SERVIO is finalizing payment release.</p>
+        </div>
+        <div class="jq-done-earnings jq-done-earnings--pending-release">${price}</div>
+      </div>
+      <div class="jq-status-note">This job is confirmed by the customer. Earnings appear as available after admin release approval.</div>
       ${workerNotesText ? `<div class="jq-done-notes"><div class="jq-notes-label">Work done:</div><p>${workerNotesText}</p></div>` : ''}
       ${proofImg ? `<div class="jq-done-image"><img src="${proofImg}" alt="Completed work photo"></div>` : ''}`;
   } else if (b.status === 'completed') {
@@ -1695,7 +2036,7 @@ function buildJobCard(b, _t) {
         <div class="jq-identity-bar__label">PAYOUT</div>
       </div>
     </div>
-    <div class="jq-premium-stepper-wrap" id="stepper-${id}">${buildStepperHtml({ accepted:'accepted', en_route:'en-route', arrived:'arrived', in_progress:'in-progress' }[b.status] || 'accepted')}</div>
+    <div class="jq-premium-stepper-wrap" id="stepper-${id}">${buildStepperHtml({ accepted: 'accepted', en_route: 'en-route', arrived: 'arrived', in_progress: 'in-progress' }[b.status] || 'accepted')}</div>
     ` : ''}
 
     <div class="jq-premium-card__body${isActive ? ' jq-premium-card__body--hidden' : ''}">
@@ -1760,10 +2101,10 @@ function buildJobCard(b, _t) {
 
 function wireArrivalFlows(container) {
   container.querySelectorAll('.jq-flow').forEach(flow => {
-    const bookingId  = flow.dataset.bookingId;
+    const bookingId = flow.dataset.bookingId;
     const correctPin = flow.dataset.pin;
-    const storeKey   = `servio_flow_${bookingId}`;
-    const timerKey   = `servio_timer_${bookingId}`;
+    const storeKey = `servio_flow_${bookingId}`;
+    const timerKey = `servio_timer_${bookingId}`;
     let timerInterval = null;
 
     /* ── Section visibility ── */
@@ -1788,9 +2129,9 @@ function wireArrivalFlows(container) {
       if (!t0) { t0 = Date.now(); localStorage.setItem(timerKey, t0); }
       const tick = () => {
         const s = Math.floor((Date.now() - t0) / 1000);
-        const h = String(Math.floor(s / 3600)).padStart(2,'0');
-        const m = String(Math.floor((s % 3600) / 60)).padStart(2,'0');
-        const sec = String(s % 60).padStart(2,'0');
+        const h = String(Math.floor(s / 3600)).padStart(2, '0');
+        const m = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
+        const sec = String(s % 60).padStart(2, '0');
         if (el) el.textContent = `${h}:${m}:${sec}`;
       };
       tick();
@@ -1809,7 +2150,7 @@ function wireArrivalFlows(container) {
     /* ── Job Details accordion ── */
     const _accordionCard = flow.closest('.jq-premium-card');
     _accordionCard?.querySelector('[data-details-toggle]')?.addEventListener('click', () => {
-      const body   = _accordionCard.querySelector('[data-details-body]');
+      const body = _accordionCard.querySelector('[data-details-body]');
       const toggle = _accordionCard.querySelector('[data-details-toggle]');
       if (!body) return;
       const isOpen = body.classList.toggle('open');
@@ -1832,7 +2173,7 @@ function wireArrivalFlows(container) {
         });
         box.addEventListener('paste', e => {
           e.preventDefault();
-          const digits = (e.clipboardData.getData('text') || '').replace(/\D/g,'').slice(0,4);
+          const digits = (e.clipboardData.getData('text') || '').replace(/\D/g, '').slice(0, 4);
           [...digits].forEach((d, j) => { if (boxes[j]) boxes[j].value = d; });
           boxes[Math.min(digits.length, boxes.length - 1)]?.focus();
         });
@@ -1915,12 +2256,12 @@ function wireArrivalFlows(container) {
 
       /* countdown ring */
       let secs = 30;
-      const ring  = document.getElementById('accept-ring');
+      const ring = document.getElementById('accept-ring');
       const secsEl = document.getElementById('accept-secs');
       const cdInterval = setInterval(() => {
         secs--;
         if (secsEl) secsEl.textContent = secs;
-        if (ring)   ring.style.strokeDashoffset = String((circumference * (1 - secs / 30)).toFixed(2));
+        if (ring) ring.style.strokeDashoffset = String((circumference * (1 - secs / 30)).toFixed(2));
         if (secs <= 0) { clearInterval(cdInterval); closeJobModal(); }
       }, 1000);
 
@@ -1931,7 +2272,7 @@ function wireArrivalFlows(container) {
           defaultDurationMin: 60,
           jobContext: {
             service: flow.dataset.service || '',
-            notes:   flow.dataset.notes   || '',
+            notes: flow.dataset.notes || '',
           },
           onConfirm: async (durationMin) => {
             try {
@@ -2106,9 +2447,9 @@ function wireArrivalFlows(container) {
       }
 
       if (action === 'start-job') {
-        const boxes  = [...flow.querySelectorAll('.jq-pin-box')];
+        const boxes = [...flow.querySelectorAll('.jq-pin-box')];
         const entered = boxes.map(b => b.value).join('');
-        const errEl  = flow.querySelector('.jq-pin-error');
+        const errEl = flow.querySelector('.jq-pin-error');
         if (correctPin && entered !== correctPin) {
           const pg = flow.querySelector('[data-pin-group]');
           if (pg) { pg.classList.remove('jq-pin--shake'); void pg.offsetWidth; pg.classList.add('jq-pin--shake'); }
@@ -2223,13 +2564,9 @@ function wireArrivalFlows(container) {
                 </div>`);
             }
 
-            const doneSection = document.getElementById('jq-completed-section');
-            if (doneSection) {
-              doneSection.style.display = 'block';
-              doneSection.querySelector('.jq-completed-list')?.prepend(card);
-            }
           }
           showToast('Completion submitted! Waiting for customer confirmation.', 'success');
+          await initJobQueue('waiting');
         } catch (err) {
           btn.disabled = false; btn.textContent = 'Submit Completion';
           showToast(err?.message || 'Failed to complete job.', 'error');
@@ -2255,10 +2592,10 @@ function populateOverviewIncoming(pendingBookings) {
   }
 
   container.innerHTML = preview.map(b => {
-    const service  = b.service?.title || b.service?.category || 'Service';
+    const service = b.service?.title || b.service?.category || 'Service';
     const customer = b.user?.name || '—';
-    const address  = b.address || '—';
-    const price    = b.totalPrice != null ? `~EGP ${Number(b.totalPrice).toLocaleString('en-US')}` : '—';
+    const address = b.address || '—';
+    const price = b.totalPrice != null ? `~EGP ${Number(b.totalPrice).toLocaleString('en-US')}` : '—';
     return `
       <div class="job-card-v2">
         <div class="job-card-v2__icon">
@@ -2287,7 +2624,7 @@ function populateOverviewSchedule(bookings) {
   const upcoming = bookings
     .filter(b => {
       const d = new Date(b.scheduledDate);
-      return d >= now && ['pending','accepted','en_route','arrived','in_progress'].includes(b.status);
+      return d >= now && ['pending', 'accepted', 'en_route', 'arrived', 'in_progress'].includes(b.status);
     })
     .sort((a, b) => new Date(a.scheduledDate) - new Date(b.scheduledDate))
     .slice(0, 4);
@@ -2297,14 +2634,14 @@ function populateOverviewSchedule(bookings) {
     return;
   }
 
-  const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
   container.innerHTML = upcoming.map(b => {
-    const d       = new Date(b.scheduledDate);
-    const day     = String(d.getDate()).padStart(2, '0');
-    const month   = MONTHS[d.getMonth()];
+    const d = new Date(b.scheduledDate);
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = MONTHS[d.getMonth()];
     const service = b.service?.title || b.service?.category || 'Service';
-    const time    = b.scheduledTime || '—';
-    const loc     = b.address ? b.address.split(',')[0] : '—';
+    const time = b.scheduledTime || '—';
+    const loc = b.address ? b.address.split(',')[0] : '—';
     return `
       <div class="dash-schedule-item">
         <div class="dash-schedule-date">
@@ -2324,24 +2661,18 @@ function populateOverviewSchedule(bookings) {
 }
 
 // ── Atelier sparkline: 7-day earnings trend ──────────────────────────────────
-function renderEarningsSparkline(completed) {
+function renderEarningsSparkline(series = []) {
   const area = document.getElementById('sparkArea');
   const line = document.getElementById('sparkLine');
   if (!area || !line) return;
 
-  const days = 7;
-  const now = new Date();
-  const buckets = new Array(days).fill(0);
-  completed.forEach(b => {
-    const d = new Date(b.scheduledDate || b.updatedAt);
-    if (Number.isNaN(d.getTime())) return;
-    const diff = Math.floor((now - d) / 86400000);
-    if (diff >= 0 && diff < days) buckets[days - 1 - diff] += (b.totalPrice || 0);
-  });
+  const buckets = Array.isArray(series) && series.length
+    ? series.slice(0, 7).map(v => Number(v) || 0)
+    : new Array(7).fill(0);
 
   const max = Math.max(...buckets, 1);
   const W = 120, H = 28, pad = 2;
-  const step = (W - pad * 2) / (days - 1);
+  const step = (W - pad * 2) / Math.max(1, buckets.length - 1);
   const points = buckets.map((v, i) => {
     const x = pad + i * step;
     const y = H - pad - (v / max) * (H - pad * 2 - 2);
@@ -2355,8 +2686,395 @@ function renderEarningsSparkline(completed) {
   area.setAttribute('d', areaPath);
 }
 
+// Canonical money formatter — single source of truth for currency display
+// across the dashboard. Use:
+//   - moneyFmt.card(x)    → "1,234.56"           (plain 2-decimal numeric)
+//   - moneyFmt.compact(x) → "1,234.5" / "1,234"  (0..2 fraction digits, stat strip)
+//   - moneyFmt.html(x)    → "1,234.56 <span class=\"money-card__ccy-inline\">EGP</span>"
+//   - moneyFmt.text(x)    → "1,234.56 EGP"
+const moneyFmt = {
+  card:    v => (Number(v) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+  compact: v => (Number(v) || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 }),
+  html:    v => `${moneyFmt.card(v)} <span class="money-card__ccy-inline">EGP</span>`,
+  text:    v => `${moneyFmt.card(v)} EGP`,
+};
+
+function buildFallbackSparklineSeries(completed = []) {
+  const days = 7;
+  const now = new Date();
+  const buckets = new Array(days).fill(0);
+  completed.forEach(b => {
+    const d = new Date(b.scheduledDate || b.updatedAt);
+    if (Number.isNaN(d.getTime())) return;
+    const diff = Math.floor((now - d) / 86400000);
+    if (diff >= 0 && diff < days) {
+      buckets[days - 1 - diff] += bookingFeeSnapshot(b).net;
+    }
+  });
+  return buckets;
+}
+
+function renderCanonicalEarningsPanel({
+  bookings = [],
+  completed = [],
+  monthEarnings = 0,
+  lastMonthEarnings = 0,
+  cashCompleted = [],
+  outstandingAmount = 0,
+  earnings = null,
+} = {}) {
+  const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
+  const breakdown = earnings?.breakdown || null;
+  const numberOr = (value, fallback = 0) => {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : fallback;
+  };
+  const formatDeltaHtml = (current, previous) => {
+    const delta = numberOr(current) - numberOr(previous);
+    if (!previous && !current) return 'No take-home yet this month';
+    if (!previous) return `Started this month with ${moneyFmt.text(current)}`;
+    const isUp = delta >= 0;
+    const arrow = isUp ? '+' : '-';
+    const sign = isUp ? '+' : '-';
+    return `
+      <span class="${isUp ? 'jq-earn-trend-up' : 'jq-earn-trend-down'}">
+        ${arrow} ${sign}${moneyFmt.text(Math.abs(delta))}
+      </span> vs last month`;
+  };
+  const paymentMethodLabel = (method) => {
+    const normalized = String(method || '').toLowerCase();
+    if (normalized === 'cash') return 'Cash job';
+    if (normalized === 'card' || normalized === 'credit card') return 'Card payment';
+    return 'Online payment';
+  };
+  const fallbackRecentItems = completed
+    .slice()
+    .sort((a, b) => new Date(b.scheduledDate || b.updatedAt) - new Date(a.scheduledDate || a.updatedAt))
+    .slice(0, 10)
+    .map((booking) => {
+      const snapshot = bookingFeeSnapshot(booking);
+      const isCash = String(booking.paymentMethod || '').toLowerCase() === 'cash';
+      return {
+        bookingId: booking._id,
+        shortBookingId: String(booking._id || '').slice(-6).toUpperCase(),
+        paymentMethod: booking.paymentMethod || (isCash ? 'cash' : 'online'),
+        customerName: booking.user?.name || '',
+        serviceName: booking.service?.title || booking.service?.category || booking.serviceName || 'Service',
+        gross: snapshot.gross,
+        fee: snapshot.fee,
+        displayAmount: snapshot.net,
+        walletCreditAmount: isCash ? 0 : snapshot.net,
+        cashCollectedAmount: isCash ? snapshot.net : 0,
+        settlementType: isCash ? 'cash_collected' : 'released_to_wallet',
+        settlementNote: isCash ? 'Cash collected directly from the customer.' : 'Released to wallet.',
+        occurredAt: booking.scheduledDate || booking.updatedAt,
+      };
+    });
+
+  const availableToWithdraw = numberOr(breakdown?.availableToWithdraw, earnings?.wallet?.balance);
+  _availableBalanceCache = { value: Number(availableToWithdraw) || 0, ts: Date.now() };
+  const pendingRelease = numberOr(breakdown?.pendingRelease, earnings?.wallet?.pendingBalance);
+  const pendingJobsCount = Math.max(0, Math.round(numberOr(
+    breakdown?.pendingJobsCount,
+    earnings?.wallet?.pendingJobs ?? earnings?.pendingJobsCount
+  )));
+  const walletReleasedNet = numberOr(breakdown?.walletReleasedNet, earnings?.wallet?.totalEarned);
+  const collectedCashNet = numberOr(
+    breakdown?.collectedCashNet,
+    cashCompleted.reduce((sum, booking) => sum + bookingFeeSnapshot(booking).net, 0)
+  );
+  const cashCompletedJobsCount = Math.max(0, Math.round(numberOr(breakdown?.cashCompletedJobsCount, cashCompleted.length)));
+  const lifetimeTakeHome = numberOr(breakdown?.lifetimeTakeHome, walletReleasedNet + collectedCashNet);
+  const completedJobsCount = Math.max(0, Math.round(numberOr(breakdown?.completedJobs, completed.length)));
+  const cashFeesLifetime = numberOr(
+    breakdown?.cashFeesLifetime,
+    cashCompleted.reduce((sum, booking) => sum + bookingFeeSnapshot(booking).fee, 0)
+  );
+  const averageCashFee = numberOr(
+    breakdown?.averageCashFee,
+    cashCompleted.length ? cashFeesLifetime / cashCompleted.length : 0
+  );
+  const monthTakeHome = numberOr(breakdown?.thisMonthTakeHome, monthEarnings);
+  const previousMonthTakeHome = numberOr(breakdown?.lastMonthTakeHome, lastMonthEarnings);
+  const outstandingCashFees = numberOr(breakdown?.outstandingCashFees, outstandingAmount);
+  const outstandingCashFeeItems = Array.isArray(breakdown?.outstandingCashFeeItems)
+    ? breakdown.outstandingCashFeeItems
+    : cashCompleted.slice(0, 5).map((booking) => {
+      const snapshot = bookingFeeSnapshot(booking);
+      return {
+        bookingId: booking._id,
+        shortBookingId: String(booking._id || '').slice(-6).toUpperCase(),
+        gross: snapshot.gross,
+        fee: snapshot.fee,
+        remaining: snapshot.fee,
+        status: 'outstanding',
+      };
+    });
+  const recentEarnings = Array.isArray(breakdown?.recentEarnings) && breakdown.recentEarnings.length
+    ? breakdown.recentEarnings
+    : fallbackRecentItems;
+  const sparkSeries = Array.isArray(breakdown?.sevenDayTrend) && breakdown.sevenDayTrend.length
+    ? breakdown.sevenDayTrend
+    : buildFallbackSparklineSeries(completed);
+
+  const periodEl = document.getElementById('ledgerPeriod');
+  if (periodEl) {
+    const now = new Date();
+    const month = now.toLocaleString('en-US', { month: 'short' }).toUpperCase();
+    periodEl.textContent = `${month} \u00B7 ${now.getFullYear()}`;
+  }
+
+  const earnTotalEl = document.getElementById('earn-total');
+  if (earnTotalEl) earnTotalEl.textContent = moneyFmt.compact(lifetimeTakeHome);
+
+  const earnMonthEl = document.getElementById('earn-month');
+  if (earnMonthEl) earnMonthEl.textContent = moneyFmt.compact(monthTakeHome);
+
+  const deltaEl = document.getElementById('earn-month-delta');
+  if (deltaEl) {
+    const last = Number(previousMonthTakeHome) || 0;
+    const cur  = Number(monthTakeHome) || 0;
+    const valueEl = deltaEl.querySelector('[data-delta-value]');
+    const iconEl  = deltaEl.querySelector('[data-delta-icon]');
+
+    let direction = 'flat';
+    let label = '—';
+
+    if (last > 0) {
+      const pct = ((cur - last) / last) * 100;
+      if (pct > 0.5)  direction = 'up';
+      else if (pct < -0.5) direction = 'down';
+      const arrow = pct > 0 ? '+' : '';
+      label = `${arrow}${pct.toFixed(0)}%`;
+    } else if (cur > 0) {
+      direction = 'up';
+      label = 'New';
+    }
+
+    deltaEl.dataset.direction = direction;
+    if (valueEl) valueEl.textContent = label;
+    if (iconEl) {
+      const paths = {
+        up:   'M12 19V5M5 12l7-7 7 7',
+        down: 'M12 5v14M5 12l7 7 7-7',
+        flat: 'M5 12h14',
+      };
+      const pathEl = iconEl.querySelector('path');
+      if (pathEl) pathEl.setAttribute('d', paths[direction]);
+    }
+  }
+
+  const earnCashEl = document.getElementById('earn-cash');
+  if (earnCashEl) earnCashEl.textContent = moneyFmt.compact(collectedCashNet);
+
+  const earnCashSubEl = document.getElementById('earn-cash-sub');
+  if (earnCashSubEl) {
+    earnCashSubEl.textContent = cashCompletedJobsCount > 0
+      ? `${cashCompletedJobsCount} completed cash ${cashCompletedJobsCount === 1 ? 'job' : 'jobs'}`
+      : 'No completed cash jobs yet';
+  }
+
+  const earnCompletedEl = document.getElementById('earn-completed-count');
+  if (earnCompletedEl) earnCompletedEl.textContent = completedJobsCount;
+
+  const debtLifetimeEl = document.getElementById('debtLifetimeFees');
+  if (debtLifetimeEl) debtLifetimeEl.textContent = moneyFmt.card(cashFeesLifetime);
+  const debtAvgEl = document.getElementById('debtAvgFee');
+  if (debtAvgEl) debtAvgEl.textContent = moneyFmt.card(averageCashFee);
+
+  renderEarningsSparkline(sparkSeries);
+
+  const bridgeWalletEl = document.getElementById('bridgeWalletNum');
+  const bridgeCashEl   = document.getElementById('bridgeCashNum');
+  const fmtChip = v => Math.round(Number(v) || 0).toLocaleString('en-US');
+  if (bridgeWalletEl) bridgeWalletEl.textContent = fmtChip(walletReleasedNet);
+  if (bridgeCashEl)   bridgeCashEl.textContent   = fmtChip(collectedCashNet);
+
+  const availableEl = document.getElementById('walletAvailable');
+  if (availableEl) availableEl.innerHTML = moneyFmt.html(availableToWithdraw);
+
+  const availableTagEl = document.getElementById('availableWithdrawTag');
+  if (availableTagEl) {
+    availableTagEl.innerHTML = availableToWithdraw > 0
+      ? '<span class="money-card__dot" aria-hidden="true"></span>Ready now'
+      : '<span class="money-card__dot" aria-hidden="true"></span>No funds yet';
+  }
+
+  const availableNoteEl = document.getElementById('availableWithdrawNote');
+  if (availableNoteEl) {
+    availableNoteEl.textContent = availableToWithdraw > 0
+      ? 'Money already released into your Servio wallet.'
+      : 'No released money is available in your Servio wallet yet.';
+  }
+
+  const pendingEl = document.getElementById('walletPending');
+  if (pendingEl) pendingEl.innerHTML = moneyFmt.html(pendingRelease);
+
+  const pendingTagEl = document.getElementById('pendingReleaseTag');
+  if (pendingTagEl) pendingTagEl.textContent = pendingRelease > 0 ? 'In review' : 'No holds';
+
+  const pendingJobsEl = document.getElementById('pendingJobsCount');
+  if (pendingJobsEl) pendingJobsEl.textContent = pendingJobsCount === 1 ? '1 job' : `${pendingJobsCount} jobs`;
+
+  const pendingNoteEl = document.getElementById('pendingReleaseNote');
+  if (pendingNoteEl) {
+    if (pendingJobsCount > 0) {
+      pendingNoteEl.textContent = pendingJobsCount === 1
+        ? 'One online job is still waiting for release approval.'
+        : `${pendingJobsCount} online jobs are still waiting for release approval.`;
+    } else {
+      pendingNoteEl.textContent = 'No online jobs are waiting for release right now.';
+    }
+  }
+
+  const pendingBusyEl = document.querySelector('[data-pending-busy]');
+  const pendingEmptyEl = document.querySelector('[data-pending-empty]');
+  const hasPending = Number(pendingRelease) > 0 || Number(pendingJobsCount) > 0;
+  if (pendingBusyEl) pendingBusyEl.hidden = !hasPending;
+  if (pendingEmptyEl) pendingEmptyEl.hidden = hasPending;
+
+  const liabilityAmountEl = document.getElementById('liabilityAmount');
+  if (liabilityAmountEl) liabilityAmountEl.innerHTML = moneyFmt.html(outstandingCashFees);
+  const liabilityCard = document.getElementById('liabilityCard');
+  if (liabilityCard) liabilityCard.dataset.state = outstandingCashFees > 0 ? 'owing' : 'settled';
+  const payLiabBtn = document.getElementById('payLiabilityBtn');
+  if (payLiabBtn) payLiabBtn.hidden = outstandingCashFees <= 0;
+
+  const debtDueTag = document.getElementById('debtDueTag');
+  if (debtDueTag) debtDueTag.textContent = outstandingCashFees > 0 ? 'Outstanding' : 'All settled';
+
+  const wBtn = document.getElementById('btnRequestPayout');
+  if (wBtn) {
+    const tooLow = availableToWithdraw < 50;
+    wBtn.disabled = tooLow;
+    wBtn.title = tooLow ? `Minimum 50 EGP needed (${moneyFmt.card(availableToWithdraw)} available)` : '';
+  }
+
+  const bankLabel = document.getElementById('withdrawBankLabel');
+  const bankEdit = document.getElementById('withdrawBankEdit');
+  if (bankLabel) {
+    const method = String(earnings?.payoutMethod || earnings?.wallet?.payoutMethod || '').toLowerCase();
+    const map = { bank: 'Bank transfer', instapay: 'InstaPay', vodafone: 'Vodafone Cash', wallet: 'E-wallet' };
+    if (map[method]) {
+      bankLabel.innerHTML = `Paying to <strong>${map[method]}</strong>`;
+      if (bankEdit) bankEdit.textContent = 'Change';
+    } else {
+      bankLabel.textContent = 'No payout method set yet';
+      if (bankEdit) bankEdit.textContent = 'Add now';
+    }
+  }
+
+  const liabilityList = document.getElementById('liability-items-list');
+  if (liabilityList) {
+    if (!outstandingCashFeeItems.length || outstandingCashFees <= 0) {
+      liabilityList.innerHTML = `
+        <div class="liability-empty">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>
+          <span>${_t('tech_no_outstanding') || 'All settled - no outstanding cash balance.'}</span>
+        </div>`;
+    } else {
+      liabilityList.innerHTML = outstandingCashFeeItems.slice(0, 5).map(item => {
+        const feeStr = moneyFmt.text(item.remaining);
+        const breakdownText = item.gross > 0
+          ? `${moneyFmt.text(item.gross)} gross - fee ${moneyFmt.text(item.fee)}`
+          : `Fee ${moneyFmt.text(item.fee)}`;
+        return `
+          <div class="jq-premium-liability-row">
+            <div class="jq-premium-liability-info">
+              <span class="jq-premium-liability-id">#${item.shortBookingId}</span>
+              <span class="jq-premium-liability-tag">${_t('tech_commission') || 'Commission'}</span>
+              <span class="jq-premium-liability-breakdown">${breakdownText}</span>
+            </div>
+            <span class="jq-premium-liability-val">${feeStr}</span>
+          </div>`;
+      }).join('');
+    }
+  }
+
+  const liabilityWarning = document.getElementById('liabilityWarning');
+  if (liabilityWarning) liabilityWarning.hidden = outstandingCashFees < 2000;
+
+  const recentList = document.getElementById('earnings-recent-list');
+  if (recentList) {
+    if (!recentEarnings.length) {
+      recentList.innerHTML = `
+        <div class="recent-jobs__empty">
+          <strong>No jobs yet.</strong>
+          <span>Once you complete a job, it'll appear here with its settlement type.</span>
+        </div>`;
+    } else {
+      recentList.innerHTML = recentEarnings.slice(0, 5).map(item => {
+        const service = item.serviceName || 'Service';
+        const dateSource = item.occurredAt || item.scheduledDate;
+        const dateStr = dateSource
+          ? new Date(dateSource).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
+          : '-';
+        const customer = item.customerName ? ` - ${item.customerName}` : '';
+        let badgeCls = 'jq-earn-row-tag--wallet';
+        let badgeLbl = 'WALLET';
+        let amountLabel = 'wallet';
+        let amountValue = numberOr(item.walletCreditAmount, item.displayAmount);
+        let amountPrefix = '+';
+        let amountClass = '';
+        let subStr = item.settlementNote || paymentMethodLabel(item.paymentMethod);
+
+        if (item.settlementType === 'cash_collected') {
+          badgeCls = 'jq-earn-row-tag--cash';
+          badgeLbl = 'CASH';
+          amountLabel = 'cash';
+          amountValue = numberOr(item.cashCollectedAmount, item.displayAmount);
+          subStr = `Cash collected directly from the customer - fee ${moneyFmt.text(item.fee)}`;
+        } else if (item.settlementType === 'released_after_offset') {
+          const offsetAmount = Math.max(0, numberOr(item.gross) - numberOr(item.walletCreditAmount, item.displayAmount));
+          badgeCls = 'jq-earn-row-tag--wallet';
+          badgeLbl = 'WALLET';
+          amountLabel = 'wallet';
+          amountValue = numberOr(item.walletCreditAmount, item.displayAmount);
+          subStr = `${paymentMethodLabel(item.paymentMethod)} released to wallet after auto-paying ${moneyFmt.text(offsetAmount)} in cash-job fees`;
+        } else if (item.settlementType === 'released_to_wallet') {
+          badgeCls = 'jq-earn-row-tag--wallet';
+          badgeLbl = 'WALLET';
+          amountLabel = 'wallet';
+          amountValue = numberOr(item.walletCreditAmount, item.displayAmount);
+          subStr = `${paymentMethodLabel(item.paymentMethod)} released to wallet`;
+        } else if (item.settlementType === 'pending_release') {
+          badgeCls = 'jq-earn-row-tag--pending';
+          badgeLbl = 'PENDING';
+          amountLabel = 'pending';
+          amountValue = numberOr(item.displayAmount, item.gross);
+          amountPrefix = '';
+          amountClass = ' jq-earn-row-amount__net--pending';
+          subStr = `${paymentMethodLabel(item.paymentMethod)} is still waiting for release approval`;
+        }
+
+        const amountStr = `${amountPrefix}${moneyFmt.text(amountValue)}`;
+        return `
+          <div class="jq-premium-earn-row" data-reveal>
+            <div class="jq-earn-row-left">
+              <div class="jq-earn-row-icon">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              </div>
+              <div class="jq-earn-row-info">
+                <div class="jq-earn-row-title">
+                  <h4>${service}</h4>
+                  <span class="jq-earn-row-tag ${badgeCls}">${badgeLbl}</span>
+                </div>
+                <p>${dateStr}${customer}</p>
+                <p class="jq-earn-row-breakdown">${subStr}</p>
+              </div>
+            </div>
+            <div class="jq-earn-row-amount">
+              <span class="jq-earn-row-amount__net${amountClass}">${amountStr}</span>
+              <span class="jq-earn-row-amount__label">${amountLabel}</span>
+            </div>
+          </div>`;
+      }).join('');
+    }
+  }
+}
+
 // ── Populate earnings panel ───────────────────────────────────────────────────
-function populateEarnings(allBookings, completed, monthEarnings, lastMonthEarnings, cashCompleted, outstandingAmount) {
+function populateEarningsLegacy(allBookings, completed, monthEarnings, lastMonthEarnings, cashCompleted, outstandingAmount) {
   const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
 
   // Ledger period header (e.g. "MAY · 2026")
@@ -2367,46 +3085,165 @@ function populateEarnings(allBookings, completed, monthEarnings, lastMonthEarnin
     periodEl.textContent = `${month} \u00B7 ${now.getFullYear()}`;
   }
 
-  // Summary stats (atelier rail strips out the trailing "EGP" via <em>)
-  const totalEarned = completed.reduce((s, b) => s + (b.totalPrice || 0), 0);
+  // Summary stats — NET take-home (gross minus platform fee). Gross shown as sub-label.
+  const totals = completed.reduce((acc, b) => {
+    const snap = bookingFeeSnapshot(b);
+    acc.gross += snap.gross;
+    acc.net += snap.net;
+    acc.fee += snap.fee;
+    return acc;
+  }, { gross: 0, net: 0, fee: 0 });
+  const totalEarned = money(totals.net);
+
   const earnTotalEl = document.getElementById('earn-total');
-  if (earnTotalEl) earnTotalEl.textContent = totalEarned.toLocaleString('en-US');
+  if (earnTotalEl) earnTotalEl.textContent = moneyFmt.compact(totalEarned);
+
+  // Legacy mode lacks the wallet/cash lifetime split exposed by the canonical
+  // breakdown — fall back to zeros so the chips render valid digits until the
+  // canonical renderer takes over.
+  const bridgeWalletElLegacy = document.getElementById('bridgeWalletNum');
+  const bridgeCashElLegacy   = document.getElementById('bridgeCashNum');
+  if (bridgeWalletElLegacy) bridgeWalletElLegacy.textContent = '0';
+  if (bridgeCashElLegacy)   bridgeCashElLegacy.textContent   = '0';
 
   const earnMonthEl = document.getElementById('earn-month');
-  if (earnMonthEl) earnMonthEl.textContent = monthEarnings.toLocaleString('en-US');
+  if (earnMonthEl) earnMonthEl.textContent = moneyFmt.compact(monthEarnings);
 
-  const earnMonthSubEl = document.getElementById('earn-month-sub');
-  if (earnMonthSubEl) {
-    const delta = monthEarnings - lastMonthEarnings;
-    const isUp = delta >= 0;
-    earnMonthSubEl.innerHTML = `
-      <span class="${isUp ? 'jq-earn-trend-up' : 'jq-earn-trend-down'}">
-        ${isUp ? '↑' : '↓'} EGP ${Math.abs(delta).toLocaleString('en-US')}
-      </span> vs last month`;
+  const deltaEl = document.getElementById('earn-month-delta');
+  if (deltaEl) {
+    const last = Number(lastMonthEarnings) || 0;
+    const cur  = Number(monthEarnings) || 0;
+    const valueEl = deltaEl.querySelector('[data-delta-value]');
+    const iconEl  = deltaEl.querySelector('[data-delta-icon]');
+
+    let direction = 'flat';
+    let label = '—';
+
+    if (last > 0) {
+      const pct = ((cur - last) / last) * 100;
+      if (pct > 0.5)  direction = 'up';
+      else if (pct < -0.5) direction = 'down';
+      const arrow = pct > 0 ? '+' : '';
+      label = `${arrow}${pct.toFixed(0)}%`;
+    } else if (cur > 0) {
+      direction = 'up';
+      label = 'New';
+    }
+
+    deltaEl.dataset.direction = direction;
+    if (valueEl) valueEl.textContent = label;
+    if (iconEl) {
+      const paths = {
+        up:   'M12 19V5M5 12l7-7 7 7',
+        down: 'M12 5v14M5 12l7 7 7-7',
+        flat: 'M5 12h14',
+      };
+      const pathEl = iconEl.querySelector('path');
+      if (pathEl) pathEl.setAttribute('d', paths[direction]);
+    }
   }
 
   const earnCompletedEl = document.getElementById('earn-completed-count');
   if (earnCompletedEl) earnCompletedEl.textContent = completed.length;
 
+  // Debt card lifetime context — force 2-decimal money format for consistency
+  const debtLifetimeEl = document.getElementById('debtLifetimeFees');
+  if (debtLifetimeEl) debtLifetimeEl.textContent = moneyFmt.card(totals.fee);
+  const debtAvgEl = document.getElementById('debtAvgFee');
+  if (debtAvgEl) {
+    const avg = completed.length > 0 ? totals.fee / completed.length : 0;
+    debtAvgEl.textContent = moneyFmt.card(avg);
+  }
+
   // Sparkline: last 7 days of completed earnings
   renderEarningsSparkline(completed);
 
-  // Outstanding cash balance — also drives walletAvailable plain-number format
+  // Outstanding cash balance — 2-decimal format, currency rendered as suffix
   const liabilityAmountEl = document.getElementById('liabilityAmount');
-  if (liabilityAmountEl) liabilityAmountEl.innerHTML = `${outstandingAmount.toLocaleString('en-US')} <span>EGP</span>`;
+  if (liabilityAmountEl) {
+    const amt2 = outstandingAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    liabilityAmountEl.innerHTML = `${amt2} <span class="money-card__ccy-inline">EGP</span>`;
+  }
   const liabilityCard = document.getElementById('liabilityCard');
   if (liabilityCard) liabilityCard.dataset.state = outstandingAmount > 0 ? 'owing' : 'settled';
   const payLiabBtn = document.getElementById('payLiabilityBtn');
   if (payLiabBtn) payLiabBtn.hidden = outstandingAmount <= 0;
 
-  // Strip trailing "EGP" from wallet amounts (atelier ledger renders ccy separately)
-  ['walletAvailable', 'walletPending'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) {
-      const raw = el.textContent.replace(/EGP/gi, '').trim() || '0';
-      el.textContent = raw;
+  // Fetch real wallet balance + pending from backend (was: stale "0" placeholder).
+  // Also enrich debt banner amount and pending-jobs count line.
+  (async () => {
+    try {
+      const earn = await getWorkerEarnings();
+      const bal = Number(earn?.wallet?.balance) || 0;
+      const pending = Number(earn?.wallet?.pendingBalance) || 0;
+      const pendingJobs = Number(earn?.wallet?.pendingJobs ?? earn?.pendingJobsCount) || 0;
+      const fmt = n => n.toLocaleString('en-US', { minimumFractionDigits: bal % 1 === 0 ? 0 : 2, maximumFractionDigits: 2 });
+      const wa = document.getElementById('walletAvailable');
+      const wp = document.getElementById('walletPending');
+      if (wa) wa.innerHTML = fmt(bal) + ' <span class="money-card__ccy-inline">EGP</span>';
+      if (wp) wp.textContent = fmt(pending);
+      // Net after debt (only when liability > 0)
+      const netRow = document.getElementById('walletNetRow');
+      const netEl = document.getElementById('walletNet');
+      const owed = Number(outstandingAmount) || 0;
+      if (netRow && netEl) {
+        if (owed > 0) {
+          const net = Math.max(0, bal - owed);
+          netEl.textContent = net.toLocaleString('en-US', { minimumFractionDigits: net % 1 === 0 ? 0 : 2, maximumFractionDigits: 2 });
+          netRow.hidden = false;
+        } else {
+          netRow.hidden = true;
+        }
+      }
+      const pjc = document.getElementById('pendingJobsCount');
+      if (pjc) {
+        if (pendingJobs > 0) {
+          pjc.hidden = false;
+          pjc.textContent = pendingJobs === 1 ? 'from 1 job in hold' : `from ${pendingJobs} jobs in hold`;
+        } else {
+          pjc.hidden = true;
+          pjc.textContent = '';
+        }
+      }
+      // Hide whole "Coming soon" cell when nothing pending
+      const pendingCell = document.getElementById('walletPending')?.closest('.money-card__foot-item');
+      const pendingDivider = pendingCell?.nextElementSibling;
+      if (pendingCell) {
+        const empty = pending <= 0;
+        pendingCell.hidden = empty;
+        if (pendingDivider?.classList.contains('money-card__foot-divider')) pendingDivider.hidden = empty;
+      }
+
+      // Withdraw button enable + bank label (moved from renderMyPayoutsV2)
+      const wBtn = document.getElementById('btnRequestPayout');
+      if (wBtn) {
+        const tooLow = bal < 50;
+        wBtn.disabled = tooLow;
+        wBtn.title = tooLow ? `Minimum 50 EGP needed (${bal.toLocaleString('en-US')} available)` : '';
+      }
+      const bankLabel = document.getElementById('withdrawBankLabel');
+      const bankEdit = document.getElementById('withdrawBankEdit');
+      if (bankLabel) {
+        const m = (earn?.payoutMethod || earn?.preferredPayoutMethod || '').toLowerCase();
+        const map = { bank: 'Bank transfer', instapay: 'InstaPay', vodafone: 'Vodafone Cash', wallet: 'E-wallet' };
+        if (map[m]) {
+          bankLabel.innerHTML = `Paying to <strong>${map[m]}</strong>`;
+          if (bankEdit) bankEdit.textContent = 'Change';
+        } else {
+          bankLabel.textContent = 'No payout method set yet';
+          if (bankEdit) bankEdit.textContent = 'Add now';
+        }
+      }
+    } catch (e) {
+      console.warn('[earnings wallet fetch]', e);
     }
-  });
+  })();
+
+  const debtDueTag = document.getElementById('debtDueTag');
+  if (debtDueTag) {
+    const settle = document.getElementById('liability-settlement-date')?.textContent?.trim();
+    debtDueTag.textContent = settle && settle !== '—' ? `Due ${settle}` : 'Outstanding';
+  }
 
   // Liability items — last 5 cash completed bookings
   const liabilityList = document.getElementById('liability-items-list');
@@ -2420,14 +3257,17 @@ function populateEarnings(allBookings, completed, monthEarnings, lastMonthEarnin
     } else {
       liabilityList.innerHTML = cashCompleted.slice(0, 5).map(b => {
         const shortId = b._id.slice(-6).toUpperCase();
-        const amount  = b.totalPrice != null ? `${Number(b.totalPrice).toLocaleString('en-US')} EGP` : '—';
+        const snap = bookingFeeSnapshot(b);
+        const feeStr = `${snap.fee.toLocaleString('en-US')} EGP`;
+        const breakdown = `${snap.gross.toLocaleString('en-US')} EGP \u00D7 ${snap.feeRate}%`;
         return `
           <div class="jq-premium-liability-row">
             <div class="jq-premium-liability-info">
               <span class="jq-premium-liability-id">#${shortId}</span>
               <span class="jq-premium-liability-tag">${_t('tech_commission') || 'Commission'}</span>
+              <span class="jq-premium-liability-breakdown">${breakdown}</span>
             </div>
-            <span class="jq-premium-liability-val">${amount}</span>
+            <span class="jq-premium-liability-val">${feeStr}</span>
           </div>`;
       }).join('');
     }
@@ -2442,19 +3282,28 @@ function populateEarnings(allBookings, completed, monthEarnings, lastMonthEarnin
   if (recentList) {
     const recentCompleted = completed
       .sort((a, b) => new Date(b.scheduledDate || b.updatedAt) - new Date(a.scheduledDate || a.updatedAt))
-      .slice(0, 10);
+      .slice(0, 5);
 
     if (recentCompleted.length === 0) {
-      const _raw2 = typeof window.t === 'function' ? window.t('tech_no_completed_jobs') : null;
-      const noJobsMsg = (_raw2 && _raw2 !== 'tech_no_completed_jobs') ? _raw2 : 'No completed jobs yet.';
-      recentList.innerHTML = `<p style="color:var(--color-text-muted);font-size:0.85rem;padding:12px 0;">${noJobsMsg}</p>`;
+      recentList.innerHTML = `
+        <div class="recent-jobs__empty">
+          <strong>No jobs yet.</strong>
+          <span>Once you complete a job, it'll appear here with its settlement type.</span>
+        </div>`;
     } else {
       recentList.innerHTML = recentCompleted.map(b => {
         const service = b.service?.title || b.service?.category || 'Service';
         const dateStr = b.scheduledDate
           ? new Date(b.scheduledDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
           : '—';
-        const amount = b.totalPrice != null ? `+${Number(b.totalPrice).toLocaleString('en-US')} EGP` : '—';
+        const isCash = b.paymentMethod === 'cash';
+        const snap = bookingFeeSnapshot(b);
+        const amountStr = `+${snap.net.toLocaleString('en-US')} EGP`;
+        const subStr = isCash
+          ? `Cash \u00B7 collected ${snap.gross.toLocaleString('en-US')} \u2212 fee ${snap.fee.toLocaleString('en-US')}`
+          : `Online \u00B7 gross ${snap.gross.toLocaleString('en-US')} \u2212 fee ${snap.fee.toLocaleString('en-US')}`;
+        const badgeCls = isCash ? 'jq-earn-row-tag--cash' : 'jq-earn-row-tag--online';
+        const badgeLbl = isCash ? 'CASH' : 'ONLINE';
         return `
           <div class="jq-premium-earn-row" data-reveal>
             <div class="jq-earn-row-left">
@@ -2462,11 +3311,18 @@ function populateEarnings(allBookings, completed, monthEarnings, lastMonthEarnin
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
               </div>
               <div class="jq-earn-row-info">
-                <h4>${service}</h4>
+                <div class="jq-earn-row-title">
+                  <h4>${service}</h4>
+                  <span class="jq-earn-row-tag ${badgeCls}">${badgeLbl}</span>
+                </div>
                 <p>${dateStr}</p>
+                <p class="jq-earn-row-breakdown">${subStr}</p>
               </div>
             </div>
-            <div class="jq-earn-row-amount">${amount}</div>
+            <div class="jq-earn-row-amount">
+              <span class="jq-earn-row-amount__net">${amountStr}</span>
+              <span class="jq-earn-row-amount__label">net</span>
+            </div>
           </div>`;
       }).join('');
     }
@@ -2502,20 +3358,20 @@ async function loadNotifications() {
     if (emptyEl) emptyEl.hidden = true;
 
     const typeIcon = {
-      booking_created:    `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
-      booking_accepted:   `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>`,
-      booking_cancelled:  `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
-      booking_completed:  `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>`,
+      booking_created: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
+      booking_accepted: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>`,
+      booking_cancelled: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
+      booking_completed: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>`,
       booking_action_required: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
-      review_received:    `<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,
-      payment_released:   `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`,
-      system:             `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+      review_received: `<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,
+      payment_released: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`,
+      system: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
     };
 
     function timeAgo(dateStr) {
       const diff = Date.now() - new Date(dateStr).getTime();
       const m = Math.floor(diff / 60000);
-      if (m < 1)  return 'Just now';
+      if (m < 1) return 'Just now';
       if (m < 60) return `${m}m ago`;
       const h = Math.floor(m / 60);
       if (h < 24) return `${h}h ago`;
@@ -2625,7 +3481,7 @@ function initSettingsValidation() {
 
   function validatePasswordMatch(showError = true) {
     if (!newPasswordInput || !confirmPasswordInput) return;
-    const newVal     = newPasswordInput.value;
+    const newVal = newPasswordInput.value;
     const confirmVal = confirmPasswordInput.value;
     if (!newVal && !confirmVal) {
       clearFieldState(confirmPasswordInput);
@@ -2663,9 +3519,9 @@ function initSettingsForm() {
   const imgStyle = 'width:100%;height:100%;object-fit:cover;border-radius:50%;';
 
   // ── Photo upload ──────────────────────────────────────────
-  const changePhotoBtn   = document.getElementById('btn-change-photo');
+  const changePhotoBtn = document.getElementById('btn-change-photo');
   const photoUploadInput = document.getElementById('photo-upload-input');
-  const preview          = document.querySelector('[data-avatar-preview]');
+  const preview = document.querySelector('[data-avatar-preview]');
 
   if (changePhotoBtn && photoUploadInput) {
     changePhotoBtn.addEventListener('click', () => photoUploadInput.click());
@@ -2692,7 +3548,7 @@ function initSettingsForm() {
         const topbar = document.getElementById('topbar-avatar');
         if (topbar) topbar.innerHTML = `<img src="${e.target.result}" alt="Profile photo" style="${imgStyle}" />`;
         // Cache locally so photo persists across reloads before save
-        try { localStorage.setItem('servio_avatar_cache', e.target.result); } catch (_) {}
+        try { localStorage.setItem('servio_avatar_cache', e.target.result); } catch (_) { }
       };
       reader.readAsDataURL(file);
 
@@ -2736,8 +3592,8 @@ function initSettingsForm() {
 
     try {
       await updateMe({
-        name:         account.fullName || account.name || '',
-        phone:        account.phone || '',
+        name: account.fullName || account.name || '',
+        phone: account.phone || '',
         profileImage: photoUrl,
       });
 
@@ -2772,14 +3628,14 @@ function initSettingsForm() {
       const slots = [];
       let hasTimeError = false;
       document.querySelectorAll('#avail-schedule .avail-day-row').forEach(row => {
-        const dayKey  = row.dataset.day;
-        const isOff   = row.classList.contains('is-off');
+        const dayKey = row.dataset.day;
+        const isOff = row.classList.contains('is-off');
         if (isOff) return;
         const fromSel = row.querySelector(`#avail-from-${dayKey}`);
-        const toSel   = row.querySelector(`#avail-to-${dayKey}`);
+        const toSel = row.querySelector(`#avail-to-${dayKey}`);
         if (!fromSel || !toSel) return;
         const from = fromSel.value;
-        const to   = toSel.value;
+        const to = toSel.value;
         if (to <= from) {
           toSel.classList.add('is-error');
           hasTimeError = true;
@@ -2807,7 +3663,7 @@ function initSettingsForm() {
           const acc = JSON.parse(localStorage.getItem('servio_account') || '{}');
           acc.availability = slots;
           localStorage.setItem('servio_account', JSON.stringify(acc));
-        } catch (_) {}
+        } catch (_) { }
 
         if (scheduleFeedback) { scheduleFeedback.hidden = false; setTimeout(() => { scheduleFeedback.hidden = true; }, 3500); }
         showToast(_t('tech_schedule_saved_msg') || 'Schedule saved successfully!', 'success');
@@ -2823,7 +3679,74 @@ function initSettingsForm() {
 
   const saveCoverageBtn = document.getElementById('save-coverage');
   const coverageFeedback = document.getElementById('avail-coverage-feedback');
+  const coverageChipsRoot = document.getElementById('coverage-area-chips');
+  const coverageSummary = document.getElementById('coverage-summary');
+  const coverageCustomInput = document.getElementById('service-area');
+  const clearCoverageBtn = document.getElementById('coverage-clear');
+  const resetCoverageBtn = document.getElementById('coverage-reset');
+  const modalResetCoverageBtn = document.getElementById('coverage-modal-reset');
+  const cardClearCoverageBtn = document.getElementById('coverage-card-clear');
+  const cardSaveCoverageBtn = document.getElementById('coverage-card-save');
+  const openCoverageBtn = document.getElementById('coverage-open-modal');
+  const closeCoverageBtn = document.getElementById('coverage-modal-close');
+  const cancelCoverageBtn = document.getElementById('coverage-modal-cancel');
+  const coverageModal = document.getElementById('coverage-modal');
+  const coverageModalBackdrop = coverageModal?.querySelector('[data-coverage-modal-close]');
+  if (clearCoverageBtn && !clearCoverageBtn.dataset.bound) {
+    clearCoverageBtn.dataset.bound = 'true';
+    clearCoverageBtn.addEventListener('click', () => {
+      clearCoverageSelection(coverageChipsRoot, coverageSummary, coverageCustomInput);
+    });
+  }
+  if (resetCoverageBtn && !resetCoverageBtn.dataset.bound) {
+    resetCoverageBtn.dataset.bound = 'true';
+    resetCoverageBtn.addEventListener('click', () => {
+      resetCoverageToSaved(coverageChipsRoot, coverageSummary, coverageCustomInput);
+    });
+  }
+  if (modalResetCoverageBtn && !modalResetCoverageBtn.dataset.bound) {
+    modalResetCoverageBtn.dataset.bound = 'true';
+    modalResetCoverageBtn.addEventListener('click', () => {
+      resetCoverageToSaved(coverageChipsRoot, coverageSummary, coverageCustomInput);
+    });
+  }
+  if (cardClearCoverageBtn && !cardClearCoverageBtn.dataset.bound) {
+    cardClearCoverageBtn.dataset.bound = 'true';
+    cardClearCoverageBtn.addEventListener('click', () => {
+      clearCoverageSelection(coverageChipsRoot, coverageSummary, coverageCustomInput);
+    });
+  }
+  if (cardSaveCoverageBtn && !cardSaveCoverageBtn.dataset.bound) {
+    cardSaveCoverageBtn.dataset.bound = 'true';
+    cardSaveCoverageBtn.addEventListener('click', () => saveCoverageBtn?.click());
+  }
+  if (openCoverageBtn && !openCoverageBtn.dataset.bound) {
+    openCoverageBtn.dataset.bound = 'true';
+    openCoverageBtn.addEventListener('click', openCoverageModal);
+  }
+  if (closeCoverageBtn && !closeCoverageBtn.dataset.bound) {
+    closeCoverageBtn.dataset.bound = 'true';
+    closeCoverageBtn.addEventListener('click', () => closeCoverageModal({ reset: true }));
+  }
+  if (cancelCoverageBtn && !cancelCoverageBtn.dataset.bound) {
+    cancelCoverageBtn.dataset.bound = 'true';
+    cancelCoverageBtn.addEventListener('click', () => closeCoverageModal({ reset: true }));
+  }
+  if (coverageModalBackdrop && !coverageModalBackdrop.dataset.bound) {
+    coverageModalBackdrop.dataset.bound = 'true';
+    coverageModalBackdrop.addEventListener('click', () => closeCoverageModal({ reset: true }));
+  }
+  if (coverageModal && !coverageModal.dataset.escapeBound) {
+    coverageModal.dataset.escapeBound = 'true';
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && coverageModal.classList.contains('is-open')) {
+        closeCoverageModal({ reset: true });
+      }
+    });
+  }
   if (saveCoverageBtn) {
+    if (saveCoverageBtn.dataset.bound) return;
+    saveCoverageBtn.dataset.bound = 'true';
     saveCoverageBtn.addEventListener('click', async () => {
       const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
       const serviceAreaInput = document.getElementById('service-area');
@@ -2834,11 +3757,6 @@ function initSettingsForm() {
         ...customAreas,
       ]);
       const serviceArea = coverageAreas.join(', ');
-      const selectedSkills = [];
-      document.querySelectorAll('#categories-grid .avail-category-chip.is-selected').forEach(chip => {
-        selectedSkills.push(chip.dataset.skill || chip.querySelector('span')?.textContent || '');
-      });
-
       const origLabel = saveCoverageBtn.querySelector('.avail-save-btn__label');
       if (origLabel) origLabel.textContent = _t('tech_saving') || 'Saving…';
       const iconSpan = saveCoverageBtn.querySelector('.avail-save-btn__icon');
@@ -2850,34 +3768,35 @@ function initSettingsForm() {
         const profileUpdate = {};
         profileUpdate.coverageAreas = coverageAreas; // allow empty to clear
         profileUpdate.serviceArea = serviceArea; // preserve legacy display behavior
-        profileUpdate.skills = selectedSkills; // allow empty array to clear
         await updateMe(profileUpdate);
 
         try {
           const acc = JSON.parse(localStorage.getItem('servio_account') || '{}');
           acc.serviceArea = serviceArea;
           acc.coverageAreas = coverageAreas;
-          acc.skills = selectedSkills;
-          acc.specialty = selectedSkills.join(', ');
           localStorage.setItem('servio_account', JSON.stringify(acc));
-        } catch (_) {}
-        if (serviceAreaInput) serviceAreaInput.value = customAreas.join(', ');
+        } catch (_) { }
+        const savedCoverageSplit = splitCoverageAreasByTaxonomy(coverageAreas);
+        if (serviceAreaInput) serviceAreaInput.value = savedCoverageSplit.custom.join(', ');
         renderCoverageEditor({
           container: coverageChips,
           searchInput: document.getElementById('coverage-search'),
           summaryEl: document.getElementById('coverage-summary'),
-          selectedAreas: coverageAreas,
+          selectedAreas: savedCoverageSplit.known,
           customInput: serviceAreaInput,
         });
+        setCoverageSavedBaseline(coverageChips, serviceAreaInput);
 
         if (coverageFeedback) { coverageFeedback.hidden = false; setTimeout(() => { coverageFeedback.hidden = true; }, 3500); }
         showToast(_t('tech_coverage_saved_msg') || 'Coverage saved successfully!', 'success');
+        if (document.getElementById('coverage-modal')?.classList.contains('is-open')) closeCoverageModal();
       } catch (err) {
         showToast(err?.message || 'Failed to save coverage.', 'error');
       } finally {
         saveCoverageBtn.disabled = false;
         if (origLabel) origLabel.textContent = _t('tech_save_coverage') || 'Save Coverage';
         if (iconSpan) iconSpan.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>`;
+        syncCoverageControls(coverageChips, document.getElementById('coverage-summary'), serviceAreaInput);
       }
     });
   }
@@ -2916,13 +3835,13 @@ function updateProfileCompleteness() {
     + (coverageFilled ? 1 : 0)
     + (availabilityFilled ? 1 : 0);
   const avatar = document.querySelector('.settings-avatar-preview img');
-  const total  = fields.length + 3;
-  const score  = Math.round(((filled + (avatar ? 1 : 0)) / total) * 100);
-  const pct  = document.getElementById('profile-complete-pct');
-  const bar  = document.getElementById('profile-complete-bar');
+  const total = fields.length + 3;
+  const score = Math.round(((filled + (avatar ? 1 : 0)) / total) * 100);
+  const pct = document.getElementById('profile-complete-pct');
+  const bar = document.getElementById('profile-complete-bar');
   const fill = document.getElementById('profile-complete-fill');
-  if (pct)  pct.textContent = score + '%';
-  if (bar)  bar.setAttribute('aria-valuenow', score);
+  if (pct) pct.textContent = score + '%';
+  if (bar) bar.setAttribute('aria-valuenow', score);
   if (fill) fill.style.width = score + '%';
 }
 
@@ -2934,7 +3853,7 @@ function initTechSecurityForm() {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const currentPw = form.querySelector('#s-current-password');
-    const newPw     = form.querySelector('#s-new-password');
+    const newPw = form.querySelector('#s-new-password');
     const confirmPw = form.querySelector('#s-confirm-password');
     const submitBtn = form.querySelector('[type="submit"]');
     if (!currentPw.value.trim()) {
@@ -2985,18 +3904,18 @@ function initTechSecurityForm() {
 
 /* ── Password strength meter + live checklist ────────────── */
 function initPasswordStrengthMeter() {
-  const newPw     = document.getElementById('s-new-password');
+  const newPw = document.getElementById('s-new-password');
   const confirmPw = document.getElementById('s-confirm-password');
-  const wrap      = document.getElementById('pw-strength-wrap');
-  const fill      = document.getElementById('pw-strength-fill');
-  const label     = document.getElementById('pw-strength-label');
+  const wrap = document.getElementById('pw-strength-wrap');
+  const fill = document.getElementById('pw-strength-fill');
+  const label = document.getElementById('pw-strength-label');
   const matchHint = document.getElementById('pw-match-hint');
   if (!newPw || !wrap) return;
 
   const checks = {
-    length:  { el: document.getElementById('pwc-length'),  test: v => v.length >= 8 },
-    upper:   { el: document.getElementById('pwc-upper'),   test: v => /[A-Z]/.test(v) },
-    number:  { el: document.getElementById('pwc-number'),  test: v => /\d/.test(v) },
+    length: { el: document.getElementById('pwc-length'), test: v => v.length >= 8 },
+    upper: { el: document.getElementById('pwc-upper'), test: v => /[A-Z]/.test(v) },
+    number: { el: document.getElementById('pwc-number'), test: v => /\d/.test(v) },
     special: { el: document.getElementById('pwc-special'), test: v => /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(v) },
   };
   const strengthLabels = ['', 'tech_pw_strength_weak', 'tech_pw_strength_fair', 'tech_pw_strength_good', 'tech_pw_strength_strong'];
@@ -3138,30 +4057,31 @@ function initDashLogout() {
 ─────────────────────────────────────────────────────────── */
 function initProfileCompletionBanner() {
   const account = getAccount();
-  const status  = account?.status || account?.verificationStatus || '';
+  const status = account?.status || account?.verificationStatus || '';
   if (status !== 'approved' && status !== 'verified') return;
 
-  const userId     = account?._id || account?.id || 'anon';
+  const userId = account?._id || account?.id || 'anon';
   const storageKey = `servio_pcb_dismissed_${userId}`;
   if (localStorage.getItem(storageKey)) return;
 
   const missing = [];
   if (!account?.bio?.trim())
-    missing.push({ label: 'Profile bio',      tab: 'profile',   stab: null });
+    missing.push({ label: 'Profile bio', tab: 'profile', stab: null });
   if (!account?.photoUrl && !account?.profilePhoto && !account?.avatar)
-    missing.push({ label: 'Profile photo',    tab: 'profile',   stab: null });
+    missing.push({ label: 'Profile photo', tab: 'profile', stab: null });
   if (!account?.services?.length && !account?.skills?.length)
-    missing.push({ label: 'Services offered', tab: 'settings',  stab: 'stab-btn-services' });
+    missing.push({ label: 'Services offered', tab: 'settings', stab: 'stab-btn-services' });
   if (!account?.serviceArea && !account?.coverageAreas?.length)
-    missing.push({ label: 'Service areas',    tab: 'settings',  stab: 'stab-btn-services' });
+    missing.push({ label: 'Service coverage', tab: 'availability', stab: null });
   if (!account?.hourlyRate && !account?.startingRate && !account?.minFee)
-    missing.push({ label: 'Pricing rules',    tab: 'settings',  stab: 'stab-btn-services' });
+    missing.push({ label: 'Pricing rules', tab: 'settings', stab: 'stab-btn-services' });
 
   if (!missing.length) return;
+  const primaryMissing = missing[0];
 
   const banner = document.createElement('div');
   banner.className = 'pcb';
-  banner.id        = 'profileCompletionBanner';
+  banner.id = 'profileCompletionBanner';
   banner.setAttribute('role', 'alert');
   banner.innerHTML = `
     <div class="pcb__inner">
@@ -3176,7 +4096,7 @@ function initProfileCompletionBanner() {
           ${missing.map(m => `<button type="button" class="pcb__chip" data-goto-tab="${m.tab}" data-goto-stab="${m.stab || ''}">${m.label}</button>`).join('')}
         </div>
       </div>
-      <button class="pcb__cta btn btn--sm" type="button" data-goto-tab="settings" data-goto-stab="stab-btn-services">Go to Settings</button>
+      <button class="pcb__cta btn btn--sm" type="button" data-goto-tab="${primaryMissing.tab}" data-goto-stab="${primaryMissing.stab || ''}">Complete Setup</button>
       <button class="pcb__close" type="button" aria-label="Dismiss">
         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
@@ -3220,10 +4140,10 @@ function initPendingGuard() {
   // Build inline doc status rows
   const docs = account?.uploadedDocs || {};
   const DOC_LABELS = {
-    idFront:   'National ID — Front',
-    idBack:    'National ID — Back',
-    idSelfie:  'Selfie with ID',
-    cvFile:    'CV / Resume',
+    idFront: 'National ID — Front',
+    idBack: 'National ID — Back',
+    idSelfie: 'Selfie with ID',
+    cvFile: 'CV / Resume',
     portfolio: 'Portfolio',
   };
   const docRows = Object.entries(DOC_LABELS).map(([key, label]) => {
@@ -3279,9 +4199,9 @@ function initPendingGuard() {
    each document row's badge and shows uploaded filenames.
 ─────────────────────────────────────────────────────────── */
 function updateVerifStatusBanner(status) {
-  const banner   = document.getElementById('verif-status-banner');
-  const textEl   = document.getElementById('verif-status-text');
-  const hintEl   = document.getElementById('verif-status-hint');
+  const banner = document.getElementById('verif-status-banner');
+  const textEl = document.getElementById('verif-status-text');
+  const hintEl = document.getElementById('verif-status-hint');
   if (!banner || !textEl) return;
 
   banner.className = 'verif-status';
@@ -3316,16 +4236,16 @@ function initVerificationTab() {
   if (!panel) return;
 
   const account = getAccount();
-  const docs    = account?.uploadedDocs || {};
+  const docs = account?.uploadedDocs || {};
 
   // Show status from localStorage first, then refresh from API
   updateVerifStatusBanner(account?.verificationStatus || 'pending');
 
   panel.querySelectorAll('[data-verif-doc]').forEach(row => {
-    const key   = row.dataset.verifDoc;
-    const doc   = docs[key];
+    const key = row.dataset.verifDoc;
+    const doc = docs[key];
     const badge = row.querySelector('[data-verif-badge]');
-    const viewBtn  = row.querySelector('[data-verif-view]');
+    const viewBtn = row.querySelector('[data-verif-view]');
     const labelSpan = row.querySelector('[data-verif-upload-label]');
     const fileInput = row.querySelector('input[type="file"]');
     const body = row.querySelector('.verif-doc-row-v2__body');
@@ -3333,8 +4253,8 @@ function initVerificationTab() {
     // Determine upload state
     const isPortfolio = key === 'portfolio';
     const uploaded = isPortfolio ? !!(doc?.count) : !!(doc?.uploaded);
-    const url      = isPortfolio ? doc?.files?.[0]?.url : doc?.url;
-    const name     = isPortfolio
+    const url = isPortfolio ? doc?.files?.[0]?.url : doc?.url;
+    const name = isPortfolio
       ? (doc?.count ? doc.count + ' file' + (doc.count > 1 ? 's' : '') + ' uploaded' : '')
       : (doc?.name || '');
 
@@ -3432,10 +4352,10 @@ function initVerificationTab() {
     if (!acc.uploadedDocs) acc.uploadedDocs = {};
 
     const apiDocMap = {
-      idFront:  { url: user.idFrontUrl,  name: user.idFrontName  },
-      idBack:   { url: user.idBackUrl,   name: user.idBackName   },
+      idFront: { url: user.idFrontUrl, name: user.idFrontName },
+      idBack: { url: user.idBackUrl, name: user.idBackName },
       idSelfie: { url: user.idSelfieUrl, name: user.idSelfieName },
-      cvFile:   { url: user.cvUrl,       name: user.cvName       },
+      cvFile: { url: user.cvUrl, name: user.cvName },
     };
 
     Object.entries(apiDocMap).forEach(([key, { url, name }]) => {
@@ -3466,15 +4386,15 @@ function initVerificationTab() {
     }
 
     localStorage.setItem('servio_account', JSON.stringify(acc));
-  }).catch(() => {});
+  }).catch(() => { });
 }
 
 /* ── Notification panel ─────────────────────────────────── */
 function initNotifPanel() {
-  const btn   = document.getElementById('topbar-notif-btn');
+  const btn = document.getElementById('topbar-notif-btn');
   const panel = document.getElementById('notif-panel');
   const markAllBtn = document.getElementById('notif-mark-all');
-  const emptyEl    = document.getElementById('notif-empty');
+  const emptyEl = document.getElementById('notif-empty');
   if (!btn || !panel) return;
 
   function countUnread() {
@@ -3489,9 +4409,9 @@ function initNotifPanel() {
   }
 
   function openPanel() {
-    const rect   = btn.getBoundingClientRect();
+    const rect = btn.getBoundingClientRect();
     const panelW = 340;
-    const isRTL  = document.documentElement.dir === 'rtl';
+    const isRTL = document.documentElement.dir === 'rtl';
 
     panel.style.top = (rect.bottom + 8) + 'px';
 
@@ -3500,14 +4420,14 @@ function initNotifPanel() {
       let left = rect.left;
       if (left + panelW > window.innerWidth - 8) left = window.innerWidth - panelW - 8;
       if (left < 8) left = 8;
-      panel.style.left  = left + 'px';
+      panel.style.left = left + 'px';
       panel.style.right = 'auto';
     } else {
       // LTR: anchor panel's right edge to the button's right edge
       let right = window.innerWidth - rect.right;
       if (right < 8) right = 8;
       panel.style.right = right + 'px';
-      panel.style.left  = 'auto';
+      panel.style.left = 'auto';
     }
 
     panel.classList.add('is-open');
@@ -3531,7 +4451,7 @@ function initNotifPanel() {
       if (item.classList.contains('is-unread')) {
         item.classList.remove('is-unread');
         const id = item.dataset.notifId;
-        if (id) apiMarkTechNotifRead(id).catch(() => {});
+        if (id) apiMarkTechNotifRead(id).catch(() => { });
         refreshBadgeAndEmpty();
       }
       const url = item.dataset.notifUrl;
@@ -3543,7 +4463,7 @@ function initNotifPanel() {
   // Mark all read
   markAllBtn?.addEventListener('click', e => {
     panel.querySelectorAll('.notif-item.is-unread').forEach(el => el.classList.remove('is-unread'));
-    apiMarkTechAllRead().catch(() => {});
+    apiMarkTechAllRead().catch(() => { });
     refreshBadgeAndEmpty();
     e.stopPropagation();
   });
@@ -3572,7 +4492,7 @@ function escapeHtml(str) {
 
 async function initReviewsTab(workerId) {
   const summaryEl = document.getElementById('tech-dash-reviews-summary');
-  const listEl    = document.getElementById('tech-dash-reviews-list');
+  const listEl = document.getElementById('tech-dash-reviews-list');
   if (!summaryEl || !listEl) return;
 
   listEl.innerHTML = skList(4);
@@ -3584,6 +4504,7 @@ async function initReviewsTab(workerId) {
     listEl.innerHTML = `<p style="padding:1rem;opacity:0.6">Could not load reviews.</p>`;
     return;
   }
+  updateReviewIndicator(reviews);
 
   if (!reviews.length) {
     summaryEl.hidden = true;
@@ -3603,14 +4524,14 @@ async function initReviewsTab(workerId) {
     </div>`;
 
   listEl.innerHTML = reviews.map(r => {
-    const name     = escapeHtml(r.user?.name || 'Customer');
+    const name = escapeHtml(r.user?.name || 'Customer');
     const initials = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
-    const comment  = escapeHtml(r.comment || '');
-    const date     = r.createdAt
+    const comment = escapeHtml(r.comment || '');
+    const date = r.createdAt
       ? new Date(r.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
       : '';
     const starCount = Math.round(r.rating || 0);
-    const starHtml  = Array.from({ length: 5 }, (_, i) =>
+    const starHtml = Array.from({ length: 5 }, (_, i) =>
       i < starCount ? '★' : '☆'
     ).join('');
     return `
@@ -3708,47 +4629,45 @@ async function initDashboard() {
   // Fetch live availability data and seed the panel
   let liveAvailability = null;
   let liveIsAvailable = false;
-  let liveSkills = null;
   let liveServiceArea = '';
   let liveCoverageAreas = [];
   let liveBlockedDates = [];
   try {
     const res = await getMe();
     const user = res?.user || res?.data?.user || res?.data || res;
-    liveAvailability = user?.availability  || null;
-    liveIsAvailable  = user?.isAvailable   || false;
-    liveSkills       = user?.skills        || null;
-    liveServiceArea  = user?.serviceArea   || '';
+    liveAvailability = user?.availability || null;
+    liveIsAvailable = user?.isAvailable || false;
+    liveServiceArea = user?.serviceArea || '';
     liveCoverageAreas = getCoverageAreasFromAccount(user || {});
-    liveBlockedDates = user?.blockedDates  || [];
+    liveBlockedDates = user?.blockedDates || [];
     // Populate service area input
     const saInput = document.getElementById('service-area');
-    if (saInput) saInput.value = Array.isArray(user?.coverageAreas) && user.coverageAreas.length ? '' : liveServiceArea;
+    const liveCoverageSplit = splitCoverageAreasByTaxonomy(liveCoverageAreas);
+    if (saInput) saInput.value = liveCoverageSplit.custom.join(', ');
     renderCoverageEditor({
       container: document.getElementById('coverage-area-chips'),
       searchInput: document.getElementById('coverage-search'),
       summaryEl: document.getElementById('coverage-summary'),
-      selectedAreas: liveCoverageAreas,
+      selectedAreas: liveCoverageSplit.known,
       customInput: saInput,
     });
+    setCoverageSavedBaseline(document.getElementById('coverage-area-chips'), saInput);
     if (user?._id) initReviewsTab(user._id);
     await renderDebtSection();
     renderCashBlockBanner(user);
   } catch (_) {
     // Fall back to cached data
     const acc = getAccount();
-    liveAvailability = acc?.availability  || null;
-    liveIsAvailable  = acc?.isAvailable   || false;
-    liveSkills       = acc?.skills        || null;
-    liveServiceArea  = acc?.serviceArea   || '';
+    liveAvailability = acc?.availability || null;
+    liveIsAvailable = acc?.isAvailable || false;
+    liveServiceArea = acc?.serviceArea || '';
     liveCoverageAreas = getCoverageAreasFromAccount(acc || {});
-    liveBlockedDates = acc?.blockedDates  || [];
+    liveBlockedDates = acc?.blockedDates || [];
   }
 
   initAvailableNowToggle(liveIsAvailable);
   initAvailabilitySchedule(liveAvailability);
   initBlockedDatesCalendar(liveAvailability || [], liveBlockedDates);
-  initCategories(liveSkills);
 
   // Fire data fetches in parallel — stats/queue/earnings all come from bookings API
   await Promise.allSettled([
@@ -3763,7 +4682,7 @@ async function initDashboard() {
       const res = await getWorkerBookings({ limit: 200 });
       const bookings = res?.bookings || (Array.isArray(res) ? res : []);
       updateSidebarIndicators(bookings);
-    } catch (_) {}
+    } catch (_) { }
 
     const activePanel = document.querySelector('[data-panel].is-active');
     if (activePanel?.dataset.panel !== 'job-queue') return;
@@ -3773,7 +4692,7 @@ async function initDashboard() {
       const activeStab = document.querySelector('#jq-tab-bar .stab-btn--active')?.dataset.stab;
       const restoreTab = activeStab?.replace('jq-', '') || null;
       await initJobQueue(restoreTab);
-    } catch (_) {}
+    } catch (_) { }
     finally { _jqPolling = false; }
   }, 15_000);
 }
@@ -3784,11 +4703,9 @@ document.addEventListener('langchange', () => {
   const acc = getAccount();
   const scheduleContainer = document.getElementById('avail-schedule');
   if (scheduleContainer) { scheduleContainer.innerHTML = ''; initAvailabilitySchedule(acc?.availability || null); }
-  const categoriesGrid = document.getElementById('categories-grid');
-  if (categoriesGrid) { categoriesGrid.innerHTML = ''; initCategories(acc?.skills || null); }
   // Re-render data-driven sections with new language
-  populateStats().catch(() => {});
-  initJobQueue().catch(() => {});
+  populateStats().catch(() => { });
+  initJobQueue().catch(() => { });
 });
 
 /* ── Phase 2: Job Board, Proposals, Arrival Flow ── */
@@ -3865,11 +4782,11 @@ function initPhase2() {
   document.getElementById('jbCategoryFilter')?.addEventListener('change', applyJbFilters);
   document.getElementById('jbAreaFilter')?.addEventListener('change', applyJbFilters);
   function applyJbFilters() {
-    const cat  = document.getElementById('jbCategoryFilter')?.value;
+    const cat = document.getElementById('jbCategoryFilter')?.value;
     const area = document.getElementById('jbAreaFilter')?.value;
     document.querySelectorAll('.jb-card').forEach(card => {
       card.classList.toggle('is-hidden',
-        !!(cat  && card.dataset.category !== cat) ||
+        !!(cat && card.dataset.category !== cat) ||
         !!(area && card.dataset.area !== area));
     });
   }
@@ -3879,19 +4796,20 @@ function initPhase2() {
     btn.addEventListener('click', () => btn.closest('[data-dismissible]').remove());
   });
 
-  // Liability: Pay Now — clears outstanding balance display
+  // Liability: Pay Now — opens settle-debt modal, refreshes on success
   document.getElementById('payLiabilityBtn')?.addEventListener('click', () => {
-    const el = document.getElementById('liabilityAmount');
-    if (el) el.textContent = '0 EGP';
-    const listEl = document.getElementById('liability-items-list');
-    if (listEl) listEl.innerHTML = '';
-    showToast(typeof window.t === 'function' ? window.t('toast_saved') : 'Balance cleared!', 'success');
+    openSettleDebtModal({
+      onSuccess: () => {
+        _availableBalanceCache = { value: null, ts: 0 };
+        populateStats();
+        renderMyDebtsV2();
+      },
+    });
   });
 
   initBioSection();
   initSocialLinks();
   initServicesCatalog();
-  initAreaTags();
   initPricingForm();
   initPayoutSection();
 }
@@ -3901,9 +4819,9 @@ function initPhase2() {
 ───────────────────────────────────────────────────────────── */
 function initBioSection() {
   const textarea = document.getElementById('s-bio');
-  const counter  = document.getElementById('bio-char-count');
-  const saveBtn  = document.getElementById('btn-save-bio');
-  const saveMsg  = document.getElementById('bio-save-msg');
+  const counter = document.getElementById('bio-char-count');
+  const saveBtn = document.getElementById('btn-save-bio');
+  const saveMsg = document.getElementById('bio-save-msg');
   if (!textarea) return;
 
   // Restore saved bio
@@ -3933,7 +4851,7 @@ function initSocialLinks() {
   // Restore saved values (data-settings-field already handled in populateDashboard,
   // but social fields may not be wired there yet — handle explicitly)
   const account = getAccount() || {};
-  ['facebook','instagram','portfolio'].forEach(key => {
+  ['facebook', 'instagram', 'portfolio'].forEach(key => {
     const el = document.getElementById('s-' + key);
     if (el && account[key]) el.value = account[key];
   });
@@ -3941,7 +4859,7 @@ function initSocialLinks() {
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     const acc = getAccount() || {};
-    ['facebook','instagram','portfolio'].forEach(key => {
+    ['facebook', 'instagram', 'portfolio'].forEach(key => {
       const el = document.getElementById('s-' + key);
       if (el) acc[key] = el.value.trim();
     });
@@ -3955,41 +4873,41 @@ function initSocialLinks() {
    SERVICES CATALOG
 ───────────────────────────────────────────────────────────── */
 const CATEGORY_LABELS = {
-  plumbing:     'Plumbing',
-  electrical:   'Electrical',
-  hvac:         'A/C & HVAC',
-  carpentry:    'Carpentry',
-  appliance:    'Appliances',
-  handyman:     'Handyman',
-  renovation:   'Renovation',
-  painting:     'Painting',
-  flooring:     'Flooring',
-  drywall:      'Drywall',
-  roofing:      'Roofing',
-  cleaning:     'Cleaning',
+  plumbing: 'Plumbing',
+  electrical: 'Electrical',
+  hvac: 'A/C & HVAC',
+  carpentry: 'Carpentry',
+  appliance: 'Appliances',
+  handyman: 'Handyman',
+  renovation: 'Renovation',
+  painting: 'Painting',
+  flooring: 'Flooring',
+  drywall: 'Drywall',
+  roofing: 'Roofing',
+  cleaning: 'Cleaning',
   'pest-control': 'Pest Control',
-  landscaping:  'Landscaping',
+  landscaping: 'Landscaping',
   installation: 'Installation',
-  other:        'Other',
+  other: 'Other',
 };
 
 const CATEGORY_ICONS = {
-  plumbing:     '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"/><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"/></svg>',
-  electrical:   '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>',
-  hvac:         '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12h20"/><path d="M12 2v20"/><path d="m20 16-4-4 4-4"/><path d="m4 8 4 4-4 4"/><path d="m16 4-4 4-4-4"/><path d="m8 20 4-4 4 4"/></svg>',
-  carpentry:    '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 12-8.373 8.373a1 1 0 1 1-3-3L12 9"/><path d="m18 15 4-4"/><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172V7l-2.26-2.26a6 6 0 0 0-4.202-1.756L9 2.96l.92.82A6.18 6.18 0 0 1 12 8.4V10l2 2h1.172a2 2 0 0 1 1.414.586L18 14"/></svg>',
-  appliance:    '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="15" x="2" y="4" rx="2"/><path d="M8 4v15M16 4v15M2 9h20M2 14h20"/></svg>',
-  handyman:     '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
-  renovation:   '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
-  painting:     '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>',
-  flooring:     '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>',
-  drywall:      '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M2 9h20M2 15h20M8 3v6M16 3v6M8 15v6M16 15v6"/></svg>',
-  roofing:      '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-7 9 7"/><path d="M3 9v13h18V9"/><path d="M9 22V12h6v10"/></svg>',
-  cleaning:     '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4.5 8-11.8A8 8 0 0 0 12 2a8 8 0 0 0-8 8.2c0 7.3 8 11.8 8 11.8z"/><circle cx="12" cy="10" r="3"/></svg>',
-  'pest-control':'<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 12h8M12 8v8"/><circle cx="12" cy="12" r="9"/><path d="M4.93 4.93l14.14 14.14"/></svg>',
-  landscaping:  '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22v-7l-2-2"/><path d="M17 8v.8A6 6 0 0 1 13.8 20v0H10v0A6.5 6.5 0 0 1 7 8h0a5 5 0 0 1 10 0z"/><path d="m14 14-2 2-2-2"/></svg>',
+  plumbing: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"/><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"/></svg>',
+  electrical: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>',
+  hvac: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12h20"/><path d="M12 2v20"/><path d="m20 16-4-4 4-4"/><path d="m4 8 4 4-4 4"/><path d="m16 4-4 4-4-4"/><path d="m8 20 4-4 4 4"/></svg>',
+  carpentry: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 12-8.373 8.373a1 1 0 1 1-3-3L12 9"/><path d="m18 15 4-4"/><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172V7l-2.26-2.26a6 6 0 0 0-4.202-1.756L9 2.96l.92.82A6.18 6.18 0 0 1 12 8.4V10l2 2h1.172a2 2 0 0 1 1.414.586L18 14"/></svg>',
+  appliance: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="15" x="2" y="4" rx="2"/><path d="M8 4v15M16 4v15M2 9h20M2 14h20"/></svg>',
+  handyman: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
+  renovation: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
+  painting: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>',
+  flooring: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>',
+  drywall: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M2 9h20M2 15h20M8 3v6M16 3v6M8 15v6M16 15v6"/></svg>',
+  roofing: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-7 9 7"/><path d="M3 9v13h18V9"/><path d="M9 22V12h6v10"/></svg>',
+  cleaning: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4.5 8-11.8A8 8 0 0 0 12 2a8 8 0 0 0-8 8.2c0 7.3 8 11.8 8 11.8z"/><circle cx="12" cy="10" r="3"/></svg>',
+  'pest-control': '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 12h8M12 8v8"/><circle cx="12" cy="12" r="9"/><path d="M4.93 4.93l14.14 14.14"/></svg>',
+  landscaping: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22v-7l-2-2"/><path d="M17 8v.8A6 6 0 0 1 13.8 20v0H10v0A6.5 6.5 0 0 1 7 8h0a5 5 0 0 1 10 0z"/><path d="m14 14-2 2-2-2"/></svg>',
   installation: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>',
-  other:        '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
+  other: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
 };
 
 async function initServicesCatalog() {
@@ -3998,20 +4916,20 @@ async function initServicesCatalog() {
   const saveMsg = document.getElementById('skills-save-msg');
   if (!catalog) return;
 
-  let allServices    = [];
-  let selectedIds    = new Set();
-  let verifiedCats   = [];
-  let pendingCats    = [];
+  let allServices = [];
+  let selectedIds = new Set();
+  let verifiedCats = [];
+  let pendingCats = [];
 
   try {
     const [svcRes, meRes] = await Promise.all([
       getServices({ limit: 200 }),
       getMe(),
     ]);
-    allServices  = svcRes.data?.services || svcRes.services || svcRes.data || [];
-    const me     = meRes.data || meRes;
-    verifiedCats = me.categories         || [];
-    pendingCats  = me.pendingCategories  || [];
+    allServices = svcRes.data?.services || svcRes.services || svcRes.data || [];
+    const me = meRes.data || meRes;
+    verifiedCats = me.categories || [];
+    pendingCats = me.pendingCategories || [];
 
     const workerServices = me.services || [];
     workerServices.forEach(s => selectedIds.add((s._id || s).toString()));
@@ -4038,13 +4956,13 @@ async function initServicesCatalog() {
 
   const formatPrice = svc => {
     if (svc.priceUnit === 'per_hour') return `${svc.basePrice} EGP/hr`;
-    if (svc.priceUnit === 'per_sqm')  return `${svc.basePrice} EGP/m²`;
+    if (svc.priceUnit === 'per_sqm') return `${svc.basePrice} EGP/m²`;
     return `${svc.basePrice} EGP`;
   };
 
   const catBadge = cat => {
-    if (verifiedCats.includes(cat))  return '<span class="svc-cat-badge svc-cat-badge--verified">Verified</span>';
-    if (pendingCats.includes(cat))   return '<span class="svc-cat-badge svc-cat-badge--pending">Pending</span>';
+    if (verifiedCats.includes(cat)) return '<span class="svc-cat-badge svc-cat-badge--verified">Verified</span>';
+    if (pendingCats.includes(cat)) return '<span class="svc-cat-badge svc-cat-badge--pending">Pending</span>';
     return '<span class="svc-cat-badge svc-cat-badge--new">Re-verify</span>';
   };
 
@@ -4064,15 +4982,15 @@ async function initServicesCatalog() {
       </button>
       <div class="svc-acc-body"${open ? '' : ' hidden'}>
         <div class="svc-pill-grid">${services.map(svc => {
-          const id = (svc._id || svc.id || '').toString();
-          const chk = selectedIds.has(id);
-          return `<label class="svc-pill${chk ? ' is-checked' : ''}">
+      const id = (svc._id || svc.id || '').toString();
+      const chk = selectedIds.has(id);
+      return `<label class="svc-pill${chk ? ' is-checked' : ''}">
             <input type="checkbox" class="svc-checkbox" value="${id}" data-category="${svc.category || ''}" ${chk ? 'checked' : ''} />
             <svg class="svc-pill__check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
             <span class="svc-pill__name">${svc.title}</span>
             <span class="svc-pill__price">${formatPrice(svc)}</span>
           </label>`;
-        }).join('')}</div>
+    }).join('')}</div>
       </div>
     </div>`;
   }).join('')}</div>`;
@@ -4099,10 +5017,10 @@ async function initServicesCatalog() {
   });
 
   saveBtn?.addEventListener('click', async () => {
-    const checkedIds  = [...catalog.querySelectorAll('.svc-checkbox:checked')].map(cb => cb.value);
+    const checkedIds = [...catalog.querySelectorAll('.svc-checkbox:checked')].map(cb => cb.value);
     const checkedCats = [...new Set([...catalog.querySelectorAll('.svc-checkbox:checked')].map(cb => cb.dataset.category).filter(Boolean))];
-    const certEl      = document.getElementById('s-certifications');
-    const skills      = certEl ? certEl.value.trim().split('\n').map(s => s.trim()).filter(Boolean) : [];
+    const certEl = document.getElementById('s-certifications');
+    const skills = certEl ? certEl.value.trim().split('\n').map(s => s.trim()).filter(Boolean) : [];
 
     try {
       await updateMe({ services: checkedIds, skills });
@@ -4129,83 +5047,21 @@ async function initServicesCatalog() {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   SERVICE AREA TAGS
-───────────────────────────────────────────────────────────── */
-async function initAreaTags() {
-  const container = document.getElementById('area-tags');
-  const saveBtn   = document.getElementById('btn-save-areas');
-  const saveMsg   = document.getElementById('areas-save-msg');
-  const searchInput = document.getElementById('settings-coverage-search');
-  const customInput = document.getElementById('settings-service-area-custom');
-  const summaryEl = document.getElementById('settings-coverage-summary');
-  if (!container) return;
-
-  let savedAreas = [];
-  try {
-    const me = await getMe();
-    const user = me?.data?.user || me?.data || me;
-    savedAreas = getCoverageAreasFromAccount(user || {});
-  } catch (e) {
-    savedAreas = getCoverageAreasFromAccount(getAccount() || {});
-  }
-
-  const rerender = () => renderCoverageEditor({
-    container,
-    searchInput,
-    summaryEl,
-    selectedAreas: normalizeAreaList([
-      ...getSelectedCoverageAreas(container),
-      ...normalizeAreaList(customInput?.value || ''),
-    ]),
-    customInput,
-  });
-
-  renderCoverageEditor({ container, searchInput, summaryEl, selectedAreas: savedAreas, customInput });
-  searchInput?.addEventListener('input', rerender);
-  customInput?.addEventListener('input', () => updateCoverageSummary(
-    summaryEl,
-    normalizeAreaList([...getSelectedCoverageAreas(container), ...normalizeAreaList(customInput.value)])
-  ));
-
-  saveBtn?.addEventListener('click', async () => {
-    const selected = normalizeAreaList([
-      ...getSelectedCoverageAreas(container),
-      ...normalizeAreaList(customInput?.value || ''),
-    ]);
-    const serviceArea = selected.join(', ');
-    try {
-      await updateMe({ coverageAreas: selected, serviceArea });
-      try {
-        const acc = getAccount() || {};
-        acc.coverageAreas = selected;
-        acc.serviceArea = serviceArea;
-        localStorage.setItem('servio_account', JSON.stringify(acc));
-      } catch (_) {}
-      savedAreas = selected;
-      renderCoverageEditor({ container, searchInput, summaryEl, selectedAreas: selected, customInput });
-      if (saveMsg) { saveMsg.hidden = false; setTimeout(() => { saveMsg.hidden = true; }, 2500); }
-    } catch (e) {
-      showToast('Failed to save service areas. Please try again.', 'error');
-    }
-  });
-}
-
-/* ─────────────────────────────────────────────────────────────
    SERVICE PRICING FORM
 ───────────────────────────────────────────────────────────── */
 function initPricingForm() {
-  const form    = document.getElementById('pricing-form');
+  const form = document.getElementById('pricing-form');
   const saveMsg = document.getElementById('pricing-save-msg');
   if (!form) return;
 
   const account = getAccount() || {};
   // Restore numeric fields
-  ['minFee','travelFee','emergencyMultiplier'].forEach(key => {
+  ['minFee', 'travelFee', 'emergencyMultiplier'].forEach(key => {
     const el = document.getElementById('s-' + key.replace(/([A-Z])/g, c => '-' + c.toLowerCase()));
     if (el && account[key] != null) el.value = account[key];
   });
   // Restore checkboxes
-  ['acceptCash','acceptCard','acceptInstapay','acceptWallet'].forEach(key => {
+  ['acceptCash', 'acceptCard', 'acceptInstapay', 'acceptWallet'].forEach(key => {
     const el = form.querySelector(`[name="${key}"]`);
     if (el) el.checked = !!account[key];
   });
@@ -4213,10 +5069,10 @@ function initPricingForm() {
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     const acc = getAccount() || {};
-    acc.minFee              = parseFloat(document.getElementById('s-min-fee')?.value) || 0;
-    acc.travelFee           = parseFloat(document.getElementById('s-travel-fee')?.value) || 0;
+    acc.minFee = parseFloat(document.getElementById('s-min-fee')?.value) || 0;
+    acc.travelFee = parseFloat(document.getElementById('s-travel-fee')?.value) || 0;
     acc.emergencyMultiplier = parseFloat(document.getElementById('s-emergency-mult')?.value) || 1;
-    ['acceptCash','acceptCard','acceptInstapay','acceptWallet'].forEach(key => {
+    ['acceptCash', 'acceptCard', 'acceptInstapay', 'acceptWallet'].forEach(key => {
       const el = form.querySelector(`[name="${key}"]`);
       if (el) acc[key] = el.checked;
     });
@@ -4229,14 +5085,14 @@ function initPricingForm() {
    PAYOUT SECTION
 ───────────────────────────────────────────────────────────── */
 function initPayoutSection() {
-  const methodCards   = document.getElementById('payout-method-cards');
-  const bankFields    = document.getElementById('payout-fields-bank');
-  const walletFields  = document.getElementById('payout-fields-wallet');
-  const saveBtn       = document.getElementById('btn-save-payout');
-  const saveMsg       = document.getElementById('payout-save-msg');
-  const scheduleOpts  = document.getElementById('payout-schedule-options');
-  const schedSaveBtn  = document.getElementById('btn-save-schedule');
-  const schedSaveMsg  = document.getElementById('schedule-save-msg');
+  const methodCards = document.getElementById('payout-method-cards');
+  const bankFields = document.getElementById('payout-fields-bank');
+  const walletFields = document.getElementById('payout-fields-wallet');
+  const saveBtn = document.getElementById('btn-save-payout');
+  const saveMsg = document.getElementById('payout-save-msg');
+  const scheduleOpts = document.getElementById('payout-schedule-options');
+  const schedSaveBtn = document.getElementById('btn-save-schedule');
+  const schedSaveMsg = document.getElementById('schedule-save-msg');
 
   if (!methodCards) return;
 
@@ -4283,7 +5139,7 @@ function initPayoutSection() {
       c.setAttribute('aria-checked', String(active));
     });
     const isBank = method === 'bank';
-    if (bankFields)   bankFields.hidden   = !isBank;
+    if (bankFields) bankFields.hidden = !isBank;
     if (walletFields) walletFields.hidden = isBank;
   }
 
@@ -4291,10 +5147,10 @@ function initPayoutSection() {
     const acc = getAccount() || {};
     const activeCard = methodCards.querySelector('.payout-method-card--active');
     acc.payoutMethod = activeCard?.dataset.payoutMethod || 'bank';
-    acc.bankName      = document.getElementById('s-bank-name')?.value || '';
+    acc.bankName = document.getElementById('s-bank-name')?.value || '';
     acc.accountHolder = document.getElementById('s-account-holder')?.value.trim() || '';
     acc.accountNumber = document.getElementById('s-account-number')?.value.trim() || '';
-    acc.walletNumber  = document.getElementById('s-wallet-number')?.value.trim() || '';
+    acc.walletNumber = document.getElementById('s-wallet-number')?.value.trim() || '';
     localStorage.setItem('servio_account', JSON.stringify(acc));
     if (saveMsg) { saveMsg.hidden = false; setTimeout(() => { saveMsg.hidden = true; }, 2500); }
   });
@@ -4312,7 +5168,7 @@ function updateActionNeededDates() {
   const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
   document.querySelectorAll('.dash-action-card').forEach(card => {
     const statusEl = card.querySelector('.dash-action-card__status');
-    const dateEl   = card.querySelector('.dash-action-card__date');
+    const dateEl = card.querySelector('.dash-action-card__date');
     if (statusEl && statusEl.textContent.trim() === 'Action needed') {
       statusEl.textContent = _t('tech_action_needed');
     }
@@ -4328,9 +5184,9 @@ function updateActionNeededDates() {
 
 /* ── Profile read-only / edit mode ────────────────────────── */
 function initProfileReadOnly() {
-  const form       = document.querySelector('[data-readonly-form]');
-  const editBtn    = document.getElementById('btn-edit-profile');
-  const cancelBtn  = document.getElementById('btn-cancel-profile');
+  const form = document.querySelector('[data-readonly-form]');
+  const editBtn = document.getElementById('btn-edit-profile');
+  const cancelBtn = document.getElementById('btn-cancel-profile');
   const actionsRow = document.getElementById('profile-edit-actions');
   if (!form || !editBtn) return;
 
@@ -4376,15 +5232,15 @@ function initProfileReadOnly() {
 
 /* ── Email change modal ────────────────────────────────────── */
 function initEmailChange() {
-  const modal      = document.getElementById('modal-change-email-tech');
-  const openBtn    = document.getElementById('btn-change-email-tech');
-  const closeBtn   = document.getElementById('btn-close-change-email-tech');
-  const cancelBtn  = document.getElementById('btn-change-email-tech-cancel');
-  const form       = document.getElementById('change-email-tech-form');
+  const modal = document.getElementById('modal-change-email-tech');
+  const openBtn = document.getElementById('btn-change-email-tech');
+  const closeBtn = document.getElementById('btn-close-change-email-tech');
+  const cancelBtn = document.getElementById('btn-change-email-tech-cancel');
+  const form = document.getElementById('change-email-tech-form');
   const newEmailEl = document.getElementById('change-email-tech-new');
-  const pwEl       = document.getElementById('change-email-tech-password');
-  const errorEl    = document.getElementById('change-email-tech-error');
-  const submitBtn  = document.getElementById('btn-change-email-tech-confirm');
+  const pwEl = document.getElementById('change-email-tech-password');
+  const errorEl = document.getElementById('change-email-tech-error');
+  const submitBtn = document.getElementById('btn-change-email-tech-confirm');
   if (!modal || !openBtn || !form) return;
 
   function openModal() { modal.removeAttribute('hidden'); newEmailEl?.focus(); }
@@ -4425,11 +5281,11 @@ function initEmailChange() {
 
 /* ── Delete Account Modal ──────────────────────────────────── */
 function initDeleteAccount() {
-  const modal     = document.getElementById('modal-delete-account');
+  const modal = document.getElementById('modal-delete-account');
   const cancelBtn = document.getElementById('btn-delete-account-cancel');
-  const confirmBtn= document.getElementById('btn-delete-account-confirm');
-  const inputEl   = document.getElementById('delete-account-confirm-input');
-  const errorEl   = document.getElementById('delete-account-error');
+  const confirmBtn = document.getElementById('btn-delete-account-confirm');
+  const inputEl = document.getElementById('delete-account-confirm-input');
+  const errorEl = document.getElementById('delete-account-error');
   if (!modal || !confirmBtn) return;
 
   function closeModal() {
@@ -4514,7 +5370,7 @@ function fmtMoneyDisp(amount, currency = 'EGP') {
 
 function categoryIconDisp(cat) {
   const c = String(cat || '').toLowerCase();
-  if (c.includes('plumb'))  return '<path d="M3 8h6a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h8"/><path d="M9 3v5"/><path d="M19 12v9"/>';
+  if (c.includes('plumb')) return '<path d="M3 8h6a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h8"/><path d="M9 3v5"/><path d="M19 12v9"/>';
   if (c.includes('electric')) return '<polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>';
   if (c.includes('ac') || c.includes('hvac') || c.includes('cool')) return '<circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="9"/><line x1="12" y1="15" x2="12" y2="22"/><line x1="2" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="22" y2="12"/>';
   if (c.includes('paint')) return '<path d="M19 11h2v2a2 2 0 0 1-2 2h-1l-1 7H7l-1-7H3v-2h2V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v6z"/>';
@@ -4582,11 +5438,7 @@ function recalcTechDispStats() {
     const k = el.dataset.dispStat;
     if (counts[k] != null) el.textContent = String(counts[k]);
   });
-  const badge = document.querySelector('[data-nav-badge="disputes"]');
-  if (badge) {
-    if (counts.action > 0) { badge.hidden = false; badge.textContent = String(counts.action); }
-    else { badge.hidden = true; }
-  }
+  setNavBadge('disputes', counts.action);
 }
 
 function getCustomerName(d) {
@@ -4613,7 +5465,7 @@ function renderTechDisputeCard(d) {
   const reason = d.reason
     ? `<div class="tdisp-card__quote">${svgIconDisp('<path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"/>', 14)}<p>${escapeHtmlDisp(d.reason).slice(0, 200)}${d.reason.length > 200 ? '…' : ''}</p></div>`
     : '';
-  const sevClass = ['low','medium','high','critical'].includes(d.severity) ? `is-sev-${d.severity}` : '';
+  const sevClass = ['low', 'medium', 'high', 'critical'].includes(d.severity) ? `is-sev-${d.severity}` : '';
 
   return `
     <article class="tdisp-card ${actionable ? 'is-actionable' : ''} ${sClass} ${sevClass}" data-disp-card="${escapeHtmlDisp(d._id)}" tabindex="0" role="button" data-disp-open="${escapeHtmlDisp(d._id)}">
@@ -4791,7 +5643,7 @@ function renderHistoryItemDisp(h) {
   const statusRaw = h?.status || '';
   const status = escapeHtmlDisp(statusLabelDisp(statusRaw));
   const roleRaw = escapeHtmlDisp(h?.byRole || 'system');
-  
+
   let roleFriendly = 'System';
   if (roleRaw === 'user') roleFriendly = 'Customer';
   else if (roleRaw === 'worker') roleFriendly = 'Technician (You)';
@@ -4800,7 +5652,7 @@ function renderHistoryItemDisp(h) {
   const who = h?.by?.name ? escapeHtmlDisp(h.by.name) : roleFriendly;
   const when = fmtDateTimeDisp(h?.at);
   const note = h?.note ? `<p class="tech-disp-hist__note">"${escapeHtmlDisp(h.note)}"</p>` : '';
-  
+
   let actionDesc = `Status updated to ${status}`;
   if (statusRaw === 'open') actionDesc = 'Dispute opened';
   else if (statusRaw === 'reviewing') actionDesc = 'Review started';
@@ -4905,15 +5757,15 @@ function renderTechDisputeModal(dispute) {
       <section class="tech-disp-section">
         <h4 class="tech-disp-section__title">Customer Evidence ${customerEvidence.length ? `(${customerEvidence.length})` : ''}</h4>
         ${customerEvidence.length
-          ? `<div class="tech-disp-evidence-grid">${customerEvidence.map(renderEvidenceCardDisp).join('')}</div>`
-          : '<p class="tech-disp-empty tech-disp-empty--inline">No customer evidence uploaded.</p>'}
+      ? `<div class="tech-disp-evidence-grid">${customerEvidence.map(renderEvidenceCardDisp).join('')}</div>`
+      : '<p class="tech-disp-empty tech-disp-empty--inline">No customer evidence uploaded.</p>'}
       </section>
 
       <section class="tech-disp-section">
         <h4 class="tech-disp-section__title">Your Evidence ${workerEvidence.length ? `(${workerEvidence.length})` : ''}</h4>
         ${workerEvidence.length
-          ? `<div class="tech-disp-evidence-grid">${workerEvidence.map(renderEvidenceCardDisp).join('')}</div>`
-          : '<p class="tech-disp-empty tech-disp-empty--inline">You have not uploaded evidence yet.</p>'}
+      ? `<div class="tech-disp-evidence-grid">${workerEvidence.map(renderEvidenceCardDisp).join('')}</div>`
+      : '<p class="tech-disp-empty tech-disp-empty--inline">You have not uploaded evidence yet.</p>'}
 
         ${!String(status || '').startsWith('resolved') && status !== 'closed' ? `
           <div class="tech-disp-upload">
@@ -4988,7 +5840,7 @@ function wireTechDisputeModalActions(dispute) {
         if (statusEl) { statusEl.textContent = 'Evidence uploaded successfully.'; statusEl.classList.remove('is-error'); }
         showToast?.('Evidence uploaded.', 'success');
         await refreshTechDisputeModal();
-        loadTechDisputes().catch(() => {});
+        loadTechDisputes().catch(() => { });
       } catch (err) {
         if (statusEl) { statusEl.textContent = `Upload failed: ${err?.message || 'Error'}`; statusEl.classList.add('is-error'); }
         showToast?.(err?.message || 'Upload failed.', 'error');
@@ -5014,7 +5866,7 @@ function wireTechDisputeModalActions(dispute) {
         await appealDispute(disputeId, reason);
         showToast?.('Appeal submitted.', 'success');
         await refreshTechDisputeModal();
-        loadTechDisputes().catch(() => {});
+        loadTechDisputes().catch(() => { });
       } catch (err) {
         showToast?.(err?.message || 'Failed to submit appeal.', 'error');
       } finally {
@@ -5031,7 +5883,7 @@ async function refreshTechDisputeModal() {
     const res = await getPartyDisputeById(id);
     const dispute = res?.data || res;
     renderTechDisputeModal(dispute);
-  } catch {}
+  } catch { }
 }
 
 initTechDisputesFilters();
@@ -5042,13 +5894,7 @@ initDashboard().catch(err => console.error('[Dashboard init error]', err));
 
 /* ── Plan 2: earnings split + debt panel + payouts ──────────────────── */
 
-function fmtMoney2(n) {
-  try {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'EGP', maximumFractionDigits: 2 }).format(Number(n) || 0);
-  } catch (_) {
-    return `${Number(n || 0).toFixed(2)} EGP`;
-  }
-}
+const fmtMoney2 = (n) => moneyFmt.text(n);
 
 function ageOf2(d) {
   if (!d) return '—';
@@ -5063,38 +5909,48 @@ function relativeTime2(d) {
   try { return new Date(d).toLocaleString(); } catch (_) { return '—'; }
 }
 
-async function renderEarningsSplitV2(wallet) {
-  const wa = document.getElementById('walletAvailable');
-  const wp = document.getElementById('walletPending');
-  const fmt = n => Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
-  if (wa) wa.textContent = fmt(wallet?.balance);
-  if (wp) wp.textContent = fmt(wallet?.pendingBalance);
+function showEarningsError(message = "Couldn't load your earnings.") {
+  const banner = document.getElementById('earnErrorBanner');
+  const msg = document.getElementById('earnErrorBannerMsg');
+  if (!banner) return;
+  if (msg) msg.textContent = message;
+  banner.hidden = false;
+}
+function hideEarningsError() {
+  const banner = document.getElementById('earnErrorBanner');
+  if (banner) banner.hidden = true;
 }
 
 async function renderMyDebtsV2() {
-  const banner = document.getElementById('debtBanner');
-  const panel  = document.getElementById('debtPanel');
-  if (!banner || !panel) return;
+  const panel = document.getElementById('debtPanel');
+  if (!panel) return;
+
+  if (_debtsAbortController) _debtsAbortController.abort();
+  _debtsAbortController = new AbortController();
+  const signal = _debtsAbortController.signal;
+
   let r;
-  try { r = await getMyDebtsV2(); }
-  catch (e) { console.error('[debts]', e); return; }
+  try { r = await getMyDebtsV2({ signal }); }
+  catch (e) {
+    if (e.name === 'AbortError') return;
+    console.error('[debts]', e);
+    showEarningsError("Couldn't load your debt info. Check your connection.");
+    return;
+  }
+  hideEarningsError();
   const { summary = {}, debts = [], submittedSettlements = [] } = r?.data || {};
   const total = Number(summary.totalOutstanding);
   const debtTab = document.getElementById('earnSubnavDebts');
   const debtBadge = document.getElementById('earnSubnavDebtsBadge');
   if (!Number.isFinite(total) || total <= 0) {
-    banner.hidden = true;
     panel.hidden = true;
     if (debtTab) debtTab.hidden = true;
     if (debtBadge) debtBadge.hidden = true;
     return;
   }
-  banner.hidden = false;
   panel.hidden = false;
   if (debtTab) debtTab.hidden = false;
   if (debtBadge) { debtBadge.hidden = false; debtBadge.textContent = String(debts.length || 1); }
-  const amtEl = document.getElementById('debtBannerAmount');
-  if (amtEl) amtEl.textContent = fmtMoney2(total);
   const pct = Math.min(100, Math.round((total / 300) * 100));
   const labelEl = document.getElementById('debtProgressLabel');
   if (labelEl) labelEl.textContent = `${fmtMoney2(total)} owed — ${pct}% of cash-block threshold`;
@@ -5129,12 +5985,27 @@ async function renderMyDebtsV2() {
 }
 
 let _allPayouts = [];
+let _debtsAbortController = null;
+let _payoutsAbortController = null;
+let _availableBalanceCache = { value: null, ts: 0 };
+const AVAILABLE_BALANCE_TTL_MS = 30_000;
+
+async function getAvailableBalanceCached() {
+  const now = Date.now();
+  if (_availableBalanceCache.value !== null && now - _availableBalanceCache.ts < AVAILABLE_BALANCE_TTL_MS) {
+    return _availableBalanceCache.value;
+  }
+  const r = await getWorkerEarnings();
+  const value = Number(r?.breakdown?.availableToWithdraw ?? r?.wallet?.balance) || 0;
+  _availableBalanceCache = { value, ts: now };
+  return value;
+}
 
 const PAYOUT_METHOD_ICONS = {
-  bank:     '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V10M19 21V10M3 10h18L12 3 3 10z"/><path d="M9 21v-6M15 21v-6"/></svg>',
+  bank: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V10M19 21V10M3 10h18L12 3 3 10z"/><path d="M9 21v-6M15 21v-6"/></svg>',
   instapay: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2.5"/><path d="M11 18h2"/></svg>',
   vodafone: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>',
-  wallet:   '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="14" rx="2.5"/><path d="M2 10h20M18 15h.01"/></svg>'
+  wallet: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="14" rx="2.5"/><path d="M2 10h20M18 15h.01"/></svg>'
 };
 
 const PAYOUT_STATUS_GROUP = {
@@ -5171,21 +6042,26 @@ function _renderPayoutRows(items) {
     document.getElementById('payoutsEmptyCta')?.addEventListener('click', async () => {
       let availableBalance = 0;
       try {
-        const earn = await getWorkerEarnings();
-        availableBalance = Number(earn?.wallet?.balance) || 0;
+        availableBalance = await getAvailableBalanceCached();
       } catch (_) { /* fall through with 0 */ }
-      openPayoutRequestModal({ availableBalance, onSuccess: () => renderMyPayoutsV2() });
+      openPayoutRequestModal({
+        availableBalance,
+        onSuccess: () => {
+          _availableBalanceCache = { value: null, ts: 0 };
+          renderMyPayoutsV2();
+        },
+      });
     });
     return;
   }
   tbody.innerHTML = items.map(p => {
-    const method   = (p.payoutMethod || '').toLowerCase();
-    const icon     = PAYOUT_METHOD_ICONS[method] || PAYOUT_METHOD_ICONS.wallet;
-    const status   = (p.status || '').toLowerCase();
-    const group    = PAYOUT_STATUS_GROUP[status] || 'neutral';
-    const dateStr  = p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
-    const timeStr  = p.createdAt ? new Date(p.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '';
-    const ref      = p.transactionRef || p.reference || '—';
+    const method = (p.payoutMethod || '').toLowerCase();
+    const icon = PAYOUT_METHOD_ICONS[method] || PAYOUT_METHOD_ICONS.wallet;
+    const status = (p.status || '').toLowerCase();
+    const group = PAYOUT_STATUS_GROUP[status] || 'neutral';
+    const dateStr = p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+    const timeStr = p.createdAt ? new Date(p.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '';
+    const ref = p.transactionRef || p.reference || '—';
     return `
       <tr>
         <td>
@@ -5209,10 +6085,10 @@ function _renderPayoutRows(items) {
 
 function _applyPayoutFilters() {
   const status = document.getElementById('payoutFilterStatus')?.value || '';
-  const from   = document.getElementById('payoutFilterFrom')?.value;
-  const to     = document.getElementById('payoutFilterTo')?.value;
+  const from = document.getElementById('payoutFilterFrom')?.value;
+  const to = document.getElementById('payoutFilterTo')?.value;
   const fromTs = from ? new Date(from).getTime() : -Infinity;
-  const toTs   = to   ? new Date(to).getTime() + 86400000 : Infinity;
+  const toTs = to ? new Date(to).getTime() + 86400000 : Infinity;
   const filtered = _allPayouts.filter(p => {
     if (status && (p.status || '').toLowerCase() !== status) return false;
     const ts = new Date(p.createdAt).getTime();
@@ -5227,26 +6103,53 @@ function _renderPayoutsSummary() {
     .filter(p => ['paid', 'completed', 'approved'].includes((p.status || '').toLowerCase()))
     .reduce((s, p) => s + (Number(p.amount) || 0), 0);
   const pending = _allPayouts.filter(p => ['pending', 'processing'].includes((p.status || '').toLowerCase())).length;
-  const totalEl   = document.getElementById('payoutsTotalAmount');
-  const countEl   = document.getElementById('payoutsTotalCount');
+  const totalEl = document.getElementById('payoutsTotalAmount');
+  const countEl = document.getElementById('payoutsTotalCount');
   const pendingEl = document.getElementById('payoutsPendingCount');
-  if (totalEl)   totalEl.textContent   = total.toLocaleString('en-US', { maximumFractionDigits: 2 });
-  if (countEl)   countEl.textContent   = _allPayouts.length;
+  if (totalEl) totalEl.textContent = total.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  if (countEl) countEl.textContent = _allPayouts.length;
   if (pendingEl) pendingEl.textContent = pending;
 }
 
 async function renderMyPayoutsV2() {
   const tbody = document.getElementById('payoutsTbody');
   if (!tbody) return;
+
+  if (_payoutsAbortController) _payoutsAbortController.abort();
+  _payoutsAbortController = new AbortController();
+  const signal = _payoutsAbortController.signal;
+
   try {
-    const r = await getMyPayouts();
+    const r = await getMyPayouts({ signal });
     _allPayouts = r?.data || [];
+    hideEarningsError();
   } catch (e) {
+    if (e.name === 'AbortError') return;
     console.error('[payouts]', e);
     _allPayouts = [];
+    showEarningsError("Couldn't load your payout history. Check your connection.");
+    return;
   }
   _renderPayoutsSummary();
   _applyPayoutFilters();
+
+  // Hide filters + summary chips when there is nothing to filter
+  const hasItems = _allPayouts.length > 0;
+  const filtersEl = document.getElementById('payoutsFilters');
+  const summaryEl = document.getElementById('payoutsSummary');
+  if (filtersEl) filtersEl.hidden = !hasItems;
+  if (summaryEl) summaryEl.hidden = !hasItems;
+}
+
+function _wireWithdrawJump() {
+  document.querySelector('[data-jump-payout-settings]')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    document.querySelector('[data-tab="settings"]')?.click();
+    setTimeout(() => {
+      document.getElementById('stab-btn-payout')?.click();
+      document.getElementById('stab-payout')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 150);
+  });
 }
 
 function _wirePayoutFilters() {
@@ -5262,23 +6165,38 @@ function _wirePayoutFilters() {
   });
 }
 
-function wireDebtActionsV2() {
-  document.getElementById('btnGoSettle')?.addEventListener('click', () => {
-    activateEarnSubTab('debts');
+function wireEarnErrorBanner() {
+  document.getElementById('earnErrorBannerRetry')?.addEventListener('click', () => {
+    hideEarningsError();
+    renderMyDebtsV2().catch(() => {});
+    renderMyPayoutsV2().catch(() => {});
   });
+}
+
+function wireDebtActionsV2() {
   document.getElementById('btnSettleDebt')?.addEventListener('click', () => {
-    openSettleDebtModal({ onSuccess: () => renderMyDebtsV2() });
+    openSettleDebtModal({
+      onSuccess: () => {
+        _availableBalanceCache = { value: null, ts: 0 };
+        populateStats();
+        renderMyDebtsV2();
+      },
+    });
   });
   const payoutHandler = async () => {
     let availableBalance = 0;
     try {
-      const earn = await getWorkerEarnings();
-      availableBalance = Number(earn?.wallet?.balance) || 0;
+      availableBalance = await getAvailableBalanceCached();
     } catch (_) { /* fall through with 0 */ }
-    openPayoutRequestModal({ availableBalance, onSuccess: () => renderMyPayoutsV2() });
+    openPayoutRequestModal({
+      availableBalance,
+      onSuccess: () => {
+        _availableBalanceCache = { value: null, ts: 0 };
+        renderMyPayoutsV2();
+      },
+    });
   };
   document.getElementById('btnRequestPayout')?.addEventListener('click', payoutHandler);
-  document.getElementById('btnRequestPayout2')?.addEventListener('click', payoutHandler);
 }
 
 /* Earnings sub-nav (Overview / Payouts / Debts) */
@@ -5299,32 +6217,51 @@ function activateEarnSubTab(name) {
 
 function wireEarnSubnav() {
   document.querySelectorAll('#panel-earnings .earn-subnav__tab').forEach(btn => {
-    btn.addEventListener('click', () => activateEarnSubTab(btn.dataset.earnTab));
+    btn.addEventListener('click', () => {
+      const target = btn.dataset.earnTab;
+      activateEarnSubTab(target);
+      if (target === 'payouts') renderMyPayoutsV2().catch(() => { });
+    });
   });
   document.querySelectorAll('#panel-earnings [data-earn-view-jump]').forEach(btn => {
     btn.addEventListener('click', () => {
       const target = btn.dataset.earnViewJump;
       activateEarnSubTab(target);
-      if (target === 'payouts') renderMyPayoutsV2().catch(() => {});
+      if (target === 'payouts') renderMyPayoutsV2().catch(() => { });
       document.getElementById('panel-earnings')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   });
 }
 
 async function initPlan2EarningsTab() {
-  const earningsBtn = document.querySelector('[data-tab="earnings"]');
-  earningsBtn?.addEventListener('click', () => {
-    setTimeout(() => {
-      renderMyDebtsV2();
-      renderMyPayoutsV2();
-    }, 100);
+  const panel = document.getElementById('panel-earnings');
+  if (!panel) return;
+
+  // Debts must load eagerly: they gate the subnav badge visibility on the
+  // Overview view. Payouts load lazily (only when the Withdrawals subtab
+  // opens) — fetching them on Overview can fire the error banner for data
+  // the user can't even see yet.
+  const renderEarningsViews = () => {
+    renderMyDebtsV2().catch(err => console.error('[debts]', err));
+  };
+
+  if (!panel.hidden) renderEarningsViews();
+
+  const observer = new MutationObserver(mutations => {
+    for (const m of mutations) {
+      if (m.attributeName === 'hidden' && !panel.hidden) {
+        renderEarningsViews();
+        break;
+      }
+    }
   });
-  if (!document.getElementById('panel-earnings')?.hidden) {
-    await Promise.all([renderMyDebtsV2(), renderMyPayoutsV2()]);
-  }
+  observer.observe(panel, { attributes: true, attributeFilter: ['hidden'] });
+
   wireDebtActionsV2();
   wireEarnSubnav();
   _wirePayoutFilters();
+  _wireWithdrawJump();
+  wireEarnErrorBanner();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -5333,17 +6270,48 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ──────────────── Plan 2 Task 20: Transactions tab ────────────────
 
-function _txFmtMoney(n) {
-  if (n === null || n === undefined || Number.isNaN(Number(n))) return '—';
-  const v = Number(n);
-  return (v < 0 ? '-' : '') + 'EGP ' + Math.abs(v).toLocaleString('en-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const TX_TYPE_META = {
+  release: { label: 'Money released to you', icon: 'in', desc: 'Customer payment cleared — money sent to your balance' },
+  hold: { label: 'Held in escrow', icon: 'hold', desc: 'Customer paid online — held safely until job is done' },
+  fee: { label: 'Platform fee', icon: 'out', desc: 'Servio platform fee on this job' },
+  charge: { label: 'Charge', icon: 'out', desc: 'Charge applied to your wallet' },
+  refund: { label: 'Refund', icon: 'out', desc: 'Money returned to the customer' },
+  dispute: { label: 'Dispute', icon: 'neutral', desc: 'Funds held while a dispute is resolved' },
+  cash_debt_auto_deduct: { label: 'Cash debt — auto paid', icon: 'out', desc: 'Owed platform fee on a cash job, taken from your payout' },
+  cash_debt_manual_payment: { label: 'Cash debt — you paid', icon: 'out', desc: 'You settled platform fees on cash jobs manually' }
+};
+
+function _txTypeMeta(type) {
+  return TX_TYPE_META[type] || { label: (type || 'Transaction'), icon: 'neutral', desc: '' };
 }
 
-function _txBookingCell(t) {
-  const bid = t.payment && t.payment.booking;
-  if (!bid) return '—';
-  const s = String(bid);
-  return '#' + s.slice(-6);
+function _txTypeIconSvg(kind) {
+  if (kind === 'in') return '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12l7 7 7-7"/></svg>';
+  if (kind === 'out') return '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 19V5M19 12l-7-7-7 7"/></svg>';
+  if (kind === 'hold') return '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
+  return '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>';
+}
+
+function _txFmtAmount(n, opts) {
+  if (n === null || n === undefined || Number.isNaN(Number(n))) return '—';
+  const v = Number(n);
+  const showSign = !(opts && opts.neutral);
+  const sign = showSign ? (v > 0 ? '+' : v < 0 ? '−' : '') : '';
+  return sign + Math.abs(v).toLocaleString('en-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function _txCleanNote(raw) {
+  if (!raw) return '';
+  let s = String(raw).replace(/[<>&]/g, '');
+  s = s
+    .replace(/^Demo\s+/i, '')
+    .replace(/\bbooking\s+([0-9a-f]{20,})\b/i, (_, id) => 'booking #' + id.slice(-6))
+    .replace(/escrow released to worker for/i, 'Payment released to you for')
+    .replace(/escrow hold for/i, 'Customer payment held for')
+    .replace(/auto-settled cash debt/i, 'Cash-job fee auto-paid')
+    .replace(/\(gross\s+([\d.,]+),?\s*after debt offset\s+([\d.,]+)\)/i, '(you collected $1, $2 sent to your wallet after fees)')
+    .replace(/\bafter debt offset\b/gi, 'after fees deducted');
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 async function renderTransactions() {
@@ -5352,38 +6320,58 @@ async function renderTransactions() {
   const params = {
     type: document.getElementById('txType')?.value || undefined,
     from: document.getElementById('txFrom')?.value || undefined,
-    to:   document.getElementById('txTo')?.value || undefined,
+    to: document.getElementById('txTo')?.value || undefined,
   };
-  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;opacity:0.6;padding:16px;">Loading…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="4" class="tx-table__loading">Loading…</td></tr>';
   let r;
   try {
     r = await getMyTransactions(params);
   } catch (err) {
     console.error('[tech tx]', err);
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#b00;padding:16px;">Failed to load transactions.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" class="tx-table__empty" style="color:#b00;">Failed to load transactions.</td></tr>';
     return;
   }
   const rows = Array.isArray(r?.data) ? r.data : [];
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;opacity:0.6;padding:16px;">No transactions.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" class="tx-table__empty">No transactions yet. Complete a job to see money movement here.</td></tr>';
   } else {
     tbody.innerHTML = rows.map(t => {
+      const isHold = t.type === 'hold';
       const amt = t.direction === 'debit' ? -Number(t.amount || 0) : Number(t.amount || 0);
-      const cls = amt >= 0 ? 'pos' : 'neg';
-      const date = t.createdAt ? new Date(t.createdAt).toLocaleString() : '—';
-      let note = t.note ? String(t.note).replace(/[<>&]/g, '') : '';
-      note = note
-        .replace(/^Demo\s+/i, '')
-        .replace(/\bbooking\s+([0-9a-f]{20,})\b/i, (_, id) => 'booking #' + id.slice(-6));
-      note = note.charAt(0).toUpperCase() + note.slice(1);
-      return '<tr>'
-        + '<td>' + date + '</td>'
-        + '<td>' + (t.type || '—') + '</td>'
-        + '<td>' + (t.direction || '—') + '</td>'
-        + '<td>' + _txBookingCell(t) + '</td>'
-        + '<td class="tx-amount tx-amount--' + cls + '">' + _txFmtMoney(amt) + '</td>'
-        + '<td>' + note + '</td>'
-        + '</tr>';
+      const meta = _txTypeMeta(t.type);
+      const amtCls = isHold ? 'neutral' : (amt > 0 ? 'pos' : amt < 0 ? 'neg' : 'neutral');
+      const dateObj = t.createdAt ? new Date(t.createdAt) : null;
+      const dateStr = dateObj ? dateObj.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+      const timeStr = dateObj ? dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '';
+      const bookingId = t.payment && t.payment.booking ? String(t.payment.booking).slice(-6) : '';
+      const bookingCell = bookingId
+        ? `<code>#${bookingId}</code>`
+        : `<span class="tx-table__booking--empty">—</span>`;
+
+      const note = _txCleanNote(t.note);
+      const noteLine = note && note.toLowerCase() !== meta.desc.toLowerCase() ? note : meta.desc;
+      const amtStr = _txFmtAmount(amt, { neutral: isHold });
+
+      return `
+        <tr>
+          <td>
+            <div class="tx-table__date">
+              <strong>${dateStr}</strong>
+              <span>${timeStr}</span>
+            </div>
+          </td>
+          <td>
+            <div class="tx-table__type">
+              <span class="tx-type-icon tx-type-icon--${meta.icon}">${_txTypeIconSvg(meta.icon)}</span>
+              <div class="tx-table__type-text">
+                <span class="tx-table__type-label">${meta.label}</span>
+                ${noteLine ? `<span class="tx-table__type-note">${noteLine}</span>` : ''}
+              </div>
+            </div>
+          </td>
+          <td class="tx-table__booking">${bookingCell}</td>
+          <td class="tx-amount-cell tx-amount-cell--${amtCls}">${amtStr} <em>EGP</em></td>
+        </tr>`;
     }).join('');
   }
   const pag = document.getElementById('txPagination');
@@ -5393,6 +6381,32 @@ async function renderTransactions() {
   }
 }
 
+function _wireTxQuickChips() {
+  const chips = document.querySelectorAll('#panel-transactions .tx-chip[data-tx-range]');
+  chips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      chips.forEach(c => c.classList.remove('is-active'));
+      chip.classList.add('is-active');
+      const range = chip.dataset.txRange;
+      const fromEl = document.getElementById('txFrom');
+      const toEl = document.getElementById('txTo');
+      if (!fromEl || !toEl) return;
+      if (range === 'all') {
+        fromEl.value = '';
+        toEl.value = '';
+      } else {
+        const days = parseInt(range, 10);
+        const now = new Date();
+        const past = new Date(now.getTime() - days * 86400000);
+        const iso = d => d.toISOString().slice(0, 10);
+        fromEl.value = iso(past);
+        toEl.value = iso(now);
+      }
+      renderTransactions();
+    });
+  });
+}
+
 function initTxTab() {
   const btn = document.querySelector('[data-tab="transactions"]');
   btn?.addEventListener('click', () => setTimeout(renderTransactions, 100));
@@ -5400,6 +6414,7 @@ function initTxTab() {
   document.getElementById('txFrom')?.addEventListener('change', renderTransactions);
   document.getElementById('txTo')?.addEventListener('change', renderTransactions);
   document.getElementById('txRefresh')?.addEventListener('click', renderTransactions);
+  _wireTxQuickChips();
   if (!document.getElementById('panel-transactions')?.hidden) renderTransactions();
 }
 
@@ -5409,24 +6424,34 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function bindTechNotifChannelPrefs() {
-  const checkboxes = document.querySelectorAll('[data-notif-channel]');
-  if (!checkboxes.length) return;
+  const toggles = document.querySelectorAll('.stab-toggle[data-notif-channel]');
+  if (!toggles.length) return;
   try {
     const data = await getNotificationPreferences();
     const channels = data?.channels || {};
-    checkboxes.forEach((cb) => {
-      const k = cb.dataset.notifChannel;
-      cb.checked = channels[k] !== false;
+    toggles.forEach((btn) => {
+      const k = btn.dataset.notifChannel;
+      const isOn = channels[k] !== false;
+      btn.classList.toggle('stab-toggle--on', isOn);
+      btn.setAttribute('aria-checked', isOn ? 'true' : 'false');
     });
-  } catch (_) {}
+  } catch (_) { }
 
-  checkboxes.forEach((cb) => {
-    cb.addEventListener('change', async () => {
+  toggles.forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const k = btn.dataset.notifChannel;
+      const isCurrentlyOn = btn.getAttribute('aria-checked') === 'true';
+      const newState = !isCurrentlyOn;
+
+      btn.classList.toggle('stab-toggle--on', newState);
+      btn.setAttribute('aria-checked', newState ? 'true' : 'false');
+
       try {
-        await updateNotificationPreferences({ [cb.dataset.notifChannel]: cb.checked });
+        await updateNotificationPreferences({ [k]: newState });
         showToast('Saved', 'success');
       } catch (e) {
-        cb.checked = !cb.checked;
+        btn.classList.toggle('stab-toggle--on', isCurrentlyOn);
+        btn.setAttribute('aria-checked', isCurrentlyOn ? 'true' : 'false');
         showToast(e?.message || 'Failed to save', 'error');
       }
     });

@@ -101,10 +101,19 @@
 
         <!-- Sidebar -->
         <aside class="dash-sidebar" aria-label="Dashboard navigation" data-sidebar>
+          <div class="dash-sidebar__masthead" aria-label="SERVIO technician portal">
+            <div class="dash-sidebar__mark" aria-hidden="true">S</div>
+            <div class="dash-sidebar__brand-copy">
+              <span class="dash-sidebar__brand-name">SERVIO</span>
+              <span class="dash-sidebar__brand-kicker" data-i18n="tech_sidebar_portal">Technician Portal</span>
+            </div>
+          </div>
 
           <div class="dash-sidebar__nav-scroll">
 
-            <ul class="dash-nav" role="tablist" aria-label="Dashboard sections">
+            <div class="dash-nav__group" aria-labelledby="tech-nav-group-work">
+              <p class="dash-nav__section-label" id="tech-nav-group-work" data-i18n="tech_nav_group_work">Work</p>
+              <ul class="dash-nav" role="tablist" aria-labelledby="tech-nav-group-work">
               <li role="none">
                 <button class="dash-nav__btn" role="tab" aria-selected="false"
                         aria-controls="panel-overview" id="tab-overview" data-tab="overview" title="Overview" data-i18n-title="tech_nav_overview">
@@ -131,6 +140,23 @@
               </li>
               <li role="none">
                 <button class="dash-nav__btn" role="tab" aria-selected="false"
+                        aria-controls="panel-availability" id="tab-availability" data-tab="availability" title="Availability" data-i18n-title="tech_nav_availability">
+                  <span class="dash-nav__icon-slot" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                  </svg>
+                  </span>
+                  <span class="dash-nav__label" data-i18n="tech_nav_availability">Availability</span>
+                </button>
+              </li>
+            </ul>
+            </div>
+
+            <div class="dash-nav__group" aria-labelledby="tech-nav-group-money">
+              <p class="dash-nav__section-label" id="tech-nav-group-money" data-i18n="tech_nav_group_money">Money</p>
+              <ul class="dash-nav" role="tablist" aria-labelledby="tech-nav-group-money">
+              <li role="none">
+                <button class="dash-nav__btn" role="tab" aria-selected="false"
                         aria-controls="panel-earnings" id="tab-earnings" data-tab="earnings" title="Earnings" data-i18n-title="tech_nav_earnings">
                   <span class="dash-nav__icon-slot" aria-hidden="true">
                   <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -138,7 +164,7 @@
                   </svg>
                   </span>
                   <span class="dash-nav__label" data-i18n="tech_nav_earnings">Earnings</span>
-                  <span class="dash-nav__dot" data-nav-dot="earnings" hidden></span>
+                  <span class="dash-nav__badge" data-nav-badge="earnings" hidden>0</span>
                 </button>
               </li>
               <li role="none">
@@ -152,17 +178,12 @@
                   <span class="dash-nav__label" data-i18n="tech_nav_transactions">Transactions</span>
                 </button>
               </li>
-              <li role="none">
-                <button class="dash-nav__btn" role="tab" aria-selected="false"
-                        aria-controls="panel-availability" id="tab-availability" data-tab="availability" title="Availability" data-i18n-title="tech_nav_availability">
-                  <span class="dash-nav__icon-slot" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-                  </svg>
-                  </span>
-                  <span class="dash-nav__label" data-i18n="tech_nav_availability">Availability</span>
-                </button>
-              </li>
+            </ul>
+            </div>
+
+            <div class="dash-nav__group" aria-labelledby="tech-nav-group-reputation">
+              <p class="dash-nav__section-label" id="tech-nav-group-reputation" data-i18n="tech_nav_group_reputation">Reputation</p>
+              <ul class="dash-nav" role="tablist" aria-labelledby="tech-nav-group-reputation">
               <li role="none">
                 <button class="dash-nav__btn" role="tab" aria-selected="false"
                         aria-controls="panel-reviews" id="tab-reviews" data-tab="reviews" title="Reviews" data-i18n-title="tech_nav_reviews">
@@ -189,8 +210,11 @@
                 </button>
               </li>
             </ul>
+            </div>
 
-            <ul class="dash-nav" role="tablist" aria-label="Account sections">
+            <div class="dash-nav__group dash-nav__group--account" aria-labelledby="tech-nav-group-account">
+              <p class="dash-nav__section-label" id="tech-nav-group-account" data-i18n="tech_nav_group_account">Account</p>
+              <ul class="dash-nav" role="tablist" aria-labelledby="tech-nav-group-account">
               <li role="none">
                 <button class="dash-nav__btn" role="tab" aria-selected="false"
                         aria-controls="panel-verification" id="tab-verification" data-tab="verification" title="Verification" data-i18n-title="tech_nav_verification">
@@ -214,6 +238,7 @@
                 </button>
               </li>
             </ul>
+            </div>
 
           </div>
 
@@ -222,9 +247,15 @@
           <!-- User profile row -->
           <div class="dash-sidebar__user">
             <div class="dash-sidebar__user-avatar" data-dash-initials>KM</div>
-            <div style="min-width:0;flex:1;">
+            <div class="dash-sidebar__user-meta">
               <span class="dash-sidebar__user-name" data-dash-name data-i18n="dash_loading">Loading…</span>
-              <span class="dash-sidebar__user-role" data-i18n="tech_user_role">Technician</span>
+              <span class="dash-sidebar__user-role">
+                <span data-i18n="tech_user_role">Technician</span>
+                <span class="dash-sidebar__status-chip" data-sidebar-availability>
+                  <span class="dash-sidebar__status-dot" aria-hidden="true"></span>
+                  <span data-sidebar-availability-label>Checking</span>
+                </span>
+              </span>
             </div>
           </div>
 
@@ -444,7 +475,6 @@
           <section class="dash-panel" id="panel-earnings" role="tabpanel" aria-labelledby="tab-earnings" data-panel="earnings" hidden>
             <div class="dash-panel__header">
               <h1 class="dash-panel__title" data-i18n="tech_nav_earnings">Earnings</h1>
-              <p class="dash-panel__subtitle" data-i18n="tech_earnings_sub">Your income overview and recent job payouts.</p>
             </div>
 
             <!-- Segmented sub-nav -->
@@ -455,7 +485,7 @@
               </button>
               <button type="button" class="earn-subnav__tab" role="tab" aria-selected="false" data-earn-tab="payouts">
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h18M3 12h18M3 17h12"/></svg>
-                <span data-i18n="tech.earnTabPayouts">Payouts</span>
+                <span data-i18n="tech.earnTabPayouts">Withdrawals</span>
               </button>
               <button type="button" class="earn-subnav__tab" role="tab" aria-selected="false" data-earn-tab="debts" id="earnSubnavDebts" hidden>
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -464,199 +494,277 @@
               </button>
             </nav>
 
-            <!-- ────────── Overview sub-view ────────── -->
+            <!-- ────────── Overview sub-view (redesigned) ────────── -->
             <div class="earn-view is-active" data-earn-view="overview" role="tabpanel">
 
-              <!-- ═══════ Atelier Wallet Ledger — premium hero ═══════ -->
-              <section class="atelier-ledger" aria-label="Wallet overview">
-                <!-- Decorative monogram seal -->
-                <div class="atelier-ledger__seal" aria-hidden="true">
-                  <svg viewBox="0 0 64 64" width="58" height="58" fill="none">
-                    <circle cx="32" cy="32" r="30" stroke="currentColor" stroke-width=".6" opacity=".4"/>
-                    <circle cx="32" cy="32" r="24.5" stroke="currentColor" stroke-width=".4" opacity=".28" stroke-dasharray="1 2"/>
-                    <path d="M22 26c4-6 16-6 20 0 4 6-2 10-10 10s-14 4-10 10c4 6 16 6 20 0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-                    <circle cx="32" cy="32" r="1.6" fill="currentColor"/>
-                  </svg>
-                </div>
+              <!-- Hidden legacy nodes kept for JS compatibility -->
+              <span id="ledgerPeriod" hidden></span>
 
-                <!-- Ledger meta row -->
-                <div class="atelier-ledger__meta">
-                  <span class="atelier-ledger__id">ledger &middot; <em id="ledgerPeriod">—</em></span>
-                  <span class="atelier-ledger__divider" aria-hidden="true"></span>
-                  <span class="atelier-ledger__status">
-                    <span class="atelier-pulse" aria-hidden="true"></span>
-                    <span data-i18n="tech.liveBalance">live balance</span>
-                  </span>
-                </div>
-
-                <!-- Two-balance display -->
-                <div class="atelier-ledger__balances">
-                  <div class="atelier-balance atelier-balance--primary">
-                    <span class="atelier-balance__eyebrow" data-i18n="tech.available">Available balance</span>
-                    <div class="atelier-balance__row">
-                      <span class="atelier-balance__amount" id="walletAvailable">0</span>
-                      <span class="atelier-balance__ccy">EGP</span>
-                    </div>
-                    <p class="atelier-balance__desc" data-i18n="tech.availableDesc">Cleared from completed jobs. Withdraw to your bank or wallet anytime.</p>
-                    <div class="atelier-balance__cta-row">
-                      <button class="atelier-cta" id="btnRequestPayout" data-i18n="tech.requestPayout">
-                        <span class="atelier-cta__label">Request payout</span>
-                        <span class="atelier-cta__arrow" aria-hidden="true">
-                          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-                        </span>
-                      </button>
-                      <span class="atelier-balance__meta" data-i18n="tech.payoutSpeed">Settles in 1&ndash;3 business days</span>
-                    </div>
-                  </div>
-
-                  <span class="atelier-divider" aria-hidden="true"></span>
-
-                  <aside class="atelier-balance atelier-balance--pending" aria-label="Pending escrow">
-                    <span class="atelier-balance__eyebrow">
-                      <span class="atelier-balance__chip"><span data-i18n="tech.pendingEscrow">Pending</span></span>
-                    </span>
-                    <div class="atelier-balance__row">
-                      <span class="atelier-balance__amount atelier-balance__amount--sm" id="walletPending">0</span>
-                      <span class="atelier-balance__ccy atelier-balance__ccy--warm">EGP</span>
-                    </div>
-                    <p class="atelier-balance__count" id="pendingJobsCount">0 jobs awaiting release</p>
-                    <p class="atelier-balance__desc atelier-balance__desc--sm" data-i18n="tech.pendingDesc">Funds the customer paid online &mdash; held safely in escrow until the job is marked complete.</p>
-                  </aside>
-                </div>
-
-                <!-- KPI rail (numbered) with sparkline -->
-                <div class="atelier-rail" aria-label="Earnings statistics">
-                  <article class="atelier-rail__cell">
-                    <span class="atelier-rail__num" aria-hidden="true">01</span>
-                    <span class="atelier-rail__label" data-i18n="tech_stat_this_month">This month</span>
-                    <span class="atelier-rail__value"><span id="earn-month">0</span> <em>EGP</em></span>
-                    <span class="atelier-rail__sub" id="earn-month-sub">&uarr; EGP 0 vs last month</span>
-                    <svg class="atelier-rail__spark" id="earnSparkline" viewBox="0 0 120 28" preserveAspectRatio="none" aria-hidden="true">
-                      <defs>
-                        <linearGradient id="sparkFill" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stop-color="currentColor" stop-opacity=".28"/>
-                          <stop offset="100%" stop-color="currentColor" stop-opacity="0"/>
-                        </linearGradient>
-                      </defs>
-                      <path id="sparkArea" d="M0 24 L17 22 L34 23 L51 21 L68 22 L85 23 L102 24 L120 24 L120 28 L0 28 Z" fill="url(#sparkFill)"/>
-                      <path id="sparkLine" d="M0 24 L17 22 L34 23 L51 21 L68 22 L85 23 L102 24 L120 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                  </article>
-
-                  <span class="atelier-rail__sep" aria-hidden="true"></span>
-
-                  <article class="atelier-rail__cell">
-                    <span class="atelier-rail__num" aria-hidden="true">02</span>
-                    <span class="atelier-rail__label" data-i18n="tech_total_earned">Total earned</span>
-                    <span class="atelier-rail__value"><span id="earn-total">0</span> <em>EGP</em></span>
-                    <span class="atelier-rail__sub" data-i18n="tech_since_joining">Since joining SERVIO</span>
-                  </article>
-
-                  <span class="atelier-rail__sep" aria-hidden="true"></span>
-
-                  <article class="atelier-rail__cell">
-                    <span class="atelier-rail__num" aria-hidden="true">03</span>
-                    <span class="atelier-rail__label" data-i18n="tech.completedJobsLabel">Completed jobs</span>
-                    <span class="atelier-rail__value"><span id="earn-completed-count">0</span></span>
-                    <span class="atelier-rail__sub" data-i18n="tech.lifetimeTotal">Lifetime total</span>
-                  </article>
-                </div>
-              </section>
-
-              <!-- Conditional debt banner (now hides cleanly) -->
-              <aside id="debtBanner" class="debt-banner" hidden role="alert">
-                <span class="debt-banner__icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                </span>
-                <div class="debt-banner__body">
-                  <strong id="debtBannerAmount">&mdash;</strong>
-                  <span id="debtBannerCopy" data-i18n="tech.debtBanner">in platform fees owed. Cash bookings blocked at threshold.</span>
-                </div>
-                <button class="btn-premium btn-premium--warn" id="btnGoSettle" data-i18n="tech.settleNow">Settle now</button>
-              </aside>
-
-              <!-- Outstanding cash liability — collapses to slim row when settled -->
-              <section class="liability-card" id="liabilityCard" data-state="settled" aria-labelledby="liabilityTitle">
-                <header class="liability-card__head">
-                  <div class="liability-card__title">
-                    <span class="liability-card__eyebrow" id="liabilityTitle" data-i18n="tech_outstanding_cash">Cash settlement &mdash; fees owed to SERVIO</span>
-                    <div class="liability-card__amount" id="liabilityAmount">0 <span>EGP</span></div>
-                    <p class="liability-card__desc" data-i18n="tech.liabilityDesc">Platform fees from cash jobs are auto-deducted from your next online payout, or you can settle manually here.</p>
-                  </div>
-                  <button class="btn-premium btn-premium--primary btn-premium--sm" id="payLiabilityBtn" data-i18n="tech_pay_now" hidden>Pay now</button>
-                </header>
-
-                <div class="liability-items" id="liability-items-list">
-                  <!-- Populated dynamically -->
-                </div>
-
-                <footer class="liability-card__foot">
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                  <span data-i18n="tech_next_settlement">Next auto-settlement</span>
-                  <strong id="liability-settlement-date">&mdash;</strong>
-                </footer>
-              </section>
-
-              <div class="liability-warning" id="liabilityWarning" data-i18n="tech_liability_warning" hidden>
-                &#9888;&#65039; Maximum liability reached &mdash; you may only accept online-payment jobs above 2,000 EGP.
+              <!-- ═══════ Fetch error banner ═══════ -->
+              <div class="earn-error-banner" id="earnErrorBanner" role="alert" hidden>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01"/><circle cx="12" cy="12" r="10"/></svg>
+                <span class="earn-error-banner__msg" id="earnErrorBannerMsg">Couldn't load your earnings.</span>
+                <button type="button" class="earn-error-banner__retry" id="earnErrorBannerRetry">Retry</button>
               </div>
 
-              <!-- Recent completed jobs — editorial list -->
-              <section class="atelier-recent" aria-labelledby="recentJobsHeading">
-                <header class="atelier-recent__head">
-                  <div class="atelier-recent__heading">
-                    <span class="atelier-recent__overline">Activity</span>
-                    <h3 class="atelier-recent__title" id="recentJobsHeading" data-i18n="tech_recent_jobs">Recent jobs</h3>
-                    <span class="atelier-recent__hint" data-i18n="tech.recentJobsHint">Latest completed jobs &amp; their payouts</span>
+              <!-- ═══════ Money Pair — Your Money / You Owe ═══════ -->
+              <section class="money-pair money-pair--three" aria-label="Wallet at a glance">
+                <!-- ── Card 1: Your Money ── -->
+                <article class="money-card money-card--income" aria-labelledby="moneyIncomeTitle">
+                  <header class="money-card__head">
+                    <span class="money-card__overline" id="moneyIncomeTitle">Available to withdraw</span>
+                    <span class="money-card__tag money-card__tag--ok" id="availableWithdrawTag">
+                      <span class="money-card__dot" aria-hidden="true"></span>
+                      Ready now
+                    </span>
+                  </header>
+
+                  <!-- Amount -->
+                  <div class="money-card__amount-row">
+                    <span class="money-card__amount" id="walletAvailable" data-skel><span class="skel-bar skel-bar--money"></span></span>
+                    <p class="money-card__sub money-card__sub--tight" id="availableWithdrawNote">Money already released into your Servio wallet.</p>
                   </div>
-                  <button type="button" class="atelier-link" data-earn-view-jump="payouts" data-i18n="tech.viewAllPayouts">
-                    <span>View all payouts</span>
-                    <span aria-hidden="true">&rarr;</span>
+
+                  <!-- Withdraw CTA — secondary (Pay Now owns visual weight when debt exists) -->
+                  <button class="money-btn money-btn--secondary money-btn--block" id="btnRequestPayout">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+                    <span>Withdraw to bank</span>
+                  </button>
+
+                  <!-- Rules pill row -->
+                  <div class="money-card__rules-row">
+                    <span class="money-card__rule-pill"><em>Min</em> 50 EGP</span>
+                    <span class="money-card__rule-sep" aria-hidden="true"></span>
+                    <span class="money-card__rule-pill"><em>Arrives</em> 1–3 days</span>
+                    <span class="money-card__rule-sep" aria-hidden="true"></span>
+                    <span class="money-card__rule-pill"><em>Fee</em> Free</span>
+                  </div>
+
+                  <!-- Bank row -->
+                  <div class="money-card__bank" id="withdrawBankRow">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V10M19 21V10M3 10h18L12 3 3 10z"/></svg>
+                    <span class="money-card__bank-text" id="withdrawBankLabel">No payout method set yet</span>
+                    <a class="money-card__bank-edit" href="#" data-jump-payout-settings id="withdrawBankEdit">Add now</a>
+                  </div>
+
+                </article>
+
+                <!-- ── Card 2: You Owe Servio ── -->
+                <article class="money-card money-card--pending" aria-labelledby="moneyPendingTitle">
+                  <header class="money-card__head">
+                    <span class="money-card__overline" id="moneyPendingTitle">
+                      Pending release
+                      <button type="button" class="money-card__info" aria-label="What is pending release?" data-tooltip="Online job payments are held for up to 2 business days before being released to your wallet.">
+                        <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+                      </button>
+                    </span>
+                    <span class="money-card__tag money-card__tag--neutral" id="pendingReleaseTag">In review</span>
+                  </header>
+
+                  <div class="money-card__amount-row">
+                    <span class="money-card__amount money-card__amount--neutral" id="walletPending" data-skel><span class="skel-bar skel-bar--money"></span></span>
+                  </div>
+
+                  <p class="money-card__sub">Online jobs that are still waiting to be released to your wallet.</p>
+
+                  <div data-pending-busy>
+                    <div class="money-card__fact-list">
+                      <div class="money-card__fact">
+                        <span class="money-card__fact-label">Jobs in hold</span>
+                        <strong id="pendingJobsCount">0 jobs</strong>
+                      </div>
+                      <div class="money-card__fact">
+                        <span class="money-card__fact-label">Status</span>
+                        <strong id="pendingReleaseNote">Waiting for release approval</strong>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="money-card__empty" data-pending-empty hidden>
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg>
+                    <strong>All caught up.</strong>
+                    <span>No online jobs waiting for release right now.</span>
+                  </div>
+                </article>
+
+                <article class="money-card money-card--debt" id="liabilityCard" data-state="settled" aria-labelledby="liabilityTitle">
+                  <header class="money-card__head">
+                    <span class="money-card__overline" id="liabilityTitle">Fees due</span>
+                    <span class="money-card__tag money-card__tag--warn" data-state-tag>
+                      <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+                      <span id="debtDueTag">Due —</span>
+                    </span>
+                    <span class="money-card__tag money-card__tag--ok" data-settled-tag>
+                      <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg>
+                      <span>All settled</span>
+                    </span>
+                  </header>
+
+                  <!-- Owing state -->
+                  <div class="money-card__amount-row" data-owing-only>
+                    <span class="money-card__amount money-card__amount--warn" id="liabilityAmount" data-skel><span class="skel-bar skel-bar--money"></span></span>
+                  </div>
+                  <p class="money-card__sub" data-owing-only>Platform fees from cash jobs you collected directly.</p>
+
+                  <!-- Breakdown sits near the number it explains -->
+                  <details class="debt-breakdown" id="debtBreakdownToggle" data-owing-only>
+                    <summary>
+                      <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                      <span>See breakdown</span>
+                    </summary>
+                    <div class="debt-breakdown__list" id="liability-items-list"></div>
+                  </details>
+
+                  <div class="money-card__actions" data-owing-only>
+                    <button class="money-btn money-btn--warn money-btn--block" id="payLiabilityBtn" data-i18n="tech_pay_now" hidden>
+                      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 10h18M5 6h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/></svg>
+                      <span>Pay now</span>
+                    </button>
+                  </div>
+
+                  <!-- Rules pill row — parity with income card -->
+                  <div class="money-card__rules-row" data-owing-only>
+                    <span class="money-card__rule-pill"><em>Settle</em> Anytime</span>
+                    <span class="money-card__rule-sep" aria-hidden="true"></span>
+                    <span class="money-card__rule-pill"><em>Method</em> Card</span>
+                    <span class="money-card__rule-sep" aria-hidden="true"></span>
+                    <span class="money-card__rule-pill"><em>Penalty</em> None</span>
+                  </div>
+
+                  <!-- Settled state -->
+                  <div class="money-card__settled-body" data-settled-only>
+                    <div class="money-card__settled-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>
+                    </div>
+                    <div class="money-card__settled-text">
+                      <strong>All clear.</strong>
+                      <span>No platform fees are due right now.</span>
+                    </div>
+                  </div>
+
+                  <!-- Footer: lifetime fee context (parity with income card foot) -->
+                  <footer class="money-card__foot" data-owing-only>
+                    <div class="money-card__foot-item">
+                      <span class="money-card__foot-label">Paid lifetime</span>
+                      <span class="money-card__foot-val"><strong id="debtLifetimeFees">0</strong> EGP</span>
+                    </div>
+                    <span class="money-card__foot-divider" aria-hidden="true"></span>
+                    <div class="money-card__foot-item">
+                      <span class="money-card__foot-label">Avg fee / job</span>
+                      <span class="money-card__foot-val"><strong id="debtAvgFee">0</strong> EGP</span>
+                    </div>
+                  </footer>
+                  <!-- liability-settlement-date kept hidden for JS compat (feeds top "Due" pill) -->
+                  <span id="liability-settlement-date" hidden></span>
+                </article>
+              </section>
+
+
+              <div class="liability-warning" id="liabilityWarning" data-i18n="tech_liability_warning" hidden>
+                ⚠️ Maximum liability reached — you may only accept online-payment jobs above 2,000 EGP.
+              </div>
+
+              <section class="stat-strip stat-strip--insights" aria-label="Earnings insights">
+                <div class="stat-strip__cell stat-strip__cell--lifetime">
+                  <span class="stat-strip__label">Lifetime take-home</span>
+                  <span class="stat-strip__value"><strong id="earn-total" data-skel><span class="skel-bar skel-bar--stat"></span></strong><em>EGP</em></span>
+                  <div class="stat-strip__formula" id="moneyBridgeText" aria-label="Lifetime take-home breakdown">
+                    <span class="formula-chip formula-chip--wallet">
+                      <span class="formula-chip__dot" aria-hidden="true"></span>
+                      <span class="formula-chip__num" id="bridgeWalletNum">0</span>
+                      <span class="formula-chip__label">wallet</span>
+                    </span>
+                    <span class="formula-chip__op" aria-hidden="true">+</span>
+                    <span class="formula-chip formula-chip--cash">
+                      <span class="formula-chip__dot" aria-hidden="true"></span>
+                      <span class="formula-chip__num" id="bridgeCashNum">0</span>
+                      <span class="formula-chip__label">cash</span>
+                    </span>
+                  </div>
+                </div>
+                <span class="stat-strip__divider" aria-hidden="true"></span>
+                <div class="stat-strip__cell">
+                  <span class="stat-strip__label">This month</span>
+                  <span class="stat-strip__value"><strong id="earn-month" data-skel><span class="skel-bar skel-bar--stat"></span></strong><em>EGP</em></span>
+                  <span class="stat-strip__delta" id="earn-month-delta" data-direction="flat">
+                    <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4" data-delta-icon><path d="M5 12h14"/></svg>
+                    <span data-delta-value>—</span>
+                    <span class="stat-strip__delta-suffix">vs last month</span>
+                  </span>
+                </div>
+                <span class="stat-strip__divider" aria-hidden="true"></span>
+                <div class="stat-strip__cell">
+                  <span class="stat-strip__label">Collected in cash</span>
+                  <span class="stat-strip__value"><strong id="earn-cash" data-skel><span class="skel-bar skel-bar--stat"></span></strong><em>EGP</em></span>
+                  <span class="stat-strip__hint" id="earn-cash-sub">Take-home from completed cash jobs</span>
+                </div>
+                <span class="stat-strip__divider" aria-hidden="true"></span>
+                <div class="stat-strip__cell">
+                  <span class="stat-strip__label">Jobs done</span>
+                  <span class="stat-strip__value"><strong id="earn-completed-count" data-skel><span class="skel-bar skel-bar--stat"></span></strong></span>
+                  <span class="stat-strip__hint">Completed jobs</span>
+                </div>
+                <span class="stat-strip__divider" aria-hidden="true"></span>
+                <div class="stat-strip__cell stat-strip__cell--chart">
+                  <span class="stat-strip__label">7-day trend</span>
+                  <svg class="stat-strip__spark stat-strip__spark--ok" id="earnSparkline" viewBox="0 0 120 28" preserveAspectRatio="none" aria-hidden="true">
+                    <defs>
+                      <linearGradient id="sparkFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="currentColor" stop-opacity=".28"/>
+                        <stop offset="100%" stop-color="currentColor" stop-opacity="0"/>
+                      </linearGradient>
+                    </defs>
+                    <path id="sparkArea" d="M0 24 L17 22 L34 23 L51 21 L68 22 L85 23 L102 24 L120 24 L120 28 L0 28 Z" fill="url(#sparkFill)"/>
+                    <path id="sparkLine" d="M0 24 L17 22 L34 23 L51 21 L68 22 L85 23 L102 24 L120 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </div>
+              </section>
+
+              <!-- Recent jobs -->
+              <section class="recent-jobs" aria-labelledby="recentJobsHeading">
+                <header class="recent-jobs__head">
+                  <div class="recent-jobs__title-block">
+                    <h2 class="recent-jobs__title" id="recentJobsHeading">Recent jobs</h2>
+                    <span class="recent-jobs__hint">How each recent job settled into cash, wallet, or pending release</span>
+                  </div>
+                  <button type="button" class="recent-jobs__link" data-earn-view-jump="payouts">
+                    <span>Payout history</span>
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
                   </button>
                 </header>
-                <div id="earnings-recent-list" class="jq-premium-recent-list">
-                  <!-- Populated dynamically -->
-                </div>
+                <div id="earnings-recent-list" class="jq-premium-recent-list"></div>
               </section>
             </div>
 
-            <!-- ────────── Payouts sub-view ────────── -->
+            <!-- ────────── Payouts sub-view (redesigned) ────────── -->
             <div class="earn-view" data-earn-view="payouts" role="tabpanel" hidden>
-              <section class="payouts-panel" id="payoutsPanel" aria-labelledby="payoutsHeading">
-                <header class="payouts-panel__head">
-                  <div class="payouts-panel__heading">
-                    <span class="atelier-recent__overline">Activity &middot; Withdrawals</span>
-                    <h3 class="atelier-recent__title" id="payoutsHeading" data-i18n="tech.payouts">Payout history</h3>
-                    <span class="atelier-recent__hint" data-i18n="tech.payoutsHint">Audit trail of every withdrawal request &amp; transfer</span>
+
+              <!-- History panel -->
+              <section class="payouts-history" id="payoutsPanel" aria-labelledby="payoutsHeading">
+                <header class="payouts-history__head">
+                  <div class="payouts-history__heading">
+                    <h2 class="payouts-history__title" id="payoutsHeading">Past withdrawals</h2>
+                    <span class="payouts-history__hint">Money sent to your bank account</span>
                   </div>
-                  <button class="atelier-cta atelier-cta--sm" id="btnRequestPayout2" data-i18n="tech.requestPayout">
-                    <span class="atelier-cta__label">Request payout</span>
-                    <span class="atelier-cta__arrow" aria-hidden="true">
-                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-                    </span>
-                  </button>
+                  <div class="payouts-summary" id="payoutsSummary" hidden>
+                    <div class="payouts-summary__cell">
+                      <span class="payouts-summary__label">Total</span>
+                      <span class="payouts-summary__value"><span id="payoutsTotalAmount">0</span><em>EGP</em></span>
+                    </div>
+                    <span class="payouts-summary__sep" aria-hidden="true"></span>
+                    <div class="payouts-summary__cell">
+                      <span class="payouts-summary__label">Count</span>
+                      <span class="payouts-summary__value" id="payoutsTotalCount">0</span>
+                    </div>
+                    <span class="payouts-summary__sep" aria-hidden="true"></span>
+                    <div class="payouts-summary__cell">
+                      <span class="payouts-summary__label">Pending</span>
+                      <span class="payouts-summary__value payouts-summary__value--warn" id="payoutsPendingCount">0</span>
+                    </div>
+                  </div>
                 </header>
 
-                <!-- Mini summary strip -->
-                <div class="payouts-summary" id="payoutsSummary">
-                  <div class="payouts-summary__cell">
-                    <span class="payouts-summary__label">Total withdrawn</span>
-                    <span class="payouts-summary__value"><span id="payoutsTotalAmount">0</span> <em>EGP</em></span>
-                  </div>
-                  <span class="payouts-summary__sep" aria-hidden="true"></span>
-                  <div class="payouts-summary__cell">
-                    <span class="payouts-summary__label">Payouts count</span>
-                    <span class="payouts-summary__value" id="payoutsTotalCount">0</span>
-                  </div>
-                  <span class="payouts-summary__sep" aria-hidden="true"></span>
-                  <div class="payouts-summary__cell">
-                    <span class="payouts-summary__label">Pending</span>
-                    <span class="payouts-summary__value payouts-summary__value--warn" id="payoutsPendingCount">0</span>
-                  </div>
-                </div>
-
-                <!-- Filters bar -->
-                <div class="payouts-filters" role="group" aria-label="Filter payouts">
+                <!-- Filters (hidden until payouts exist) -->
+                <div class="payouts-filters" id="payoutsFilters" role="group" aria-label="Filter payouts" hidden>
                   <label class="payouts-filter">
                     <span class="payouts-filter__label">Status</span>
                     <select id="payoutFilterStatus" class="payouts-filter__select">
@@ -681,16 +789,15 @@
                   <button type="button" class="payouts-filters__clear" id="payoutFiltersClear">Clear</button>
                 </div>
 
-                <!-- Table -->
-                <div class="payouts-panel__body">
+                <div class="payouts-history__body">
                   <table class="admin-table admin-table--earnings payouts-table">
                     <thead>
                       <tr>
-                        <th data-i18n="tech.thDate">Date</th>
-                        <th data-i18n="tech.thMethod">Method</th>
-                        <th class="payouts-table__num" data-i18n="tech.thAmount">Amount</th>
-                        <th data-i18n="tech.thStatus">Status</th>
-                        <th data-i18n="tech.thRef">Ref</th>
+                        <th>Date</th>
+                        <th>Method</th>
+                        <th class="payouts-table__num">Amount</th>
+                        <th>Status</th>
+                        <th>Receipt</th>
                       </tr>
                     </thead>
                     <tbody id="payoutsTbody"></tbody>
@@ -704,7 +811,7 @@
               <section class="section-card" id="debtPanel" aria-labelledby="debtHeading">
                 <header class="section-card__head">
                   <div class="section-card__heading">
-                    <h3 class="section-card__title" id="debtHeading" data-i18n="tech.myDebts">My Debts</h3>
+                    <h2 class="section-card__title" id="debtHeading" data-i18n="tech.myDebts">My Debts</h2>
                     <span class="section-card__hint" data-i18n="tech.debtsHint">Outstanding platform fees</span>
                   </div>
                   <button class="btn-premium btn-premium--primary btn-premium--sm" id="btnSettleDebt" data-i18n="tech.settleCta">Settle now</button>
@@ -716,12 +823,12 @@
                     </div>
                     <p id="debtProgressLabel" class="debt-meter__label">—</p>
                   </div>
-                  <h4 class="section-card__subhead" data-i18n="tech.debtsBreakdown">Breakdown</h4>
+                  <h3 class="section-card__subhead" data-i18n="tech.debtsBreakdown">Breakdown</h3>
                   <table class="admin-table admin-table--earnings">
                     <thead><tr><th>Booking</th><th>Amount</th><th>Age</th><th>Status</th><th>Settled via</th></tr></thead>
                     <tbody id="debtsTbody"></tbody>
                   </table>
-                  <h4 class="section-card__subhead" data-i18n="tech.submittedSettlements">Submitted settlements</h4>
+                  <h3 class="section-card__subhead" data-i18n="tech.submittedSettlements">Submitted settlements</h3>
                   <table class="admin-table admin-table--earnings">
                     <thead><tr><th>Ref</th><th>Amount</th><th>Method</th><th>Status</th><th>When</th></tr></thead>
                     <tbody id="settlementsTbody"></tbody>
@@ -731,44 +838,66 @@
             </div>
           </section>
 
-          <!-- ── Transactions panel (Plan 2 Task 20) ── -->
+          <!-- ── Transactions panel (redesigned) ── -->
           <section class="dash-panel" id="panel-transactions" role="tabpanel" aria-labelledby="tab-transactions" data-panel="transactions" hidden>
             <div class="dash-panel__header">
               <h1 class="dash-panel__title" data-i18n="tech_nav_transactions">Transactions</h1>
-              <p class="dash-panel__subtitle" data-i18n="tech_tx_sub">Full wallet ledger: every credit, debit, fee, settlement and refund.</p>
+              <p class="dash-panel__subtitle">Every movement of money — what came in, what went out, and why.</p>
             </div>
-            <div class="filters-bar" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
-              <select id="txType">
-                <option value="">All types</option>
-                <option value="release">Release</option>
-                <option value="fee">Fee</option>
-                <option value="hold">Hold</option>
-                <option value="charge">Charge</option>
-                <option value="refund">Refund</option>
-                <option value="dispute">Dispute</option>
-                <option value="cash_debt_auto_deduct">Cash debt — auto</option>
-                <option value="cash_debt_manual_payment">Cash debt — manual</option>
-              </select>
-              <input id="txFrom" type="date" />
-              <input id="txTo" type="date" />
-              <button id="txRefresh" class="btn btn--ghost" type="button">Refresh</button>
+
+            <!-- Filter shelf -->
+            <div class="tx-filter">
+              <div class="tx-filter__chips" role="group" aria-label="Quick date range">
+                <button type="button" class="tx-chip is-active" data-tx-range="all">All time</button>
+                <button type="button" class="tx-chip" data-tx-range="7">Last 7 days</button>
+                <button type="button" class="tx-chip" data-tx-range="30">Last 30 days</button>
+                <button type="button" class="tx-chip" data-tx-range="90">Last 90 days</button>
+              </div>
+              <div class="tx-filter__controls">
+                <label class="tx-filter__field">
+                  <span>Type</span>
+                  <select id="txType">
+                    <option value="">All types</option>
+                    <option value="release">Money released to you</option>
+                    <option value="hold">Held in escrow</option>
+                    <option value="fee">Platform fee</option>
+                    <option value="charge">Charge</option>
+                    <option value="refund">Refund</option>
+                    <option value="dispute">Dispute</option>
+                    <option value="cash_debt_auto_deduct">Cash debt — auto</option>
+                    <option value="cash_debt_manual_payment">Cash debt — manual</option>
+                  </select>
+                </label>
+                <label class="tx-filter__field">
+                  <span>From</span>
+                  <input id="txFrom" type="date" />
+                </label>
+                <label class="tx-filter__field">
+                  <span>To</span>
+                  <input id="txTo" type="date" />
+                </label>
+                <button id="txRefresh" class="tx-refresh-btn" type="button" title="Refresh">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                  <span>Refresh</span>
+                </button>
+              </div>
             </div>
-            <div class="table-wrap">
-              <table class="admin-table">
+
+            <!-- Ledger table -->
+            <div class="tx-table-wrap">
+              <table class="tx-table">
                 <thead>
                   <tr>
                     <th>Date</th>
-                    <th>Type</th>
-                    <th>Direction</th>
+                    <th>What happened</th>
                     <th>Booking</th>
-                    <th>Amount (EGP)</th>
-                    <th>Note</th>
+                    <th class="tx-table__num">Amount</th>
                   </tr>
                 </thead>
-                <tbody id="txTbody"><tr><td colspan="6" style="text-align:center;opacity:0.6;padding:24px;">Loading…</td></tr></tbody>
+                <tbody id="txTbody"><tr><td colspan="4" class="tx-table__loading">Loading…</td></tr></tbody>
               </table>
             </div>
-            <div id="txPagination" style="margin-top:12px;text-align:center;opacity:0.7;"></div>
+            <div id="txPagination" class="tx-pagination"></div>
           </section>
 
           <!-- ── Availability panel ── -->
@@ -870,7 +999,7 @@
     </div>
   </div>
 
-            <!-- ── Service Area & Categories ── -->
+            <!-- ── Service Coverage ── -->
             <div class="avail-section-card" data-reveal>
               <div class="avail-section-card__header">
                 <div class="avail-section-card__header-left">
@@ -879,52 +1008,37 @@
                   </div>
                   <div>
                     <h2 class="avail-section-card__title">Service Coverage</h2>
-                    <p class="avail-section-card__sub">Where you work and what services you offer.</p>
+                    <p class="avail-section-card__sub">Choose the districts where customers can book your time.</p>
                   </div>
                 </div>
               </div>
 
-              <div class="avail-coverage-grid">
-                <div class="form-field">
-                  <label class="form-label" for="coverage-search">Coverage districts</label>
-                  <div class="field-icon-wrap">
-                    <svg class="field-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>
-                    <input class="form-input form-input--icon" type="search" id="coverage-search" placeholder="Search districts" autocomplete="off" />
-                  </div>
-                  <p class="form-hint">Select exact districts customers can book you in.</p>
+              <div class="coverage-compact-card" id="coverage-compact-card" aria-live="polite">
+                <div class="coverage-compact-card__body">
+                  <span class="coverage-control-panel__eyebrow">Selected coverage</span>
+                  <strong id="coverage-card-count">0 areas</strong>
+                  <p class="coverage-summary" id="coverage-card-summary">No coverage areas selected.</p>
+                  <div class="coverage-selected-strip coverage-selected-strip--compact" id="coverage-card-strip" aria-label="Selected coverage preview"></div>
                 </div>
-                <div class="coverage-chip-editor" id="coverage-area-chips" role="group" aria-label="Coverage districts"></div>
-                <p class="coverage-summary" id="coverage-summary">No coverage areas selected.</p>
-                <div class="form-field">
-                  <label class="form-label" for="service-area" data-i18n="tech_service_area_lbl">Custom area fallback</label>
-                  <div class="field-icon-wrap">
-                    <svg class="field-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                    <input class="form-input form-input--icon" type="text" id="service-area" name="serviceArea" placeholder="Only if a district is missing" data-i18n-placeholder="tech_service_area_ph" />
+                <div class="coverage-compact-card__actions">
+                  <button class="btn btn--primary coverage-manage-btn" type="button" id="coverage-open-modal">
+                    Manage coverage
+                  </button>
+                  <button class="coverage-link-btn coverage-link-btn--danger" type="button" id="coverage-card-clear" disabled>Clear all</button>
+                  <button class="btn btn--primary avail-save-btn coverage-card-save" type="button" id="coverage-card-save" disabled>
+                    <span class="avail-save-btn__icon">
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                    </span>
+                    <span class="avail-save-btn__label" data-i18n="tech_save_coverage">Save Coverage</span>
+                  </button>
+                  <span class="coverage-dirty-state" id="coverage-card-dirty-state" hidden>Unsaved changes</span>
+                  <div class="avail-save-feedback" id="avail-coverage-feedback" hidden>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#22A05A" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    <span data-i18n="tech_coverage_saved_msg">Coverage saved successfully!</span>
                   </div>
-                  <p class="form-hint">Use commas for custom areas not listed above.</p>
                 </div>
               </div>
 
-              <fieldset class="avail-categories" style="margin-top: 20px;">
-                <legend class="avail-categories__legend">
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-                  <span data-i18n="tech_service_cats_lbl">Service Categories</span>
-                </legend>
-                <div class="avail-categories__grid" id="categories-grid"></div>
-              </fieldset>
-              
-              <div class="avail-save-row" style="margin-top: 24px;" data-reveal>
-                <button class="btn btn--primary avail-save-btn" type="button" id="save-coverage">
-                  <span class="avail-save-btn__icon">
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                  </span>
-                  <span class="avail-save-btn__label" data-i18n="tech_save_coverage">Save Coverage</span>
-                </button>
-                <div class="avail-save-feedback" id="avail-coverage-feedback" hidden>
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#22A05A" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
-                  <span data-i18n="tech_coverage_saved_msg">Coverage saved successfully!</span>
-                </div>
-              </div>
             </div>
           </section>
 
@@ -1380,24 +1494,30 @@
                       <span class="settings-toggle-label">Email</span>
                       <span class="settings-toggle-sub">Receive notifications by email.</span>
                     </div>
-                    <label class="stab-toggle-input"><input type="checkbox" data-notif-channel="email" /></label>
+                    <button type="button" class="stab-toggle" role="switch" aria-checked="false" data-notif-channel="email">
+                      <span class="stab-toggle__track"><span class="stab-toggle__thumb"></span></span>
+                    </button>
                   </div>
                   <div class="settings-toggle-row">
                     <div class="settings-toggle-info">
                       <span class="settings-toggle-label">In-app</span>
                       <span class="settings-toggle-sub">See notifications inside Servio.</span>
                     </div>
-                    <label class="stab-toggle-input"><input type="checkbox" data-notif-channel="inApp" /></label>
+                    <button type="button" class="stab-toggle" role="switch" aria-checked="false" data-notif-channel="inApp">
+                      <span class="stab-toggle__track"><span class="stab-toggle__thumb"></span></span>
+                    </button>
                   </div>
                   <div class="settings-toggle-row">
                     <div class="settings-toggle-info">
                       <span class="settings-toggle-label">Browser push</span>
                       <span class="settings-toggle-sub">Get push alerts in your browser.</span>
                     </div>
-                    <label class="stab-toggle-input"><input type="checkbox" data-notif-channel="push" /></label>
+                    <button type="button" class="stab-toggle" role="switch" aria-checked="false" data-notif-channel="push">
+                      <span class="stab-toggle__track"><span class="stab-toggle__thumb"></span></span>
+                    </button>
                   </div>
-                  <div class="settings-toggle-row">
-                    <button type="button" class="btn-secondary" id="enable-browser-push-btn">Enable browser notifications</button>
+                  <div class="settings-toggle-row" style="padding-top: 16px; border-bottom: none;">
+                    <button type="button" class="btn btn--outline" id="enable-browser-push-btn">Enable browser notifications</button>
                   </div>
                 </div>
               </div>
@@ -1539,32 +1659,6 @@
                 <div class="settings-submit-row">
                   <button class="btn btn--primary" type="button" id="btn-save-skills">Save Changes</button>
                   <span class="settings-save-msg" id="skills-save-msg" hidden>Saved!</span>
-                </div>
-              </div>
-
-              <!-- Service Areas -->
-              <div class="settings-section">
-                <h2 class="settings-section__heading">
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                  <span data-i18n="tech_areas_title">Service Areas</span>
-                </h2>
-                <p class="settings-section__desc" data-i18n="tech_areas_desc">Select the districts you're willing to travel to for jobs.</p>
-                <div class="avail-coverage-grid">
-                  <div class="form-field">
-                    <label class="form-label" for="settings-coverage-search">Search districts</label>
-                    <input class="form-input" type="search" id="settings-coverage-search" placeholder="Search Maadi, Nasr City, New Cairo..." autocomplete="off" />
-                  </div>
-                  <div class="skill-tags coverage-chip-editor" id="area-tags" role="group" aria-label="Service areas"></div>
-                  <p class="coverage-summary" id="settings-coverage-summary">No coverage areas selected.</p>
-                  <div class="form-field">
-                    <label class="form-label" for="settings-service-area-custom">Custom areas</label>
-                    <input class="form-input" type="text" id="settings-service-area-custom" placeholder="Only if a district is missing" />
-                    <span class="form-hint">Use commas for custom districts not listed above.</span>
-                  </div>
-                </div>
-                <div class="settings-submit-row">
-                  <button class="btn btn--primary" type="button" id="btn-save-areas" data-i18n="tech_save_changes">Save Changes</button>
-                  <span class="settings-save-msg" id="areas-save-msg" hidden data-i18n="tech_saved_msg">Saved!</span>
                 </div>
               </div>
 
@@ -2315,6 +2409,82 @@
       </div>
     </div>
   </div>
+
+  <!-- ── Coverage Modal (moved to body level to escape dash-content stacking context) ── -->
+  <div class="coverage-modal" id="coverage-modal" aria-hidden="true">
+    <div class="coverage-modal__backdrop" data-coverage-modal-close></div>
+    <div class="coverage-modal__panel" role="dialog" aria-modal="true" aria-labelledby="coverage-modal-title">
+      <div class="coverage-modal__header">
+        <div>
+          <span class="coverage-control-panel__eyebrow">Service area</span>
+          <h3 id="coverage-modal-title">Manage service coverage</h3>
+          <p>Pick exact districts, or choose a governorate only when you cover every district inside it.</p>
+        </div>
+        <button class="coverage-modal__close" type="button" id="coverage-modal-close" aria-label="Close coverage manager">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="coverage-modal__body">
+        <div class="avail-coverage-grid" id="coverage-editor">
+          <div class="coverage-control-panel" aria-live="polite">
+            <div class="coverage-control-panel__main">
+              <span class="coverage-control-panel__eyebrow">Selected coverage</span>
+              <strong id="coverage-selected-count">0 areas</strong>
+              <p class="coverage-summary" id="coverage-summary">No coverage areas selected.</p>
+            </div>
+            <div class="coverage-control-panel__actions">
+              <button class="coverage-link-btn" type="button" id="coverage-reset" disabled>Reset to saved</button>
+              <button class="coverage-link-btn coverage-link-btn--danger" type="button" id="coverage-clear" disabled>Clear all</button>
+            </div>
+          </div>
+
+          <div class="coverage-selected-strip" id="coverage-selected-strip" aria-label="Selected coverage areas"></div>
+
+          <div class="form-field coverage-search-field">
+            <label class="form-label" for="coverage-search">Find coverage</label>
+            <div class="field-icon-wrap">
+              <svg class="field-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>
+              <input class="form-input form-input--icon" type="search" id="coverage-search" placeholder="Search districts or governorates" autocomplete="off" />
+            </div>
+            <p class="form-hint">Search expands matching governorates and filters districts inside this modal only.</p>
+          </div>
+
+          <div class="coverage-empty-state" id="coverage-empty-state" hidden>No matching districts or governorates.</div>
+
+          <div class="coverage-chip-editor coverage-taxonomy" id="coverage-area-chips" role="group" aria-label="Coverage districts"></div>
+
+          <details class="coverage-custom-details">
+            <summary>
+              <span>Custom location fallback</span>
+              <small>Only if a district is missing from the list</small>
+            </summary>
+            <div class="form-field">
+              <label class="form-label" for="service-area" data-i18n="tech_service_area_lbl">Custom location fallback</label>
+              <div class="field-icon-wrap">
+                <svg class="field-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                <input class="form-input form-input--icon" type="text" id="service-area" name="serviceArea" placeholder="e.g. Cairo Festival City, Smart Village" data-i18n-placeholder="tech_service_area_ph" />
+              </div>
+              <p class="form-hint">Use commas for custom areas not listed above.</p>
+            </div>
+          </details>
+        </div>
+      </div>
+
+      <div class="coverage-modal__footer">
+        <span class="coverage-dirty-state" id="coverage-dirty-state" hidden>Unsaved changes</span>
+        <button class="coverage-link-btn" type="button" id="coverage-modal-reset" disabled>Reset to saved</button>
+        <button class="btn btn--ghost" type="button" id="coverage-modal-cancel">Cancel</button>
+        <button class="btn btn--primary avail-save-btn" type="button" id="save-coverage" disabled>
+          <span class="avail-save-btn__icon">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          </span>
+          <span class="avail-save-btn__label" data-i18n="tech_save_coverage">Save Coverage</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   </body>
 </html>
 

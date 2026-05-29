@@ -41,6 +41,7 @@ async function request(method, path, body, opts = {}) {
 
   const fetchOpts = { method, headers };
   if (body !== undefined) fetchOpts.body = JSON.stringify(body);
+  if (opts && opts.signal) fetchOpts.signal = opts.signal;
 
   const res = await fetch(`${base()}${path}`, fetchOpts);
   const data = await res.json().catch(() => ({}));
@@ -60,11 +61,11 @@ async function request(method, path, body, opts = {}) {
 }
 
 const api = {
-  get:    (path)        => request('GET',    path),
-  post:   (path, body)  => request('POST',   path, body),
-  put:    (path, body)  => request('PUT',    path, body),
-  patch:  (path, body)  => request('PATCH',  path, body),
-  delete: (path, body)  => request('DELETE', path, body),
+  get:    (path, opts)        => request('GET',    path, undefined, opts),
+  post:   (path, body, opts)  => request('POST',   path, body, opts),
+  put:    (path, body, opts)  => request('PUT',    path, body, opts),
+  patch:  (path, body, opts)  => request('PATCH',  path, body, opts),
+  delete: (path, body, opts)  => request('DELETE', path, body, opts),
 };
 
 export { api, getToken, getSession, saveSession, clearSession, mapRoleFromBackend, mapRoleToBackend };

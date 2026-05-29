@@ -24,6 +24,7 @@ import {
   requestDisputeEvidence,
   resolveDisputeAppeal,
   adminListPayments,
+  adminPaymentDetail,
   adminPaymentsStats,
   adminPartialRefund,
   adminListCashDebtsGrouped,
@@ -2988,12 +2989,12 @@ async function renderPendingApprovals(filter = {}) {
 
     container.innerHTML = `
       <div class="fp-table-wrap">
-      <table class="admin-table fp-table">
+      <table class="admin-table fp-table finance-table finance-table--queue">
         <thead>
           <tr>
             <th>Customer</th><th>Worker</th><th>Service</th>
             <th>Method</th><th>Amount</th><th>Worker Earns</th>
-            <th>Platform Fee</th><th>Confirmed At</th><th>Actions</th>
+            <th>Platform Fee</th><th>Decision Basis</th><th>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -3025,7 +3026,7 @@ async function renderPendingApprovals(filter = {}) {
         try {
           await adminApprovePayment(btn.dataset.id);
           showToast('Approved.', 'success');
-          renderPendingApprovals(filter);
+          refreshPaymentsWorksurface();
         } catch (err) {
           showToast(err?.response?.data?.message || 'Approval failed.', 'error');
         }
@@ -3039,7 +3040,7 @@ async function renderPendingApprovals(filter = {}) {
         try {
           await adminRejectCash(btn.dataset.id, { reason });
           showToast('Rejected.', 'info');
-          renderPendingApprovals(filter);
+          refreshPaymentsWorksurface();
         } catch (err) {
           showToast(err?.response?.data?.message || 'Rejection failed.', 'error');
         }
@@ -3054,7 +3055,7 @@ async function renderPendingApprovals(filter = {}) {
         try {
           await adminRefund(btn.dataset.id, { reason });
           showToast('Refunded.', 'info');
-          renderPendingApprovals(filter);
+          refreshPaymentsWorksurface();
         } catch (err) {
           showToast(err?.response?.data?.message || 'Refund failed.', 'error');
         }
@@ -3244,7 +3245,7 @@ function _payAge(d) {
   return h < 24 ? `${h}h` : `${Math.floor(h / 24)}d`;
 }
 
-async function loadPaymentsKpis() {
+async function legacyLoadPaymentsKpis() {
   try {
     const r = await adminPaymentsStats();
     const data = r?.data || r || {};
@@ -3256,7 +3257,7 @@ async function loadPaymentsKpis() {
   } catch (e) { console.warn('kpi load failed', e); }
 }
 
-async function loadPaymentsTable() {
+async function legacyLoadPaymentsTable() {
   const tbody = document.getElementById('paymentsTbody');
   if (!tbody) return;
   try {
@@ -3271,7 +3272,7 @@ async function loadPaymentsTable() {
   } catch (e) { console.warn('payments table load failed', e); }
 }
 
-function _payRowHtml(p) {
+function legacyPayRowHtml(p) {
   const b = p.booking || {};
   const cust = b.user || b.customer || {};
   const tech = b.worker || b.technician || {};
@@ -3290,7 +3291,7 @@ function _payRowHtml(p) {
   </tr>`;
 }
 
-async function openPaymentDetailDrawer(bookingId) {
+async function legacyOpenPaymentDetailDrawer(bookingId) {
   const drawer = document.getElementById('paymentDrawer');
   if (!drawer || !bookingId) return;
   drawer.hidden = false;
@@ -3382,7 +3383,7 @@ async function openPaymentDetailDrawer(bookingId) {
   }
 }
 
-function _payDrawerHtml(p) {
+function legacyPayDrawerHtml(p) {
   const b = p.booking || {};
   const cust = b.user || b.customer || {};
   const tech = b.worker || b.technician || {};
@@ -3410,6 +3411,343 @@ function _payDrawerHtml(p) {
     </div>`;
 }
 
+let _paymentDrawerLastFocus = null;
+let _paymentDrawerEscHandler = null;
+
+const FINANCE_REASON_CODES = {
+  release: [
+    { value: 'customer_confirmed', label: 'Customer confirmed' },
+    { value: 'auto_release_window', label: 'Release window passed' },
+    { value: 'admin_policy', label: 'Admin policy' },
+  ],
+  emergency: [
+    { value: 'emergency_override', label: 'Emergency override' },
+    { value: 'support_resolution', label: 'Support resolution' },
+    { value: 'admin_policy', label: 'Admin policy' },
+  ],
+  lock: [
+    { value: 'missing_evidence', label: 'Missing evidence' },
+    { value: 'active_dispute', label: 'Active dispute' },
+    { value: 'high_risk_payment', label: 'High-risk payment' },
+    { value: 'manual_lock', label: 'Manual lock' },
+  ],
+  unlock: [
+    { value: 'evidence_received', label: 'Evidence received' },
+    { value: 'dispute_resolved', label: 'Dispute resolved' },
+    { value: 'manual_unlock', label: 'Manual unlock' },
+  ],
+  refund: [
+    { value: 'service_incomplete', label: 'Service incomplete' },
+    { value: 'quality_issue', label: 'Quality issue' },
+    { value: 'customer_goodwill', label: 'Customer goodwill' },
+    { value: 'admin_policy', label: 'Admin policy' },
+  ],
+};
+
+function _payFmtDateTime(d) { return d ? new Date(d).toLocaleString() : 'Not recorded'; }
+function _payTitle(v) {
+  return String(v || 'unknown').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+function _payShortId(v) { return String(v || '').slice(-6) || '------'; }
+function _payActionLabel(action) {
+  return ({
+    release: 'Release',
+    request_evidence: 'Request evidence',
+    partial_refund: 'Partial refund',
+    full_refund: 'Full refund',
+    emergency_release: 'Emergency release',
+    lock: 'Lock',
+    unlock: 'Unlock',
+    escalate: 'Escalate',
+    manual_review: 'Manual review',
+  })[action] || _payTitle(action);
+}
+function _payAllowed(detail, action) {
+  return detail?.decisionPacket?.allowedActions?.includes(action);
+}
+
+async function refreshPaymentsWorksurface() {
+  await Promise.all([loadPaymentsKpis(), loadPaymentsTable(), renderPendingApprovals()]);
+}
+
+async function loadPaymentsKpis() {
+  try {
+    const r = await adminPaymentsStats();
+    const data = r?.data || r || {};
+    for (const [k, v] of Object.entries(data)) {
+      const el = document.querySelector(`#paymentsKpis .kpi[data-key="${k}"] .kpi__value`);
+      if (!el) continue;
+      el.textContent = (typeof v === 'number' && /Total$/i.test(k)) ? _payFmtMoney(v) : String(v ?? '-');
+    }
+    const syncEl = document.getElementById('financeLastSync');
+    if (syncEl) syncEl.textContent = `Last sync ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  } catch (e) { console.warn('kpi load failed', e); }
+}
+
+async function loadPaymentsTable() {
+  const tbody = document.getElementById('paymentsTbody');
+  if (!tbody) return;
+  try {
+    const r = await adminListPayments({ ..._payState.filters, page: _payState.page, limit: _payState.limit });
+    const items = r?.data || [];
+    tbody.innerHTML = items.length
+      ? items.map(_payRowHtml).join('')
+      : '<tr><td colspan="10" class="center-align finance-empty-row">No ledger records match the current filters.</td></tr>';
+    tbody.querySelectorAll('[data-action="view"]').forEach((btn) => {
+      btn.onclick = () => openPaymentDetailDrawer(btn.dataset.paymentId);
+    });
+  } catch (e) { console.warn('payments table load failed', e); }
+}
+
+function _payRowHtml(p) {
+  const b = p.booking || {};
+  const cust = b.user || b.customer || {};
+  const worker = b.worker || b.technician || {};
+  const svc = b.service || {};
+  const fee = p.platformFee ?? b.platformFeeAmount ?? 0;
+  const rowRisk = p.lockedAt ? 'Locked' : (b.status === 'pending_admin_review' && p.status === 'held' ? 'Needs review' : 'Audit');
+  return `<tr>
+    <td><span class="finance-id">#${escapeHtml(_payShortId(b._id || p._id))}</span></td>
+    <td>${_payFmtDate(p.createdAt)}</td>
+    <td>${escapeHtml(cust.name || '-')}</td>
+    <td>${escapeHtml(worker.name || '-')}</td>
+    <td>${escapeHtml(svc.title || b.serviceName || b.serviceCategory || '-')}</td>
+    <td class="finance-money">${_payFmtMoney(p.amount)}</td>
+    <td class="finance-money">${_payFmtMoney(fee)}</td>
+    <td><span class="status-chip status-chip--${escapeHtml(p.status)}">${escapeHtml(p.status)}</span></td>
+    <td><span class="finance-queue-tag">${escapeHtml(rowRisk)} / ${_payAge(p.createdAt)}</span></td>
+    <td><button class="finance-detail-btn" data-action="view" data-payment-id="${escapeHtml(p._id || '')}">Details</button></td>
+  </tr>`;
+}
+
+function closePaymentDetailDrawer() {
+  const drawer = document.getElementById('paymentDrawer');
+  if (!drawer) return;
+  drawer.hidden = true;
+  drawer.innerHTML = '';
+  if (_paymentDrawerEscHandler) {
+    document.removeEventListener('keydown', _paymentDrawerEscHandler);
+    _paymentDrawerEscHandler = null;
+  }
+  if (_paymentDrawerLastFocus && typeof _paymentDrawerLastFocus.focus === 'function') {
+    _paymentDrawerLastFocus.focus();
+  }
+}
+
+async function openPaymentDetailDrawer(paymentId) {
+  const drawer = document.getElementById('paymentDrawer');
+  if (!drawer || !paymentId) return;
+  _paymentDrawerLastFocus = document.activeElement;
+  drawer.hidden = false;
+  drawer.innerHTML = '<p class="finance-drawer-loading">Loading decision packet...</p>';
+  _paymentDrawerEscHandler = (event) => {
+    if (event.key === 'Escape') closePaymentDetailDrawer();
+  };
+  document.addEventListener('keydown', _paymentDrawerEscHandler);
+  try {
+    const r = await adminPaymentDetail(paymentId);
+    const detail = r?.data || r;
+    if (!detail?.payment) {
+      drawer.innerHTML = '<p class="finance-drawer-loading">Payment not found.</p>';
+      return;
+    }
+    drawer.innerHTML = _payDrawerHtml(detail);
+    drawer.querySelector('[data-close]').onclick = closePaymentDetailDrawer;
+    drawer.querySelector('[data-action="request-evidence"]')?.addEventListener('click', () => handlePaymentEvidenceRequest(detail));
+    drawer.querySelector('[data-action="approve"]')?.addEventListener('click', () => handlePaymentRelease(detail));
+    drawer.querySelector('[data-action="partial-refund"]')?.addEventListener('click', () => handlePartialRefund(detail));
+    drawer.querySelector('[data-action="full-refund"]')?.addEventListener('click', () => handleFullRefund(detail));
+    drawer.querySelector('[data-action="force-release"]')?.addEventListener('click', () => handleForceRelease(detail));
+    drawer.querySelector('[data-action="force-lock"]')?.addEventListener('click', () => handleForceLock(detail));
+    drawer.querySelector('[data-action="force-unlock"]')?.addEventListener('click', () => handleForceUnlock(detail));
+  } catch (e) {
+    drawer.innerHTML = `<p class="finance-drawer-loading">Error: ${escapeHtml(e.message || String(e))}</p>`;
+  }
+}
+
+function handlePaymentRelease(detail) {
+  const worker = detail.parties?.worker?.name || 'worker';
+  openPaymentConfirmModal({
+    title: 'Approve release',
+    body: `Release ${_payFmtMoney(detail.paymentBreakdown?.workerEarning)} to ${escapeHtml(worker)}?`,
+    reasonCodeOptions: FINANCE_REASON_CODES.release,
+    confirmLabel: 'Release payment',
+    onConfirm: async ({ reasonCode }) => {
+      await adminApprovePayment(detail.booking.id, { reasonCode });
+      closePaymentDetailDrawer();
+      await refreshPaymentsWorksurface();
+    },
+  });
+}
+
+function handlePartialRefund(detail) {
+  openPartialRefundModal({
+    payment: { ...detail.payment, amount: detail.paymentBreakdown.amount },
+    decisionDetail: detail,
+    onConfirm: async (payload) => {
+      await adminPartialRefund(detail.booking.id, payload);
+      closePaymentDetailDrawer();
+      await refreshPaymentsWorksurface();
+    },
+  });
+}
+
+function handleFullRefund(detail) {
+  openPaymentConfirmModal({
+    title: 'Full refund',
+    body: `Refund the remaining ${_payFmtMoney(detail.paymentBreakdown.remainingRefundable)} to the customer?`,
+    requireReason: true,
+    reasonCodeOptions: FINANCE_REASON_CODES.refund,
+    confirmLabel: 'Refund customer',
+    onConfirm: async ({ reason, reasonCode }) => {
+      await adminRefund(detail.payment.id, { reason: `${reasonCode}: ${reason}` });
+      closePaymentDetailDrawer();
+      await refreshPaymentsWorksurface();
+    },
+  });
+}
+
+function handleForceRelease(detail) {
+  openPaymentConfirmModal({
+    title: 'Emergency release',
+    body: `Bypass policy checks and release ${_payFmtMoney(detail.paymentBreakdown.workerEarning)}. This is logged for audit.`,
+    requireReason: true,
+    reasonCodeOptions: FINANCE_REASON_CODES.emergency,
+    confirmLabel: 'Force release',
+    onConfirm: async ({ reason, reasonCode }) => {
+      await adminForceRelease(detail.payment.id, { reason, reasonCode });
+      showToast('Payment force-released', 'success');
+      closePaymentDetailDrawer();
+      await refreshPaymentsWorksurface();
+    },
+  });
+}
+
+function handleForceLock(detail) {
+  openPaymentConfirmModal({
+    title: 'Lock payment',
+    body: 'Lock prevents release until an admin unlocks this payment with a reason.',
+    requireReason: true,
+    reasonCodeOptions: FINANCE_REASON_CODES.lock,
+    confirmLabel: 'Lock payment',
+    onConfirm: async ({ reason, reasonCode }) => {
+      await adminForceLock(detail.payment.id, { reason, reasonCode });
+      showToast('Payment locked', 'success');
+      closePaymentDetailDrawer();
+      await refreshPaymentsWorksurface();
+    },
+  });
+}
+
+function handleForceUnlock(detail) {
+  openPaymentConfirmModal({
+    title: 'Unlock payment',
+    body: 'Resume the normal escrow review flow for this payment.',
+    requireReason: true,
+    reasonCodeOptions: FINANCE_REASON_CODES.unlock,
+    confirmLabel: 'Unlock payment',
+    onConfirm: async ({ reason, reasonCode }) => {
+      await adminForceUnlock(detail.payment.id, { reason, reasonCode });
+      showToast('Payment unlocked', 'success');
+      closePaymentDetailDrawer();
+      await refreshPaymentsWorksurface();
+    },
+  });
+}
+
+function handlePaymentEvidenceRequest(detail) {
+  const firstDispute = detail?.evidence?.disputes?.[0];
+  if (!firstDispute?.id) {
+    showToast('Open a dispute before requesting formal evidence from this drawer.', 'info');
+    return;
+  }
+  openPaymentConfirmModal({
+    title: 'Request evidence',
+    body: 'Ask both parties for more evidence on the active dispute.',
+    requireReason: true,
+    confirmLabel: 'Request evidence',
+    onConfirm: async ({ reason }) => {
+      await requestDisputeEvidence(firstDispute.id, 'both', reason);
+      showToast('Evidence requested.', 'success');
+      await openPaymentDetailDrawer(detail.payment.id);
+    },
+  });
+}
+
+function _payDrawerHtml(detail) {
+  const p = detail.payment || {};
+  const b = detail.booking || {};
+  const breakdown = detail.paymentBreakdown || {};
+  const decision = detail.decisionPacket || {};
+  const customer = detail.parties?.customer || {};
+  const worker = detail.parties?.worker || {};
+  const recommended = _payActionLabel(decision.recommendedAction);
+  const evidenceCount = (b.workerCompletionImages?.length || 0) + (detail.evidence?.bookingImages?.length || 0);
+  const flags = decision.policyFlags?.length ? decision.policyFlags : ['clear_for_standard_review'];
+  const timeline = detail.timeline || {};
+  const audit = detail.auditTrail || [];
+  return `<div class="drawer__head finance-drawer__head">
+      <div>
+        <span class="finance-drawer__eyebrow">Escrow decision packet</span>
+        <h3>Payment ${_payFmtMoney(breakdown.amount)}</h3>
+      </div>
+      <button data-close aria-label="Close">&times;</button>
+    </div>
+    <section class="finance-recommendation finance-recommendation--${escapeHtml(decision.riskLevel || 'low')}">
+      <span>Recommended</span>
+      <strong>${escapeHtml(recommended)}</strong>
+      <small>${escapeHtml(decision.riskLevel || 'low')} risk / ${decision.autoReleaseEligible ? 'Auto-release eligible' : `${decision.releaseWindowHours || 48}h review window`}</small>
+    </section>
+    <section class="finance-breakdown">
+      <div><span>Total charged</span><strong>${_payFmtMoney(breakdown.amount)}</strong></div>
+      <div><span>Worker earns</span><strong>${_payFmtMoney(breakdown.workerEarning)}</strong></div>
+      <div><span>Platform fee</span><strong>${_payFmtMoney(breakdown.platformFee)}</strong></div>
+      <div><span>Refund exposure</span><strong>${_payFmtMoney(breakdown.remainingRefundable)}</strong></div>
+    </section>
+    <dl class="drawer__meta finance-drawer__meta">
+      <dt>Status</dt><dd><span class="status-chip status-chip--${escapeHtml(p.status)}">${escapeHtml(p.status)}</span></dd>
+      <dt>Booking</dt><dd>#${escapeHtml(_payShortId(b.id))}</dd>
+      <dt>Customer</dt><dd>${escapeHtml(customer.name || '-')}</dd>
+      <dt>Worker</dt><dd>${escapeHtml(worker.name || '-')}</dd>
+      <dt>Service</dt><dd>${escapeHtml(b.service || '-')}</dd>
+      <dt>Evidence</dt><dd>${evidenceCount} completion file(s)</dd>
+    </dl>
+    <section class="finance-policy">
+      <h4>Policy checklist</h4>
+      <div class="finance-policy__grid">
+        ${flags.map(flag => `<span>${escapeHtml(_payTitle(flag))}</span>`).join('')}
+      </div>
+      ${decision.missingEvidence?.length ? `<p class="finance-policy__note">Missing: ${decision.missingEvidence.map(_payTitle).join(', ')}</p>` : ''}
+    </section>
+    <section class="finance-timeline">
+      <h4>Review timeline</h4>
+      <ol>
+        <li><span>Paid</span><strong>${escapeHtml(_payFmtDateTime(timeline.paidAt))}</strong></li>
+        <li><span>Worker completed</span><strong>${escapeHtml(_payFmtDateTime(timeline.completedAt))}</strong></li>
+        <li><span>Customer confirmed</span><strong>${escapeHtml(_payFmtDateTime(timeline.customerConfirmedAt))}</strong></li>
+        <li><span>Release eligible</span><strong>${escapeHtml(_payFmtDateTime(timeline.releaseEligibleAt))}</strong></li>
+      </ol>
+    </section>
+    <section class="finance-evidence">
+      <h4>Evidence and risk</h4>
+      <p>${escapeHtml(b.workerNotes || 'No worker completion note recorded.')}</p>
+      <div class="finance-evidence__chips">
+        <span>${detail.evidence?.disputes?.length || 0} active dispute(s)</span>
+        <span>${detail.evidence?.supportIssues?.length || 0} support issue(s)</span>
+        <span>${audit.length} audit event(s)</span>
+      </div>
+    </section>
+    <div class="drawer__actions finance-drawer__actions">
+      ${_payAllowed(detail, 'release') ? '<button class="btn btn--primary" data-action="approve">Approve release</button>' : ''}
+      ${_payAllowed(detail, 'request_evidence') ? '<button class="btn btn--ghost" data-action="request-evidence">Request evidence</button>' : ''}
+      ${_payAllowed(detail, 'partial_refund') ? '<button class="btn btn--warn" data-action="partial-refund">Partial refund</button>' : ''}
+      ${_payAllowed(detail, 'full_refund') ? '<button class="btn btn--warn" data-action="full-refund">Full refund</button>' : ''}
+      ${_payAllowed(detail, 'emergency_release') ? '<button class="btn btn--danger" data-action="force-release">Emergency release</button>' : ''}
+      ${_payAllowed(detail, 'lock') ? '<button class="btn btn--ghost" data-action="force-lock">Lock</button>' : ''}
+      ${_payAllowed(detail, 'unlock') ? '<button class="btn btn--ghost" data-action="force-unlock">Unlock</button>' : ''}
+    </div>`;
+}
+
 export async function renderPaymentsTab() {
   await Promise.all([loadPaymentsKpis(), loadPaymentsTable(), renderPendingApprovals()]);
   const statusEl = document.getElementById('payStatusFilter');
@@ -3434,7 +3772,7 @@ export async function renderPaymentsTab() {
     loadPaymentsTable();
   };
   const approvalMethodEl = document.getElementById('approvalMethodFilter');
-  if (approvalMethodEl) approvalMethodEl.onchange = (e) => renderPendingApprovals(e.target.value ? { method: e.target.value } : {});
+  if (approvalMethodEl) approvalMethodEl.onchange = (e) => renderPendingApprovals(e.target.value ? { paymentMethod: e.target.value } : {});
 }
 
 // Finance inner tab switching (global so other modules can call)

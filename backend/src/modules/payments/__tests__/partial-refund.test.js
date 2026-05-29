@@ -39,7 +39,7 @@ test('proportional partial-refund splits + writes audit', async () => {
   const adminId = id();
   const res = await service.partialRefund({
     bookingId: booking._id, adminId, refundAmount: 40,
-    deductFrom: 'proportional', reason: 'late',
+    deductFrom: 'proportional', reasonCode: 'quality_issue', reason: 'late service issue',
   });
   expect(res.payment.status).toBe('partially_refunded');
   expect(res.splits.fromTech).toBeCloseTo(40 * (100 / 118), 1);
@@ -54,6 +54,29 @@ test('rejects refund > amount', async () => {
   const { booking } = await setup();
   await expect(service.partialRefund({
     bookingId: booking._id, adminId: id(),
-    refundAmount: 200, deductFrom: 'tech', reason: 'x',
+    refundAmount: 200, deductFrom: 'tech', reasonCode: 'quality_issue', reason: 'bad outcome',
   })).rejects.toThrow(/Refund/);
+});
+
+test('rejects refund split beyond available worker earnings', async () => {
+  const { booking } = await setup();
+  await expect(service.partialRefund({
+    bookingId: booking._id,
+    adminId: id(),
+    refundAmount: 110,
+    deductFrom: 'tech',
+    reasonCode: 'quality_issue',
+    reason: 'worker share too small',
+  })).rejects.toThrow(/worker earnings/);
+});
+
+test('rejects missing structured reason code', async () => {
+  const { booking } = await setup();
+  await expect(service.partialRefund({
+    bookingId: booking._id,
+    adminId: id(),
+    refundAmount: 10,
+    deductFrom: 'platform',
+    reason: 'missing code',
+  })).rejects.toThrow(/reasonCode/);
 });

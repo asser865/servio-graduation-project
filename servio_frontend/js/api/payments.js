@@ -6,8 +6,8 @@ export const holdPayment = (bookingId, body) =>
 export const confirmCompletion = (bookingId) =>
   api.post(`/payments/confirm/${bookingId}`);
 
-export const adminApprovePayment = (bookingId) =>
-  api.post(`/payments/admin/approve/${bookingId}`);
+export const adminApprovePayment = (bookingId, body = {}) =>
+  api.post(`/payments/admin/approve/${bookingId}`, { reasonCode: 'customer_confirmed', ...body });
 
 export const adminRejectCash = (bookingId, body) =>
   api.post(`/payments/admin/reject-cash/${bookingId}`, body);
@@ -38,6 +38,9 @@ export const adminListPayments = (params = {}) => {
   const qs = new URLSearchParams(params).toString();
   return api.get(`/payments/admin/payments${qs ? '?' + qs : ''}`);
 };
+
+export const adminPaymentDetail = (paymentId) =>
+  api.get(`/payments/admin/payments/${paymentId}/detail`);
 
 export const adminPaymentsStats = () =>
   api.get('/payments/admin/payments/stats');
@@ -119,11 +122,11 @@ export const getPartyDisputeById = (id) =>
   api.get(`/payments/disputes/party/${id}`);
 
 // ─── Plan 2: debts + settlements + payouts ──────────────────────────────
-export const getMyDebtsV2      = () => api.get('/payments/my-debts/v2');
+export const getMyDebtsV2      = (opts = {}) => api.get('/payments/my-debts/v2', opts);
 export const settleMyDebt      = (body) => api.post('/payments/my-debts/settle', body);
 export const getMySettlements  = () => api.get('/payments/my-settlements');
 export const requestPayout     = (body) => api.post('/payments/payout-request', body);
-export const getMyPayouts      = () => api.get('/payments/my-payouts');
+export const getMyPayouts      = (opts = {}) => api.get('/payments/my-payouts', opts);
 
 export const adminListSettlements = (params = {}) => {
   const qs = new URLSearchParams(params).toString();

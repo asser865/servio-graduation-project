@@ -1,10 +1,47 @@
 const Payment = require('./payment.model');
+const User = require('../users/user.model');
 
-async function listAdminPayments({ status, workerId, customerId, from, to, minAmount, maxAmount, page = 1, limit = 20 }) {
+async function listAdminPayments({
+  status,
+  workerId,
+  customerId,
+  customer,
+  worker,
+  bookingId,
+  from,
+  to,
+  minAmount,
+  maxAmount,
+  page = 1,
+  limit = 20,
+}) {
   const q = {};
   if (status && status !== 'all') q.status = status;
+  if (bookingId) q.booking = bookingId;
   if (customerId) q.user = customerId;
   if (workerId) q.worker = workerId;
+  if (!customerId && customer) {
+    const users = await User.find({
+      role: 'user',
+      $or: [
+        { name: { $regex: customer, $options: 'i' } },
+        { email: { $regex: customer, $options: 'i' } },
+        { phone: { $regex: customer, $options: 'i' } },
+      ],
+    }).select('_id').limit(50);
+    q.user = { $in: users.map(u => u._id) };
+  }
+  if (!workerId && worker) {
+    const workers = await User.find({
+      role: 'worker',
+      $or: [
+        { name: { $regex: worker, $options: 'i' } },
+        { email: { $regex: worker, $options: 'i' } },
+        { phone: { $regex: worker, $options: 'i' } },
+      ],
+    }).select('_id').limit(50);
+    q.worker = { $in: workers.map(u => u._id) };
+  }
   if (from || to) q.createdAt = {};
   if (from) q.createdAt.$gte = new Date(from);
   if (to)   q.createdAt.$lte = new Date(to);
@@ -32,10 +69,11 @@ async function listAdminPayments({ status, workerId, customerId, from, to, minAm
 
 async function statsAdmin() {
   const today = new Date(); today.setHours(0, 0, 0, 0);
+  const Booking = require('../bookings/booking.model');
   const [heldAgg, releasedTodayAgg, pendingReview, disputed, refundsToday, avgRelease] = await Promise.all([
     Payment.aggregate([{ $match: { status: 'held' } }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
     Payment.aggregate([{ $match: { status: 'released', releasedAt: { $gte: today } } }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
-    Payment.countDocuments({ status: 'held' }),
+    Booking.countDocuments({ status: 'pending_admin_review' }),
     Payment.countDocuments({ status: 'disputed' }),
     Payment.countDocuments({ status: { $in: ['refunded', 'partially_refunded'] }, refundedAt: { $gte: today } }),
     Payment.aggregate([

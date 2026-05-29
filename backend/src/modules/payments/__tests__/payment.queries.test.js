@@ -27,6 +27,19 @@ test('listAdminPayments filters + paginates', async () => {
   expect(r.total).toBe(5);
 });
 
+test('listAdminPayments filters by bookingId', async () => {
+  const targetBooking = id();
+  await held(118);
+  await Payment.create({
+    booking: targetBooking, user: id(), worker: id(),
+    amount: 220, platformFee: 20, workerEarning: 200,
+    status: 'held', skipFeeCalc: true,
+  });
+  const r = await queries.listAdminPayments({ bookingId: targetBooking.toString() });
+  expect(r.items.length).toBe(1);
+  expect(r.items[0].amount).toBe(220);
+});
+
 test('statsAdmin returns aggregates', async () => {
   await held(100);
   await Payment.create({

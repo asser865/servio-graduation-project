@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const Booking = require('./booking.model');
 const Payment = require('../payments/payment.model');
 const Transaction = require('../payments/transaction.model');
-const Wallet = require('../payments/wallet.model');
+const paymentService = require('../payments/payment.service');
 const WorkerStrike = require('../users/worker-strike.model');
 const adminSettings = require('../admin/admin-settings.service');
 const getGateway = require('../payments/gateways');
@@ -12,15 +12,6 @@ const notify = require('../notifications/dispatcher');
 const { money: r2 } = require('../../utils/rounding');
 
 const NOSHOW_ELIGIBLE = ['accepted', 'en_route', 'arrived', 'in_progress'];
-
-async function getOrCreateWallet(workerId, session) {
-  let wallet = await Wallet.findOne({ worker: workerId }).session(session);
-  if (!wallet) {
-    const created = await Wallet.create([{ worker: workerId }], { session });
-    wallet = created[0];
-  }
-  return wallet;
-}
 
 async function markCustomerNoShow(bookingId, { by, evidence = [], note }) {
   const session = await mongoose.startSession();
@@ -47,14 +38,6 @@ async function markCustomerNoShow(bookingId, { by, evidence = [], note }) {
         workerCompensation = r2(payment.amount * (noShowFeePct / 100));
         refundAmount = r2(payment.amount - workerCompensation);
 
-        const wallet = await getOrCreateWallet(booking.worker, session);
-        if (wallet.pendingBalance >= payment.workerEarning) {
-          wallet.pendingBalance = r2(wallet.pendingBalance - payment.workerEarning);
-        }
-        wallet.balance = r2(wallet.balance + workerCompensation);
-        wallet.totalEarned = r2((wallet.totalEarned || 0) + workerCompensation);
-        await wallet.save({ session });
-
         if (refundAmount > 0) {
           if (payment.gatewayChargeId) {
             try {
@@ -73,6 +56,12 @@ async function markCustomerNoShow(bookingId, { by, evidence = [], note }) {
         payment.releasedAt = new Date();
         payment.refundedAmount = (payment.refundedAmount || 0) + refundAmount;
         await payment.save({ session });
+
+        booking.paymentStatus = refundAmount > 0 ? 'refunded' : 'released';
+        const { wallet } = await paymentService.reconcileWorkerWalletState(booking.worker, session);
+        wallet.balance = r2((wallet.balance || 0) + workerCompensation);
+        wallet.totalEarned = r2((wallet.totalEarned || 0) + workerCompensation);
+        await wallet.save({ session });
 
         await Transaction.create([{
           payment: payment._id,
@@ -168,10 +157,7 @@ async function markWorkerNoShow(bookingId, { by, note }) {
         payment.refundedAmount = refundAmount;
         await payment.save({ session });
 
-        const wallet = await getOrCreateWallet(booking.worker, session);
-        if (wallet.pendingBalance >= payment.workerEarning) {
-          await wallet.deductPending(payment.workerEarning);
-        }
+        await paymentService.reconcileWorkerWalletState(booking.worker, session);
 
         await Transaction.create([{
           payment: payment._id,

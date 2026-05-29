@@ -6,7 +6,6 @@ const Payment     = require('./payment.model');
 const Dispute     = require('./dispute.model');
 const CashDebt    = require('./cash-debt.model');
 const Transaction = require('./transaction.model');
-const Wallet      = require('./wallet.model');
 const ApiError    = require('../../utils/ApiError');
 const notifSvc    = require('../notifications/notification.service');
 const notify      = require('../notifications/dispatcher');
@@ -244,9 +243,10 @@ class DisputeService {
           freshBooking.status = 'completed';
 
           if (hasPayment) {
+            const freshPayment = await Payment.findById(payment._id).session(session);
             freshBooking.paymentStatus = 'released';
             await freshBooking.save({ session });
-            await ps.releaseHeldPayment(payment, freshBooking, adminId, session);
+            await ps.releaseHeldPayment(freshPayment, freshBooking, adminId, session);
             return;
           }
 
@@ -287,17 +287,6 @@ class DisputeService {
       const session = await mongoose.startSession();
       try {
         await session.withTransaction(async () => {
-          let wallet = await Wallet.findOne({ worker: payment.worker }).session(session);
-          if (!wallet) {
-            [wallet] = await Wallet.create([{ worker: payment.worker }], { session });
-          }
-          // worker pendingBalance was incremented at holdPayment by workerEarning.
-          // Deduct full pending then credit available with workerNet (partial keep).
-          await wallet.deductPending(payment.workerEarning);
-          wallet.balance += workerNet;
-          wallet.totalEarned += workerNet;
-          await wallet.save({ session });
-
           payment.status = 'refunded';
           payment.refundedAt = new Date();
           await payment.save({ session });
@@ -307,6 +296,11 @@ class DisputeService {
             { status: 'completed', paymentStatus: 'refunded' },
             { session }
           );
+
+          const { wallet } = await ps.reconcileWorkerWalletState(payment.worker, session);
+          wallet.balance += workerNet;
+          wallet.totalEarned += workerNet;
+          await wallet.save({ session });
 
           await Transaction.create([{
             payment: payment._id,

@@ -7,7 +7,8 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "test": "jest --runInBand",
-    "migrate:escrow": "node src/migrations/2026-05-19-escrow-cashdebt.js"
+    "migrate:escrow": "node src/migrations/2026-05-19-escrow-cashdebt.js",
+    "migrate:wallet-reconcile": "node src/migrations/2026-05-28-reconcile-worker-wallets.js"
   },
   "jest": {
     "testEnvironment": "node",

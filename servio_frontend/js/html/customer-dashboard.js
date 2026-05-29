@@ -805,10 +805,12 @@ function populateProfile() {
 
 /* ── Live bookings & reviews data from API ──────────────── */
 async function loadBookingsData() {
-  const activePane = document.querySelector('#bookings-stab-bar .stab-btn--active')?.dataset.stab || 'bookings-active';
+  let activePane = document.querySelector('#bookings-stab-bar .stab-btn--active')?.dataset.stab || 'bookings-active';
   try {
     const res = await getMyBookings({ limit: 200 });
     const bookings = res?.bookings || [];
+    const hasCustomerAction = bookings.some(b => ['awaiting_customer_confirmation', 'disputed'].includes(b.status));
+    if (activePane === 'bookings-action' && !hasCustomerAction) activePane = 'bookings-active';
 
     if (!_bookingSnapshotBuilt) {
       _buildSnapshot(bookings);
@@ -1199,7 +1201,7 @@ function renderBookingsTab(bookings) {
   const STATUS_TO_PANE = {
     accepted: 'stab-bookings-active', en_route: 'stab-bookings-active', arrived: 'stab-bookings-active', in_progress: 'stab-bookings-active',
     awaiting_customer_confirmation: 'stab-bookings-action',
-    pending_admin_review: 'stab-bookings-action',
+    pending_admin_review: 'stab-bookings-active',
     disputed: 'stab-bookings-action',
     pending: 'stab-bookings-pending',
   };
@@ -1302,7 +1304,7 @@ function buildBookingCard(b) {
     arrived:     { label: 'Arrived',     style: 'background:rgba(234,179,8,0.1);color:#eab308;border-color:#eab308' },
     in_progress: { label: 'In Progress', style: 'background:rgba(180,160,50,0.1);color:#eab308;border-color:#eab308' },
     awaiting_customer_confirmation: { label: 'Needs Review', style: 'background:rgba(234,179,8,0.1);color:#eab308;border-color:#eab308' },
-    pending_admin_review: { label: 'Under Review', style: 'background:rgba(59,130,246,0.1);color:#60a5fa;border-color:rgba(59,130,246,0.35)' },
+    pending_admin_review: { label: 'Finalizing', style: 'background:rgba(59,130,246,0.1);color:#60a5fa;border-color:rgba(59,130,246,0.35)' },
     disputed:    { label: 'Disputed',    style: 'background:rgba(239,68,68,0.12);color:#ef4444;border-color:rgba(239,68,68,0.35)' },
     completed:   { label: 'Completed',   style: 'background:rgba(34,197,94,0.1);color:#22c55e;border-color:rgba(34,197,94,0.3)' },
     cancelled:   { label: 'Cancelled',   style: 'background:rgba(156,163,175,0.1);color:#9ca3af;border-color:rgba(156,163,175,0.3)' },
@@ -1425,21 +1427,19 @@ function buildBookingCard(b) {
       : status === 'pending_admin_review'
         ? `<div class="booking-card__action-hint booking-card__action-hint--admin">
              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-             <span>Under admin review. We'll update you shortly.</span>
+             <span>Completion confirmed. SERVIO is finalizing payment release. No action needed.</span>
            </div>`
         : '';
   const disputeActionHTML = status === 'awaiting_customer_confirmation'
     ? `<a class="btn btn--issue" href="./booking-details.html?id=${b._id}&action=dispute">Open Dispute</a>`
-    : status === 'pending_admin_review'
-      ? `<button class="btn btn--issue" type="button" data-tab-link="support">View Support</button>`
-      : status === 'disputed'
+    : status === 'disputed'
         ? `<button class="btn btn--issue" type="button" data-tab-link="support">View Dispute</button>`
         : '';
 
   // Invoice panel
   const invoiceHTML = !isCancelled ? `<div class="booking-card__invoice-panel"><div class="invoice-content"><p class="invoice-content__title">Invoice ${bookingRef}</p><div class="invoice-table"><div class="invoice-table__row"><span>${title}</span><span>${formatFeeMoney(totals.base)}</span></div><div class="invoice-table__row"><span>Service Date</span><span>${formattedDate}</span></div><div class="invoice-table__row"><span>Platform Fee (${totals.feeRate}%)</span><span>${formatFeeMoney(totals.feeAmount)}</span></div><div class="invoice-table__row is-total"><span>Total</span><span>${formatFeeMoney(totals.estimatedTotal)}</span></div></div><div class="booking-card__invoice-footer"><p>Payment Method: <strong>${paymentMethod}</strong></p></div></div></div>` : '';
 
-  const isActionNeeded = ['awaiting_customer_confirmation', 'disputed', 'pending_admin_review'].includes(status);
+  const isActionNeeded = ['awaiting_customer_confirmation', 'disputed'].includes(status);
   const cardClasses = ['booking-card'];
   if (isActionNeeded) cardClasses.push('booking-card--action-needed');
   if (status === 'disputed') cardClasses.push('booking-card--disputed');
@@ -1857,7 +1857,7 @@ async function populateStats(bookings = null) {
     }
 
     const total     = bookings.length;
-    const active    = bookings.filter(b => ['pending','accepted','en_route','arrived','in_progress'].includes(b.status)).length;
+    const active    = bookings.filter(b => ['pending','accepted','en_route','arrived','in_progress','pending_admin_review'].includes(b.status)).length;
     const completed = bookings.filter(b => b.status === 'completed').length;
     const totalSpent = bookings
       .filter(b => b.status === 'completed')

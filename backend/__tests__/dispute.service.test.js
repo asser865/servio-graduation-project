@@ -1,5 +1,7 @@
 'use strict';
 
+const mongoose = require('mongoose');
+
 jest.mock('../src/modules/bookings/booking.model');
 jest.mock('../src/modules/payments/payment.model');
 jest.mock('../src/modules/payments/dispute.model');
@@ -8,6 +10,9 @@ jest.mock('../src/modules/payments/transaction.model');
 jest.mock('../src/modules/payments/payment.service', () => ({
   refundPayment: jest.fn(),
   releaseHeldPayment: jest.fn(),
+}));
+jest.mock('../src/modules/notifications/dispatcher', () => ({
+  safeDispatch: jest.fn(),
 }));
 jest.mock('../src/modules/notifications/notification.service', () => ({
   notifyDisputeOpened: jest.fn().mockResolvedValue(undefined),
@@ -49,6 +54,10 @@ function queryResult(value) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  jest.spyOn(mongoose, 'startSession').mockResolvedValue({
+    withTransaction: async (fn) => fn(),
+    endSession: jest.fn().mockResolvedValue(undefined),
+  });
   Booking.findById = jest.fn().mockResolvedValue(makeBooking());
   Booking.findByIdAndUpdate = jest.fn().mockResolvedValue(true);
   Payment.findOne = jest.fn().mockResolvedValue({
@@ -65,6 +74,10 @@ beforeEach(() => {
     toObject: () => ({ _id: 'dispute1', ...data }),
   }));
   Transaction.create = jest.fn().mockResolvedValue(true);
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
 });
 
 describe('disputeService.openDispute', () => {
@@ -215,5 +228,56 @@ describe('disputeService.resolveDispute', () => {
 
     expect(paymentService.refundPayment).toHaveBeenCalledWith('payment1', ADMIN_ID, 'Refund approved.');
     expect(dispute.status).toBe('resolved_refund');
+  });
+
+  test('resolves online dispute as release using fresh booking and payment records inside the transaction', async () => {
+    const booking = makeBooking({ status: 'disputed', paymentStatus: 'disputed' });
+    const freshBooking = {
+      _id: BOOKING_ID,
+      worker: WORKER_ID,
+      status: 'disputed',
+      paymentStatus: 'disputed',
+      save: jest.fn().mockResolvedValue(true),
+    };
+    const freshPayment = {
+      _id: 'payment-fresh',
+      worker: WORKER_ID,
+      status: 'disputed',
+    };
+    const dispute = {
+      _id: 'dispute1',
+      status: 'open',
+      booking,
+      payment: { _id: 'payment1', amount: 440 },
+      history: [],
+      internalNotes: [],
+      save: jest.fn().mockResolvedValue(true),
+    };
+
+    const session = await mongoose.startSession();
+    mongoose.startSession.mockResolvedValue(session);
+    Dispute.findById = jest.fn().mockReturnValue(queryResult(dispute));
+    Booking.findById = jest.fn().mockReturnValue({
+      session: jest.fn().mockResolvedValue(freshBooking),
+    });
+    Payment.findById = jest.fn().mockReturnValue({
+      session: jest.fn().mockResolvedValue(freshPayment),
+    });
+    paymentService.releaseHeldPayment.mockResolvedValue(true);
+
+    await disputeService.resolveDispute('dispute1', ADMIN_ID, {
+      resolution: 'Release approved after review.',
+      decision: 'release',
+    });
+
+    expect(Booking.findById).toHaveBeenCalledWith(BOOKING_ID);
+    expect(Payment.findById).toHaveBeenCalledWith('payment1');
+    expect(freshBooking.status).toBe('completed');
+    expect(freshBooking.paymentStatus).toBe('released');
+    expect(freshBooking.save).toHaveBeenCalledWith({ session });
+    expect(paymentService.releaseHeldPayment).toHaveBeenCalledWith(freshPayment, freshBooking, ADMIN_ID, session);
+    expect(dispute.status).toBe('resolved_release');
+    expect(dispute.decision).toBe('release');
+    expect(session.endSession).toHaveBeenCalled();
   });
 });
