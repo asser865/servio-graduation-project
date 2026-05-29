@@ -453,6 +453,18 @@ function validateStep1() {
     const grid = document.querySelector('.timeslot-grid');
     if (grid) animate(grid, { x: [0, -5, 5, -3, 3, 0] }, { duration: 0.35 });
     errors.push(null);
+  } else if (bookDate?.value) {
+    const _t = new Date();
+    const selTodayStr = `${_t.getFullYear()}-${String(_t.getMonth() + 1).padStart(2, '0')}-${String(_t.getDate()).padStart(2, '0')}`;
+    if (bookDate.value === selTodayStr && parseInt(state.selectedTime, 10) <= new Date().getHours()) {
+      const grid = document.querySelector('.timeslot-grid');
+      if (grid) {
+        animate(grid, { x: [0, -5, 5, -3, 3, 0] }, { duration: 0.35 });
+        grid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      showToast('That time slot has already passed. Please select a future time.', 'error');
+      errors.push(null);
+    }
   }
 
   errors.forEach((el) => {
@@ -556,12 +568,19 @@ function refreshBookedSlots(dateStr) {
   if (!workerId) return;
   const container = document.getElementById('timeslotContainer');
   if (!container) return;
+
+  const _rNow    = new Date();
+  const _rToday  = `${_rNow.getFullYear()}-${String(_rNow.getMonth() + 1).padStart(2, '0')}-${String(_rNow.getDate()).padStart(2, '0')}`;
+  const _rIsToday = dateStr === _rToday;
+  const _rNowHour = _rNow.getHours();
+
   getWorkerBookedSlots(workerId, dateStr)
     .then(res => {
       const booked = new Set(res.data?.bookedSlots || res.bookedSlots || []);
       console.debug('[booking] booked slots for', dateStr, Array.from(booked));
       container.querySelectorAll('.timeslot-pill').forEach(pill => {
-        const shouldBlock = booked.has(pill.dataset.time);
+        const isPast      = _rIsToday && parseInt(pill.dataset.time, 10) <= _rNowHour;
+        const shouldBlock = isPast || booked.has(pill.dataset.time);
         pill.classList.toggle('is-unavailable', shouldBlock);
         pill.disabled = shouldBlock;
         pill.setAttribute('aria-disabled', String(shouldBlock));
@@ -639,6 +658,11 @@ function renderTimeSlotsForDate(dateString, availability) {
     'evening': `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>`
   };
 
+  const _now     = new Date();
+  const todayStr = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
+  const isToday  = dateString === todayStr;
+  const nowHour  = _now.getHours();
+
   groups.forEach(group => {
     const periodKey = group.label.split(' ')[0].toLowerCase();
     const icon = PERIOD_ICONS[periodKey] || PERIOD_ICONS['morning'];
@@ -651,8 +675,9 @@ function renderTimeSlotsForDate(dateString, availability) {
       </div>
       <div class="timeslot-grid" role="group" aria-label="${group.label} time slots">
         ${group.slots.map(slot => {
-          const label = formatTimeLabel(slot);
-          return `<button type="button" class="timeslot-pill" data-time="${slot}">${label}</button>`;
+          const label   = formatTimeLabel(slot);
+          const isPast  = isToday && parseInt(slot, 10) <= nowHour;
+          return `<button type="button" class="timeslot-pill${isPast ? ' is-unavailable' : ''}" data-time="${slot}"${isPast ? ' disabled aria-disabled="true"' : ''}>${label}</button>`;
         }).join('')}
       </div>`;
     container.appendChild(section);

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SERVIO i18n — English ↔ Arabic live translation
  * Loaded as a plain (non-module) script so it runs before ES-module bundles.
  */
@@ -28,7 +28,6 @@
       footer_quick_links:       'Quick Links',
       footer_about:             'About Us',
       footer_about_us:          'About Us',
-      footer_products:          'Products',
       footer_for_techs:         'For Technicians',
       footer_contact_us:        'Contact Us',
       footer_contact_us_col:    'Contact Us',
@@ -1756,6 +1755,7 @@
       tech_dash_profile:     'My Profile',
       tech_dash_logout:      'Log Out',
       tech_dash_available:   'Available',
+      tech_dash_unavailable: 'Offline',
       tech_dash_busy:        'Busy',
       tech_dash_no_jobs:     'No jobs yet',
       tech_dash_no_jobs_sub: 'When customers book you, jobs will appear here.',
@@ -1766,8 +1766,14 @@
       tech_brief_label: 'Today',
       month_mar_short: 'MAR',
       month_apr_short: 'APR',
+      tech_nav_group_work: 'Work',
+      tech_nav_group_money: 'Money',
+      tech_nav_group_reputation: 'Reputation',
+      tech_nav_group_account: 'Account',
+      tech_sidebar_portal: 'Technician Portal',
       tech_nav_job_queue:    'Job Queue',
       tech_nav_earnings:     'Earnings',
+      tech_nav_transactions: 'Transactions',
       tech_nav_availability: 'Availability',
       tech_nav_reviews:      'Reviews',
       tech_nav_verification: 'Verification',
@@ -1838,7 +1844,7 @@
       tech_avail_title:      'Availability',
       tech_avail_sub:        'Set your working hours and service area so customers can find you.',
       tech_weekly_schedule:  'Weekly Schedule',
-      tech_service_area_lbl: 'Service Area',
+      tech_service_area_lbl: 'Custom location fallback',
       tech_service_cats_lbl: 'Service Categories',
       /* Reviews panel */
       tech_reviews_title:    'Reviews',
@@ -1898,12 +1904,12 @@
       tech_finish_job:       'Finish Job',
       tech_job_billed:       'Job successfully billed. Earnings added to your wallet.',
       /* Earnings extras */
-      tech_total_earned:     'Total Earned',
+      tech_total_earned:     'Net Earnings',
       tech_pending_payout:   'Pending Payout',
       /* Availability extras */
       tech_available_now:    'Available Now',
       tech_save_availability:'Save Availability',
-      tech_service_area_ph:  'e.g. Cairo, Giza',
+      tech_service_area_ph:  'e.g. Cairo Festival City, Smart Village',
       /* Settings extras */
       tech_profile_info:     'Profile Information',
       tech_profile_info_desc:'Your name, contact details, and trade shown on your public profile.',
@@ -3255,7 +3261,6 @@
       footer_quick_links:       'روابط سريعة',
       footer_about:             'عنّا',
       footer_about_us:          'عنّا',
-      footer_products:          'المنتجات',
       footer_for_techs:         'للفنيين',
       footer_contact_us:        'اتصل بنا',
       footer_contact_us_col:    'اتصل بنا',
@@ -4964,6 +4969,7 @@
       tech_dash_profile:     'ملفي الشخصي',
       tech_dash_logout:      'تسجيل الخروج',
       tech_dash_available:   'متاح',
+      tech_dash_unavailable: '\u063a\u064a\u0631 \u0645\u062a\u0627\u062d',
       tech_dash_busy:        'مشغول',
       tech_dash_no_jobs:     'لا توجد وظائف بعد',
       tech_dash_no_jobs_sub: 'عندما يحجزك العملاء ستظهر الوظائف هنا.',
@@ -4974,8 +4980,14 @@
       tech_brief_label: 'اليوم',
       month_mar_short: 'مارس',
       month_apr_short: 'أبريل',
+      tech_nav_group_work: '\u0627\u0644\u0639\u0645\u0644',
+      tech_nav_group_money: '\u0627\u0644\u0645\u0627\u0644',
+      tech_nav_group_reputation: '\u0627\u0644\u0633\u0645\u0639\u0629',
+      tech_nav_group_account: '\u0627\u0644\u062d\u0633\u0627\u0628',
+      tech_sidebar_portal: '\u0628\u0648\u0627\u0628\u0629 \u0627\u0644\u0641\u0646\u064a',
       tech_nav_job_queue:    'قائمة الوظائف',
       tech_nav_earnings:     'الأرباح',
+      tech_nav_transactions: '\u0627\u0644\u0645\u0639\u0627\u0645\u0644\u0627\u062a',
       tech_nav_availability: 'التوفر',
       tech_nav_reviews:      'التقييمات',
       tech_nav_verification: 'التحقق',
@@ -5045,7 +5057,7 @@
       tech_avail_title:      'التوفر',
       tech_avail_sub:        'حدد ساعات عملك ومنطقة خدمتك لكي يجدك العملاء.',
       tech_weekly_schedule:  'الجدول الأسبوعي',
-      tech_service_area_lbl: 'منطقة الخدمة',
+      tech_service_area_lbl: 'موقع مخصص احتياطي',
       tech_service_cats_lbl: 'فئات الخدمة',
       tech_reviews_title:    'التقييمات',
       tech_reviews_sub:      'تعليقات عملائك.',
@@ -5100,12 +5112,12 @@
       tech_finish_job:       'إنهاء الوظيفة',
       tech_job_billed:       'تمت فوترة الوظيفة بنجاح. تمت إضافة الأرباح إلى محفظتك.',
       /* Earnings extras */
-      tech_total_earned:     'إجمالي الأرباح',
+      tech_total_earned:     'صافي الأرباح',
       tech_pending_payout:   'الدفع المعلق',
       /* Availability extras */
       tech_available_now:    'متاح الآن',
       tech_save_availability:'حفظ التوفر',
-      tech_service_area_ph:  'مثال: القاهرة، الجيزة',
+      tech_service_area_ph:  'مثال: كايرو فيستيفال سيتي، سمارت فيليدج',
       /* Settings extras */
       tech_profile_info:     'معلومات الملف الشخصي',
       tech_profile_info_desc:'اسمك وتفاصيل التواصل والمهنة الظاهرة في ملفك العام.',

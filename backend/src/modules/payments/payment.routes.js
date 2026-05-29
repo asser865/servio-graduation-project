@@ -90,6 +90,7 @@ router.post('/admin/:id/force-lock',    protect, authorize(...ADMINS), permissio
 router.post('/admin/:id/force-unlock',  protect, authorize(...ADMINS), permission(PERMS.PAYMENTS_EMERGENCY), controller.adminForceUnlock);
 router.post('/admin/partial-refund/:bookingId', protect, authorize(...ADMINS), permission(PERMS.PAYMENTS_REFUND), controller.adminPartialRefund);
 router.get('/admin/payments',       protect, authorize('admin'), controller.adminListPayments);
+router.get('/admin/payments/:id/detail', protect, authorize('admin'), controller.adminPaymentDetail);
 router.get('/admin/payments/stats', protect, authorize('admin'), controller.adminPaymentsStats);
 router.post('/disputes', protect, authorize('user'), controller.openDispute);
 router.get('/disputes/my', protect, authorize('user'), controller.getMyDisputes);

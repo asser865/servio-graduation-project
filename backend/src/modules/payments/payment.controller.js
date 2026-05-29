@@ -22,7 +22,10 @@ const confirmCompletion = async (req, res) => {
 
 const adminApproveCompletion = async (req, res) => {
   const { bookingId } = req.params;
-  const result = await paymentService.adminApproveCompletion(bookingId, req.user.id);
+  const result = await paymentService.adminApproveCompletion(bookingId, req.user.id, {
+    reasonCode: req.body?.reasonCode,
+    note: req.body?.note,
+  });
   logEvent({ req, type: 'finance', action: 'Admin approved payment release', target: bookingId });
   return ApiResponse.success(res, StatusCodes.OK, 'Booking approved and payment processed.', result);
 };
@@ -212,6 +215,11 @@ const adminListPayments = async (req, res) => {
   return paginated(res, r);
 };
 
+const adminPaymentDetail = async (req, res) => {
+  const detail = await paymentService.getAdminPaymentDetail(req.params.id);
+  return single(res, detail);
+};
+
 const adminPaymentsStats = async (req, res) => {
   const stats = await queries.statsAdmin();
   return single(res, stats);
@@ -219,9 +227,9 @@ const adminPaymentsStats = async (req, res) => {
 
 const adminPartialRefund = async (req, res) => {
   const { bookingId } = req.params;
-  const { refundAmount, deductFrom, reason } = req.body;
+  const { refundAmount, deductFrom, reason, reasonCode } = req.body;
   const result = await paymentService.partialRefund({
-    bookingId, adminId: req.user.id, refundAmount, deductFrom, reason, ipAddress: req.ip,
+    bookingId, adminId: req.user.id, refundAmount, deductFrom, reason, reasonCode, ipAddress: req.ip,
   });
   return ApiResponse.success(res, StatusCodes.OK, 'Partial refund processed.', result);
 };
@@ -525,7 +533,8 @@ const downloadReceipt = async (req, res) => {
 const adminForceRelease = async (req, res) => {
   const p = await paymentService.forceRelease(req.params.id, {
     actor:     req.user.id,
-    reason:    req.body?.reason,
+    reason:    req.body?.reason || req.body?.note,
+    reasonCode: req.body?.reasonCode,
     ipAddress: req.ip,
   });
   return ApiResponse.success(res, StatusCodes.OK, 'Payment force-released.', p);
@@ -534,7 +543,8 @@ const adminForceRelease = async (req, res) => {
 const adminForceLock = async (req, res) => {
   const p = await paymentService.forceLock(req.params.id, {
     actor:     req.user.id,
-    reason:    req.body?.reason,
+    reason:    req.body?.reason || req.body?.note,
+    reasonCode: req.body?.reasonCode,
     ipAddress: req.ip,
   });
   return ApiResponse.success(res, StatusCodes.OK, 'Payment locked.', p);
@@ -543,7 +553,8 @@ const adminForceLock = async (req, res) => {
 const adminForceUnlock = async (req, res) => {
   const p = await paymentService.forceUnlock(req.params.id, {
     actor:     req.user.id,
-    reason:    req.body?.reason,
+    reason:    req.body?.reason || req.body?.note,
+    reasonCode: req.body?.reasonCode,
     ipAddress: req.ip,
   });
   return ApiResponse.success(res, StatusCodes.OK, 'Payment unlocked.', p);
@@ -557,6 +568,7 @@ module.exports = {
   adminForceUnlock,
   adminPartialRefund,
   adminListPayments,
+  adminPaymentDetail,
   adminPaymentsStats,
   confirmCompletion,
   adminApproveCompletion,

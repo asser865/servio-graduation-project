@@ -1279,7 +1279,12 @@
         <div class="fin-section fp-panel" data-fin-section="payments">
           <div class="fp-header">
             <div class="fp-header__title">
-              <h2 data-i18n="admin.payments.title">Payments</h2>
+              <span class="finance-command__label">Escrow operations</span>
+              <h2 data-i18n="admin.payments.title">Payment command center</h2>
+              <div class="finance-command__meta">
+                <span id="financeLastSync">Last sync --:--</span>
+                <span>48h release window</span>
+              </div>
               <p class="fp-header__lede" data-i18n="admin_payments_lede">Card-paid bookings held in escrow — approve releases, refunds and disputes.</p>
             </div>
           </div>
@@ -1338,9 +1343,9 @@
             </div>
 
             <div class="fp-table-wrap">
-              <table class="admin-table fp-table" id="paymentsTable">
+              <table class="admin-table fp-table finance-table finance-table--ledger" id="paymentsTable">
                 <thead>
-                  <tr><th>#</th><th>Date</th><th>Customer</th><th>Tech</th><th>Service</th><th>Amount</th><th>Fee</th><th>Status</th><th>Age</th><th></th></tr>
+                  <tr><th>#</th><th>Date</th><th>Customer</th><th>Worker</th><th>Service</th><th>Amount</th><th>Fee</th><th>Status</th><th>Review state</th><th></th></tr>
                 </thead>
                 <tbody id="paymentsTbody"></tbody>
               </table>
@@ -1352,7 +1357,7 @@
 
           <div class="fp-section">
             <div class="fp-section__head">
-              <h3 class="fp-section__title" data-i18n="admin_payments_pending_approvals">Pending approvals</h3>
+              <h3 class="fp-section__title" data-i18n="admin_payments_pending_approvals">Decision queue</h3>
               <div class="admin-filter-row">
                 <select id="approvalMethodFilter">
                   <option value="">All Methods</option>

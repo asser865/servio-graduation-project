@@ -4,7 +4,7 @@ const Payment = require('../payments/payment.model');
 const Transaction = require('../payments/transaction.model');
 const WorkerStrike = require('../users/worker-strike.model');
 const User = require('../users/user.model');
-const Wallet = require('../payments/wallet.model');
+const paymentService = require('../payments/payment.service');
 const adminSettings = require('../admin/admin-settings.service');
 const getGateway = require('../payments/gateways');
 const ApiError = require('../../utils/ApiError');
@@ -75,12 +75,7 @@ async function customerCancel(bookingId, { reason, by }) {
           await payment.save({ session });
 
           const wkrId = payment.worker || booking.worker;
-          if (wkrId) {
-            const wallet = await Wallet.findOne({ worker: wkrId }).session(session);
-            if (wallet && wallet.pendingBalance >= payment.workerEarning) {
-              await wallet.deductPending(payment.workerEarning);
-            }
-          }
+          if (wkrId) await paymentService.reconcileWorkerWalletState(wkrId, session);
 
           await Transaction.create([{
             payment: payment._id,
@@ -180,10 +175,7 @@ async function workerCancel(bookingId, { reason, by }) {
         await payment.save({ session });
 
         const wkrId = payment.worker || by;
-        const wallet = await Wallet.findOne({ worker: wkrId }).session(session);
-        if (wallet && wallet.pendingBalance >= payment.workerEarning) {
-          await wallet.deductPending(payment.workerEarning);
-        }
+        await paymentService.reconcileWorkerWalletState(wkrId, session);
 
         await Transaction.create([{
           payment: payment._id,

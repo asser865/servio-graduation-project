@@ -5,6 +5,7 @@ const Booking    = require('../bookings/booking.model');
 const Payment    = require('./payment.model');
 const SavedCard  = require('../savedCards/savedCard.model');
 const Wallet     = require('./wallet.model');
+const CashDebt   = require('./cash-debt.model');
 const Transaction = require('./transaction.model');
 const ApiError   = require('../../utils/ApiError');
 const getGateway = require('./gateways');
@@ -37,6 +38,54 @@ const getOrCreateWallet = async (workerId, session) => {
   return wallet;
 };
 
+const PAYMENT_PENDING_STATUSES = ['held', 'disputed'];
+const INACTIVE_BOOKING_STATUSES = ['cancelled', 'rejected', 're_pooling'];
+
+function isMoneyDateInRange(date, { dateFrom, dateTo } = {}) {
+  if (!date) return false;
+  const value = new Date(date);
+  if (Number.isNaN(value.getTime())) return false;
+  if (dateFrom) {
+    const from = new Date(dateFrom);
+    if (!Number.isNaN(from.getTime()) && value < from) return false;
+  }
+  if (dateTo) {
+    const to = new Date(dateTo);
+    if (!Number.isNaN(to.getTime()) && value > to) return false;
+  }
+  return true;
+}
+
+function bookingTakeHomeSnapshot(booking) {
+  const gross = roundMoney(booking?.totalPrice || 0);
+  const fee = roundMoney(booking?.platformFeeAmount || 0);
+  return {
+    gross,
+    fee,
+    net: roundMoney(gross - fee),
+  };
+}
+
+function bookingMoneyDate(booking) {
+  return booking?.actualCompletedAt || booking?.updatedAt || booking?.scheduledDate || booking?.createdAt || null;
+}
+
+function startOfDay(date) {
+  const value = new Date(date);
+  value.setHours(0, 0, 0, 0);
+  return value;
+}
+
+function formatShortBookingId(value) {
+  return String(value || '').slice(-6).toUpperCase();
+}
+
+function validPendingBooking(booking) {
+  if (!booking) return false;
+  if (INACTIVE_BOOKING_STATUSES.includes(booking.status)) return false;
+  return !['released', 'refunded', 'cash_pending_settlement', 'cash_settled', 'not_required'].includes(booking.paymentStatus);
+}
+
 class PaymentService {
   async holdPayment(bookingId, customerId, { savedCardId, useCredit = false }) {
     const booking = await Booking.findById(bookingId);
@@ -55,7 +104,7 @@ class PaymentService {
     if (!['card', 'online'].includes(booking.paymentMethod)) {
       throw new ApiError(StatusCodes.BAD_REQUEST, 'This booking does not use online payment.');
     }
-    if (booking.status !== 'pending') {
+    if (!['pending', 'accepted'].includes(booking.status)) {
       throw new ApiError(StatusCodes.CONFLICT, `Cannot hold payment for booking with status '${booking.status}'.`);
     }
 
@@ -250,7 +299,7 @@ class PaymentService {
     return booking;
   }
 
-  async adminApproveCompletion(bookingId, adminId) {
+  async adminApproveCompletion(bookingId, adminId, { reasonCode = 'customer_confirmed', note = '' } = {}) {
     const booking = await Booking.findById(bookingId);
     if (!booking) throw new ApiError(StatusCodes.NOT_FOUND, 'Booking not found.');
     if (booking.status !== 'pending_admin_review') {
@@ -269,7 +318,7 @@ class PaymentService {
         if (!payment || payment.status !== 'held') {
           throw new ApiError(StatusCodes.BAD_REQUEST, 'No held payment found for this booking.');
         }
-        await this.releaseHeldPayment(payment, booking, adminId, session);
+        await this.releaseHeldPayment(payment, booking, adminId, session, { reasonCode, note });
         booking.paymentStatus = 'released';
       } else {
         const CashDebt = require('./cash-debt.model');
@@ -306,7 +355,7 @@ class PaymentService {
     return result;
   }
 
-  async releaseHeldPayment(payment, booking, adminId, session) {
+  async releaseHeldPayment(payment, booking, adminId, session, { reasonCode = 'customer_confirmed', note = '' } = {}) {
     if (payment.lockedAt) {
       throw new ApiError(StatusCodes.CONFLICT, 'Payment is locked by admin.');
     }
@@ -317,10 +366,6 @@ class PaymentService {
       payment.workerEarning,
       session
     );
-
-    const wallet = await getOrCreateWallet(workerId, session);
-    await wallet.deductPending(payment.workerEarning);
-    await wallet.credit(remainingAmount);
 
     if (payment.gatewayIntentId) {
       const gw = getGateway();
@@ -333,6 +378,13 @@ class PaymentService {
     payment.releaseApprovedAt = new Date();
     payment.releaseApprovedBy = adminId;
     await payment.save({ session });
+    if (booking.paymentStatus !== 'released') {
+      booking.paymentStatus = 'released';
+      await booking.save({ session });
+    }
+
+    const { wallet } = await this.reconcileWorkerWalletState(workerId, session);
+    await wallet.credit(remainingAmount);
 
     // Auto-issue invoice inside txn (Plan 3 Task 14)
     let invoiceId = null;
@@ -360,7 +412,7 @@ class PaymentService {
       actionType: 'payment_release',
       targetType: 'payment',
       targetId: payment._id,
-      details: { amount: payment.amount, bookingId: booking._id },
+      details: { amount: payment.amount, bookingId: booking._id, reasonCode, note },
       session,
     });
 
@@ -444,9 +496,6 @@ class PaymentService {
     let updatedPayment;
 
     await session.withTransaction(async () => {
-      const wallet = await getOrCreateWallet(payment.worker, session);
-      await wallet.deductPending(payment.workerEarning);
-
       if (payment.gatewayChargeId) {
         const gw = getGateway();
         const refund = await gw.refund({
@@ -465,6 +514,8 @@ class PaymentService {
         { status: 'cancelled', paymentStatus: 'refunded' },
         { session }
       );
+
+      const { wallet } = await this.reconcileWorkerWalletState(payment.worker, session);
 
       await logTransaction({
         payment: payment._id,
@@ -541,6 +592,180 @@ class PaymentService {
     };
   }
 
+  async getAdminPaymentDetail(paymentId) {
+    const payment = await Payment.findById(paymentId)
+      .populate('user', 'name email phone')
+      .populate('worker', 'name email phone')
+      .populate({
+        path: 'booking',
+        populate: [
+          { path: 'user', select: 'name email phone' },
+          { path: 'worker', select: 'name email phone' },
+          { path: 'service', select: 'title category basePrice' },
+        ],
+      });
+
+    if (!payment) throw new ApiError(StatusCodes.NOT_FOUND, 'Payment not found.');
+
+    const booking = payment.booking && typeof payment.booking === 'object' ? payment.booking : null;
+    const Dispute = require('./dispute.model');
+    const SupportIssue = require('../support/support-issue.model');
+    const AdminAction = require('../admin/admin-action.model');
+
+    const activeDisputeStatuses = ['open', 'reviewing', 'awaiting_evidence', 'appealed', 'escalated'];
+    const activeSupportStatuses = ['open', 'reviewing', 'waiting_customer', 'waiting_worker'];
+    const [disputes, supportIssues, auditTrail] = await Promise.all([
+      booking ? Dispute.find({ booking: booking._id, status: { $in: activeDisputeStatuses } }).sort({ createdAt: -1 }).limit(10) : [],
+      booking ? SupportIssue.find({ booking: booking._id, status: { $in: activeSupportStatuses } }).sort({ createdAt: -1 }).limit(10) : [],
+      AdminAction.find({ targetType: 'payment', targetId: payment._id }).sort({ createdAt: -1 }).limit(20),
+    ]);
+
+    const amount = roundMoney(payment.amount || 0);
+    const workerEarning = roundMoney(payment.workerEarning || 0);
+    const platformFee = roundMoney(payment.platformFee || 0);
+    const refundedAmount = roundMoney(payment.refundedAmount || 0);
+    const remainingRefundable = Math.max(0, roundMoney(amount - refundedAmount));
+    const releaseWindowHours = Number(process.env.ESCROW_RELEASE_WINDOW_HOURS || 48);
+    const highRiskThreshold = Number(process.env.ESCROW_HIGH_RISK_AMOUNT || 2000);
+    const customerConfirmedAt = booking?.customerConfirmedAt || null;
+    const releaseEligibleAt = customerConfirmedAt
+      ? new Date(new Date(customerConfirmedAt).getTime() + releaseWindowHours * 3600000)
+      : null;
+
+    const missingEvidence = [];
+    if (!booking?.actualCompletedAt) missingEvidence.push('worker_completion_timestamp');
+    if (!booking?.customerConfirmedAt) missingEvidence.push('customer_confirmation');
+
+    const hasOpenDispute = disputes.length > 0;
+    const hasOpenSupportIssue = supportIssues.length > 0;
+    const isLocked = Boolean(payment.lockedAt);
+    const isHighValue = amount >= highRiskThreshold;
+    const isFlagged = Boolean(booking?.flaggedForReview);
+
+    const policyFlags = [];
+    if (isLocked) policyFlags.push('payment_locked');
+    if (hasOpenDispute) policyFlags.push('active_dispute');
+    if (hasOpenSupportIssue) policyFlags.push('active_support_issue');
+    if (isHighValue) policyFlags.push('high_value_payment');
+    if (isFlagged) policyFlags.push('booking_flagged_for_review');
+    if (missingEvidence.length) policyFlags.push('missing_required_evidence');
+
+    const allowedActions = new Set();
+    if (['held', 'released'].includes(payment.status)) {
+      allowedActions.add('partial_refund');
+      allowedActions.add('full_refund');
+    }
+    if (payment.status === 'held' && !isLocked) {
+      allowedActions.add('request_evidence');
+      allowedActions.add('lock');
+      allowedActions.add('emergency_release');
+      if (booking?.status === 'pending_admin_review' && !hasOpenDispute && !hasOpenSupportIssue && !missingEvidence.length) {
+        allowedActions.add('release');
+      }
+    }
+    if (isLocked) allowedActions.add('unlock');
+    if (hasOpenDispute || hasOpenSupportIssue || isHighValue || isFlagged) allowedActions.add('escalate');
+
+    let recommendedAction = 'release';
+    if (isLocked || hasOpenDispute || hasOpenSupportIssue) recommendedAction = 'escalate';
+    else if (missingEvidence.length) recommendedAction = 'request_evidence';
+    else if (isHighValue || isFlagged) recommendedAction = 'manual_review';
+
+    const riskLevel = isLocked || hasOpenDispute || isFlagged ? 'high'
+      : hasOpenSupportIssue || isHighValue || missingEvidence.length ? 'medium'
+      : 'low';
+
+    const autoReleaseEligible = recommendedAction === 'release'
+      && releaseEligibleAt
+      && releaseEligibleAt.getTime() <= Date.now()
+      && !isHighValue;
+
+    return {
+      payment: {
+        id: payment._id,
+        status: payment.status,
+        currency: payment.currency,
+        lockedAt: payment.lockedAt,
+        lockReason: payment.lockReason,
+        createdAt: payment.createdAt,
+        heldAt: payment.heldAt,
+        releasedAt: payment.releasedAt,
+        refundedAt: payment.refundedAt,
+      },
+      booking: booking ? {
+        id: booking._id,
+        status: booking.status,
+        paymentStatus: booking.paymentStatus,
+        service: booking.service?.title || booking.serviceName || booking.serviceCategory,
+        scheduledDate: booking.scheduledDate,
+        address: booking.address,
+        workerNotes: booking.workerNotes || '',
+        workerCompletionImages: booking.workerCompletionImages || [],
+        flaggedForReview: booking.flaggedForReview,
+        flagReason: booking.flagReason || '',
+      } : null,
+      parties: {
+        customer: payment.user || booking?.user || null,
+        worker: payment.worker || booking?.worker || null,
+      },
+      paymentBreakdown: {
+        amount,
+        workerEarning,
+        platformFee,
+        refundedAmount,
+        remainingRefundable,
+      },
+      timeline: {
+        bookedAt: booking?.createdAt || null,
+        paidAt: payment.heldAt || payment.createdAt,
+        workerStartedAt: booking?.actualStartedAt || null,
+        completedAt: booking?.actualCompletedAt || booking?.completedAt || null,
+        customerConfirmedAt,
+        reviewStartedAt: payment.releaseRequestedAt || customerConfirmedAt,
+        releaseEligibleAt,
+      },
+      evidence: {
+        workerNotes: booking?.workerNotes || '',
+        workerCompletionImages: booking?.workerCompletionImages || [],
+        bookingImages: booking?.images || [],
+        disputes: disputes.map(d => ({
+          id: d._id,
+          status: d.status,
+          category: d.category,
+          severity: d.severity,
+          reason: d.reason,
+          evidenceCount: Array.isArray(d.evidence) ? d.evidence.length : 0,
+          createdAt: d.createdAt,
+        })),
+        supportIssues: supportIssues.map(issue => ({
+          id: issue._id,
+          type: issue.type,
+          status: issue.status,
+          priority: issue.priority,
+          description: issue.description,
+          evidenceCount: Array.isArray(issue.evidence) ? issue.evidence.length : 0,
+          createdAt: issue.createdAt,
+        })),
+      },
+      decisionPacket: {
+        recommendedAction,
+        allowedActions: Array.from(allowedActions),
+        policyFlags,
+        missingEvidence,
+        riskLevel,
+        autoReleaseEligible,
+        releaseWindowHours,
+      },
+      auditTrail: auditTrail.map(action => ({
+        id: action._id,
+        actionType: action.actionType,
+        details: action.details || {},
+        admin: action.admin,
+        createdAt: action.createdAt,
+      })),
+    };
+  }
+
   async getPaymentByBooking(bookingId, requesterId, requesterRole) {
     const payment = await Payment.findByBooking(bookingId);
     if (!payment) throw new ApiError(StatusCodes.NOT_FOUND, 'Payment not found.');
@@ -553,40 +778,331 @@ class PaymentService {
     return payment;
   }
 
+  async reconcileWorkerWalletState(workerId, session) {
+    const wallet = await getOrCreateWallet(workerId, session);
+    const candidatePayments = await Payment.find({
+      worker: workerId,
+      status: { $in: [...PAYMENT_PENDING_STATUSES, 'partially_refunded'] },
+    })
+      .populate('booking', 'status paymentStatus updatedAt cancelledAt')
+      .session(session || null);
+
+    const releaseTransactions = candidatePayments.length
+      ? await Transaction.find({
+        payment: { $in: candidatePayments.map((payment) => payment._id) },
+        type: 'release',
+      })
+        .sort({ createdAt: 1 })
+        .session(session || null)
+      : [];
+
+    const releaseTxByPayment = new Map();
+    for (const tx of releaseTransactions) {
+      const key = String(tx.payment || '');
+      if (key && !releaseTxByPayment.has(key)) releaseTxByPayment.set(key, tx);
+    }
+
+    let normalizedPayments = 0;
+    for (const payment of candidatePayments) {
+      const booking = payment.booking;
+      const releaseTx = releaseTxByPayment.get(String(payment._id));
+      const shouldBeReleased = PAYMENT_PENDING_STATUSES.includes(payment.status)
+        && (releaseTx || booking?.paymentStatus === 'released');
+      const shouldBeRefunded = PAYMENT_PENDING_STATUSES.includes(payment.status)
+        && !shouldBeReleased
+        && (booking?.paymentStatus === 'refunded' || INACTIVE_BOOKING_STATUSES.includes(booking?.status));
+
+      if (!shouldBeReleased && !shouldBeRefunded) continue;
+
+      if (shouldBeReleased) {
+        const releasedAt = releaseTx?.createdAt || booking?.updatedAt || new Date();
+        payment.status = 'released';
+        if (!payment.releasedAt) payment.releasedAt = releasedAt;
+        if (!payment.releaseApprovedAt) payment.releaseApprovedAt = releasedAt;
+      } else {
+        payment.status = 'refunded';
+        if (!payment.refundedAt) payment.refundedAt = booking?.cancelledAt || booking?.updatedAt || new Date();
+      }
+
+      await payment.save({ session });
+      normalizedPayments += 1;
+    }
+
+    const hasPartialPending = candidatePayments.some(
+      (payment) => payment.status === 'partially_refunded' && !payment.releasedAt && validPendingBooking(payment.booking)
+    );
+
+    if (hasPartialPending) {
+      return {
+        wallet,
+        expectedPendingBalance: roundMoney(wallet.pendingBalance || 0),
+        skippedPendingReconcile: true,
+        normalizedPayments,
+      };
+    }
+
+    const activePendingPayments = await Payment.find({
+      worker: workerId,
+      status: { $in: PAYMENT_PENDING_STATUSES },
+    })
+      .populate('booking', 'status paymentStatus')
+      .session(session || null);
+
+    const expectedPendingBalance = roundMoney(activePendingPayments.reduce((sum, payment) => {
+      if (!validPendingBooking(payment.booking)) return sum;
+      return sum + roundMoney(payment.workerEarning || 0);
+    }, 0));
+
+    if (roundMoney(wallet.pendingBalance || 0) !== expectedPendingBalance) {
+      wallet.pendingBalance = expectedPendingBalance;
+      await wallet.save({ session });
+    }
+
+    return {
+      wallet,
+      expectedPendingBalance,
+      skippedPendingReconcile: false,
+      normalizedPayments,
+    };
+  }
+
   async getWorkerEarnings(workerId, filters = {}) {
+    await this.reconcileWorkerWalletState(workerId);
+
     const wallet = await getOrCreateWallet(workerId);
     const User = require('../users/user.model');
     const worker = await User.findById(workerId).select('completedJobs');
 
-    const query = {
+    const paymentQuery = {
       worker: workerId,
-      status: { $in: ['held', 'released'] },
+      status: { $in: ['held', 'released', 'disputed'] },
     };
+    if (filters.status) paymentQuery.status = filters.status;
 
+    const [cashBookings, cashDebts, onlinePayments, completedJobs] = await Promise.all([
+      Booking.find({
+        worker: workerId,
+        paymentMethod: 'cash',
+        status: 'completed',
+      })
+        .populate('user', 'name')
+        .sort({ updatedAt: -1 }),
+      CashDebt.find({
+        worker: workerId,
+        status: { $in: ['outstanding', 'partially_paid', 'paid'] },
+      }),
+      Payment.find(paymentQuery)
+        .populate({
+          path: 'booking',
+          select: 'status paymentStatus paymentMethod scheduledDate updatedAt actualCompletedAt serviceCategory serviceName totalPrice platformFeeAmount address user',
+          populate: { path: 'user', select: 'name' },
+        })
+        .sort({ createdAt: -1 }),
+      Booking.countDocuments({ worker: workerId, status: 'completed' }),
+    ]);
 
-    if (filters.dateFrom || filters.dateTo) {
-      query.createdAt = {};
-      if (filters.dateFrom) query.createdAt.$gte = new Date(filters.dateFrom);
-      if (filters.dateTo) query.createdAt.$lte = new Date(filters.dateTo);
+    const onlinePaymentIds = onlinePayments.map((payment) => payment._id);
+    const releaseTransactions = onlinePaymentIds.length
+      ? await Transaction.find({
+        payment: { $in: onlinePaymentIds },
+        type: 'release',
+      }).sort({ createdAt: -1 })
+      : [];
+
+    const latestReleaseTxByPayment = new Map();
+    for (const tx of releaseTransactions) {
+      const key = String(tx.payment || '');
+      if (key && !latestReleaseTxByPayment.has(key)) latestReleaseTxByPayment.set(key, tx);
     }
-    if (filters.status) query.status = filters.status;
-    const payments = await Payment.find(query)
-      .populate('booking', 'scheduledDate address')
-      .sort({ createdAt: -1 });
-    const summary = payments.reduce(
-      (acc, p) => {
-        if (p.status === 'held') acc.totalHeld += p.workerEarning;
-        if (p.status === 'released') acc.totalReleased += p.workerEarning;
+
+    const cashBookingById = new Map(cashBookings.map((booking) => [String(booking._id), booking]));
+    const debtByBooking = new Map(cashDebts.map((debt) => [String(debt.booking), debt]));
+    const outstandingCashFees = roundMoney(cashDebts.reduce((sum, debt) => {
+      if (!['outstanding', 'partially_paid'].includes(debt.status)) return sum;
+      return sum + roundMoney((debt.amount || 0) - (debt.paidAmount || 0));
+    }, 0));
+    const cashFeesLifetime = roundMoney(cashDebts.reduce((sum, debt) => sum + roundMoney(debt.amount || 0), 0));
+
+    const monthStart = startOfDay(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+    const nextMonthStart = startOfDay(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1));
+    const lastMonthStart = startOfDay(new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1));
+    const sevenDayStart = startOfDay(new Date(Date.now() - 6 * 86400000));
+    const sevenDayTrend = new Array(7).fill(0);
+
+    const cashItems = cashBookings.map((booking) => {
+      const amount = bookingTakeHomeSnapshot(booking);
+      const occurredAt = bookingMoneyDate(booking);
+      const debt = debtByBooking.get(String(booking._id));
+      const settlementNote = debt?.status === 'paid'
+        ? 'Cash collected. Platform fee already settled.'
+        : 'Cash collected. Platform fee tracked separately.';
+      const item = {
+        bookingId: booking._id,
+        shortBookingId: formatShortBookingId(booking._id),
+        paymentMethod: 'cash',
+        customerName: booking.user?.name || '',
+        serviceName: booking.serviceName || booking.serviceCategory || 'Service',
+        gross: amount.gross,
+        fee: amount.fee,
+        takeHomeNet: amount.net,
+        walletCreditAmount: 0,
+        cashCollectedAmount: amount.net,
+        displayAmount: amount.net,
+        settlementType: 'cash_collected',
+        settlementNote,
+        releaseStatus: booking.paymentStatus || 'cash_settled',
+        bookingStatus: booking.status,
+        occurredAt,
+        scheduledDate: booking.scheduledDate || null,
+        address: booking.address || '',
+      };
+
+      if (occurredAt && occurredAt >= monthStart && occurredAt < nextMonthStart) {
+        item._countsForMonth = true;
+      }
+      if (occurredAt && occurredAt >= lastMonthStart && occurredAt < monthStart) {
+        item._countsForLastMonth = true;
+      }
+      if (occurredAt && occurredAt >= sevenDayStart) {
+        const bucket = Math.floor((startOfDay(occurredAt).getTime() - sevenDayStart.getTime()) / 86400000);
+        if (bucket >= 0 && bucket < sevenDayTrend.length) sevenDayTrend[bucket] = roundMoney(sevenDayTrend[bucket] + amount.net);
+      }
+      return item;
+    });
+
+    const paymentItems = onlinePayments
+      .filter((payment) => payment.booking && (payment.status === 'released' || validPendingBooking(payment.booking)))
+      .map((payment) => {
+        const booking = payment.booking;
+        const gross = roundMoney(booking?.totalPrice || payment.workerEarning || 0);
+        const fee = roundMoney(booking?.platformFeeAmount || payment.platformFee || 0);
+        const releaseTx = latestReleaseTxByPayment.get(String(payment._id));
+        const releasedAmount = roundMoney(releaseTx?.amount || (payment.status === 'released' ? payment.workerEarning || 0 : 0));
+        const occurredAt = releaseTx?.createdAt || payment.releasedAt || bookingMoneyDate(booking) || payment.createdAt;
+        const isReleased = payment.status === 'released';
+        const settlementType = isReleased
+          ? (releasedAmount < roundMoney(payment.workerEarning || 0) ? 'released_after_offset' : 'released_to_wallet')
+          : 'pending_release';
+        const settlementNote = isReleased
+          ? (releaseTx?.note || 'Released to wallet.')
+          : 'Pending release approval.';
+        const displayAmount = isReleased ? releasedAmount : roundMoney(payment.workerEarning || gross);
+        const item = {
+          bookingId: booking._id,
+          shortBookingId: formatShortBookingId(booking._id),
+          paymentId: payment._id,
+          paymentMethod: booking.paymentMethod || payment.paymentMethod || 'online',
+          customerName: booking.user?.name || '',
+          serviceName: booking.serviceName || booking.serviceCategory || 'Service',
+          gross,
+          fee,
+          takeHomeNet: displayAmount,
+          walletCreditAmount: isReleased ? releasedAmount : 0,
+          cashCollectedAmount: 0,
+          displayAmount,
+          settlementType,
+          settlementNote,
+          releaseStatus: payment.status,
+          bookingStatus: booking.status,
+          occurredAt,
+          scheduledDate: booking.scheduledDate || null,
+          address: booking.address || '',
+        };
+
+        if (isReleased && occurredAt && occurredAt >= monthStart && occurredAt < nextMonthStart) {
+          item._countsForMonth = true;
+        }
+        if (isReleased && occurredAt && occurredAt >= lastMonthStart && occurredAt < monthStart) {
+          item._countsForLastMonth = true;
+        }
+        if (isReleased && occurredAt && occurredAt >= sevenDayStart) {
+          const bucket = Math.floor((startOfDay(occurredAt).getTime() - sevenDayStart.getTime()) / 86400000);
+          if (bucket >= 0 && bucket < sevenDayTrend.length) sevenDayTrend[bucket] = roundMoney(sevenDayTrend[bucket] + releasedAmount);
+        }
+        return item;
+      });
+
+    const outstandingCashFeeItems = cashDebts
+      .filter((debt) => ['outstanding', 'partially_paid'].includes(debt.status))
+      .map((debt) => {
+        const booking = cashBookingById.get(String(debt.booking));
+        const amount = bookingTakeHomeSnapshot(booking);
+        return {
+          bookingId: debt.booking,
+          shortBookingId: formatShortBookingId(debt.booking),
+          gross: amount.gross,
+          fee: roundMoney(debt.amount || 0),
+          remaining: roundMoney((debt.amount || 0) - (debt.paidAmount || 0)),
+          paidAmount: roundMoney(debt.paidAmount || 0),
+          status: debt.status,
+          occurredAt: bookingMoneyDate(booking) || debt.createdAt,
+        };
+      })
+      .sort((a, b) => new Date(b.occurredAt || 0) - new Date(a.occurredAt || 0));
+
+    const recentEarnings = [...cashItems, ...paymentItems]
+      .sort((a, b) => new Date(b.occurredAt || 0) - new Date(a.occurredAt || 0))
+      .slice(0, 10);
+
+    const filteredPayments = onlinePayments.filter((payment) => {
+      const matchDate = isMoneyDateInRange(
+        payment.releasedAt || payment.heldAt || payment.createdAt,
+        filters
+      );
+      return matchDate || (!filters.dateFrom && !filters.dateTo);
+    });
+
+    const summary = filteredPayments.reduce(
+      (acc, payment) => {
+        if (PAYMENT_PENDING_STATUSES.includes(payment.status) && validPendingBooking(payment.booking)) {
+          acc.totalHeld = roundMoney(acc.totalHeld + (payment.workerEarning || 0));
+        }
+        if (payment.status === 'released') {
+          const releaseTx = latestReleaseTxByPayment.get(String(payment._id));
+          acc.totalReleased = roundMoney(acc.totalReleased + (releaseTx?.amount || payment.workerEarning || 0));
+        }
         return acc;
       },
       { totalHeld: 0, totalReleased: 0 }
     );
 
+    const cashNet = roundMoney(cashItems.reduce((sum, item) => sum + item.cashCollectedAmount, 0));
+    const thisMonthTakeHome = roundMoney(
+      [...cashItems, ...paymentItems].reduce((sum, item) => sum + (item._countsForMonth ? item.displayAmount : 0), 0)
+    );
+    const lastMonthTakeHome = roundMoney(
+      [...cashItems, ...paymentItems].reduce((sum, item) => sum + (item._countsForLastMonth ? item.displayAmount : 0), 0)
+    );
+    const walletReleasedNet = roundMoney(wallet.totalEarned || 0);
+    const pendingRelease = roundMoney(wallet.pendingBalance || 0);
+    const pendingJobsCount = onlinePayments.filter(
+      (payment) => PAYMENT_PENDING_STATUSES.includes(payment.status) && validPendingBooking(payment.booking)
+    ).length;
+
     return {
       wallet,
-      payments,
+      payoutMethod: wallet.payoutMethod,
+      payments: filteredPayments,
       summary,
-      completedJobs: worker ? worker.completedJobs : 0
+      completedJobs: completedJobs || worker?.completedJobs || 0,
+      breakdown: {
+        availableToWithdraw: roundMoney(wallet.balance || 0),
+        pendingRelease,
+        pendingJobsCount,
+        outstandingCashFees,
+        collectedCashNet: cashNet,
+        cashCompletedJobsCount: cashItems.length,
+        walletReleasedNet,
+        lifetimeTakeHome: roundMoney(walletReleasedNet + cashNet),
+        thisMonthTakeHome,
+        lastMonthTakeHome,
+        completedJobs: completedJobs || worker?.completedJobs || 0,
+        cashFeesLifetime,
+        averageCashFee: cashItems.length ? roundMoney(cashFeesLifetime / cashItems.length) : 0,
+        outstandingCashFeeItems,
+        recentEarnings,
+        sevenDayTrend,
+      },
     };
   }
 
@@ -677,7 +1193,16 @@ PaymentService.prototype.refundWithFallback = async function ({ paymentId, amoun
   } finally { if (ownSession) await session.endSession(); }
 };
 
-PaymentService.prototype.partialRefund = async function ({ bookingId, adminId, refundAmount, deductFrom, reason, ipAddress }) {
+const PARTIAL_REFUND_REASON_CODES = new Set([
+  'service_incomplete',
+  'quality_issue',
+  'pricing_adjustment',
+  'customer_goodwill',
+  'admin_policy',
+  'manual_adjustment',
+]);
+
+PaymentService.prototype.partialRefund = async function ({ bookingId, adminId, refundAmount, deductFrom, reason, reasonCode, ipAddress }) {
   const session = await mongoose.startSession();
   try {
     return await session.withTransaction(async () => {
@@ -686,51 +1211,88 @@ PaymentService.prototype.partialRefund = async function ({ bookingId, adminId, r
       if (!['held', 'released'].includes(payment.status)) {
         throw new ApiError(StatusCodes.BAD_REQUEST, `Cannot refund status=${payment.status}`);
       }
-      if (refundAmount > payment.amount) {
-        throw new ApiError(StatusCodes.BAD_REQUEST, 'Refund > payment amount');
+      const amount = roundMoney(Number(refundAmount));
+      if (!Number.isFinite(amount) || amount <= 0) {
+        throw new ApiError(StatusCodes.BAD_REQUEST, 'Refund amount must be greater than zero');
+      }
+      const normalizedReasonCode = String(reasonCode || '').trim();
+      if (!PARTIAL_REFUND_REASON_CODES.has(normalizedReasonCode)) {
+        throw new ApiError(StatusCodes.BAD_REQUEST, 'Valid refund reasonCode is required');
+      }
+      const note = String(reason || '').trim();
+      if (note.length < 5) {
+        throw new ApiError(StatusCodes.BAD_REQUEST, 'Refund reason note must be at least 5 chars');
+      }
+      const remainingRefundable = roundMoney((payment.amount || 0) - (payment.refundedAmount || 0));
+      if (amount > remainingRefundable) {
+        throw new ApiError(StatusCodes.BAD_REQUEST, 'Refund exceeds remaining refundable amount');
       }
 
       const booking = await Booking.findById(bookingId).session(session);
-      const techShare = payment.workerEarning;
-      const platformShare = payment.platformFee;
+      if (!booking) throw new ApiError(StatusCodes.NOT_FOUND, 'Booking not found');
+      const AdminAction = require('../admin/admin-action.model');
+      const previousRefundActions = await AdminAction.find({
+        targetType: 'payment',
+        targetId: payment._id,
+        actionType: 'payment_partial_refund',
+      }).session(session);
+      const previousFromTech = roundMoney(previousRefundActions.reduce((sum, action) => sum + Number(action.details?.fromTech || 0), 0));
+      const previousFromPlatform = roundMoney(previousRefundActions.reduce((sum, action) => sum + Number(action.details?.fromPlatform || 0), 0));
+      const techShare = roundMoney(payment.workerEarning || 0);
+      const platformShare = roundMoney(payment.platformFee || 0);
+      const techAvailable = Math.max(0, roundMoney(techShare - previousFromTech));
+      const platformAvailable = Math.max(0, roundMoney(platformShare - previousFromPlatform));
       let fromTech = 0, fromPlatform = 0;
       switch (deductFrom) {
-        case 'tech':         fromTech = refundAmount; break;
-        case 'platform':     fromPlatform = refundAmount; break;
+        case 'tech':         fromTech = amount; break;
+        case 'platform':     fromPlatform = amount; break;
         case 'proportional': {
-          const ratio = refundAmount / payment.amount;
+          const ratio = amount / payment.amount;
           fromTech = roundMoney(techShare * ratio);
           fromPlatform = roundMoney(platformShare * ratio);
           break;
         }
         default: throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid deductFrom');
       }
+      if (fromTech > techAvailable) {
+        throw new ApiError(StatusCodes.BAD_REQUEST, 'Refund exceeds available worker earnings');
+      }
+      if (fromPlatform > platformAvailable) {
+        throw new ApiError(StatusCodes.BAD_REQUEST, 'Refund exceeds available platform fee');
+      }
 
       if (payment.gatewayChargeId) {
         const gateway = getGateway();
         const refund = await gateway.refund({
           chargeId: payment.gatewayChargeId,
-          amount: refundAmount,
-          reason,
+          amount,
+          reason: note,
         });
         payment.gatewayRefundId = refund.refundId;
       }
 
-      payment.status = 'partially_refunded';
+      payment.refundedAmount = roundMoney((payment.refundedAmount || 0) + amount);
+      payment.status = payment.refundedAmount >= payment.amount ? 'refunded' : 'partially_refunded';
       payment.refundedAt = new Date();
       await payment.save({ session });
 
       const wallet = await Wallet.findOne({ worker: booking.worker }).session(session);
-      if (wallet && fromTech > 0) {
-        if (payment.releasedAt) wallet.balance = roundMoney((wallet.balance || 0) - fromTech);
-        else wallet.pendingBalance = roundMoney((wallet.pendingBalance || 0) - fromTech);
+      if (fromTech > 0) {
+        if (!wallet) throw new ApiError(StatusCodes.CONFLICT, 'Worker wallet not found');
+        if (payment.releasedAt) {
+          if (roundMoney(wallet.balance || 0) < fromTech) throw new ApiError(StatusCodes.BAD_REQUEST, 'Insufficient released worker balance for refund');
+          wallet.balance = roundMoney((wallet.balance || 0) - fromTech);
+        } else {
+          if (roundMoney(wallet.pendingBalance || 0) < fromTech) throw new ApiError(StatusCodes.BAD_REQUEST, 'Insufficient pending worker balance for refund');
+          wallet.pendingBalance = roundMoney((wallet.pendingBalance || 0) - fromTech);
+        }
         await wallet.save({ session });
       }
 
       await adminAction.record({
         adminId, actionType: 'payment_partial_refund',
         targetType: 'payment', targetId: payment._id,
-        details: { refundAmount, fromTech, fromPlatform, reason },
+        details: { refundAmount: amount, fromTech, fromPlatform, reasonCode: normalizedReasonCode, reason: note },
         ipAddress, session,
       });
       return { payment, splits: { fromTech, fromPlatform } };
@@ -740,7 +1302,7 @@ PaymentService.prototype.partialRefund = async function ({ bookingId, adminId, r
   }
 };
 
-PaymentService.prototype.forceRelease = async function (paymentId, { actor, reason, ipAddress } = {}) {
+PaymentService.prototype.forceRelease = async function (paymentId, { actor, reason, reasonCode = 'emergency_override', ipAddress } = {}) {
   if (!reason || reason.trim().length < 10) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Reason required (min 10 chars).');
   }
@@ -759,7 +1321,7 @@ PaymentService.prototype.forceRelease = async function (paymentId, { actor, reas
       const booking = await Booking.findById(payment.booking).session(session);
       if (!booking) throw new ApiError(StatusCodes.NOT_FOUND, 'Booking not found.');
 
-      await this.releaseHeldPayment(payment, booking, actor, session);
+      await this.releaseHeldPayment(payment, booking, actor, session, { reasonCode, note: reason });
       if (booking.status !== 'completed') {
         booking.status = 'completed';
         booking.paymentStatus = 'released';
@@ -771,7 +1333,7 @@ PaymentService.prototype.forceRelease = async function (paymentId, { actor, reas
         actionType: 'emergency_release',
         targetType: 'payment',
         targetId: payment._id,
-        details: { reason, amount: payment.amount, bookingId: booking._id },
+        details: { reason, reasonCode, amount: payment.amount, bookingId: booking._id },
         ipAddress,
         session,
       });
@@ -782,7 +1344,7 @@ PaymentService.prototype.forceRelease = async function (paymentId, { actor, reas
   } finally { await session.endSession(); }
 };
 
-PaymentService.prototype.forceLock = async function (paymentId, { actor, reason, ipAddress } = {}) {
+PaymentService.prototype.forceLock = async function (paymentId, { actor, reason, reasonCode = 'manual_lock', ipAddress } = {}) {
   if (!reason || reason.trim().length < 10) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Reason required (min 10 chars).');
   }
@@ -801,13 +1363,13 @@ PaymentService.prototype.forceLock = async function (paymentId, { actor, reason,
     actionType: 'emergency_lock',
     targetType: 'payment',
     targetId: payment._id,
-    details: { reason },
+    details: { reason, reasonCode },
     ipAddress,
   });
   return payment;
 };
 
-PaymentService.prototype.forceUnlock = async function (paymentId, { actor, reason, ipAddress } = {}) {
+PaymentService.prototype.forceUnlock = async function (paymentId, { actor, reason, reasonCode = 'manual_unlock', ipAddress } = {}) {
   if (!reason || reason.trim().length < 5) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Reason required (min 5 chars).');
   }
@@ -823,7 +1385,7 @@ PaymentService.prototype.forceUnlock = async function (paymentId, { actor, reaso
     actionType: 'emergency_unlock',
     targetType: 'payment',
     targetId: payment._id,
-    details: { reason },
+    details: { reason, reasonCode },
     ipAddress,
   });
   return payment;
