@@ -22,7 +22,6 @@ class _TechnicianEditProfileScreenState
   late TextEditingController _bioCtrl;
   late TextEditingController _hourlyRateCtrl;
   late TextEditingController _locationCtrl;
-  late TextEditingController _skillsCtrl;
   String _availabilityType = '';
   bool _saving = false;
 
@@ -53,7 +52,6 @@ class _TechnicianEditProfileScreenState
           : '',
     );
     _locationCtrl = TextEditingController(text: account?.locationLabel ?? '');
-    _skillsCtrl = TextEditingController(text: account?.skills.join(', ') ?? '');
     _availabilityType = account?.availabilityType ?? '';
   }
 
@@ -65,7 +63,6 @@ class _TechnicianEditProfileScreenState
     _bioCtrl.dispose();
     _hourlyRateCtrl.dispose();
     _locationCtrl.dispose();
-    _skillsCtrl.dispose();
     super.dispose();
   }
 
@@ -107,15 +104,6 @@ class _TechnicianEditProfileScreenState
         fields['hourlyRate'] = rate;
       }
     }
-    final rawSkills = _skillsCtrl.text
-        .split(',')
-        .map((s) => s.trim())
-        .where((s) => s.isNotEmpty)
-        .toList();
-    if (rawSkills.join(',') != (account?.skills.join(',') ?? '')) {
-      fields['skills'] = rawSkills;
-    }
-
     if (fields.isEmpty) {
       if (!mounted) return;
       setState(() => _saving = false);
@@ -314,15 +302,6 @@ class _TechnicianEditProfileScreenState
               decoration: const InputDecoration(
                 labelText: 'Service Area (e.g. Nasr City)',
                 prefixIcon: Icon(Icons.location_on_outlined),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _skillsCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Skills (comma-separated)',
-                prefixIcon: Icon(Icons.build_outlined),
-                hintText: 'e.g. pipe repair, drain cleaning',
               ),
             ),
             const SizedBox(height: 16),
