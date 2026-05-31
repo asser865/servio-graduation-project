@@ -266,6 +266,8 @@ class SessionProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> refreshAccount() => _refreshAccount();
+
   Future<void> _refreshAccount() async {
     final refreshed = await _usersApi.getMe();
     await _setAccount(refreshed);

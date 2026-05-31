@@ -6,7 +6,7 @@ import '../../core/models/dispute.dart';
 import '../../core/state/disputes_provider.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
-import '../../design_system/widgets/servio_card.dart';
+import '../../design_system/widgets/servio_skeleton.dart';
 
 class TechnicianDisputesScreen extends StatefulWidget {
   const TechnicianDisputesScreen({super.key});
@@ -18,15 +18,7 @@ class TechnicianDisputesScreen extends StatefulWidget {
 
 class _TechnicianDisputesScreenState
     extends State<TechnicianDisputesScreen> {
-  String _filter = 'all';
-
-  static const _filters = <(String, String)>[
-    ('All', 'all'),
-    ('Open', 'open'),
-    ('Awaiting Evidence', 'awaiting_evidence'),
-    ('Reviewing', 'reviewing'),
-    ('Resolved', 'resolved'),
-  ];
+  String _selectedTab = 'open';
 
   @override
   void initState() {
@@ -36,19 +28,6 @@ class _TechnicianDisputesScreenState
         context.read<DisputesProvider>().loadMyDisputes(asWorker: true);
       }
     });
-  }
-
-  List<Dispute> _filtered(List<Dispute> all) {
-    if (_filter == 'all') return all;
-    if (_filter == 'resolved') {
-      return all
-          .where((d) =>
-              d.status.startsWith('resolved') ||
-              d.status == 'closed' ||
-              d.status == 'appealed')
-          .toList();
-    }
-    return all.where((d) => d.status == _filter).toList();
   }
 
   void _showDetail(Dispute dispute) {
@@ -105,16 +84,33 @@ class _TechnicianDisputesScreenState
             );
           }
 
-          final all = provider.disputes;
-          final filtered = _filtered(all);
+          // Filter duplicates by unique ID
+          final seenIds = <String>{};
+          final all = <Dispute>[];
+          for (final d in provider.disputes) {
+            if (d.id.isNotEmpty && !seenIds.contains(d.id)) {
+              seenIds.add(d.id);
+              all.add(d);
+            }
+          }
 
-          final open = all.where((d) => d.status == 'open').length;
-          final awaiting =
-              all.where((d) => d.status == 'awaiting_evidence').length;
+          final open = all.where((d) => d.status == 'open' || d.status == 'reviewing' || d.status == 'escalated').length;
+          final awaiting = all.where((d) => d.status == 'awaiting_evidence' || d.status == 'appealed').length;
           final resolved = all
               .where((d) =>
                   d.status.startsWith('resolved') || d.status == 'closed')
               .length;
+
+          // Filter disputes by selected tab
+          final filtered = all.where((d) {
+            if (_selectedTab == 'open') {
+              return d.status == 'open' || d.status == 'reviewing' || d.status == 'escalated';
+            } else if (_selectedTab == 'awaiting') {
+              return d.status == 'awaiting_evidence' || d.status == 'appealed';
+            } else {
+              return d.status.startsWith('resolved') || d.status == 'closed';
+            }
+          }).toList();
 
           return RefreshIndicator(
             color: servio.accent,
@@ -123,20 +119,19 @@ class _TechnicianDisputesScreenState
               slivers: <Widget>[
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                    child: _StatsRow(
-                      total: all.length,
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    child: _DisputesSummaryGrid(
+                      loading: provider.loading && provider.disputes.isEmpty,
                       open: open,
                       awaiting: awaiting,
                       resolved: resolved,
+                      selectedTab: _selectedTab,
+                      onTabChanged: (String tab) {
+                        setState(() {
+                          _selectedTab = tab;
+                        });
+                      },
                     ),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: _FilterRow(
-                    filters: _filters,
-                    selected: _filter,
-                    onSelect: (f) => setState(() => _filter = f),
                   ),
                 ),
                 if (filtered.isEmpty)
@@ -150,9 +145,11 @@ class _TechnicianDisputesScreenState
                               size: 48, color: servio.textSecondary),
                           const SizedBox(height: 12),
                           Text(
-                            _filter == 'all'
-                                ? 'No disputes yet.'
-                                : 'No disputes match this filter.',
+                            _selectedTab == 'open'
+                                ? 'No open disputes.'
+                                : _selectedTab == 'awaiting'
+                                    ? 'No disputes awaiting evidence.'
+                                    : 'No resolved disputes.',
                             style: theme.textTheme.bodyMedium
                                 ?.copyWith(color: servio.textSecondary),
                           ),
@@ -185,136 +182,11 @@ class _TechnicianDisputesScreenState
   }
 }
 
-// ── Stats Row ─────────────────────────────────────────────────────────────────
 
-class _StatsRow extends StatelessWidget {
-  const _StatsRow({
-    required this.total,
-    required this.open,
-    required this.awaiting,
-    required this.resolved,
-  });
-
-  final int total;
-  final int open;
-  final int awaiting;
-  final int resolved;
-
-  @override
-  Widget build(BuildContext context) {
-    final servio = context.servio;
-    final dividerColor = servio.border.withValues(alpha: 0.6);
-
-    return ServioCard(
-      radius: ServioRadius.lg,
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      child: Row(
-        children: <Widget>[
-          _Stat(label: 'Total', value: '$total', color: servio.accent),
-          SizedBox(
-              height: 36,
-              child: VerticalDivider(color: dividerColor, width: 1)),
-          _Stat(label: 'Open', value: '$open', color: ServioColors.warning),
-          SizedBox(
-              height: 36,
-              child: VerticalDivider(color: dividerColor, width: 1)),
-          _Stat(
-              label: 'Evidence',
-              value: '$awaiting',
-              color: ServioColors.info),
-          SizedBox(
-              height: 36,
-              child: VerticalDivider(color: dividerColor, width: 1)),
-          _Stat(
-              label: 'Resolved',
-              value: '$resolved',
-              color: ServioColors.success),
-        ],
-      ),
-    );
-  }
-}
-
-class _Stat extends StatelessWidget {
-  const _Stat(
-      {required this.label, required this.value, required this.color});
-  final String label;
-  final String value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final servio = context.servio;
-    return Expanded(
-      child: Column(
-        children: <Widget>[
-          Text(
-            value,
-            style: theme.textTheme.titleLarge?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: theme.textTheme.bodySmall
-                ?.copyWith(color: servio.textSecondary),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Filter Row ────────────────────────────────────────────────────────────────
-
-class _FilterRow extends StatelessWidget {
-  const _FilterRow({
-    required this.filters,
-    required this.selected,
-    required this.onSelect,
-  });
-
-  final List<(String, String)> filters;
-  final String selected;
-  final ValueChanged<String> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    final servio = context.servio;
-    return SizedBox(
-      height: 52,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        children: filters.map(((String, String) f) {
-          final active = selected == f.$2;
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: FilterChip(
-              label: Text(f.$1),
-              selected: active,
-              onSelected: (_) => onSelect(f.$2),
-              selectedColor: ServioColors.tint(servio.accent),
-              checkmarkColor: servio.accent,
-              labelStyle: TextStyle(
-                color: active ? servio.accent : servio.textSecondary,
-                fontWeight:
-                    active ? FontWeight.w600 : FontWeight.w400,
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-}
 
 // ── Dispute Card ──────────────────────────────────────────────────────────────
 
-class _DisputeCard extends StatelessWidget {
+class _DisputeCard extends StatefulWidget {
   const _DisputeCard({required this.dispute, required this.onTap});
   final Dispute dispute;
   final VoidCallback onTap;
@@ -359,88 +231,174 @@ class _DisputeCard extends StatelessWidget {
       };
 
   @override
+  State<_DisputeCard> createState() => _DisputeCardState();
+}
+
+class _DisputeCardState extends State<_DisputeCard> {
+  bool _isPressed = false;
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final servio = context.servio;
-    final sc = statusColor(dispute.status, servio);
+    final sc = _DisputeCard.statusColor(widget.dispute.status, servio);
     final dateStr =
-        '${dispute.createdAt.day.toString().padLeft(2, '0')}/'
-        '${dispute.createdAt.month.toString().padLeft(2, '0')}/'
-        '${dispute.createdAt.year}';
+        '${widget.dispute.createdAt.day.toString().padLeft(2, '0')}/'
+        '${widget.dispute.createdAt.month.toString().padLeft(2, '0')}/'
+        '${widget.dispute.createdAt.year}';
 
-    return ServioCard(
-      radius: ServioRadius.lg,
-      onTap: onTap,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              _Badge(label: statusLabel(dispute.status), color: sc),
-              const SizedBox(width: 8),
-              _Badge(
-                label: dispute.severity.toUpperCase(),
-                color: _severityColor(dispute.severity),
-                fontSize: 10,
-              ),
-              const Spacer(),
-              Text(
-                dateStr,
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: servio.textSecondary),
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapUp: (_) => setState(() => _isPressed = false),
+      onTapCancel: () => setState(() => _isPressed = false),
+      onTap: widget.onTap,
+      child: AnimatedScale(
+        scale: _isPressed ? 0.98 : 1.0,
+        duration: const Duration(milliseconds: 100),
+        curve: Curves.easeOut,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          decoration: BoxDecoration(
+            color: theme.cardColor,
+            borderRadius: BorderRadius.circular(ServioRadius.lg),
+            border: Border.all(
+              color: servio.border.withValues(alpha: 0.3),
+              width: 1.0,
+            ),
+            boxShadow: <BoxShadow>[
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 6,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          Text(
-            categoryLabel(dispute.category),
-            style: theme.textTheme.titleSmall
-                ?.copyWith(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            dispute.reason,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodySmall
-                ?.copyWith(color: servio.textSecondary),
-          ),
-          if (dispute.status == 'awaiting_evidence') ...<Widget>[
-            const SizedBox(height: 10),
-            Row(
-              children: <Widget>[
-                const Icon(Icons.upload_file_outlined,
-                    size: 14, color: ServioColors.danger),
-                const SizedBox(width: 6),
-                Text(
-                  'Evidence required — tap to upload',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: ServioColors.danger,
-                    fontWeight: FontWeight.w600,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              // Top Status Badge + Severity + Date
+              Row(
+                children: <Widget>[
+                  _Badge(label: _DisputeCard.statusLabel(widget.dispute.status), color: sc),
+                  const SizedBox(width: 6),
+                  _Badge(
+                    label: widget.dispute.severity.toUpperCase(),
+                    color: _DisputeCard._severityColor(widget.dispute.severity),
+                    fontSize: 9,
+                  ),
+                  const Spacer(),
+                  Row(
+                    children: [
+                      Icon(Icons.access_time_rounded, size: 12, color: servio.textSecondary),
+                      const SizedBox(width: 4),
+                      Text(
+                        dateStr,
+                        style: theme.textTheme.bodySmall?.copyWith(color: servio.textSecondary, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Dispute Category / Title and details
+              Text(
+                _DisputeCard.categoryLabel(widget.dispute.category),
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15,
+                  letterSpacing: -0.2,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                widget.dispute.reason,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: servio.textSecondary,
+                  height: 1.4,
+                ),
+              ),
+
+              // Awaiting Evidence Highlight
+              if (widget.dispute.status == 'awaiting_evidence') ...<Widget>[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: ServioColors.danger.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(ServioRadius.md),
+                    border: Border.all(color: ServioColors.danger.withValues(alpha: 0.25)),
+                  ),
+                  child: const Row(
+                    children: <Widget>[
+                      Icon(Icons.upload_file_outlined, size: 14, color: ServioColors.danger),
+                      SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Evidence required — tap to upload',
+                          style: TextStyle(
+                            color: ServioColors.danger,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
-            ),
-          ],
-          if (dispute.resolution != null &&
-              dispute.resolution!.isNotEmpty) ...<Widget>[
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: servio.backgroundSoft,
-                borderRadius: BorderRadius.circular(ServioRadius.sm),
-              ),
-              child: Text(
-                'Resolution: ${dispute.resolution}',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: servio.textSecondary),
-              ),
-            ),
-          ],
-        ],
+
+              // Resolution details
+              if (widget.dispute.resolution != null && widget.dispute.resolution!.isNotEmpty) ...<Widget>[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: servio.success.withValues(alpha: 0.07),
+                    borderRadius: BorderRadius.circular(ServioRadius.md),
+                    border: Border.all(color: servio.success.withValues(alpha: 0.2)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Icon(Icons.check_circle_outline_rounded, size: 15, color: servio.success),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Text(
+                              'Resolution Decision',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: servio.success,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 10,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              widget.dispute.resolution!,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: servio.success,
+                                height: 1.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1301,6 +1259,149 @@ class _TimelineItem extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Disputes Summary Grid — Open / Awaiting Evidence / Resolved
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _DisputesSummaryGrid extends StatelessWidget {
+  const _DisputesSummaryGrid({
+    required this.loading,
+    required this.open,
+    required this.awaiting,
+    required this.resolved,
+    required this.selectedTab,
+    required this.onTabChanged,
+  });
+
+  final bool loading;
+  final int open;
+  final int awaiting;
+  final int resolved;
+  final String selectedTab;
+  final ValueChanged<String> onTabChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: _DisputesSummaryCard(
+            label: 'Open Disputes',
+            count: open,
+            color: ServioColors.warning,
+            loading: loading,
+            isSelected: selectedTab == 'open',
+            onTap: () => onTabChanged('open'),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _DisputesSummaryCard(
+            label: 'Awaiting Evidence',
+            count: awaiting,
+            color: ServioColors.info,
+            loading: loading,
+            isSelected: selectedTab == 'awaiting',
+            onTap: () => onTabChanged('awaiting'),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _DisputesSummaryCard(
+            label: 'Resolved',
+            count: resolved,
+            color: ServioColors.success,
+            loading: loading,
+            isSelected: selectedTab == 'resolved',
+            onTap: () => onTabChanged('resolved'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DisputesSummaryCard extends StatelessWidget {
+  const _DisputesSummaryCard({
+    required this.label,
+    required this.count,
+    required this.color,
+    required this.loading,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String label;
+  final int count;
+  final Color color;
+  final bool loading;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
+        decoration: BoxDecoration(
+          color: isSelected
+              ? color.withValues(alpha: 0.08)
+              : theme.cardColor,
+          borderRadius: BorderRadius.circular(ServioRadius.md),
+          border: Border.all(
+            color: isSelected
+                ? color
+                : servio.border.withValues(alpha: 0.3),
+            width: isSelected ? 1.5 : 1.0,
+          ),
+          boxShadow: isSelected
+              ? <BoxShadow>[
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.12),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : null,
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+        child: Opacity(
+          opacity: isSelected ? 1.0 : 0.65,
+          child: Column(
+            children: <Widget>[
+              if (loading)
+                ServioSkeleton(height: 24, width: 40, radius: ServioRadius.sm)
+              else
+                Text(
+                  '$count',
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: servio.textSecondary,
+                  fontSize: 10,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

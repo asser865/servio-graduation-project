@@ -62,6 +62,15 @@ class UserAccount {
     this.verificationRejectionReason = '',
     this.verificationSubmittedAt,
     this.verificationReviewedAt,
+    this.serviceIds = const <String>[],
+    this.pendingCategories = const <String>[],
+    this.minFee = 0.0,
+    this.travelFee = 0.0,
+    this.emergencyMultiplier = 1.0,
+    this.acceptCash = false,
+    this.acceptCard = false,
+    this.acceptInstapay = false,
+    this.acceptWallet = false,
   });
 
   final String id;
@@ -99,6 +108,15 @@ class UserAccount {
   final String verificationRejectionReason;
   final DateTime? verificationSubmittedAt;
   final DateTime? verificationReviewedAt;
+  final List<String> serviceIds;
+  final List<String> pendingCategories;
+  final double minFee;
+  final double travelFee;
+  final double emergencyMultiplier;
+  final bool acceptCash;
+  final bool acceptCard;
+  final bool acceptInstapay;
+  final bool acceptWallet;
 
   String get initials {
     if (avatarInitials.isNotEmpty) return avatarInitials;
@@ -163,6 +181,15 @@ class UserAccount {
     String? verificationRejectionReason,
     DateTime? verificationSubmittedAt,
     DateTime? verificationReviewedAt,
+    List<String>? serviceIds,
+    List<String>? pendingCategories,
+    double? minFee,
+    double? travelFee,
+    double? emergencyMultiplier,
+    bool? acceptCash,
+    bool? acceptCard,
+    bool? acceptInstapay,
+    bool? acceptWallet,
   }) =>
       UserAccount(
         id: id ?? this.id,
@@ -200,6 +227,15 @@ class UserAccount {
         verificationRejectionReason: verificationRejectionReason ?? this.verificationRejectionReason,
         verificationSubmittedAt: verificationSubmittedAt ?? this.verificationSubmittedAt,
         verificationReviewedAt: verificationReviewedAt ?? this.verificationReviewedAt,
+        serviceIds: serviceIds ?? this.serviceIds,
+        pendingCategories: pendingCategories ?? this.pendingCategories,
+        minFee: minFee ?? this.minFee,
+        travelFee: travelFee ?? this.travelFee,
+        emergencyMultiplier: emergencyMultiplier ?? this.emergencyMultiplier,
+        acceptCash: acceptCash ?? this.acceptCash,
+        acceptCard: acceptCard ?? this.acceptCard,
+        acceptInstapay: acceptInstapay ?? this.acceptInstapay,
+        acceptWallet: acceptWallet ?? this.acceptWallet,
       );
 
   Map<String, dynamic> toJson() => {
@@ -238,6 +274,15 @@ class UserAccount {
         'verificationRejectionReason': verificationRejectionReason,
         'verificationSubmittedAt': verificationSubmittedAt?.toIso8601String(),
         'verificationReviewedAt': verificationReviewedAt?.toIso8601String(),
+        'services': serviceIds,
+        'pendingCategories': pendingCategories,
+        'minFee': minFee,
+        'travelFee': travelFee,
+        'emergencyMultiplier': emergencyMultiplier,
+        'acceptCash': acceptCash,
+        'acceptCard': acceptCard,
+        'acceptInstapay': acceptInstapay,
+        'acceptWallet': acceptWallet,
       };
 
   factory UserAccount.fromJson(Map<String, dynamic> json) => UserAccount(
@@ -281,6 +326,15 @@ class UserAccount {
         verificationRejectionReason: (json['verificationRejectionReason'] as String?) ?? '',
         verificationSubmittedAt: DateTime.tryParse((json['verificationSubmittedAt'] as String?) ?? ''),
         verificationReviewedAt: DateTime.tryParse((json['verificationReviewedAt'] as String?) ?? ''),
+        serviceIds: List<String>.from((json['services'] as List<dynamic>?) ?? []),
+        pendingCategories: List<String>.from((json['pendingCategories'] as List<dynamic>?) ?? []),
+        minFee: ((json['minFee'] as num?) ?? 0).toDouble(),
+        travelFee: ((json['travelFee'] as num?) ?? 0).toDouble(),
+        emergencyMultiplier: ((json['emergencyMultiplier'] as num?) ?? 1.0).toDouble(),
+        acceptCash: (json['acceptCash'] as bool?) ?? false,
+        acceptCard: (json['acceptCard'] as bool?) ?? false,
+        acceptInstapay: (json['acceptInstapay'] as bool?) ?? false,
+        acceptWallet: (json['acceptWallet'] as bool?) ?? false,
       );
 
   // Maps backend API response (uses _id, role: 'user'|'worker', nested address)
@@ -329,6 +383,19 @@ class UserAccount {
           (json['verificationSubmittedAt'] as String?) ?? ''),
       verificationReviewedAt: DateTime.tryParse(
           (json['verificationReviewedAt'] as String?) ?? ''),
+      // services may be populated objects {_id, title} OR plain ID strings
+      serviceIds: _stringListFromJson(json['services']),
+      // pendingCategories is always a plain string array in the backend schema
+      pendingCategories: List<String>.from(
+          (json['pendingCategories'] as List<dynamic>?) ?? []),
+      minFee: ((json['minFee'] as num?) ?? 0).toDouble(),
+      travelFee: ((json['travelFee'] as num?) ?? 0).toDouble(),
+      emergencyMultiplier:
+          ((json['emergencyMultiplier'] as num?) ?? 1.0).toDouble(),
+      acceptCash: (json['acceptCash'] as bool?) ?? false,
+      acceptCard: (json['acceptCard'] as bool?) ?? false,
+      acceptInstapay: (json['acceptInstapay'] as bool?) ?? false,
+      acceptWallet: (json['acceptWallet'] as bool?) ?? false,
     );
   }
 }
@@ -350,4 +417,12 @@ List<Map<String, String>> _portfolioFromJson(dynamic value) {
       'name': (m['name'] as String?) ?? '',
     };
   }).toList();
+}
+
+List<String> _stringListFromJson(dynamic value) {
+  if (value is! List<dynamic>) return const <String>[];
+  return value
+      .map((e) => e is Map ? (e['_id'] as String?) ?? '' : (e as String?) ?? '')
+      .where((s) => s.isNotEmpty)
+      .toList();
 }

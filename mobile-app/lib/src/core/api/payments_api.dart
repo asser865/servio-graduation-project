@@ -15,6 +15,9 @@ class EarningsSummary {
     required this.completedJobs,
     required this.payoutMethod,
     required this.payoutSchedule,
+    required this.availableBalance,
+    required this.thisMonthEarnings,
+    required this.lastMonthEarnings,
     this.bankName,
     this.accountHolder,
     this.accountNumber,
@@ -26,6 +29,9 @@ class EarningsSummary {
   final int completedJobs;
   final String payoutMethod;
   final String payoutSchedule;
+  final double availableBalance;
+  final double thisMonthEarnings;
+  final double lastMonthEarnings;
   final String? bankName;
   final String? accountHolder;
   final String? accountNumber;
@@ -33,12 +39,16 @@ class EarningsSummary {
 
   factory EarningsSummary.fromJson(Map<String, dynamic> json) {
     final wallet = json['wallet'] as Map<String, dynamic>? ?? {};
+    final breakdown = json['breakdown'] as Map<String, dynamic>? ?? {};
     final details = wallet['payoutDetails'] as Map<String, dynamic>? ?? {};
 
     return EarningsSummary(
-      totalEarnings: ((wallet['totalEarned'] as num?) ?? 0).toDouble(),
-      pendingPayout: ((wallet['pendingBalance'] as num?) ?? 0).toDouble(),
-      completedJobs: ((json['completedJobs'] as num?) ?? 0).toInt(),
+      totalEarnings: ((breakdown['lifetimeTakeHome'] as num?) ?? (wallet['totalEarned'] as num?) ?? 0).toDouble(),
+      pendingPayout: ((breakdown['pendingRelease'] as num?) ?? (wallet['pendingBalance'] as num?) ?? 0).toDouble(),
+      completedJobs: ((breakdown['completedJobs'] as num?) ?? (json['completedJobs'] as num?) ?? 0).toInt(),
+      availableBalance: ((breakdown['availableToWithdraw'] as num?) ?? (wallet['balance'] as num?) ?? 0).toDouble(),
+      thisMonthEarnings: ((breakdown['thisMonthTakeHome'] as num?) ?? 0).toDouble(),
+      lastMonthEarnings: ((breakdown['lastMonthTakeHome'] as num?) ?? 0).toDouble(),
       payoutMethod: wallet['payoutMethod'] as String? ?? 'bank',
       payoutSchedule: wallet['payoutSchedule'] as String? ?? 'weekly',
       bankName: details['bankName'] as String?,

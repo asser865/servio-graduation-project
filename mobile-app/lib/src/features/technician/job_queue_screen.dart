@@ -11,17 +11,20 @@ import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_tab_shell.dart';
-import 'job_details_screen.dart';
 import 'availability_manager_screen.dart';
+import 'job_details_screen.dart';
+import 'technician_shell.dart';
 import 'widgets/duration_estimation_sheet.dart';
 
 class JobQueueScreen extends StatefulWidget {
   const JobQueueScreen({
     super.key,
     this.autoRefreshInterval = const Duration(seconds: 20),
+    this.showBackButton = false,
   });
 
   final Duration? autoRefreshInterval;
+  final bool showBackButton;
 
   @override
   State<JobQueueScreen> createState() => _JobQueueScreenState();
@@ -427,89 +430,8 @@ class _JobQueueScreenState extends State<JobQueueScreen>
         '${_formatCurrentDate()} • $activeRemainingCount ${activeRemainingCount == 1 ? 'Job' : 'Jobs'} Remaining';
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Technician Portal'),
-        backgroundColor: theme.scaffoldBackgroundColor,
-        elevation: 0,
-        centerTitle: false,
-        automaticallyImplyLeading: false,
-        titleTextStyle: theme.textTheme.headlineMedium?.copyWith(
-          fontFamily: 'Poppins',
-          fontSize: 22,
-          fontWeight: FontWeight.bold,
-          color: navyAnchor,
-        ),
-        actions: <Widget>[
-          Builder(
-            builder: (context) {
-              final account = context.watch<SessionProvider>().account;
-              final isAvailable = account?.isAvailable ?? false;
-              final statusColor = isAvailable ? const Color(0xFF1B8A5A) : const Color(0xFFD32F2F); // Green vs Red
-
-              return Tooltip(
-                message: isAvailable ? 'Available - Tap to manage schedule' : 'Offline/Busy - Tap to manage schedule',
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(20),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const AvailabilityManagerScreen(),
-                        ),
-                      );
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: statusColor.withValues(alpha: 0.3),
-                          width: 1,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: <Widget>[
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: statusColor,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: statusColor.withValues(alpha: 0.4),
-                                  blurRadius: 4,
-                                  spreadRadius: 1,
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Icon(
-                            Icons.calendar_month_rounded,
-                            size: 18,
-                            color: navyAnchor,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            color: navyAnchor,
-            onPressed: () {},
-          ),
-          const SizedBox(width: 4),
-        ],
-      ),
-      body: RefreshIndicator(
+      body: SafeArea(
+        child: RefreshIndicator(
         onRefresh: () => _fetchJobs(silent: false),
         child: _loading
             ? const Center(child: CircularProgressIndicator())
@@ -546,28 +468,138 @@ class _JobQueueScreenState extends State<JobQueueScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: <Widget>[
-                        // ── Page Title & Stats ─────────────────────────────────
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        // ── Header: back button + title + availability ────────
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            Text(
-                              'Job Queue',
-                              style: TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 28,
-                                fontWeight: FontWeight.bold,
-                                color: navyAnchor,
+                            // Back button
+                            GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () {
+                                final nav = Navigator.of(context);
+                                if (nav.canPop()) {
+                                  nav.pop();
+                                } else {
+                                  nav.pushAndRemoveUntil(
+                                    MaterialPageRoute<void>(
+                                        builder: (_) =>
+                                            const TechnicianShell()),
+                                    (Route<dynamic> route) => false,
+                                  );
+                                }
+                              },
+                              child: Container(
+                                width: 40,
+                                height: 40,
+                                margin: const EdgeInsets.only(right: 14),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.surface,
+                                  shape: BoxShape.circle,
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Color.fromRGBO(34, 40, 49, 0.08),
+                                      blurRadius: 12,
+                                      offset: Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: Icon(
+                                  Icons.arrow_back_ios_new_rounded,
+                                  size: 16,
+                                  color: navyAnchor,
+                                ),
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              dynamicSubtitle,
-                              style: TextStyle(
-                                fontFamily: 'Inter',
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: servio.textSecondary,
+                            // Title + subtitle
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Job Queue',
+                                    style: TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.bold,
+                                      color: navyAnchor,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    dynamicSubtitle,
+                                    style: TextStyle(
+                                      fontFamily: 'Inter',
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: servio.textSecondary,
+                                    ),
+                                  ),
+                                ],
                               ),
+                            ),
+                            // Availability button
+                            Builder(
+                              builder: (ctx) {
+                                final account =
+                                    ctx.watch<SessionProvider>().account;
+                                final isAvailable =
+                                    account?.isAvailable ?? false;
+                                final statusColor = isAvailable
+                                    ? const Color(0xFF1B8A5A)
+                                    : const Color(0xFFD32F2F);
+                                return Tooltip(
+                                  message: isAvailable
+                                      ? 'Available – tap to manage schedule'
+                                      : 'Offline/Busy – tap to manage schedule',
+                                  child: GestureDetector(
+                                    onTap: () => Navigator.of(ctx).push(
+                                      MaterialPageRoute<void>(
+                                        builder: (_) =>
+                                            const AvailabilityManagerScreen(),
+                                      ),
+                                    ),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 12, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: statusColor.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(
+                                          color:
+                                              statusColor.withValues(alpha: 0.3),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Container(
+                                            width: 8,
+                                            height: 8,
+                                            decoration: BoxDecoration(
+                                              color: statusColor,
+                                              shape: BoxShape.circle,
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: statusColor.withValues(
+                                                      alpha: 0.4),
+                                                  blurRadius: 4,
+                                                  spreadRadius: 1,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Icon(
+                                            Icons.calendar_month_rounded,
+                                            size: 18,
+                                            color: navyAnchor,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
                           ],
                         ),
@@ -724,6 +756,7 @@ class _JobQueueScreenState extends State<JobQueueScreen>
                       ],
                     ),
                   ),
+        ),
       ),
     );
   }
@@ -829,13 +862,24 @@ class _JobQueueScreenState extends State<JobQueueScreen>
                             ),
                           ),
                           const SizedBox(height: 4),
-                          Text(
-                            location,
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 14,
-                              color: servio.textSecondary,
-                            ),
+                          Row(
+                            children: [
+                              Icon(Icons.location_on_outlined,
+                                  size: 14, color: servio.textSecondary),
+                              const SizedBox(width: 3),
+                              Flexible(
+                                child: Text(
+                                  location,
+                                  style: TextStyle(
+                                    fontFamily: 'Inter',
+                                    fontSize: 14,
+                                    color: servio.textSecondary,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -859,21 +903,10 @@ class _JobQueueScreenState extends State<JobQueueScreen>
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
                 // Metadata Row
+                const SizedBox(height: 16),
                 Row(
                   children: [
-                    Icon(Icons.location_on_outlined, size: 16, color: servio.textSecondary),
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
-                        job.addressCity,
-                        style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: servio.textSecondary),
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
                     Icon(Icons.schedule_outlined, size: 16, color: servio.textSecondary),
                     const SizedBox(width: 4),
                     Flexible(
@@ -897,6 +930,7 @@ class _JobQueueScreenState extends State<JobQueueScreen>
                     ),
                   ],
                 ),
+
                 const SizedBox(height: 20),
                 // Actions
                 Row(

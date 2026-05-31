@@ -74,3 +74,8 @@ AI_SERVICE_AUDIT_REPORT.md
 
 # Stitch folders
 stitch-*/
+
+# Antigravity CLI
+.antigravitycli/
+.antigravitycli
+

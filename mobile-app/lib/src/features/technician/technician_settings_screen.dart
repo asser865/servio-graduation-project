@@ -7,7 +7,9 @@ import '../../design_system/servio_tokens.dart';
 import '../shared/account_screen.dart';
 import 'technician_edit_profile_screen.dart';
 import 'technician_notification_settings_screen.dart';
+import 'technician_pricing_screen.dart';
 import 'technician_security_screen.dart';
+import 'technician_services_screen.dart';
 import 'payout_summary_screen.dart';
 import 'service_area_screen.dart';
 import 'technician_disputes_screen.dart';
@@ -78,7 +80,7 @@ class TechnicianSettingsScreen extends StatelessWidget {
                   iconColor: profileIcon,
                   backgroundColor: profileBg,
                   label: 'Edit Profile',
-                  subtitle: 'Name, photo, skills, rate',
+                  subtitle: 'Name, photo, bio, rate',
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
                       builder: (_) => const TechnicianEditProfileScreen(),
@@ -94,6 +96,30 @@ class TechnicianSettingsScreen extends StatelessWidget {
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
                       builder: (_) => const ServiceAreaScreen(),
+                    ),
+                  ),
+                ),
+                _NavTile(
+                  icon: Icons.handyman_rounded,
+                  iconColor: profileIcon,
+                  backgroundColor: profileBg,
+                  label: 'My Services',
+                  subtitle: 'Select services you offer',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const TechnicianServicesScreen(),
+                    ),
+                  ),
+                ),
+                _NavTile(
+                  icon: Icons.attach_money_rounded,
+                  iconColor: profileIcon,
+                  backgroundColor: profileBg,
+                  label: 'Pricing & Payments',
+                  subtitle: 'Fees, multipliers, payment methods',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const TechnicianPricingScreen(),
                     ),
                   ),
                 ),

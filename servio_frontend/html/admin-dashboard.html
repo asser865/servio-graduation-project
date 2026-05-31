@@ -1097,6 +1097,27 @@
           <p class="admin-panel__subtitle">Operational cases for late arrivals, no-shows, in-work problems, and post-completion complaints.</p>
         </div>
 
+        <div class="admin-kpi-grid" style="margin-bottom: 2rem;">
+          <div class="admin-kpi-card">
+            <div class="admin-kpi-card__main">
+              <span class="admin-kpi-card__label">Open Issues</span>
+              <div class="admin-kpi-card__value" id="kpi-support-issues" style="color: var(--color-warning);">0</div>
+            </div>
+          </div>
+          <div class="admin-kpi-card">
+            <div class="admin-kpi-card__main">
+              <span class="admin-kpi-card__label">Open Disputes</span>
+              <div class="admin-kpi-card__value" id="kpi-support-disputes" style="color: var(--color-danger);">0</div>
+            </div>
+          </div>
+          <div class="admin-kpi-card">
+            <div class="admin-kpi-card__main">
+              <span class="admin-kpi-card__label">Resolved</span>
+              <div class="admin-kpi-card__value" id="kpi-support-resolved" style="color: var(--color-success);">0</div>
+            </div>
+          </div>
+        </div>
+
         <div class="admin-support-toolbar" aria-label="Support issue filters">
           <select id="supportStatusFilter">
             <option value="">All statuses</option>
@@ -1142,6 +1163,76 @@
             </thead>
             <tbody>
               <tr><td colspan="8" class="center-align" style="padding: 3rem; color: var(--color-text-muted);">Loading support issues...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- ── Problem Reports ── -->
+        <div class="admin-panel__header" style="margin-top: 2.5rem;">
+          <h2>Problem Reports</h2>
+          <p class="admin-panel__subtitle">App bugs, wrong information, payment issues, and account problems reported by users.</p>
+        </div>
+
+        <div class="admin-support-toolbar" aria-label="Problem report filters">
+          <select id="problemReportStatusFilter">
+            <option value="">All statuses</option>
+            <option value="open">Open</option>
+            <option value="resolved">Resolved</option>
+          </select>
+          <input id="problemReportSearch" type="search" placeholder="Search category, description, reporter">
+          <button class="bk-action-btn" type="button" id="problemReportRefreshBtn">Refresh</button>
+        </div>
+
+        <div class="admin-table-wrap" style="border:1px solid var(--color-border); border-radius:12px; overflow:hidden; background:var(--color-surface); margin-bottom: 2rem;">
+          <table class="bk-table" id="problemReportsTable">
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th>Reporter</th>
+                <th>Description</th>
+                <th>Status</th>
+                <th>Submitted</th>
+                <th class="center-align">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="6" class="center-align" style="padding: 3rem; color: var(--color-text-muted);">Loading problem reports...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- ── Contact Messages ── -->
+        <div class="admin-panel__header">
+          <h2>Contact Messages</h2>
+          <p class="admin-panel__subtitle">Messages sent by users through the Contact Us form.</p>
+        </div>
+
+        <div class="admin-support-toolbar" aria-label="Contact message filters">
+          <select id="contactMessageStatusFilter">
+            <option value="">All statuses</option>
+            <option value="new">New</option>
+            <option value="replied">Replied</option>
+            <option value="closed">Closed</option>
+          </select>
+          <input id="contactMessageSearch" type="search" placeholder="Search name, email, subject, message">
+          <button class="bk-action-btn" type="button" id="contactMessageRefreshBtn">Refresh</button>
+        </div>
+
+        <div class="admin-table-wrap" style="border:1px solid var(--color-border); border-radius:12px; overflow:hidden; background:var(--color-surface);">
+          <table class="bk-table" id="contactMessagesTable">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Subject</th>
+                <th>Message</th>
+                <th>Status</th>
+                <th>Received</th>
+                <th class="center-align">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="7" class="center-align" style="padding: 3rem; color: var(--color-text-muted);">Loading contact messages...</td></tr>
             </tbody>
           </table>
         </div>
@@ -2731,6 +2822,18 @@
       </div>
       <div class="admin-modal__body" id="adminSupportBody">
         <p class="empty-state">Select a support issue to review.</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="adminContactModal" class="admin-modal-backdrop" hidden aria-modal="true" role="dialog" aria-labelledby="adminContactTitle">
+    <div class="admin-modal admin-modal--wide">
+      <div class="admin-modal__header">
+        <h3 class="admin-modal__title" id="adminContactTitle">Contact message details</h3>
+        <button class="admin-modal__close" data-modal-close="adminContactModal" aria-label="Close">&times;</button>
+      </div>
+      <div class="admin-modal__body" id="adminContactBody">
+        <p class="empty-state">Select a contact message to review.</p>
       </div>
     </div>
   </div>
