@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+import '../../core/api/api_client.dart';
+import '../../core/api/contact_api.dart';
 
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
@@ -46,17 +50,30 @@ class _ContactScreenState extends State<ContactScreen> {
     }
 
     setState(() => _isSubmitting = true);
-    await Future<void>.delayed(const Duration(milliseconds: 700));
-    if (!mounted) return;
-
-    setState(() {
-      _isSubmitting = false;
-      _successMessage = 'Message sent. We will reply within 2 hours.';
-      _nameController.clear();
-      _emailController.clear();
-      _subjectController.clear();
-      _messageController.clear();
-    });
+    try {
+      final api = ContactApi(context.read<ApiClient>());
+      await api.sendMessage(
+        name: _nameController.text.trim(),
+        email: _emailController.text.trim(),
+        subject: _subjectController.text.trim(),
+        message: _messageController.text.trim(),
+      );
+      if (!mounted) return;
+      setState(() {
+        _isSubmitting = false;
+        _successMessage = 'Message sent. We will reply within 2 hours.';
+        _nameController.clear();
+        _emailController.clear();
+        _subjectController.clear();
+        _messageController.clear();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isSubmitting = false;
+        _errorMessage = 'Failed to send message. Please try again.';
+      });
+    }
   }
 
   Future<void> _launchContact(Uri uri) async {

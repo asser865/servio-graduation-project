@@ -1,5 +1,7 @@
 require('express-async-errors');
 
+const fs = require('fs');
+const path = require('path');
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
@@ -25,7 +27,9 @@ const savedCardRoutes      = require('./modules/savedCards/savedCard.routes');
 const platformRoutes  = require('./modules/platform/platform.routes');
 const locationsRoutes = require('./modules/platform/locations.routes');
 const favoritesRoutes = require('./modules/favorites/favorite.routes');
-const supportIssueRoutes = require('./modules/support/support-issue.routes');
+const supportIssueRoutes    = require('./modules/support/support-issue.routes');
+const problemReportRoutes   = require('./modules/support/problem-report.routes');
+const contactMessageRoutes  = require('./modules/support/contact-message.routes');
 
 const { notFound, errorHandler } = require('./middleware/error.middleware');
 
@@ -64,6 +68,21 @@ if (process.env.NODE_ENV !== 'test') {
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Ensure upload folders exist on disk
+if (!fs.existsSync(path.join(uploadRoot, 'avatar'))) {
+  fs.mkdirSync(path.join(uploadRoot, 'avatar'), { recursive: true });
+}
+
+// Fallback dynamic middleware for missing user avatar files to prevent 404 image load exceptions
+app.get('/uploads/avatar/:filename', (req, res, next) => {
+  const filePath = path.join(uploadRoot, 'avatar', req.params.filename);
+  if (!fs.existsSync(filePath)) {
+    // Redirects to a beautiful themed initial placeholder matching Servio neutralWarm (#e3d5ca) and accent (#9a8c73) branding colors
+    return res.redirect('https://ui-avatars.com/api/?name=S&background=e3d5ca&color=9a8c73');
+  }
+  next();
+});
+
 app.use('/uploads', (req, res, next) => {
   res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
   next();
@@ -100,6 +119,8 @@ app.use(`${API_PREFIX}/platform-settings`, platformRoutes);
 app.use(`${API_PREFIX}/locations`, locationsRoutes);
 app.use(`${API_PREFIX}/favorites`, favoritesRoutes);
 app.use(`${API_PREFIX}/support`, supportIssueRoutes);
+app.use(`${API_PREFIX}/reports`, problemReportRoutes);
+app.use(`${API_PREFIX}/contact`, contactMessageRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

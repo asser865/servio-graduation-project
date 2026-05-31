@@ -116,4 +116,10 @@ class ApiEndpoints {
   static String supportIssueStatus(String id) => '/support/issues/$id/status';
   static String supportIssueResolve(String id) => '/support/issues/$id/resolve';
   static String supportIssueEscalate(String id) => '/support/issues/$id/escalate-dispute';
+
+  // ── Problem reports ──────────────────────────────────────────────────────────
+  static const String problemReports = '/reports/problems';
+
+  // ── Contact ──────────────────────────────────────────────────────────────────
+  static const String contact = '/contact';
 }

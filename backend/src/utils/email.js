@@ -427,4 +427,89 @@ async function sendSubscriptionConfirmEmail(toEmail, serviceCategory, serviceKey
   });
 }
 
-module.exports = { sendPasswordResetEmail, sendTechAvailableEmail, sendSubscriptionConfirmEmail };
+async function sendContactReplyEmail(toEmail, userName, originalSubject, originalMessage, replyContent) {
+  const transporter = buildTransporter();
+
+  if (!transporter) {
+    console.log('\n─── CONTACT REPLY EMAIL (dev — no SMTP configured) ───');
+    console.log(`To: ${toEmail} (${userName})`);
+    console.log(`Original Subject: ${originalSubject}`);
+    console.log(`Reply Content: ${replyContent}`);
+    console.log('──────────────────────────────────────────────────────\n');
+    return;
+  }
+
+  await transporter.sendMail({
+    from: process.env.SMTP_FROM || `"SERVIO" <${process.env.SMTP_USER}>`,
+    to: toEmail,
+    subject: `Re: ${originalSubject} - SERVIO Support`,
+    html: `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Support Reply — SERVIO</title>
+</head>
+<body style="margin:0;padding:0;background-color:#FAF8F5;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#FAF8F5;padding:40px 16px;">
+    <tr>
+      <td align="center">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0"
+               style="max-width:560px;background:#ffffff;border-radius:20px;
+                       box-shadow:0 14px 36px rgba(34,40,49,0.10);overflow:hidden;">
+          <tr>
+            <td style="background:#3C2415;padding:36px 40px 32px;text-align:center;">
+              <table align="center" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="padding-right:12px;">
+                    <table cellpadding="0" cellspacing="0" border="0" style="background:rgba(227,213,202,0.2);border-radius:12px;">
+                      <tr>
+                        <td width="42" height="42" align="center" valign="middle" style="font-size:24px;">🛡️</td>
+                      </tr>
+                    </table>
+                  </td>
+                  <td>
+                    <span style="font-size:26px;font-weight:800;color:#E3D5CA;letter-spacing:2px;">SERVIO</span>
+                  </td>
+                </tr>
+              </table>
+              <div style="width:48px;height:3px;background:#9A8C73;border-radius:2px;margin:20px auto 0;"></div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:40px 40px 32px;">
+              <h2 style="margin:0 0 16px;font-size:20px;font-weight:700;color:#222831;">Hi ${userName},</h2>
+              <p style="margin:0 0 20px;font-size:15px;color:#6B6560;line-height:1.6;">
+                Our support team has reviewed your message and sent the following reply:
+              </p>
+              <div style="background:#FAF8F5;border-left:4px solid #3C2415;padding:16px;border-radius:0 8px 8px 0;margin-bottom:28px;">
+                <p style="margin:0;font-size:15px;color:#3C2415;font-weight:500;line-height:1.6;white-space:pre-wrap;">${replyContent}</p>
+              </div>
+              <hr style="border:0;border-top:1px solid #DDD5CC;margin:28px 0;"/>
+              <p style="margin:0 0 8px;font-size:13px;color:#9A8C73;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Your Original Message:</p>
+              <p style="margin:0 0 4px;font-size:14px;color:#222831;"><strong>Subject:</strong> ${originalSubject}</p>
+              <p style="margin:0;font-size:14px;color:#6B6560;line-height:1.5;font-style:italic;">"${originalMessage}"</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background:#F7F3EF;border-top:1px solid #DDD5CC;padding:24px 40px;text-align:center;">
+              <p style="margin:0;font-size:12px;color:#9A8C73;">
+                © 2026 SERVIO — Home Services Marketplace
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+  });
+}
+
+module.exports = {
+  sendPasswordResetEmail,
+  sendTechAvailableEmail,
+  sendSubscriptionConfirmEmail,
+  sendContactReplyEmail,
+};

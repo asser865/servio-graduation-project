@@ -10,6 +10,7 @@ import '../../core/api/users_api.dart';
 import '../../core/models/booking_model.dart';
 import '../../core/state/disputes_provider.dart';
 import '../../core/state/notifications_provider.dart';
+import '../../core/state/support_provider.dart';
 import 'raise_dispute_screen.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
@@ -944,6 +945,188 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
     }
   }
 
+  Future<void> _reportSupportIssue() async {
+    // Determine the contextual issue types based on the booking status.
+    final statusCode = widget.data.statusCode.toLowerCase();
+    final List<({String value, String label})> issueTypes;
+    if (statusCode == 'confirmed' || statusCode == 'en_route') {
+      issueTypes = const [
+        (value: 'late', label: 'Late Arrival'),
+        (value: 'no_show', label: 'No-Show'),
+        (value: 'other', label: 'Other'),
+      ];
+    } else if (statusCode == 'arrived' || statusCode == 'in_progress') {
+      issueTypes = const [
+        (value: 'during_work_problem', label: 'During-Work Problem'),
+        (value: 'safety', label: 'Safety Concern'),
+        (value: 'other', label: 'Other'),
+      ];
+    } else if (statusCode == 'completed') {
+      issueTypes = const [
+        (value: 'post_completion', label: 'Post-Completion Issue'),
+        (value: 'other', label: 'Other'),
+      ];
+    } else {
+      issueTypes = const [
+        (value: 'late', label: 'Late Arrival'),
+        (value: 'no_show', label: 'No-Show'),
+        (value: 'during_work_problem', label: 'During-Work Problem'),
+        (value: 'safety', label: 'Safety Concern'),
+        (value: 'post_completion', label: 'Post-Completion Issue'),
+        (value: 'other', label: 'Other'),
+      ];
+    }
+
+    String selectedType = issueTypes.first.value;
+    final descController = TextEditingController();
+    String? sheetError;
+    bool submitting = false;
+
+    final submitted = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(ServioRadius.xl)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheet) {
+            final theme = Theme.of(ctx);
+            final servio = ctx.servio;
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.viewInsetsOf(ctx).bottom,
+              ),
+              child: SafeArea(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          margin: const EdgeInsets.only(bottom: 20),
+                          decoration: BoxDecoration(
+                            color: servio.border,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      Text(
+                        'Report an Issue',
+                        style: theme.textTheme.titleLarge
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Select the issue type and describe the problem.',
+                        style: theme.textTheme.bodyMedium
+                            ?.copyWith(color: servio.textSecondary),
+                      ),
+                      const SizedBox(height: 16),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: issueTypes.map((t) {
+                          final selected = t.value == selectedType;
+                          return ChoiceChip(
+                            label: Text(t.label),
+                            selected: selected,
+                            onSelected: (_) =>
+                                setSheet(() => selectedType = t.value),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: descController,
+                        minLines: 4,
+                        maxLines: 6,
+                        maxLength: 1000,
+                        textInputAction: TextInputAction.newline,
+                        decoration: const InputDecoration(
+                          labelText: 'Description',
+                          hintText: 'Describe the issue in detail…',
+                          alignLabelWithHint: true,
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      if (sheetError != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          sheetError!,
+                          style: TextStyle(
+                              color: servio.danger, fontSize: 12),
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: submitting
+                            ? null
+                            : () {
+                                final desc = descController.text.trim();
+                                if (desc.length < 20) {
+                                  setSheet(() => sheetError =
+                                      'Please provide at least 20 characters.');
+                                  return;
+                                }
+                                setSheet(() {
+                                  sheetError = null;
+                                  submitting = true;
+                                });
+                                Navigator.of(ctx).pop(true);
+                              },
+                        child: submitting
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Text('Submit Issue'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    final description = descController.text.trim();
+    descController.dispose();
+
+    if (submitted != true || !mounted) return;
+
+    setState(() => _disputeLoading = true);
+    try {
+      await context.read<SupportProvider>().createIssue(
+            bookingId: widget.data.backendId,
+            type: selectedType,
+            description: description,
+          );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Issue reported. Our team will follow up.')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Failed to report issue. Please try again.')),
+      );
+    } finally {
+      if (mounted) setState(() => _disputeLoading = false);
+    }
+  }
+
   /// Shows a bottom sheet asking for a cancellation reason, then cancels
   /// the booking with that reason sent to the backend.
   Future<void> _cancelBooking() async {
@@ -1309,7 +1492,7 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                       _disputeLoading
                           ? const Center(child: CircularProgressIndicator())
                           : OutlinedButton.icon(
-                              onPressed: _reportDispute,
+                              onPressed: _reportSupportIssue,
                               icon: const Icon(Icons.flag_outlined, size: 18),
                               label: const Text('Report a Problem'),
                               style: OutlinedButton.styleFrom(

@@ -116,9 +116,14 @@ class Dispute {
   bool get isOpen =>
       status == 'open' ||
       status == 'reviewing' ||
-      status == 'awaiting_evidence';
+      status == 'awaiting_evidence' ||
+      status == 'appealed' ||
+      status == 'escalated';
   bool get isResolved =>
-      status == 'resolved_refund' || status == 'resolved_release';
+      status == 'resolved_refund' ||
+      status == 'resolved_release' ||
+      status == 'resolved_partial' ||
+      status == 'resolved_redo';
 
   factory Dispute.fromJson(Map<String, dynamic> json) {
     final rawEvidence = (json['evidence'] as List<dynamic>?) ?? <dynamic>[];

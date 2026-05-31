@@ -46,6 +46,7 @@ class SupportProvider extends ChangeNotifier {
   String? get error => _error;
   bool get loaded => _loaded;
   SupportTab get activeTab => _activeTab;
+  List<Dispute> get disputes => _disputes;
 
   // Filtering exactly mirrors website renderSupportCases() logic:
   // active  → open issues (status NOT in [resolved, closed])
@@ -55,8 +56,16 @@ class SupportProvider extends ChangeNotifier {
   List<SupportIssue> get openIssues =>
       _issues.where((i) => i.isOpen).toList();
 
-  List<Dispute> get openDisputes =>
-      _disputes.where((d) => d.status == 'open' || d.status == 'reviewing').toList();
+  List<Dispute> get openDisputes => _disputes.where((d) {
+        const activeStatuses = <String>{
+          'open',
+          'reviewing',
+          'awaiting_evidence',
+          'appealed',
+          'escalated',
+        };
+        return activeStatuses.contains(d.status);
+      }).toList();
 
   List<SupportIssue> get resolvedIssues =>
       _issues.where((i) => i.isResolved).toList();
@@ -125,5 +134,21 @@ class SupportProvider extends ChangeNotifier {
   void addIssue(SupportIssue issue) {
     _issues = <SupportIssue>[issue, ..._issues];
     notifyListeners();
+  }
+
+  Future<SupportIssue> createIssue({
+    required String bookingId,
+    required String type,
+    required String description,
+    List<String> evidence = const <String>[],
+  }) async {
+    final issue = await _issuesApi.createSupportIssue(
+      bookingId: bookingId,
+      type: type,
+      description: description,
+      evidence: evidence,
+    );
+    addIssue(issue);
+    return issue;
   }
 }
