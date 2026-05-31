@@ -82,7 +82,7 @@ class _TechnicianServicesScreenState extends State<TechnicianServicesScreen> {
         final cats = newCategories.join(', ');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Services saved. $cats: pending admin review.')),
+              content: Text('Services saved. $cats pending admin review.')),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
