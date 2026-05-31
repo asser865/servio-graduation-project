@@ -326,6 +326,15 @@ class UserAccount {
         verificationRejectionReason: (json['verificationRejectionReason'] as String?) ?? '',
         verificationSubmittedAt: DateTime.tryParse((json['verificationSubmittedAt'] as String?) ?? ''),
         verificationReviewedAt: DateTime.tryParse((json['verificationReviewedAt'] as String?) ?? ''),
+        serviceIds: List<String>.from((json['services'] as List<dynamic>?) ?? []),
+        pendingCategories: List<String>.from((json['pendingCategories'] as List<dynamic>?) ?? []),
+        minFee: ((json['minFee'] as num?) ?? 0).toDouble(),
+        travelFee: ((json['travelFee'] as num?) ?? 0).toDouble(),
+        emergencyMultiplier: ((json['emergencyMultiplier'] as num?) ?? 1.0).toDouble(),
+        acceptCash: (json['acceptCash'] as bool?) ?? false,
+        acceptCard: (json['acceptCard'] as bool?) ?? false,
+        acceptInstapay: (json['acceptInstapay'] as bool?) ?? false,
+        acceptWallet: (json['acceptWallet'] as bool?) ?? false,
       );
 
   // Maps backend API response (uses _id, role: 'user'|'worker', nested address)

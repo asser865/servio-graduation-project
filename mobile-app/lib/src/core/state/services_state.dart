@@ -15,6 +15,7 @@ class ServicesProvider extends ChangeNotifier {
 
   List<BackendService> get services => _services;
   bool get loading => _loading;
+  bool get isLoading => _loading;
   String? get error => _error;
 
   Future<void> fetchAll({String? category}) async {
