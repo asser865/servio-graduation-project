@@ -374,7 +374,9 @@ class UserAccount {
           (json['verificationSubmittedAt'] as String?) ?? ''),
       verificationReviewedAt: DateTime.tryParse(
           (json['verificationReviewedAt'] as String?) ?? ''),
+      // services may be populated objects {_id, title} OR plain ID strings
       serviceIds: _stringListFromJson(json['services']),
+      // pendingCategories is always a plain string array in the backend schema
       pendingCategories: List<String>.from(
           (json['pendingCategories'] as List<dynamic>?) ?? []),
       minFee: ((json['minFee'] as num?) ?? 0).toDouble(),
@@ -411,7 +413,7 @@ List<Map<String, String>> _portfolioFromJson(dynamic value) {
 List<String> _stringListFromJson(dynamic value) {
   if (value is! List<dynamic>) return const <String>[];
   return value
-      .map((e) => e is Map ? (e['_id'] as String?) ?? '' : e.toString())
+      .map((e) => e is Map ? (e['_id'] as String?) ?? '' : (e as String?) ?? '')
       .where((s) => s.isNotEmpty)
       .toList();
 }
