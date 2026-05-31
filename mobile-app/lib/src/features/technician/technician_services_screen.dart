@@ -229,6 +229,15 @@ class _CategorySectionState extends State<_CategorySection> {
     _expanded = widget.selectedCount > 0;
   }
 
+  @override
+  void didUpdateWidget(_CategorySection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Auto-expand when the first service in this category gets selected
+    if (oldWidget.selectedCount == 0 && widget.selectedCount > 0) {
+      _expanded = true;
+    }
+  }
+
   static const Map<String, String> _categoryLabels = {
     'plumbing': 'Plumbing',
     'electrical': 'Electrical',
