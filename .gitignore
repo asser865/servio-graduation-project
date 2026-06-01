@@ -79,3 +79,6 @@ stitch-*/
 .antigravitycli/
 .antigravitycli
 
+# Local design and mcp configurations
+design.md
+mcp.json
