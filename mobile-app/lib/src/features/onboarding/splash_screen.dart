@@ -104,6 +104,31 @@ class _SplashScreenState extends State<SplashScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
+              // ── Logo ─────────────────────────────────────
+              AnimatedBuilder(
+                animation: _logoController,
+                builder: (BuildContext context, Widget? child) {
+                  final Animation<double> anim = CurvedAnimation(
+                    parent: _logoController,
+                    curve: const Interval(0.0, 0.5, curve: Curves.easeOutBack),
+                  );
+                  return Transform.scale(
+                    scale: 0.5 + 0.5 * anim.value,
+                    child: Opacity(
+                      opacity: anim.value.clamp(0.0, 1.0),
+                      child: child,
+                    ),
+                  );
+                },
+                child: Image.asset(
+                  'assets/images/servio_logo.png',
+                  width: 110,
+                  height: 110,
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
               // ── Animated word "SERVIO" ────────────────────
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,

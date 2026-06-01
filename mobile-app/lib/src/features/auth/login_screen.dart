@@ -156,7 +156,7 @@ class _LoginScreenState extends State<LoginScreen>
               builder: (context, constraints) {
                 final horizontalPadding =
                     constraints.maxWidth >= 700 ? 32.0 : 20.0;
-                final topPadding = constraints.maxHeight < 720 ? 18.0 : 32.0;
+                final topPadding = constraints.maxHeight < 720 ? 64.0 : 72.0;
                 final minHeight = (constraints.maxHeight - topPadding - 24)
                     .clamp(0.0, double.infinity)
                     .toDouble();
@@ -343,6 +343,16 @@ class _LoginHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: <Widget>[
+        ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Image.asset(
+            'assets/images/servio_logo.png',
+            width: 72,
+            height: 72,
+            fit: BoxFit.cover,
+          ),
+        ),
+        const SizedBox(height: 14),
         Text(
           'SERVIO',
           textAlign: TextAlign.center,

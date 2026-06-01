@@ -182,6 +182,16 @@ class _HomeBodyState extends State<_HomeBody>
             title: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: <Widget>[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.asset(
+                    'assets/images/servio_logo.png',
+                    width: 32,
+                    height: 32,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Text(
                   'SERVIO',
                   style: TextStyle(
