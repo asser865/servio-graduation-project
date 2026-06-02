@@ -16,12 +16,13 @@
   }
 })();
 
-import { getBooking, cancelBooking, rescheduleBooking } from '../api/bookings.js';
+import { getBooking, cancelBooking, rescheduleBooking, submitCustomerFeedback, verifyRefusal } from '../api/bookings.js';
 import { snapshotFeeFromBooking, formatMoney as formatFeeMoney, paymentMethodLabel } from '../utils/fee.js';
 import { holdPayment, confirmCompletion, openDispute } from '../api/payments.js';
 import { createSupportIssue } from '../api/support.js';
 import { openCardPickerModal } from '../components/card-picker-modal.js';
 import { uploadPublicFile } from '../api/uploads.js';
+import openCustomerFeedbackModal from '../components/customer-feedback-modal.js';
 
 const POLL_MS = 45000;
 const FINAL_STATUSES = new Set(['completed', 'cancelled', 'rejected', 'disputed']);
@@ -402,7 +403,38 @@ function renderEscrowActions(booking) {
   if (!bar) return;
 
   const status = booking?.status;
-  if (status === 'awaiting_customer_confirmation') {
+  if (status === 'payment_refused' && booking.refusalVerification?.status === 'pending') {
+    bar.hidden = false;
+    bar.innerHTML = `
+      <div class="bk-duration-summary bk-duration-summary--flagged">
+        <div class="bk-duration-summary__row">
+          <span class="bk-duration-summary__label">Payment refusal verification</span>
+          <span class="bk-duration-summary__value">Response required</span>
+        </div>
+        <div class="bk-duration-summary__flag">
+          <span>The technician reported that payment was refused. Confirm what happened so the finance team can review the booking.</span>
+        </div>
+      </div>
+      <button id="bkConfirmRefusalBtn" class="btn btn--ghost btn--danger">I refused payment</button>
+      <button id="bkDisputeRefusalBtn" class="btn btn--primary">This report is incorrect</button>
+    `;
+    const respond = async (customerConfirmsRefusal) => {
+      const customerResponse = window.prompt('Add a short note for the finance review:');
+      if (customerResponse === null) return;
+      try {
+        await verifyRefusal(booking._id || booking.bookingId, {
+          customerConfirmsRefusal,
+          customerResponse: customerResponse.trim(),
+        });
+        showToast('Your response was recorded.', 'success');
+        await refreshBooking();
+      } catch (err) {
+        showToast(err?.data?.message || err?.message || 'Failed to record your response.', 'error');
+      }
+    };
+    document.getElementById('bkConfirmRefusalBtn')?.addEventListener('click', () => respond(true));
+    document.getElementById('bkDisputeRefusalBtn')?.addEventListener('click', () => respond(false));
+  } else if (status === 'awaiting_customer_confirmation') {
     bar.hidden = false;
 
     // Compute actual elapsed time from server timestamps
@@ -449,12 +481,17 @@ function renderEscrowActions(booking) {
     `;
 
     document.getElementById('bkConfirmCompleteBtn')?.addEventListener('click', async () => {
+      const bookingId = booking._id || booking.bookingId;
       try {
-        await confirmCompletion(booking._id || booking.bookingId);
-        showToast('Confirmed! Awaiting admin review.', 'success');
-        await refreshBooking();
+        await openCustomerFeedbackModal({
+          bookingId,
+          onSubmit: async (payload) => {
+            await submitCustomerFeedback(bookingId, payload);
+            await refreshBooking();
+          },
+        });
       } catch (err) {
-        showToast(err?.data?.message || err?.message || 'Failed to confirm. Please try again.', 'error');
+        showToast(err?.data?.message || err?.message || 'Failed to submit feedback. Please try again.', 'error');
       }
     });
 

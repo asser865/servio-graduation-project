@@ -22,3 +22,5 @@ export function deleteSelectedAuditLogs(ids) {
 export const getAdminSettings = () => api.get('/admin/settings');
 export const updateAdminSettings = (data) => api.put('/admin/settings', data);
 export const getAnalytics = () => api.get('/users/analytics');
+export const getAdminOverview = () => api.get('/admin/overview');
+export const getAdminRevenue = (days) => api.get(`/admin/revenue?days=${encodeURIComponent(days)}`);

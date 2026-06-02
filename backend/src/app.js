@@ -27,9 +27,10 @@ const savedCardRoutes      = require('./modules/savedCards/savedCard.routes');
 const platformRoutes  = require('./modules/platform/platform.routes');
 const locationsRoutes = require('./modules/platform/locations.routes');
 const favoritesRoutes = require('./modules/favorites/favorite.routes');
-const supportIssueRoutes    = require('./modules/support/support-issue.routes');
-const problemReportRoutes   = require('./modules/support/problem-report.routes');
-const contactMessageRoutes  = require('./modules/support/contact-message.routes');
+const supportIssueRoutes      = require('./modules/support/support-issue.routes');
+const problemReportRoutes     = require('./modules/support/problem-report.routes');
+const contactMessageRoutes    = require('./modules/support/contact-message.routes');
+const financeBulkActionRoutes = require('./modules/finance/bulk-action.routes');
 
 const { notFound, errorHandler } = require('./middleware/error.middleware');
 
@@ -38,9 +39,15 @@ const uploadRoot = resolveUploadRoot();
 
 app.use(helmet());
 
-const allowedOrigins = (process.env.CLIENT_URL || '*')
-  .split(',')
-  .map((origin) => origin.trim());
+const productionOrigins = [
+  'https://servio-frontend.vercel.app',
+  'https://servio-frontend-staging.vercel.app',
+];
+
+const allowedOrigins = [
+  ...(process.env.CLIENT_URL || '*').split(',').map((origin) => origin.trim()),
+  ...productionOrigins,
+];
 
 if (process.env.NODE_ENV === 'production' && allowedOrigins.includes('*')) {
   throw new Error('CLIENT_URL must be explicitly set in production - wildcard origin is not allowed with credentials.');
@@ -121,6 +128,7 @@ app.use(`${API_PREFIX}/favorites`, favoritesRoutes);
 app.use(`${API_PREFIX}/support`, supportIssueRoutes);
 app.use(`${API_PREFIX}/reports`, problemReportRoutes);
 app.use(`${API_PREFIX}/contact`, contactMessageRoutes);
+app.use(`${API_PREFIX}/finance`, financeBulkActionRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

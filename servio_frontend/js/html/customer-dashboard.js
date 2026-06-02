@@ -60,6 +60,60 @@ function getAccount() {
   } catch { return null; }
 }
 
+/* ── Sidebar nav indicators ────────────────────────────── */
+const CUSTOMER_NAV_SEEN_KEY = 'servio_customer_nav_seen_v1';
+
+function getCustomerNavSeen() {
+  try { return JSON.parse(localStorage.getItem(CUSTOMER_NAV_SEEN_KEY) || '{}'); } catch { return {}; }
+}
+
+function setCustomerNavSeen(map) {
+  try { localStorage.setItem(CUSTOMER_NAV_SEEN_KEY, JSON.stringify(map)); } catch {}
+}
+
+function setCustomerNavBadge(tabId, count) {
+  document.querySelectorAll(`[data-nav-badge="${tabId}"]`).forEach((badge) => {
+    if (count > 0) {
+      badge.hidden = false;
+      badge.textContent = count > 99 ? '99+' : String(count);
+      badge.setAttribute('aria-label', `${count} new update${count === 1 ? '' : 's'}`);
+    } else {
+      badge.hidden = true;
+      badge.removeAttribute('aria-label');
+    }
+  });
+}
+
+function markCustomerTabSeen(tabId) {
+  const seen = getCustomerNavSeen();
+  seen[tabId] = Date.now();
+  setCustomerNavSeen(seen);
+  if (tabId !== 'notifications') setCustomerNavBadge(tabId, 0);
+}
+
+function customerItemTime(item) {
+  return new Date(item?.updatedAt || item?.createdAt || item?.scheduledDate || 0).getTime();
+}
+
+function updateCustomerBookingIndicators(bookings) {
+  const seen = getCustomerNavSeen();
+  const list = Array.isArray(bookings) ? bookings : [];
+  const bookingUpdates = list.filter((booking) => {
+    if (['completed', 'cancelled', 'rejected'].includes(booking.status)) return false;
+    return customerItemTime(booking) > (seen.bookings || 0);
+  });
+  const needsAction = list.filter((booking) =>
+    ['awaiting_customer_confirmation', 'disputed'].includes(booking.status)
+  );
+  const bookingIds = new Set([...bookingUpdates, ...needsAction].map((booking) => booking._id).filter(Boolean));
+  const historyUpdates = list.filter((booking) =>
+    ['completed', 'cancelled', 'rejected'].includes(booking.status)
+    && customerItemTime(booking) > (seen.history || 0)
+  );
+  setCustomerNavBadge('bookings', bookingIds.size);
+  setCustomerNavBadge('history', historyUpdates.length);
+}
+
 function normalizeEmail(value) {
   return String(value || '').trim().toLowerCase();
 }
@@ -261,8 +315,18 @@ function initTabs() {
       const btn = document.createElement('button');
       btn.className = 'dash-mobile-tab';
       btn.type = 'button';
-      btn.textContent = tab.textContent.trim();
+      const label = tab.querySelector('.dash-nav__label')?.textContent.trim() || tab.textContent.trim();
+      btn.append(document.createTextNode(label));
       btn.dataset.mobileTab = tab.dataset.tab;
+      const sourceBadge = tab.querySelector('[data-nav-badge]');
+      if (sourceBadge) {
+        const badge = document.createElement('span');
+        badge.className = 'nav-badge';
+        badge.dataset.navBadge = tab.dataset.tab;
+        badge.hidden = sourceBadge.hidden;
+        badge.textContent = sourceBadge.textContent || '0';
+        btn.appendChild(badge);
+      }
       mobileTabs.appendChild(btn);
     });
   }
@@ -283,6 +347,7 @@ function initTabs() {
       if (active) revealAll(p);
     });
     sessionStorage.setItem(TAB_KEY, id);
+    markCustomerTabSeen(id);
   }
 
   tabs.forEach(tab => tab.addEventListener('click', () => {
@@ -404,7 +469,7 @@ function initTabs() {
   if (saved === 'proposals') showProposalsSkeleton();
   if (saved === 'overview') showOverviewSkeleton();
   if (saved === 'bookings') showBookingsSkeleton();
-  apiGetNotifications(1, 0).then(res => updateNotifBadge(res.data?.unreadCount ?? 0)).catch(() => {});
+  refreshCustomerNotificationBadge();
 }
 
 /* ── First-paint skeletons for static panels (Overview, Job Posts, Proposals) ── */
@@ -819,6 +884,7 @@ async function loadBookingsData() {
       _diffAndNotify(bookings);
     }
 
+    updateCustomerBookingIndicators(bookings);
     renderBookingsTab(bookings);
     loadSupportCases().catch(err => console.error('[Disputes]', err));
     populateStats(bookings);
@@ -1324,7 +1390,9 @@ function buildBookingCard(b) {
 
   const status = b.status || 'pending';
   const isCancelled = status === 'cancelled' || status === 'rejected';
-  const badge = BADGE_CONFIG[status] || BADGE_CONFIG.pending;
+  const badge = status === 'pending_admin_review' && b.paymentMethod === 'cash'
+    ? { ...BADGE_CONFIG.pending_admin_review, label: 'Cash Review' }
+    : BADGE_CONFIG[status] || BADGE_CONFIG.pending;
   const stepperCfg = STEPPER_CONFIG[status] || null;
   const filterStatus = STATUS_FILTER[status] || 'pending';
 
@@ -1427,7 +1495,9 @@ function buildBookingCard(b) {
       : status === 'pending_admin_review'
         ? `<div class="booking-card__action-hint booking-card__action-hint--admin">
              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-             <span>Completion confirmed. SERVIO is finalizing payment release. No action needed.</span>
+             <span>${b.paymentMethod === 'cash'
+               ? 'Cash payment confirmed. SERVIO is reconciling the commission record. No action needed.'
+               : 'Completion confirmed. SERVIO is finalizing payment release. No action needed.'}</span>
            </div>`
         : '';
   const disputeActionHTML = status === 'awaiting_customer_confirmation'
@@ -1557,7 +1627,7 @@ function renderSupportCases() {
   setText('supportOpenIssuesCount', openIssues.length);
   setText('supportOpenDisputesCount', openDisputes.length);
   setText('supportResolvedCount', resolvedIssues.length + resolvedDisputes.length);
-  setText('supportCasesBadge', openCount);
+  setCustomerNavBadge('support', openCount);
 
   const cards = [];
   if (_supportFilter === 'active') {
@@ -1923,23 +1993,15 @@ const NOTIF_TYPE_ICON = {
   system:              `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
 };
 
-function _setBadge(el, count) {
-  if (!el) return;
-  let badge = el.querySelector('.notif-badge');
-  if (!badge) {
-    badge = document.createElement('span');
-    badge.className = 'notif-badge nav-badge nav-badge--red';
-    el.appendChild(badge);
-  }
-  badge.textContent = count;
-  badge.hidden = count === 0;
-}
-
 function updateNotifBadge(count) {
   const unread = count ?? _cachedNotifs.filter(n => !n.isRead).length;
-  _setBadge(document.getElementById('tab-notifications'), unread);
-  const mobileBtn = document.querySelector('[data-mobile-tab="notifications"]');
-  if (mobileBtn) _setBadge(mobileBtn, unread);
+  setCustomerNavBadge('notifications', unread);
+}
+
+function refreshCustomerNotificationBadge() {
+  return apiGetNotifications(1, 0)
+    .then((res) => updateNotifBadge(res?.unreadCount ?? res?.data?.unreadCount ?? 0))
+    .catch(() => {});
 }
 
 function _timeAgo(dateStr) {
@@ -3000,7 +3062,10 @@ listFavorites({ limit: 1, offset: 0 }).then(({ total }) => {
 let _custPollInterval = null;
 const startCustPolling = () => {
   if (_custPollInterval) clearInterval(_custPollInterval);
-  _custPollInterval = setInterval(() => loadBookingsData(), 30000);
+  _custPollInterval = setInterval(() => {
+    loadBookingsData();
+    refreshCustomerNotificationBadge();
+  }, 30000);
 };
 const stopCustPolling = () => { if (_custPollInterval) clearInterval(_custPollInterval); _custPollInterval = null; };
 startCustPolling();

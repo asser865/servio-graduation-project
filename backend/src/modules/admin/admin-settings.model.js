@@ -3,8 +3,8 @@ const mongoose = require('mongoose');
 const adminSettingsSchema = new mongoose.Schema({
   key: { type: String, default: 'global', unique: true },
   escrow: {
-    autoConfirmHours:             { type: Number, default: 72 },
-    reminderHours:                { type: [Number], default: [24, 48] },
+    autoConfirmHours:             { type: Number, default: 48 },
+    reminderHours:                { type: [Number], default: [24, 44] },
     postConfirmDisputeGraceHours: { type: Number, default: 24 },
     autoApproveEnabled:           { type: Boolean, default: false },
     autoApproveMaxAmount:         { type: Number, default: 50 },

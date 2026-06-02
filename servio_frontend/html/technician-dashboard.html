@@ -34,6 +34,8 @@
     </script>
     <link rel="stylesheet" href="../css/main.css" />
     <link rel="stylesheet" href="../css/pages/technician-dashboard.css" />
+    <link rel="stylesheet" href="../css/pages/earnings-overview-glass.css" />
+    <link rel="stylesheet" href="../css/components/completion-outcome.css" />
   </head>
   <body data-page="technician-dashboard">
     <a class="skip-link" href="#main">Skip to content</a>
@@ -42,11 +44,11 @@
     <header class="dash-topbar" id="dash-topbar">
       <div class="dash-topbar__inner">
         <a class="dash-topbar__brand" href="./index.html" aria-label="SERVIO Home" data-i18n-aria-label="topbar_brand_aria">
-          <img src="../assets/images/logo.svg" alt="SERVIO" width="32" height="32" />
+          <span class="brand__mark"><img src="../assets/images/logo.png" alt="SERVIO" /></span>
           <span class="dash-topbar__brand-name">SERVIO</span>
         </a>
 
-        <h1 class="dash-topbar__title" id="dash-topbar-title" data-i18n="tech_nav_overview">Overview</h1>
+        <div class="dash-topbar__title" id="dash-topbar-title" data-i18n="tech_nav_overview">Overview</div>
 
         <div class="dash-topbar__actions">
           <div class="lang" data-lang>
@@ -165,17 +167,6 @@
                   </span>
                   <span class="dash-nav__label" data-i18n="tech_nav_earnings">Earnings</span>
                   <span class="dash-nav__badge" data-nav-badge="earnings" hidden>0</span>
-                </button>
-              </li>
-              <li role="none">
-                <button class="dash-nav__btn" role="tab" aria-selected="false"
-                        aria-controls="panel-transactions" id="tab-transactions" data-tab="transactions" title="Transactions" data-i18n-title="tech_nav_transactions">
-                  <span class="dash-nav__icon-slot" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
-                  </svg>
-                  </span>
-                  <span class="dash-nav__label" data-i18n="tech_nav_transactions">Transactions</span>
                 </button>
               </li>
             </ul>
@@ -479,195 +470,50 @@
 
             <!-- Segmented sub-nav -->
             <nav class="earn-subnav" role="tablist" aria-label="Earnings views">
-              <button type="button" class="earn-subnav__tab is-active" role="tab" aria-selected="true" data-earn-tab="overview">
+              <button type="button" class="earn-subnav__tab is-active" id="earnTabOverview" role="tab" aria-selected="true" aria-controls="earnViewOverview" tabindex="0" data-earn-tab="overview">
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
                 <span data-i18n="tech.earnTabOverview">Overview</span>
               </button>
-              <button type="button" class="earn-subnav__tab" role="tab" aria-selected="false" data-earn-tab="payouts">
+              <button type="button" class="earn-subnav__tab" id="earnTabPayouts" role="tab" aria-selected="false" aria-controls="earnViewPayouts" tabindex="-1" data-earn-tab="payouts">
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h18M3 12h18M3 17h12"/></svg>
-                <span data-i18n="tech.earnTabPayouts">Withdrawals</span>
+                <span>Wallet history</span>
               </button>
-              <button type="button" class="earn-subnav__tab" role="tab" aria-selected="false" data-earn-tab="debts" id="earnSubnavDebts" hidden>
+              <button type="button" class="earn-subnav__tab" role="tab" aria-selected="false" aria-controls="earnViewDebts" tabindex="-1" data-earn-tab="debts" id="earnSubnavDebts" hidden>
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                 <span data-i18n="tech.earnTabDebts">Debts</span>
                 <span class="earn-subnav__badge" id="earnSubnavDebtsBadge" hidden>0</span>
               </button>
             </nav>
 
-            <!-- ────────── Overview sub-view (redesigned) ────────── -->
-            <div class="earn-view is-active" data-earn-view="overview" role="tabpanel">
+            <!-- ────────── Overview sub-view (glass redesign) ────────── -->
+            <div class="earn-view earn-view--glass is-active" id="earnViewOverview" data-earn-view="overview" role="tabpanel" aria-labelledby="earnTabOverview">
 
               <!-- Hidden legacy nodes kept for JS compatibility -->
               <span id="ledgerPeriod" hidden></span>
+              <span id="liability-settlement-date" hidden></span>
+              <span id="earn-cash-sub" hidden></span>
 
               <!-- ═══════ Fetch error banner ═══════ -->
-              <div class="earn-error-banner" id="earnErrorBanner" role="alert" hidden>
+              <div class="earn-error-banner eog-error" id="earnErrorBanner" role="alert" hidden>
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01"/><circle cx="12" cy="12" r="10"/></svg>
                 <span class="earn-error-banner__msg" id="earnErrorBannerMsg">Couldn't load your earnings.</span>
                 <button type="button" class="earn-error-banner__retry" id="earnErrorBannerRetry">Retry</button>
               </div>
 
-              <!-- ═══════ Money Pair — Your Money / You Owe ═══════ -->
-              <section class="money-pair money-pair--three" aria-label="Wallet at a glance">
-                <!-- ── Card 1: Your Money ── -->
-                <article class="money-card money-card--income" aria-labelledby="moneyIncomeTitle">
-                  <header class="money-card__head">
-                    <span class="money-card__overline" id="moneyIncomeTitle">Available to withdraw</span>
-                    <span class="money-card__tag money-card__tag--ok" id="availableWithdrawTag">
-                      <span class="money-card__dot" aria-hidden="true"></span>
-                      Ready now
+              <!-- ═══════ Top stat tiles ═══════ -->
+              <section class="eog-grid eog-grid--stats" aria-label="Earnings at a glance">
+                <article class="eog-tile eog-tile--stat eog-tile--lifetime">
+                  <header class="eog-tile__head">
+                    <span class="eog-tile__label">Lifetime Earnings</span>
+                    <span class="eog-tile__icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h18v10H3zM3 11h18M7 15h2"/></svg>
                     </span>
                   </header>
-
-                  <!-- Amount -->
-                  <div class="money-card__amount-row">
-                    <span class="money-card__amount" id="walletAvailable" data-skel><span class="skel-bar skel-bar--money"></span></span>
-                    <p class="money-card__sub money-card__sub--tight" id="availableWithdrawNote">Money already released into your Servio wallet.</p>
+                  <div class="eog-tile__amount">
+                    <strong id="earn-total" data-skel><span class="skel-bar skel-bar--stat"></span></strong>
+                    <em>EGP</em>
                   </div>
-
-                  <!-- Withdraw CTA — secondary (Pay Now owns visual weight when debt exists) -->
-                  <button class="money-btn money-btn--secondary money-btn--block" id="btnRequestPayout">
-                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
-                    <span>Withdraw to bank</span>
-                  </button>
-
-                  <!-- Rules pill row -->
-                  <div class="money-card__rules-row">
-                    <span class="money-card__rule-pill"><em>Min</em> 50 EGP</span>
-                    <span class="money-card__rule-sep" aria-hidden="true"></span>
-                    <span class="money-card__rule-pill"><em>Arrives</em> 1–3 days</span>
-                    <span class="money-card__rule-sep" aria-hidden="true"></span>
-                    <span class="money-card__rule-pill"><em>Fee</em> Free</span>
-                  </div>
-
-                  <!-- Bank row -->
-                  <div class="money-card__bank" id="withdrawBankRow">
-                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V10M19 21V10M3 10h18L12 3 3 10z"/></svg>
-                    <span class="money-card__bank-text" id="withdrawBankLabel">No payout method set yet</span>
-                    <a class="money-card__bank-edit" href="#" data-jump-payout-settings id="withdrawBankEdit">Add now</a>
-                  </div>
-
-                </article>
-
-                <!-- ── Card 2: You Owe Servio ── -->
-                <article class="money-card money-card--pending" aria-labelledby="moneyPendingTitle">
-                  <header class="money-card__head">
-                    <span class="money-card__overline" id="moneyPendingTitle">
-                      Pending release
-                      <button type="button" class="money-card__info" aria-label="What is pending release?" data-tooltip="Online job payments are held for up to 2 business days before being released to your wallet.">
-                        <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-                      </button>
-                    </span>
-                    <span class="money-card__tag money-card__tag--neutral" id="pendingReleaseTag">In review</span>
-                  </header>
-
-                  <div class="money-card__amount-row">
-                    <span class="money-card__amount money-card__amount--neutral" id="walletPending" data-skel><span class="skel-bar skel-bar--money"></span></span>
-                  </div>
-
-                  <p class="money-card__sub">Online jobs that are still waiting to be released to your wallet.</p>
-
-                  <div data-pending-busy>
-                    <div class="money-card__fact-list">
-                      <div class="money-card__fact">
-                        <span class="money-card__fact-label">Jobs in hold</span>
-                        <strong id="pendingJobsCount">0 jobs</strong>
-                      </div>
-                      <div class="money-card__fact">
-                        <span class="money-card__fact-label">Status</span>
-                        <strong id="pendingReleaseNote">Waiting for release approval</strong>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="money-card__empty" data-pending-empty hidden>
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg>
-                    <strong>All caught up.</strong>
-                    <span>No online jobs waiting for release right now.</span>
-                  </div>
-                </article>
-
-                <article class="money-card money-card--debt" id="liabilityCard" data-state="settled" aria-labelledby="liabilityTitle">
-                  <header class="money-card__head">
-                    <span class="money-card__overline" id="liabilityTitle">Fees due</span>
-                    <span class="money-card__tag money-card__tag--warn" data-state-tag>
-                      <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
-                      <span id="debtDueTag">Due —</span>
-                    </span>
-                    <span class="money-card__tag money-card__tag--ok" data-settled-tag>
-                      <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg>
-                      <span>All settled</span>
-                    </span>
-                  </header>
-
-                  <!-- Owing state -->
-                  <div class="money-card__amount-row" data-owing-only>
-                    <span class="money-card__amount money-card__amount--warn" id="liabilityAmount" data-skel><span class="skel-bar skel-bar--money"></span></span>
-                  </div>
-                  <p class="money-card__sub" data-owing-only>Platform fees from cash jobs you collected directly.</p>
-
-                  <!-- Breakdown sits near the number it explains -->
-                  <details class="debt-breakdown" id="debtBreakdownToggle" data-owing-only>
-                    <summary>
-                      <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                      <span>See breakdown</span>
-                    </summary>
-                    <div class="debt-breakdown__list" id="liability-items-list"></div>
-                  </details>
-
-                  <div class="money-card__actions" data-owing-only>
-                    <button class="money-btn money-btn--warn money-btn--block" id="payLiabilityBtn" data-i18n="tech_pay_now" hidden>
-                      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 10h18M5 6h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/></svg>
-                      <span>Pay now</span>
-                    </button>
-                  </div>
-
-                  <!-- Rules pill row — parity with income card -->
-                  <div class="money-card__rules-row" data-owing-only>
-                    <span class="money-card__rule-pill"><em>Settle</em> Anytime</span>
-                    <span class="money-card__rule-sep" aria-hidden="true"></span>
-                    <span class="money-card__rule-pill"><em>Method</em> Card</span>
-                    <span class="money-card__rule-sep" aria-hidden="true"></span>
-                    <span class="money-card__rule-pill"><em>Penalty</em> None</span>
-                  </div>
-
-                  <!-- Settled state -->
-                  <div class="money-card__settled-body" data-settled-only>
-                    <div class="money-card__settled-icon" aria-hidden="true">
-                      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>
-                    </div>
-                    <div class="money-card__settled-text">
-                      <strong>All clear.</strong>
-                      <span>No platform fees are due right now.</span>
-                    </div>
-                  </div>
-
-                  <!-- Footer: lifetime fee context (parity with income card foot) -->
-                  <footer class="money-card__foot" data-owing-only>
-                    <div class="money-card__foot-item">
-                      <span class="money-card__foot-label">Paid lifetime</span>
-                      <span class="money-card__foot-val"><strong id="debtLifetimeFees">0</strong> EGP</span>
-                    </div>
-                    <span class="money-card__foot-divider" aria-hidden="true"></span>
-                    <div class="money-card__foot-item">
-                      <span class="money-card__foot-label">Avg fee / job</span>
-                      <span class="money-card__foot-val"><strong id="debtAvgFee">0</strong> EGP</span>
-                    </div>
-                  </footer>
-                  <!-- liability-settlement-date kept hidden for JS compat (feeds top "Due" pill) -->
-                  <span id="liability-settlement-date" hidden></span>
-                </article>
-              </section>
-
-
-              <div class="liability-warning" id="liabilityWarning" data-i18n="tech_liability_warning" hidden>
-                ⚠️ Maximum liability reached — you may only accept online-payment jobs above 2,000 EGP.
-              </div>
-
-              <section class="stat-strip stat-strip--insights" aria-label="Earnings insights">
-                <div class="stat-strip__cell stat-strip__cell--lifetime">
-                  <span class="stat-strip__label">Lifetime take-home</span>
-                  <span class="stat-strip__value"><strong id="earn-total" data-skel><span class="skel-bar skel-bar--stat"></span></strong><em>EGP</em></span>
-                  <div class="stat-strip__formula" id="moneyBridgeText" aria-label="Lifetime take-home breakdown">
+                  <div class="eog-tile__bridge" id="moneyBridgeText" aria-label="Lifetime take-home breakdown">
                     <span class="formula-chip formula-chip--wallet">
                       <span class="formula-chip__dot" aria-hidden="true"></span>
                       <span class="formula-chip__num" id="bridgeWalletNum">0</span>
@@ -680,103 +526,313 @@
                       <span class="formula-chip__label">cash</span>
                     </span>
                   </div>
-                </div>
-                <span class="stat-strip__divider" aria-hidden="true"></span>
-                <div class="stat-strip__cell">
-                  <span class="stat-strip__label">This month</span>
-                  <span class="stat-strip__value"><strong id="earn-month" data-skel><span class="skel-bar skel-bar--stat"></span></strong><em>EGP</em></span>
-                  <span class="stat-strip__delta" id="earn-month-delta" data-direction="flat">
+                </article>
+
+                <article class="eog-tile eog-tile--stat eog-tile--month">
+                  <header class="eog-tile__head">
+                    <span class="eog-tile__label">This Month</span>
+                    <span class="eog-tile__icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></svg>
+                    </span>
+                  </header>
+                  <div class="eog-tile__amount">
+                    <strong id="earn-month" data-skel><span class="skel-bar skel-bar--stat"></span></strong>
+                    <em>EGP</em>
+                  </div>
+                  <span class="eog-tile__delta" id="earn-month-delta" data-direction="flat">
                     <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4" data-delta-icon><path d="M5 12h14"/></svg>
                     <span data-delta-value>—</span>
-                    <span class="stat-strip__delta-suffix">vs last month</span>
+                    <span class="eog-tile__delta-suffix">vs last month</span>
                   </span>
-                </div>
-                <span class="stat-strip__divider" aria-hidden="true"></span>
-                <div class="stat-strip__cell">
-                  <span class="stat-strip__label">Collected in cash</span>
-                  <span class="stat-strip__value"><strong id="earn-cash" data-skel><span class="skel-bar skel-bar--stat"></span></strong><em>EGP</em></span>
-                  <span class="stat-strip__hint" id="earn-cash-sub">Take-home from completed cash jobs</span>
-                </div>
-                <span class="stat-strip__divider" aria-hidden="true"></span>
-                <div class="stat-strip__cell">
-                  <span class="stat-strip__label">Jobs done</span>
-                  <span class="stat-strip__value"><strong id="earn-completed-count" data-skel><span class="skel-bar skel-bar--stat"></span></strong></span>
-                  <span class="stat-strip__hint">Completed jobs</span>
-                </div>
-                <span class="stat-strip__divider" aria-hidden="true"></span>
-                <div class="stat-strip__cell stat-strip__cell--chart">
-                  <span class="stat-strip__label">7-day trend</span>
-                  <svg class="stat-strip__spark stat-strip__spark--ok" id="earnSparkline" viewBox="0 0 120 28" preserveAspectRatio="none" aria-hidden="true">
+                </article>
+
+                <article class="eog-tile eog-tile--stat eog-tile--jobs">
+                  <header class="eog-tile__head">
+                    <span class="eog-tile__label">Jobs Completed</span>
+                    <span class="eog-tile__icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg>
+                    </span>
+                  </header>
+                  <div class="eog-tile__amount eog-tile__amount--plain">
+                    <strong id="earn-completed-count" data-skel><span class="skel-bar skel-bar--stat"></span></strong>
+                  </div>
+                  <span class="eog-tile__hint">Completed jobs to date</span>
+                </article>
+
+                <article class="eog-tile eog-tile--stat eog-tile--cash">
+                  <header class="eog-tile__head">
+                    <span class="eog-tile__label">Cash Collected</span>
+                    <span class="eog-tile__icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg>
+                    </span>
+                  </header>
+                  <div class="eog-tile__amount">
+                    <strong id="earn-cash" data-skel><span class="skel-bar skel-bar--stat"></span></strong>
+                    <em>EGP</em>
+                  </div>
+                  <svg class="eog-tile__spark" id="earnSparkline" viewBox="0 0 120 28" preserveAspectRatio="none" aria-hidden="true">
                     <defs>
                       <linearGradient id="sparkFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stop-color="currentColor" stop-opacity=".28"/>
+                        <stop offset="0%" stop-color="currentColor" stop-opacity=".32"/>
                         <stop offset="100%" stop-color="currentColor" stop-opacity="0"/>
                       </linearGradient>
                     </defs>
                     <path id="sparkArea" d="M0 24 L17 22 L34 23 L51 21 L68 22 L85 23 L102 24 L120 24 L120 28 L0 28 Z" fill="url(#sparkFill)"/>
                     <path id="sparkLine" d="M0 24 L17 22 L34 23 L51 21 L68 22 L85 23 L102 24 L120 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                   </svg>
-                </div>
+                </article>
               </section>
 
-              <!-- Recent jobs -->
-              <section class="recent-jobs" aria-labelledby="recentJobsHeading">
-                <header class="recent-jobs__head">
-                  <div class="recent-jobs__title-block">
-                    <h2 class="recent-jobs__title" id="recentJobsHeading">Recent jobs</h2>
-                    <span class="recent-jobs__hint">How each recent job settled into cash, wallet, or pending release</span>
+              <!-- ═══════ Divider ═══════ -->
+              <div class="eog-divider" role="separator" aria-hidden="true">
+                <span class="eog-divider__dot"></span>
+              </div>
+
+              <!-- ═══════ Balance + Minis (left col) + Recent Activity (right col) ═══════ -->
+              <section class="eog-grid eog-grid--main" aria-label="Wallet balance and recent activity">
+                <div class="eog-main__left">
+                  <article class="eog-tile eog-tile--balance">
+                    <header class="eog-balance__head">
+                      <div class="eog-balance__heading">
+                        <h3 class="eog-balance__title">Available Balance</h3>
+                        <p class="eog-balance__sub">Ready for withdrawal to linked accounts.</p>
+                      </div>
+                      <button class="eog-btn eog-btn--primary" id="btnRequestPayout" type="button">
+                        <span>Withdraw Funds</span>
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                      </button>
+                    </header>
+                    <div class="eog-balance__amount">
+                      <strong id="walletAvailable" data-skel><span class="skel-bar skel-bar--money"></span></strong>
+                    </div>
+                    <footer class="eog-balance__foot" id="withdrawBankRow">
+                      <div class="eog-balance__bank">
+                        <span class="eog-balance__bank-label">Net to Bank</span>
+                        <strong class="eog-balance__bank-value" id="withdrawBankLabel">No payout method set yet</strong>
+                      </div>
+                      <a class="eog-btn eog-btn--ghost" id="withdrawBankEdit" href="#" data-jump-payout-settings>
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V10M19 21V10M3 10h18L12 3 3 10z"/></svg>
+                        <span>Manage Accounts</span>
+                      </a>
+                    </footer>
+                  </article>
+
+                  <div class="eog-minis-row" aria-label="Wallet detail">
+                    <article class="eog-tile eog-tile--mini eog-tile--pending" id="pendingCard" data-state="settled">
+                      <header class="eog-tile__head">
+                        <span class="eog-tile__label" id="moneyPendingTitle">
+                          Pending Releases
+                          <button type="button" class="money-card__info" aria-label="What is pending release?" aria-expanded="false" data-tooltip="Online job payments are held for up to 2 business days before being released to your wallet.">
+                            <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+                          </button>
+                        </span>
+                        <span class="eog-tile__icon" aria-hidden="true">
+                          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>
+                        </span>
+                      </header>
+                      <div data-pending-busy>
+                        <div class="eog-tile__amount">
+                          <strong id="walletPending" data-skel><span class="skel-bar skel-bar--money"></span></strong>
+                        </div>
+                        <div class="eog-tile__meta">
+                          <span class="eog-tile__hint"><strong id="pendingJobsCount">0 jobs</strong> · <span id="pendingReleaseNote">Clearing in 1–3 days</span></span>
+                          <span class="money-card__tag money-card__tag--info" id="pendingReleaseTag">In review</span>
+                        </div>
+                      </div>
+                      <div class="eog-tile__settled" data-pending-empty>
+                        <span class="eog-tile__settled-icon" aria-hidden="true">
+                          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>
+                        </span>
+                        <strong>All cleared. No holds.</strong>
+                      </div>
+                    </article>
+
+                    <article class="eog-tile eog-tile--mini eog-tile--held" id="heldCard" data-state="settled">
+                      <header class="eog-tile__head">
+                        <span class="eog-tile__label">Held for Review</span>
+                        <span class="eog-tile__icon" aria-hidden="true">
+                          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 4v6c0 5-3.5 8-8 8s-8-3-8-8V7l8-4z"/></svg>
+                        </span>
+                      </header>
+                      <div data-held-busy hidden>
+                        <div class="eog-tile__amount">
+                          <strong>0.00</strong>
+                          <em>EGP</em>
+                        </div>
+                        <span class="eog-tile__hint">Under review</span>
+                      </div>
+                      <div class="eog-tile__settled" data-held-empty>
+                        <span class="eog-tile__settled-icon" aria-hidden="true">
+                          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>
+                        </span>
+                        <strong>No active disputes.</strong>
+                      </div>
+                    </article>
+
+                    <article class="eog-tile eog-tile--mini eog-tile--debt" id="liabilityCard" data-state="settled" aria-labelledby="liabilityTitle">
+                      <header class="eog-tile__head">
+                        <span class="eog-tile__label" id="liabilityTitle">Platform Fees Due</span>
+                        <span class="money-card__tag money-card__tag--warn" data-state-tag>
+                          <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+                          <span id="debtDueTag">Outstanding</span>
+                        </span>
+                      </header>
+                      <div data-owing-only>
+                        <div class="eog-tile__amount eog-tile__amount--debt">
+                          <strong id="liabilityAmount" data-skel><span class="skel-bar skel-bar--money"></span></strong>
+                        </div>
+                        <button class="eog-btn eog-btn--warn eog-tile__cta" id="payLiabilityBtn" data-pay-liability type="button" hidden>
+                          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 10h18M5 6h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/></svg>
+                          <span data-i18n="tech_pay_now">Settle Fees</span>
+                        </button>
+                        <details class="eog-debt__breakdown" id="debtBreakdownToggle">
+                          <summary>
+                            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            <span>See breakdown</span>
+                          </summary>
+                          <div class="eog-debt__list" id="liability-items-list"></div>
+                        </details>
+                        <dl class="eog-debt__stats">
+                          <div><dt>Paid lifetime</dt><dd><strong id="debtLifetimeFees">0</strong><em>EGP</em></dd></div>
+                          <div><dt>Avg fee / job</dt><dd><strong id="debtAvgFee">0</strong><em>EGP</em></dd></div>
+                        </dl>
+                      </div>
+                      <div class="eog-tile__settled" data-settled-only>
+                        <span class="eog-tile__settled-icon" aria-hidden="true">
+                          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>
+                        </span>
+                        <strong>No platform fees due.</strong>
+                      </div>
+                    </article>
                   </div>
-                  <button type="button" class="recent-jobs__link" data-earn-view-jump="payouts">
-                    <span>Payout history</span>
-                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-                  </button>
-                </header>
-                <div id="earnings-recent-list" class="jq-premium-recent-list"></div>
+                </div>
+
+                <article class="eog-tile eog-tile--activity">
+                  <header class="eog-activity__head">
+                    <h3 class="eog-activity__title">Recent Activity</h3>
+                    <span class="eog-activity__icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                    </span>
+                  </header>
+                  <div id="earnings-recent-list" class="eog-activity__list jq-premium-recent-list"></div>
+                  <footer class="eog-activity__foot">
+                    <button type="button" class="eog-btn eog-btn--ghost eog-activity__all" data-goto-tab="job-queue">
+                      <span>See all jobs history</span>
+                      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                    </button>
+                  </footer>
+                </article>
               </section>
+
+              <div class="liability-warning eog-warn" id="liabilityWarning" data-i18n="tech_liability_warning" hidden>
+                ⚠️ Maximum liability reached — you may only accept online-payment jobs above 2,000 EGP.
+              </div>
+
+              <!-- ═══════ Section title ═══════ -->
+              <h2 class="eog-section-title">Payout Methods &amp; Settings</h2>
+
+              <!-- ═══════ Linked Accounts + Goals ═══════ -->
+              <section class="eog-grid eog-grid--bottom" aria-label="Payout methods and goals">
+                <article class="eog-tile eog-tile--accounts">
+                  <header class="eog-accounts__head">
+                    <h3 class="eog-accounts__title">Linked Accounts</h3>
+                    <a href="#" class="eog-accounts__add" data-jump-payout-settings>
+                      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
+                      <span>Add New Payout Method</span>
+                    </a>
+                  </header>
+                  <ul class="eog-accounts__list">
+                    <li class="eog-accounts__item">
+                      <span class="eog-accounts__icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V10M19 21V10M3 10h18L12 3 3 10z"/></svg>
+                      </span>
+                      <div class="eog-accounts__body">
+                        <strong>Default payout</strong>
+                        <span>Linked bank — use <em>Manage Accounts</em> to update</span>
+                      </div>
+                      <a class="eog-accounts__edit" href="#" data-jump-payout-settings aria-label="Edit payout method">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h4l11-11-4-4L4 16v4z"/></svg>
+                      </a>
+                    </li>
+                    <li class="eog-accounts__item">
+                      <span class="eog-accounts__icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 10h20"/></svg>
+                      </span>
+                      <div class="eog-accounts__body">
+                        <strong>Backup method</strong>
+                        <span>Add a second account for redundancy</span>
+                      </div>
+                      <a class="eog-accounts__edit" href="#" data-jump-payout-settings aria-label="Edit backup method">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h4l11-11-4-4L4 16v4z"/></svg>
+                      </a>
+                    </li>
+                  </ul>
+                  <footer class="eog-accounts__toggle">
+                    <div class="eog-accounts__toggle-body">
+                      <strong>Auto-Withdrawal</strong>
+                      <span>Automatically transfer balance every Friday</span>
+                    </div>
+                    <label class="eog-switch" aria-label="Toggle automatic weekly withdrawal">
+                      <input type="checkbox" id="autoWithdrawalToggle">
+                      <span class="eog-switch__track"><span class="eog-switch__thumb"></span></span>
+                    </label>
+                  </footer>
+                </article>
+
+                <article class="eog-tile eog-tile--goals">
+                  <header class="eog-goals__head">
+                    <h3 class="eog-goals__title">Earnings Goals</h3>
+                    <span class="eog-tile__icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/></svg>
+                    </span>
+                  </header>
+
+                  <div class="eog-goal">
+                    <div class="eog-goal__head">
+                      <span class="eog-goal__label">Monthly Target: <strong>5,000 EGP</strong></span>
+                      <span class="eog-goal__pct">Track via <em>This Month</em></span>
+                    </div>
+                    <div class="eog-goal__bar"><div class="eog-goal__fill" id="monthlyGoalBar"></div></div>
+                    <div class="eog-goal__scale"><span>0</span><span>2,500</span><span>5,000</span></div>
+                  </div>
+
+                  <div class="eog-goal eog-goal--daily">
+                    <div class="eog-goal__head">
+                      <span class="eog-goal__label">Daily Goal: <strong>250 EGP</strong></span>
+                    </div>
+                    <div class="eog-goal__badge">
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>
+                      <span>Pace yourself — every job counts toward today.</span>
+                    </div>
+                  </div>
+                </article>
+              </section>
+
             </div>
 
             <!-- ────────── Payouts sub-view (redesigned) ────────── -->
-            <div class="earn-view" data-earn-view="payouts" role="tabpanel" hidden>
+            <div class="earn-view" id="earnViewPayouts" data-earn-view="payouts" role="tabpanel" aria-labelledby="earnTabPayouts" hidden>
 
-              <!-- History panel -->
               <section class="payouts-history" id="payoutsPanel" aria-labelledby="payoutsHeading">
                 <header class="payouts-history__head">
                   <div class="payouts-history__heading">
-                    <h2 class="payouts-history__title" id="payoutsHeading">Past withdrawals</h2>
-                    <span class="payouts-history__hint">Money sent to your bank account</span>
-                  </div>
-                  <div class="payouts-summary" id="payoutsSummary" hidden>
-                    <div class="payouts-summary__cell">
-                      <span class="payouts-summary__label">Total</span>
-                      <span class="payouts-summary__value"><span id="payoutsTotalAmount">0</span><em>EGP</em></span>
-                    </div>
-                    <span class="payouts-summary__sep" aria-hidden="true"></span>
-                    <div class="payouts-summary__cell">
-                      <span class="payouts-summary__label">Count</span>
-                      <span class="payouts-summary__value" id="payoutsTotalCount">0</span>
-                    </div>
-                    <span class="payouts-summary__sep" aria-hidden="true"></span>
-                    <div class="payouts-summary__cell">
-                      <span class="payouts-summary__label">Pending</span>
-                      <span class="payouts-summary__value payouts-summary__value--warn" id="payoutsPendingCount">0</span>
-                    </div>
+                    <h2 class="payouts-history__title" id="payoutsHeading">Wallet history</h2>
+                    <span class="payouts-history__hint" id="walletHistoryHint">Track withdrawals, release status, and fees you already paid.</span>
                   </div>
                 </header>
 
-                <!-- Filters (hidden until payouts exist) -->
-                <div class="payouts-filters" id="payoutsFilters" role="group" aria-label="Filter payouts" hidden>
+                <div class="wallet-history__tabs" role="tablist" aria-label="Wallet history categories">
+                  <button type="button" class="wallet-history__tab is-active" id="historyTabWithdrawals" role="tab" aria-selected="true" aria-controls="walletHistoryTable" tabindex="0" data-wallet-history-category="withdrawals">Withdrawals</button>
+                  <button type="button" class="wallet-history__tab" id="historyTabReleases" role="tab" aria-selected="false" aria-controls="walletHistoryTable" tabindex="-1" data-wallet-history-category="releases">Release status</button>
+                  <button type="button" class="wallet-history__tab" id="historyTabFees" role="tab" aria-selected="false" aria-controls="walletHistoryTable" tabindex="-1" data-wallet-history-category="fees">Paid fees</button>
+                </div>
+
+                <div class="wallet-history__summary" id="walletHistorySummary" role="status" aria-live="polite" hidden></div>
+
+                <div class="payouts-filters" id="payoutsFilters" role="group" aria-label="Filter wallet history">
                   <label class="payouts-filter">
                     <span class="payouts-filter__label">Status</span>
-                    <select id="payoutFilterStatus" class="payouts-filter__select">
-                      <option value="">All</option>
-                      <option value="pending">Pending</option>
-                      <option value="processing">Processing</option>
-                      <option value="paid">Paid</option>
-                      <option value="completed">Completed</option>
-                      <option value="rejected">Rejected</option>
-                      <option value="failed">Failed</option>
-                      <option value="cancelled">Cancelled</option>
-                    </select>
+                    <select id="payoutFilterStatus" class="payouts-filter__select"></select>
                   </label>
                   <label class="payouts-filter">
                     <span class="payouts-filter__label">From</span>
@@ -789,25 +845,27 @@
                   <button type="button" class="payouts-filters__clear" id="payoutFiltersClear">Clear</button>
                 </div>
 
+                <div class="wallet-history__error" id="walletHistoryError" role="alert" hidden>
+                  <span>Couldn't load wallet history.</span>
+                  <button type="button" id="walletHistoryRetry">Retry</button>
+                </div>
+
                 <div class="payouts-history__body">
-                  <table class="admin-table admin-table--earnings payouts-table">
-                    <thead>
-                      <tr>
-                        <th>Date</th>
-                        <th>Method</th>
-                        <th class="payouts-table__num">Amount</th>
-                        <th>Status</th>
-                        <th>Receipt</th>
-                      </tr>
-                    </thead>
-                    <tbody id="payoutsTbody"></tbody>
+                  <table class="admin-table admin-table--earnings payouts-table" id="walletHistoryTable" aria-live="polite">
+                    <thead id="walletHistoryHead"></thead>
+                    <tbody id="walletHistoryTbody"></tbody>
                   </table>
                 </div>
+                <footer class="wallet-history__pagination" id="walletHistoryPagination" hidden>
+                  <button type="button" class="wallet-history__page-btn" id="walletHistoryPrev">Previous</button>
+                  <span id="walletHistoryPageLabel">Page 1</span>
+                  <button type="button" class="wallet-history__page-btn" id="walletHistoryNext">Next</button>
+                </footer>
               </section>
             </div>
 
             <!-- ────────── Debts sub-view (conditional) ────────── -->
-            <div class="earn-view" data-earn-view="debts" role="tabpanel" hidden>
+            <div class="earn-view" id="earnViewDebts" data-earn-view="debts" role="tabpanel" aria-labelledby="earnSubnavDebts" hidden>
               <section class="section-card" id="debtPanel" aria-labelledby="debtHeading">
                 <header class="section-card__head">
                   <div class="section-card__heading">
@@ -836,68 +894,6 @@
                 </div>
               </section>
             </div>
-          </section>
-
-          <!-- ── Transactions panel (redesigned) ── -->
-          <section class="dash-panel" id="panel-transactions" role="tabpanel" aria-labelledby="tab-transactions" data-panel="transactions" hidden>
-            <div class="dash-panel__header">
-              <h1 class="dash-panel__title" data-i18n="tech_nav_transactions">Transactions</h1>
-              <p class="dash-panel__subtitle">Every movement of money — what came in, what went out, and why.</p>
-            </div>
-
-            <!-- Filter shelf -->
-            <div class="tx-filter">
-              <div class="tx-filter__chips" role="group" aria-label="Quick date range">
-                <button type="button" class="tx-chip is-active" data-tx-range="all">All time</button>
-                <button type="button" class="tx-chip" data-tx-range="7">Last 7 days</button>
-                <button type="button" class="tx-chip" data-tx-range="30">Last 30 days</button>
-                <button type="button" class="tx-chip" data-tx-range="90">Last 90 days</button>
-              </div>
-              <div class="tx-filter__controls">
-                <label class="tx-filter__field">
-                  <span>Type</span>
-                  <select id="txType">
-                    <option value="">All types</option>
-                    <option value="release">Money released to you</option>
-                    <option value="hold">Held in escrow</option>
-                    <option value="fee">Platform fee</option>
-                    <option value="charge">Charge</option>
-                    <option value="refund">Refund</option>
-                    <option value="dispute">Dispute</option>
-                    <option value="cash_debt_auto_deduct">Cash debt — auto</option>
-                    <option value="cash_debt_manual_payment">Cash debt — manual</option>
-                  </select>
-                </label>
-                <label class="tx-filter__field">
-                  <span>From</span>
-                  <input id="txFrom" type="date" />
-                </label>
-                <label class="tx-filter__field">
-                  <span>To</span>
-                  <input id="txTo" type="date" />
-                </label>
-                <button id="txRefresh" class="tx-refresh-btn" type="button" title="Refresh">
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-                  <span>Refresh</span>
-                </button>
-              </div>
-            </div>
-
-            <!-- Ledger table -->
-            <div class="tx-table-wrap">
-              <table class="tx-table">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>What happened</th>
-                    <th>Booking</th>
-                    <th class="tx-table__num">Amount</th>
-                  </tr>
-                </thead>
-                <tbody id="txTbody"><tr><td colspan="4" class="tx-table__loading">Loading…</td></tr></tbody>
-              </table>
-            </div>
-            <div id="txPagination" class="tx-pagination"></div>
           </section>
 
           <!-- ── Availability panel ── -->

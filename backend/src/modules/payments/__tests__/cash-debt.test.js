@@ -40,3 +40,29 @@ test('remaining defaults to amount on create', async () => {
   });
   expect(d.remaining).toBe(75);
 });
+
+test('platform-fee metadata defaults are applied', async () => {
+  const d = await CashDebt.create({
+    worker: new mongoose.Types.ObjectId(),
+    booking: new mongoose.Types.ObjectId(),
+    amount: 20,
+  });
+  expect(d.debtType).toBe('platform_fee');
+  expect(d.refundRecipientAmount).toBe(0);
+  expect(d.relatedDispute).toBeUndefined();
+});
+
+test('accepts refund-recovery metadata linked to a dispute', async () => {
+  const dispute = new mongoose.Types.ObjectId();
+  const d = await CashDebt.create({
+    worker: new mongoose.Types.ObjectId(),
+    booking: new mongoose.Types.ObjectId(),
+    amount: 90,
+    debtType: 'refund_recovery',
+    refundRecipientAmount: 75,
+    relatedDispute: dispute,
+  });
+  expect(d.debtType).toBe('refund_recovery');
+  expect(d.refundRecipientAmount).toBe(75);
+  expect(String(d.relatedDispute)).toBe(String(dispute));
+});

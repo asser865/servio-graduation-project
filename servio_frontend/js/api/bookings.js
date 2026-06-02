@@ -29,3 +29,17 @@ export const markCustomerNoShow = (id, { note, evidence = [] } = {}) =>
   api.post(`/bookings/${id}/no-show/customer`, { note, evidence });
 export const markWorkerNoShow = (id, { note, evidence = [] } = {}) =>
   api.post(`/bookings/${id}/no-show/worker`, { note, evidence });
+
+// Payments overhaul — worker submits completion outcome (paid / refused / could-not-complete)
+export const submitCompletionOutcome = (bookingId, payload) =>
+  api.post(`/bookings/${bookingId}/completion-outcome`, payload);
+
+// Customer feedback — confirm or report issue after worker submits completion
+export const submitCustomerFeedback = (bookingId, payload) =>
+  api.post(`/bookings/${bookingId}/customer-feedback`, payload);
+
+export const verifyRefusal = (bookingId, payload) =>
+  api.post(`/bookings/${bookingId}/refusal-verification`, payload);
+
+export const getRefusalsAwaitingResponse = () =>
+  api.get('/bookings/admin/refusal-verifications');

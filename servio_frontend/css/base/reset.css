@@ -84,4 +84,6 @@ ol[role="list"] {
   }
 }
 
+[hidden] { display: none !important; }
+
 /* . */

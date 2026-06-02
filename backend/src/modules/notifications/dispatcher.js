@@ -37,6 +37,9 @@ async function dispatch(event, payload = {}) {
 
   const userId = resolveRecipientId(payload);
   if (!userId) return { dispatched: false, reason: 'no_recipient' };
+  if (NotificationPreference.db.readyState !== 1) {
+    return { dispatched: false, reason: 'db_unavailable' };
+  }
 
   let pref = null;
   try {

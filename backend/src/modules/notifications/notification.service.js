@@ -12,6 +12,7 @@ const Notification = require('./notification.model');
  * @param {string}  [referenceUrl]
  */
 async function createNotification(userId, type, title, body, referenceId = null, referenceUrl = null) {
+  if (Notification.db.readyState !== 1) return null;
   try {
     await Notification.create({ userId, type, title, body, referenceId, referenceUrl });
   } catch (err) {

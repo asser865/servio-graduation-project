@@ -7,15 +7,17 @@ import { skCardGrid, skList, skStatGrid, skTableRows } from '../components/skele
 import { getInitials } from '../utils/string.js';
 import { getMe, updateMe, updatePassword, updateEmail, deleteMe, updateAvailability, toggleAvailableNow, toggleBlockedDate } from '../api/users.js';
 import { uploadPublicFile } from '../api/uploads.js';
-import { getWorkerBookings, updateBookingStatus } from '../api/bookings.js';
+import { getWorkerBookings, updateBookingStatus, submitCompletionOutcome } from '../api/bookings.js';
+import { openCompletionOutcomeModal } from '../components/completion-outcome-modal.js';
 import { getWorkerReviews } from '../api/reviews.js';
 import { getServices } from '../api/services.js';
-import { getMyDebts, getWorkerDisputes, getPartyDisputeById, addDisputeEvidence, appealDispute, getMyDebtsV2, getMySettlements, getMyPayouts, getMyTransactions, getWorkerEarnings } from '../api/payments.js';
+import { getMyDebts, getWorkerDisputes, getPartyDisputeById, addDisputeEvidence, appealDispute, getMyDebtsV2, getMySettlements, getMyPayouts, getWorkerEarnings, getWorkerEarningsHistory } from '../api/payments.js';
 import { openSettleDebtModal } from '../components/settle-debt-form.js';
 import { openPayoutRequestModal } from '../components/payout-request-form.js';
 import { getNotifications as apiGetTechNotifs, markOneRead as apiMarkTechNotifRead, markAllRead as apiMarkTechAllRead, getNotificationPreferences, updateNotificationPreferences } from '../api/notifications.js';
 import { getHierarchy as getLocationHierarchy, resolveSlug as resolveLocationSlug, labelForSlug as locationLabel, getDescendants as locationDescendants } from '../data/locations.js';
 import { calculateBookingFee, DEFAULT_PLATFORM_FEE_RATE, money } from '../utils/fee.js';
+import { createPoller, hasChanged, snapshotFocus, restoreFocus } from '../utils/live-poll.js';
 
 // Per-booking fee snapshot. Uses booking's recorded fee if backend stamped it,
 // else recomputes via platform default. Returns { gross, fee, net, feeRate }.
@@ -479,7 +481,6 @@ const TAB_LABEL_KEYS = {
   'overview': 'tech_nav_overview',
   'job-queue': 'tech_nav_job_queue',
   'earnings': 'tech_nav_earnings',
-  'transactions': 'tech_nav_transactions',
   'availability': 'tech_nav_availability',
   'reviews': 'tech_nav_reviews',
   'verification': 'tech_nav_verification',
@@ -1784,7 +1785,9 @@ function buildJobCard(b, _t) {
     arrived: { label: 'Arrived', dot: 'amber' },
     in_progress: { label: 'In Progress', dot: 'purple' },
     awaiting_customer_confirmation: { label: 'Waiting for Customer', dot: 'amber' },
-    pending_admin_review: { label: 'Pending Release', dot: 'blue' },
+    pending_admin_review: b.paymentMethod === 'cash'
+      ? { label: 'Cash Review', dot: 'blue' }
+      : { label: 'Pending Release', dot: 'blue' },
     completed: { label: 'Completed', dot: 'green' },
     cancelled: { label: 'Cancelled', dot: 'grey' },
     rejected: { label: 'Declined', dot: 'grey' },
@@ -1955,6 +1958,7 @@ function buildJobCard(b, _t) {
       ${workerNotesText ? `<div class="jq-done-notes"><div class="jq-notes-label">Work done:</div><p>${workerNotesText}</p></div>` : ''}
       ${proofImg ? `<div class="jq-done-image"><img src="${proofImg}" alt="Completed work photo"></div>` : ''}`;
   } else if (b.status === 'pending_admin_review') {
+    const isCashReview = b.paymentMethod === 'cash';
     const workerNotesText = escapeHtml(b.workerNotes || b.completionNotes || '');
     const proofImg = (Array.isArray(b.workerCompletionImages) && b.workerCompletionImages[0]) || (Array.isArray(b.completionPhotos) && b.completionPhotos[0]) || '';
     flowHtml = `
@@ -1963,12 +1967,16 @@ function buildJobCard(b, _t) {
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
         </div>
         <div class="jq-done-info">
-          <p class="jq-done-label">Pending Release</p>
-          <p class="jq-done-sub">Customer confirmed. SERVIO is finalizing payment release.</p>
+          <p class="jq-done-label">${isCashReview ? 'Cash Confirmation Review' : 'Pending Release'}</p>
+          <p class="jq-done-sub">${isCashReview
+            ? 'Customer paid cash. SERVIO is reconciling the commission record.'
+            : 'Customer confirmed. SERVIO is finalizing payment release.'}</p>
         </div>
         <div class="jq-done-earnings jq-done-earnings--pending-release">${price}</div>
       </div>
-      <div class="jq-status-note">This job is confirmed by the customer. Earnings appear as available after admin release approval.</div>
+      <div class="jq-status-note">${isCashReview
+        ? 'Cash was collected directly. No payment release is required; SERVIO is checking the commission settlement record.'
+        : 'This job is confirmed by the customer. Earnings appear as available after admin release approval.'}</div>
       ${workerNotesText ? `<div class="jq-done-notes"><div class="jq-notes-label">Work done:</div><p>${workerNotesText}</p></div>` : ''}
       ${proofImg ? `<div class="jq-done-image"><img src="${proofImg}" alt="Completed work photo"></div>` : ''}`;
   } else if (b.status === 'completed') {
@@ -2513,63 +2521,25 @@ function wireArrivalFlows(container) {
       }
 
       if (action === 'submit-complete') {
-        const notes = flow.querySelector('.jq-notes-textarea')?.value?.trim() || '';
-        const imageInput = flow.querySelector('.jq-completion-image-input');
-        const completionImage = imageInput?.files?.[0] || null;
-        btn.disabled = true; btn.textContent = 'Submitting...';
+        // Payments overhaul — open outcome modal (paid / refused / could-not-complete)
+        // instead of the legacy single-photo + notes flow.
+        btn.disabled = true;
+        const prevLabel = btn.textContent;
+        btn.textContent = 'Opening…';
         try {
-          btn.textContent = 'Submitting...';
-          let completionImageUrl = '';
-          if (completionImage) {
-            btn.textContent = 'Uploading image...';
-            const uploaded = await uploadPublicFile(completionImage, 'completion');
-            completionImageUrl = uploaded?.url || '';
-            btn.textContent = 'Submitting...';
-          }
-          btn.textContent = 'Submitting...';
-          await updateBookingStatus(bookingId, 'awaiting_customer_confirmation', {
-            workerNotes: notes,
-            workerCompletionImages: completionImageUrl ? [completionImageUrl] : [],
+          await openCompletionOutcomeModal({
+            bookingId,
+            onSubmit: async (payload) => {
+              await submitCompletionOutcome(bookingId, payload);
+              clearInterval(timerInterval);
+              localStorage.removeItem(storeKey);
+              localStorage.removeItem(timerKey);
+              await initJobQueue('waiting');
+            },
           });
-          clearInterval(timerInterval);
-          const duration = document.getElementById(`timer-${bookingId}`)?.textContent || '—';
-          const customer = flow.dataset.customer || '—';
-          const payoutAmount = flow.closest('.jq-premium-card')?.querySelector('.jq-identity-bar__amount, .payout-amount')?.textContent?.trim() || '—';
-          localStorage.removeItem(storeKey);
-          localStorage.removeItem(timerKey);
-
-          const card = flow.closest('.jq-premium-card');
-          if (card) {
-            card.className = 'jq-premium-card jq-premium-card--completed jq-premium-card--done-anim is-visible';
-            card.removeAttribute('data-status');
-            card.innerHTML = `
-              <div class="jq-done-banner">
-                <div class="jq-done-icon">
-                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="3"><polyline points="4,12 9,17 20,6"/></svg>
-                </div>
-                <div class="jq-done-info">
-                  <p class="jq-done-label">Awaiting Customer Confirmation</p>
-                  <p class="jq-done-sub">${customer} · ${duration}</p>
-                </div>
-                <div class="jq-done-earnings">${payoutAmount}</div>
-              </div>
-              ${notes ? `<div class="jq-done-notes">
-                <div class="jq-notes-label">Work done:</div>
-                <p>${escapeHtml(notes)}</p>
-              </div>` : ''}`;
-            if (completionImageUrl) {
-              card.insertAdjacentHTML('beforeend', `
-                <div class="jq-done-image">
-                  <img src="${completionImageUrl}" alt="Completed work photo">
-                </div>`);
-            }
-
-          }
-          showToast('Completion submitted! Waiting for customer confirmation.', 'success');
-          await initJobQueue('waiting');
-        } catch (err) {
-          btn.disabled = false; btn.textContent = 'Submit Completion';
-          showToast(err?.message || 'Failed to complete job.', 'error');
+        } finally {
+          btn.disabled = false;
+          btn.textContent = prevLabel;
         }
         return;
       }
@@ -2741,12 +2711,6 @@ function renderCanonicalEarningsPanel({
         ${arrow} ${sign}${moneyFmt.text(Math.abs(delta))}
       </span> vs last month`;
   };
-  const paymentMethodLabel = (method) => {
-    const normalized = String(method || '').toLowerCase();
-    if (normalized === 'cash') return 'Cash job';
-    if (normalized === 'card' || normalized === 'credit card') return 'Card payment';
-    return 'Online payment';
-  };
   const fallbackRecentItems = completed
     .slice()
     .sort((a, b) => new Date(b.scheduledDate || b.updatedAt) - new Date(a.scheduledDate || a.updatedAt))
@@ -2766,7 +2730,6 @@ function renderCanonicalEarningsPanel({
         walletCreditAmount: isCash ? 0 : snapshot.net,
         cashCollectedAmount: isCash ? snapshot.net : 0,
         settlementType: isCash ? 'cash_collected' : 'released_to_wallet',
-        settlementNote: isCash ? 'Cash collected directly from the customer.' : 'Released to wallet.',
         occurredAt: booking.scheduledDate || booking.updatedAt,
       };
     });
@@ -2929,9 +2892,13 @@ function renderCanonicalEarningsPanel({
 
   const pendingBusyEl = document.querySelector('[data-pending-busy]');
   const pendingEmptyEl = document.querySelector('[data-pending-empty]');
+  const pendingCard = document.getElementById('pendingCard');
+  
   const hasPending = Number(pendingRelease) > 0 || Number(pendingJobsCount) > 0;
+  
   if (pendingBusyEl) pendingBusyEl.hidden = !hasPending;
   if (pendingEmptyEl) pendingEmptyEl.hidden = hasPending;
+  if (pendingCard) pendingCard.dataset.state = hasPending ? 'busy' : 'settled';
 
   const liabilityAmountEl = document.getElementById('liabilityAmount');
   if (liabilityAmountEl) liabilityAmountEl.innerHTML = moneyFmt.html(outstandingCashFees);
@@ -3003,51 +2970,41 @@ function renderCanonicalEarningsPanel({
           <span>Once you complete a job, it'll appear here with its settlement type.</span>
         </div>`;
     } else {
-      recentList.innerHTML = recentEarnings.slice(0, 5).map(item => {
+      recentList.innerHTML = recentEarnings.slice(0, 3).map(item => {
         const service = item.serviceName || 'Service';
         const dateSource = item.occurredAt || item.scheduledDate;
         const dateStr = dateSource
           ? new Date(dateSource).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
           : '-';
-        const customer = item.customerName ? ` - ${item.customerName}` : '';
+        const customer = item.customerName || 'Not listed';
         let badgeCls = 'jq-earn-row-tag--wallet';
         let badgeLbl = 'WALLET';
-        let amountLabel = 'wallet';
         let amountValue = numberOr(item.walletCreditAmount, item.displayAmount);
         let amountPrefix = '+';
         let amountClass = '';
-        let subStr = item.settlementNote || paymentMethodLabel(item.paymentMethod);
 
         if (item.settlementType === 'cash_collected') {
           badgeCls = 'jq-earn-row-tag--cash';
           badgeLbl = 'CASH';
-          amountLabel = 'cash';
           amountValue = numberOr(item.cashCollectedAmount, item.displayAmount);
-          subStr = `Cash collected directly from the customer - fee ${moneyFmt.text(item.fee)}`;
         } else if (item.settlementType === 'released_after_offset') {
-          const offsetAmount = Math.max(0, numberOr(item.gross) - numberOr(item.walletCreditAmount, item.displayAmount));
           badgeCls = 'jq-earn-row-tag--wallet';
           badgeLbl = 'WALLET';
-          amountLabel = 'wallet';
           amountValue = numberOr(item.walletCreditAmount, item.displayAmount);
-          subStr = `${paymentMethodLabel(item.paymentMethod)} released to wallet after auto-paying ${moneyFmt.text(offsetAmount)} in cash-job fees`;
         } else if (item.settlementType === 'released_to_wallet') {
           badgeCls = 'jq-earn-row-tag--wallet';
           badgeLbl = 'WALLET';
-          amountLabel = 'wallet';
           amountValue = numberOr(item.walletCreditAmount, item.displayAmount);
-          subStr = `${paymentMethodLabel(item.paymentMethod)} released to wallet`;
         } else if (item.settlementType === 'pending_release') {
           badgeCls = 'jq-earn-row-tag--pending';
           badgeLbl = 'PENDING';
-          amountLabel = 'pending';
           amountValue = numberOr(item.displayAmount, item.gross);
           amountPrefix = '';
           amountClass = ' jq-earn-row-amount__net--pending';
-          subStr = `${paymentMethodLabel(item.paymentMethod)} is still waiting for release approval`;
         }
 
         const amountStr = `${amountPrefix}${moneyFmt.text(amountValue)}`;
+        const feeStr = moneyFmt.text(item.fee);
         return `
           <div class="jq-premium-earn-row" data-reveal>
             <div class="jq-earn-row-left">
@@ -3056,21 +3013,179 @@ function renderCanonicalEarningsPanel({
               </div>
               <div class="jq-earn-row-info">
                 <div class="jq-earn-row-title">
-                  <h4>${service}</h4>
-                  <span class="jq-earn-row-tag ${badgeCls}">${badgeLbl}</span>
+                  <h4>${escapeHtml(service)}</h4>
+                  <span class="jq-earn-row-date">${escapeHtml(dateStr)}</span>
                 </div>
-                <p>${dateStr}${customer}</p>
-                <p class="jq-earn-row-breakdown">${subStr}</p>
+                <div class="jq-earn-row-customer">
+                  <span class="jq-earn-row-customer__label">Customer</span>
+                  <span class="jq-earn-row-customer__name">${escapeHtml(customer)}</span>
+                </div>
               </div>
             </div>
             <div class="jq-earn-row-amount">
               <span class="jq-earn-row-amount__net${amountClass}">${amountStr}</span>
-              <span class="jq-earn-row-amount__label">${amountLabel}</span>
+              <span class="jq-earn-row-tag ${badgeCls}">${badgeLbl}</span>
+              <span class="jq-earn-row-fee"><span>Fee</span><strong>${feeStr}</strong></span>
             </div>
           </div>`;
       }).join('');
     }
   }
+
+  renderEarningsOverviewExtras({ monthTakeHome, completed });
+}
+
+// ── Earnings goals + linked accounts (real data) ──────────────────────────────
+const EARNINGS_GOALS_KEY = 'servio_earnings_goals_v1';
+function getEarningsGoals() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(EARNINGS_GOALS_KEY) || 'null');
+    if (stored && Number.isFinite(stored.monthly) && Number.isFinite(stored.daily)) return stored;
+  } catch {}
+  return { monthly: 5000, daily: 250 };
+}
+function setEarningsGoals(goals) {
+  try { localStorage.setItem(EARNINGS_GOALS_KEY, JSON.stringify(goals)); } catch {}
+}
+
+function computeTodayTakeHome(completed) {
+  if (!Array.isArray(completed)) return 0;
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
+  return completed.reduce((sum, b) => {
+    const when = new Date(b.scheduledDate || b.updatedAt || 0);
+    if (when.getFullYear() === y && when.getMonth() === m && when.getDate() === d) {
+      const snap = bookingFeeSnapshot(b);
+      return sum + (Number(snap.net) || 0);
+    }
+    return sum;
+  }, 0);
+}
+
+function maskAccountNumber(raw) {
+  const digits = String(raw || '').replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.length <= 4) return `•••• ${digits}`;
+  return `•••• ${digits.slice(-4)}`;
+}
+
+function renderLinkedAccountsTile(account) {
+  const list = document.querySelector('.eog-tile--accounts .eog-accounts__list');
+  if (!list) return;
+  const acc = account || {};
+  const method = String(acc.payoutMethod || '').toLowerCase();
+  const bankSet    = !!(acc.bankName || acc.accountHolder || acc.accountNumber);
+  const walletSet  = !!acc.walletNumber;
+
+  const bankIcon = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V10M19 21V10M3 10h18L12 3 3 10z"/></svg>`;
+  const cardIcon = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 10h20"/></svg>`;
+  const editIcon = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h4l11-11-4-4L4 16v4z"/></svg>`;
+  const escape = (s) => String(s || '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+
+  const items = [];
+
+  if (bankSet) {
+    const title = method !== 'wallet' ? 'Default payout · Bank' : 'Linked Bank';
+    const sub = [escape(acc.bankName), maskAccountNumber(acc.accountNumber)].filter(Boolean).join(' · ');
+    items.push(`
+      <li class="eog-accounts__item${method !== 'wallet' ? ' eog-accounts__item--active' : ''}">
+        <span class="eog-accounts__icon" aria-hidden="true">${bankIcon}</span>
+        <div class="eog-accounts__body">
+          <strong>${title}</strong>
+          <span>${sub || 'Bank transfer'}</span>
+        </div>
+        <a class="eog-accounts__edit" href="#" data-jump-payout-settings aria-label="Edit bank">${editIcon}</a>
+      </li>`);
+  }
+  if (walletSet) {
+    const title = method === 'wallet' ? 'Default payout · Wallet' : 'Mobile Wallet';
+    items.push(`
+      <li class="eog-accounts__item${method === 'wallet' ? ' eog-accounts__item--active' : ''}">
+        <span class="eog-accounts__icon" aria-hidden="true">${cardIcon}</span>
+        <div class="eog-accounts__body">
+          <strong>${title}</strong>
+          <span>${maskAccountNumber(acc.walletNumber)}</span>
+        </div>
+        <a class="eog-accounts__edit" href="#" data-jump-payout-settings aria-label="Edit wallet">${editIcon}</a>
+      </li>`);
+  }
+  if (!items.length) {
+    items.push(`
+      <li class="eog-accounts__item eog-accounts__item--empty">
+        <span class="eog-accounts__icon" aria-hidden="true">${bankIcon}</span>
+        <div class="eog-accounts__body">
+          <strong>No payout method yet</strong>
+          <span>Add a bank or wallet to receive earnings</span>
+        </div>
+        <a class="eog-accounts__edit" href="#" data-jump-payout-settings aria-label="Add payout method">${editIcon}</a>
+      </li>`);
+  } else if (items.length === 1) {
+    const missing = bankSet ? 'wallet' : 'bank';
+    const ico = missing === 'bank' ? bankIcon : cardIcon;
+    items.push(`
+      <li class="eog-accounts__item eog-accounts__item--placeholder">
+        <span class="eog-accounts__icon" aria-hidden="true">${ico}</span>
+        <div class="eog-accounts__body">
+          <strong>Backup method</strong>
+          <span>Add a ${missing} for redundancy</span>
+        </div>
+        <a class="eog-accounts__edit" href="#" data-jump-payout-settings aria-label="Add backup method">${editIcon}</a>
+      </li>`);
+  }
+
+  list.innerHTML = items.join('');
+}
+
+function renderEarningsGoalsTile(monthTakeHome, todayTakeHome) {
+  const goals = getEarningsGoals();
+  const monthLabel = document.querySelector('.eog-tile--goals .eog-goal:not(.eog-goal--daily) .eog-goal__label');
+  const monthBar   = document.getElementById('monthlyGoalBar');
+  const monthScale = document.querySelector('.eog-tile--goals .eog-goal:not(.eog-goal--daily) .eog-goal__scale');
+  const monthPct   = document.querySelector('.eog-tile--goals .eog-goal:not(.eog-goal--daily) .eog-goal__pct');
+  const dailyLabel = document.querySelector('.eog-tile--goals .eog-goal--daily .eog-goal__label');
+  const dailyBadge = document.querySelector('.eog-tile--goals .eog-goal--daily .eog-goal__badge');
+
+  const monthValue = Math.max(0, Number(monthTakeHome) || 0);
+  const todayValue = Math.max(0, Number(todayTakeHome) || 0);
+  const monthlyTarget = Math.max(1, goals.monthly);
+  const dailyTarget   = Math.max(1, goals.daily);
+  const monthPctNum   = Math.min(100, Math.round((monthValue / monthlyTarget) * 100));
+  const dailyPctNum   = Math.min(100, Math.round((todayValue / dailyTarget) * 100));
+
+  if (monthLabel) monthLabel.innerHTML = `Monthly Target: <strong>${moneyFmt.compact(monthlyTarget)} EGP</strong>`;
+  if (monthBar)   monthBar.style.width = `${monthPctNum}%`;
+  if (monthPct)   monthPct.innerHTML = `${moneyFmt.compact(monthValue)} <em>/ ${moneyFmt.compact(monthlyTarget)} EGP</em>`;
+  if (monthScale) monthScale.innerHTML = `<span>0</span><span>${moneyFmt.compact(monthlyTarget/2)}</span><span>${moneyFmt.compact(monthlyTarget)}</span>`;
+
+  if (dailyLabel) dailyLabel.innerHTML = `Daily Goal: <strong>${moneyFmt.compact(dailyTarget)} EGP</strong> · today <strong>${moneyFmt.compact(todayValue)}</strong>`;
+  if (dailyBadge) {
+    const hit = dailyPctNum >= 100;
+    dailyBadge.classList.toggle('eog-goal__badge--hit', hit);
+    const checkSvg = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>`;
+    const sparkSvg = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 2v4M12 18v4M2 12h4M18 12h4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/></svg>`;
+    dailyBadge.innerHTML = `${hit ? checkSvg : sparkSvg}<span>${hit ? 'Daily goal reached — nice work.' : `${dailyPctNum}% toward today's goal · keep going.`}</span>`;
+  }
+}
+
+function wireAutoWithdrawalToggle(account) {
+  const toggle = document.getElementById('autoWithdrawalToggle');
+  if (!toggle) return;
+  const acc = account || {};
+  toggle.checked = !!acc.autoWithdraw;
+  if (toggle.dataset.wired === '1') return;
+  toggle.dataset.wired = '1';
+  toggle.addEventListener('change', () => {
+    const current = getAccount() || {};
+    current.autoWithdraw = !!toggle.checked;
+    try { localStorage.setItem('servio_account', JSON.stringify(current)); } catch {}
+  });
+}
+
+function renderEarningsOverviewExtras({ monthTakeHome, completed }) {
+  const account = getAccount();
+  renderLinkedAccountsTile(account);
+  wireAutoWithdrawalToggle(account);
+  renderEarningsGoalsTile(monthTakeHome, computeTodayTakeHome(completed));
 }
 
 // ── Populate earnings panel ───────────────────────────────────────────────────
@@ -3282,7 +3397,7 @@ function populateEarningsLegacy(allBookings, completed, monthEarnings, lastMonth
   if (recentList) {
     const recentCompleted = completed
       .sort((a, b) => new Date(b.scheduledDate || b.updatedAt) - new Date(a.scheduledDate || a.updatedAt))
-      .slice(0, 5);
+      .slice(0, 3);
 
     if (recentCompleted.length === 0) {
       recentList.innerHTML = `
@@ -3299,9 +3414,8 @@ function populateEarningsLegacy(allBookings, completed, monthEarnings, lastMonth
         const isCash = b.paymentMethod === 'cash';
         const snap = bookingFeeSnapshot(b);
         const amountStr = `+${snap.net.toLocaleString('en-US')} EGP`;
-        const subStr = isCash
-          ? `Cash \u00B7 collected ${snap.gross.toLocaleString('en-US')} \u2212 fee ${snap.fee.toLocaleString('en-US')}`
-          : `Online \u00B7 gross ${snap.gross.toLocaleString('en-US')} \u2212 fee ${snap.fee.toLocaleString('en-US')}`;
+        const customer = b.user?.name || 'Not listed';
+        const feeStr = `${snap.fee.toLocaleString('en-US')} EGP`;
         const badgeCls = isCash ? 'jq-earn-row-tag--cash' : 'jq-earn-row-tag--online';
         const badgeLbl = isCash ? 'CASH' : 'ONLINE';
         return `
@@ -3312,16 +3426,19 @@ function populateEarningsLegacy(allBookings, completed, monthEarnings, lastMonth
               </div>
               <div class="jq-earn-row-info">
                 <div class="jq-earn-row-title">
-                  <h4>${service}</h4>
-                  <span class="jq-earn-row-tag ${badgeCls}">${badgeLbl}</span>
+                  <h4>${escapeHtml(service)}</h4>
+                  <span class="jq-earn-row-date">${escapeHtml(dateStr)}</span>
                 </div>
-                <p>${dateStr}</p>
-                <p class="jq-earn-row-breakdown">${subStr}</p>
+                <div class="jq-earn-row-customer">
+                  <span class="jq-earn-row-customer__label">Customer</span>
+                  <span class="jq-earn-row-customer__name">${escapeHtml(customer)}</span>
+                </div>
               </div>
             </div>
             <div class="jq-earn-row-amount">
               <span class="jq-earn-row-amount__net">${amountStr}</span>
-              <span class="jq-earn-row-amount__label">net</span>
+              <span class="jq-earn-row-tag ${badgeCls}">${badgeLbl}</span>
+              <span class="jq-earn-row-fee"><span>Fee</span><strong>${feeStr}</strong></span>
             </div>
           </div>`;
       }).join('');
@@ -3336,6 +3453,8 @@ function populateEarningsLegacy(allBookings, completed, monthEarnings, lastMonth
     const settlementStr = lastDay.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
     settlementEl.textContent = settlementStr;
   }
+
+  renderEarningsOverviewExtras({ monthTakeHome: monthEarnings, completed });
 }
 
 // ── Load notifications from backend API ───────────────────────────────────────
@@ -4675,26 +4794,44 @@ async function initDashboard() {
     initJobQueue(),
   ]);
 
-  // Poll every 15s — sidebar indicators + job queue if currently visible
+  // Poll every 15s — sidebar indicators + job queue if currently visible.
+  // Polite poller: skips while user types / modal open / tab hidden,
+  // skips DOM rebuild when payload hash unchanged, preserves focus.
   let _jqPolling = false;
-  setInterval(async () => {
-    try {
-      const res = await getWorkerBookings({ limit: 200 });
-      const bookings = res?.bookings || (Array.isArray(res) ? res : []);
-      updateSidebarIndicators(bookings);
-    } catch (_) { }
+  const techPoller = createPoller({
+    name: 'tech-dashboard',
+    intervalMs: 15_000,
+    tick: async () => {
+      let bookings = [];
+      try {
+        const res = await getWorkerBookings({ limit: 200 });
+        bookings = res?.bookings || (Array.isArray(res) ? res : []);
+      } catch (_) { return; }
 
-    const activePanel = document.querySelector('[data-panel].is-active');
-    if (activePanel?.dataset.panel !== 'job-queue') return;
-    if (_jqPolling) return;
-    _jqPolling = true;
-    try {
-      const activeStab = document.querySelector('#jq-tab-bar .stab-btn--active')?.dataset.stab;
-      const restoreTab = activeStab?.replace('jq-', '') || null;
-      await initJobQueue(restoreTab);
-    } catch (_) { }
-    finally { _jqPolling = false; }
-  }, 15_000);
+      // Sidebar badges — surgical textContent update, always safe to run
+      updateSidebarIndicators(bookings);
+
+      const activePanel = document.querySelector('[data-panel].is-active');
+      if (activePanel?.dataset.panel !== 'job-queue') return;
+      if (_jqPolling) return;
+
+      // Skip rebuild when bookings unchanged → no flicker, no caret loss
+      const summary = bookings.map(b => `${b._id}:${b.status}:${b.updatedAt || ''}`);
+      if (!hasChanged('tech:jobQueue', summary)) return;
+
+      _jqPolling = true;
+      const jqRoot = document.querySelector('[data-panel="job-queue"]') || document;
+      const snap = snapshotFocus(jqRoot);
+      try {
+        const activeStab = document.querySelector('#jq-tab-bar .stab-btn--active')?.dataset.stab;
+        const restoreTab = activeStab?.replace('jq-', '') || null;
+        await initJobQueue(restoreTab);
+        restoreFocus(snap, jqRoot);
+      } catch (_) { }
+      finally { _jqPolling = false; }
+    }
+  });
+  techPoller.start();
 }
 
 /* Re-render dynamic grids and welcome text on language change */
@@ -4796,16 +4933,27 @@ function initPhase2() {
     btn.addEventListener('click', () => btn.closest('[data-dismissible]').remove());
   });
 
-  // Liability: Pay Now — opens settle-debt modal, refreshes on success
-  document.getElementById('payLiabilityBtn')?.addEventListener('click', () => {
+  // Liability: Pay Now — event delegation so it works even if button is
+  // re-rendered, re-mounted, or attached after init. Survives DOM rewrites.
+  const onPayLiabilityClick = (e) => {
+    const btn = e.target.closest('#payLiabilityBtn, [data-pay-liability]');
+    if (!btn) return;
+    e.preventDefault();
     openSettleDebtModal({
       onSuccess: () => {
         _availableBalanceCache = { value: null, ts: 0 };
         populateStats();
         renderMyDebtsV2();
       },
+      onError: (msg) => {
+        try { showToast(msg, 'error'); } catch (_) { alert(msg); }
+      },
     });
-  });
+  };
+  if (!document.__payLiabilityWired) {
+    document.addEventListener('click', onPayLiabilityClick);
+    document.__payLiabilityWired = true;
+  }
 
   initBioSection();
   initSocialLinks();
@@ -5940,17 +6088,19 @@ async function renderMyDebtsV2() {
   hideEarningsError();
   const { summary = {}, debts = [], submittedSettlements = [] } = r?.data || {};
   const total = Number(summary.totalOutstanding);
+  const activeDebts = debts.filter(debt => ['outstanding', 'partially_paid'].includes(debt.status));
   const debtTab = document.getElementById('earnSubnavDebts');
   const debtBadge = document.getElementById('earnSubnavDebtsBadge');
   if (!Number.isFinite(total) || total <= 0) {
     panel.hidden = true;
     if (debtTab) debtTab.hidden = true;
     if (debtBadge) debtBadge.hidden = true;
+    if (debtTab?.getAttribute('aria-selected') === 'true') activateEarnSubTab('overview');
     return;
   }
   panel.hidden = false;
   if (debtTab) debtTab.hidden = false;
-  if (debtBadge) { debtBadge.hidden = false; debtBadge.textContent = String(debts.length || 1); }
+  if (debtBadge) { debtBadge.hidden = false; debtBadge.textContent = String(activeDebts.length || 1); }
   const pct = Math.min(100, Math.round((total / 300) * 100));
   const labelEl = document.getElementById('debtProgressLabel');
   if (labelEl) labelEl.textContent = `${fmtMoney2(total)} owed — ${pct}% of cash-block threshold`;
@@ -5962,7 +6112,7 @@ async function renderMyDebtsV2() {
   }
   const tbody = document.getElementById('debtsTbody');
   if (tbody) {
-    tbody.innerHTML = debts.map(d => `
+    tbody.innerHTML = activeDebts.map(d => `
       <tr>
         <td>#${String(d.booking || '').toString().slice(-4)}</td>
         <td>${fmtMoney2(d.remaining ?? d.amount)}/${fmtMoney2(d.amount)}</td>
@@ -6111,7 +6261,7 @@ function _renderPayoutsSummary() {
   if (pendingEl) pendingEl.textContent = pending;
 }
 
-async function renderMyPayoutsV2() {
+async function renderLegacyPayoutsV2() {
   const tbody = document.getElementById('payoutsTbody');
   if (!tbody) return;
 
@@ -6141,6 +6291,288 @@ async function renderMyPayoutsV2() {
   if (summaryEl) summaryEl.hidden = !hasItems;
 }
 
+const WALLET_HISTORY_PAGE_SIZE = 10;
+const _walletHistoryState = { category: 'withdrawals', page: 1, total: 0 };
+let _walletHistoryAbortController = null;
+
+const WALLET_HISTORY_CONFIG = {
+  withdrawals: {
+    hint: 'Track every transfer requested from your Servio wallet.',
+    columns: ['Date', 'Bank method', 'Amount', 'Status', 'Receipt'],
+    statuses: [['', 'All statuses'], ['pending', 'Pending'], ['approved', 'Approved'], ['paid', 'Paid'], ['rejected', 'Rejected']],
+    emptyTitle: 'No withdrawals yet',
+    emptyDescription: 'When you request a bank transfer, its status and receipt will appear here.',
+  },
+  releases: {
+    hint: 'See which online job payments are waiting and which reached your wallet.',
+    columns: ['Job', 'Amount', 'Status', 'Waiting since', 'Released on'],
+    statuses: [['', 'All statuses'], ['waiting_for_release', 'Waiting for release'], ['released', 'Released'], ['needs_review', 'Needs review'], ['reversed', 'Reversed (refund)']],
+    emptyTitle: 'No release history yet',
+    emptyDescription: 'Online job payments will appear here while they wait for release and after they reach your wallet.',
+  },
+  fees: {
+    hint: 'Review platform fees already settled from completed cash jobs.',
+    columns: ['Job', 'Fee amount', 'Payment method', 'Paid on'],
+    statuses: [['paid', 'Paid']],
+    emptyTitle: 'No paid fees yet',
+    emptyDescription: 'Platform fees you settle from cash jobs will appear here.',
+  },
+};
+
+function _walletHistoryDate(value) {
+  if (!value) return 'â€”';
+  return new Date(value).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function _walletHistoryStatusLabel(status) {
+  const labels = {
+    waiting_for_release: 'Waiting for release',
+    needs_review: 'Needs review',
+    approved: 'Approved',
+    pending: 'Pending',
+    paid: 'Paid',
+    rejected: 'Rejected',
+    released: 'Released',
+    reversed: 'Reversed',
+  };
+  return labels[status] || String(status || 'â€”').replace(/_/g, ' ');
+}
+
+function _walletHistoryStatus(status) {
+  const groups = {
+    pending: 'warn',
+    approved: 'warn',
+    waiting_for_release: 'warn',
+    paid: 'ok',
+    released: 'ok',
+    rejected: 'bad',
+    needs_review: 'bad',
+    reversed: 'bad',
+  };
+  return `<span class="payouts-status payouts-status--${groups[status] || 'neutral'}">${escapeHtml(_walletHistoryStatusLabel(status))}</span>`;
+}
+
+function _walletHistoryMethod(method) {
+  const labels = {
+    bank: 'Bank transfer',
+    bank_transfer: 'Bank transfer',
+    instapay: 'InstaPay',
+    vodafone_cash: 'Vodafone Cash',
+    orange_cash: 'Orange Cash',
+    wallet_balance: 'Wallet balance',
+    auto_offset: 'Automatic wallet offset',
+    admin_override: 'Recorded by Servio',
+  };
+  return labels[method] || String(method || 'Recorded payment').replace(/_/g, ' ');
+}
+
+function _walletHistoryJob(item) {
+  const id = escapeHtml(String(item.bookingId || '').slice(-6).toUpperCase());
+  return `<div class="wallet-history__job"><strong>${escapeHtml(item.job || 'Service job')}</strong><span>#${id || 'â€”'}</span></div>`;
+}
+
+function _renderWalletHistoryHead() {
+  const head = document.getElementById('walletHistoryHead');
+  if (!head) return;
+  const config = WALLET_HISTORY_CONFIG[_walletHistoryState.category];
+  head.innerHTML = `<tr>${config.columns.map(column => `<th>${column}</th>`).join('')}</tr>`;
+}
+
+function _renderWalletHistoryLoading() {
+  const tbody = document.getElementById('walletHistoryTbody');
+  if (!tbody) return;
+  _renderWalletHistoryHead();
+  const summary = document.getElementById('walletHistorySummary');
+  if (summary) { summary.hidden = true; summary.textContent = ''; }
+  tbody.innerHTML = Array.from({ length: 4 }, () => `
+    <tr class="wallet-history__skeleton" aria-hidden="true">
+      <td colspan="5"><span class="skel-bar"></span></td>
+    </tr>`).join('');
+}
+
+function _renderWalletHistoryEmpty() {
+  const tbody = document.getElementById('walletHistoryTbody');
+  if (!tbody) return;
+  const config = WALLET_HISTORY_CONFIG[_walletHistoryState.category];
+  const cta = _walletHistoryState.category === 'withdrawals'
+    ? '<button type="button" class="atelier-link" id="payoutsEmptyCta"><span>Request a withdrawal</span><span aria-hidden="true">&rarr;</span></button>'
+    : '';
+  tbody.innerHTML = `
+    <tr class="payouts-empty-row">
+      <td colspan="5">
+        <div class="payouts-empty">
+          <div class="payouts-empty__icon">
+            <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+          </div>
+          <h4 class="payouts-empty__title">${config.emptyTitle}</h4>
+          <p class="payouts-empty__desc">${config.emptyDescription}</p>
+          ${cta}
+        </div>
+      </td>
+    </tr>`;
+  document.getElementById('payoutsEmptyCta')?.addEventListener('click', async () => {
+    let availableBalance = 0;
+    try {
+      availableBalance = await getAvailableBalanceCached();
+    } catch (_) { /* fall through with 0 */ }
+    openPayoutRequestModal({
+      availableBalance,
+      onSuccess: () => {
+        _availableBalanceCache = { value: null, ts: 0 };
+        renderWalletHistory({ resetPage: true });
+      },
+    });
+  });
+}
+
+function _renderWalletHistoryRows(items) {
+  const tbody = document.getElementById('walletHistoryTbody');
+  if (!tbody) return;
+  _renderWalletHistoryHead();
+  if (!items.length) {
+    _renderWalletHistoryEmpty();
+    return;
+  }
+
+  if (_walletHistoryState.category === 'withdrawals') {
+    tbody.innerHTML = items.map(item => `
+      <tr>
+        <td data-label="Date">${_walletHistoryDate(item.requestedAt)}</td>
+        <td data-label="Bank method">${escapeHtml(_walletHistoryMethod(item.method))}</td>
+        <td data-label="Amount" class="payouts-table__num"><strong>${fmtMoney2(item.amount)}</strong></td>
+        <td data-label="Status">${_walletHistoryStatus(item.status)}</td>
+        <td data-label="Receipt">${item.receipt ? `<code class="payouts-ref">${escapeHtml(item.receipt)}</code>` : '<span class="wallet-history__muted">Not issued yet</span>'}</td>
+      </tr>`).join('');
+    return;
+  }
+
+  if (_walletHistoryState.category === 'releases') {
+    tbody.innerHTML = items.map(item => {
+      const reversed = item.status === 'reversed';
+      const amountValue = reversed ? -Math.abs(Number(item.amount) || 0) : Number(item.amount) || 0;
+      const amountClass = reversed ? ' wallet-history__amount--neg' : '';
+      const amountStr = reversed ? `−${fmtMoney2(Math.abs(amountValue))}` : fmtMoney2(amountValue);
+      return `
+      <tr>
+        <td data-label="Job">${_walletHistoryJob(item)}</td>
+        <td data-label="Amount"><strong class="wallet-history__amount${amountClass}">${amountStr}</strong></td>
+        <td data-label="Status">${_walletHistoryStatus(item.status)}</td>
+        <td data-label="Waiting since">${_walletHistoryDate(item.waitingSince)}</td>
+        <td data-label="Released on">${_walletHistoryDate(item.releasedAt)}</td>
+      </tr>`;
+    }).join('');
+    return;
+  }
+
+  tbody.innerHTML = items.map(item => `
+    <tr>
+      <td data-label="Job">${_walletHistoryJob(item)}</td>
+      <td data-label="Fee amount"><strong>${fmtMoney2(item.amount)}</strong></td>
+      <td data-label="Payment method">${escapeHtml(_walletHistoryMethod(item.method))}</td>
+      <td data-label="Paid on">${_walletHistoryDate(item.paidAt)}</td>
+    </tr>`).join('');
+}
+
+function _renderWalletHistorySummary(items, meta) {
+  const el = document.getElementById('walletHistorySummary');
+  if (!el) return;
+  const total = Number(meta?.total) || 0;
+  if (!total) {
+    el.hidden = true;
+    el.textContent = '';
+    return;
+  }
+  const cat = _walletHistoryState.category;
+  const list = Array.isArray(items) ? items : [];
+  const parts = [];
+
+  if (cat === 'withdrawals') {
+    const inProgress = list.filter(i => i.status === 'pending' || i.status === 'approved').length;
+    const paid = list.filter(i => i.status === 'paid').length;
+    parts.push(['Total', String(total)]);
+    parts.push(['In progress', String(inProgress)]);
+    parts.push(['Paid', String(paid)]);
+  } else if (cat === 'releases') {
+    const waiting = list.filter(i => i.status === 'waiting_for_release').length;
+    const released = list.filter(i => i.status === 'released').length;
+    const reversed = list.filter(i => i.status === 'reversed').length;
+    parts.push(['Total', String(total)]);
+    parts.push(['Waiting', String(waiting)]);
+    parts.push(['Released', String(released)]);
+    if (reversed) parts.push(['Reversed', String(reversed), 'warn']);
+  } else if (cat === 'fees') {
+    const sum = list.reduce((acc, i) => acc + (Number(i.amount) || 0), 0);
+    parts.push(['Total entries', String(total)]);
+    parts.push(['Sum on page', `${fmtMoney2(sum)} EGP`]);
+  }
+
+  el.innerHTML = parts.map(([label, value, tone]) => {
+    const cls = tone ? ` wallet-history__summary-item--${escapeHtml(tone)}` : '';
+    return `<span class="wallet-history__summary-item${cls}"><span class="wallet-history__summary-label">${escapeHtml(label)}</span><strong class="wallet-history__summary-value">${escapeHtml(value)}</strong></span>`;
+  }).join('');
+  el.hidden = false;
+}
+
+function _renderWalletHistoryPagination() {
+  const pagination = document.getElementById('walletHistoryPagination');
+  const label = document.getElementById('walletHistoryPageLabel');
+  const prev = document.getElementById('walletHistoryPrev');
+  const next = document.getElementById('walletHistoryNext');
+  const totalPages = Math.max(1, Math.ceil(_walletHistoryState.total / WALLET_HISTORY_PAGE_SIZE));
+  if (pagination) pagination.hidden = _walletHistoryState.total <= WALLET_HISTORY_PAGE_SIZE;
+  if (label) label.textContent = `Page ${_walletHistoryState.page} of ${totalPages}`;
+  if (prev) prev.disabled = _walletHistoryState.page <= 1;
+  if (next) next.disabled = _walletHistoryState.page >= totalPages;
+}
+
+function _setWalletHistoryStatusOptions() {
+  const select = document.getElementById('payoutFilterStatus');
+  if (!select) return;
+  select.innerHTML = WALLET_HISTORY_CONFIG[_walletHistoryState.category].statuses
+    .map(([value, label]) => `<option value="${value}">${label}</option>`)
+    .join('');
+}
+
+async function renderWalletHistory({ resetPage = false } = {}) {
+  const tbody = document.getElementById('walletHistoryTbody');
+  if (!tbody) return;
+  if (resetPage) _walletHistoryState.page = 1;
+  if (_walletHistoryAbortController) _walletHistoryAbortController.abort();
+  _walletHistoryAbortController = new AbortController();
+  const error = document.getElementById('walletHistoryError');
+  if (error) error.hidden = true;
+  _renderWalletHistoryLoading();
+
+  const params = {
+    category: _walletHistoryState.category,
+    page: _walletHistoryState.page,
+    limit: WALLET_HISTORY_PAGE_SIZE,
+    status: document.getElementById('payoutFilterStatus')?.value || '',
+    from: document.getElementById('payoutFilterFrom')?.value || '',
+    to: document.getElementById('payoutFilterTo')?.value || '',
+  };
+
+  try {
+    const result = await getWorkerEarningsHistory(params, { signal: _walletHistoryAbortController.signal });
+    _walletHistoryState.total = Number(result?.meta?.total) || 0;
+    _renderWalletHistoryRows(result?.items || []);
+    _renderWalletHistorySummary(result?.items || [], result?.meta || {});
+    _renderWalletHistoryPagination();
+  } catch (e) {
+    if (e.name === 'AbortError') return;
+    console.error('[wallet history]', e);
+    _walletHistoryState.total = 0;
+    if (error) error.hidden = false;
+    tbody.innerHTML = '<tr><td colspan="5" class="wallet-history__load-error">Wallet history could not be loaded.</td></tr>';
+    _renderWalletHistorySummary([], {});
+    _renderWalletHistoryPagination();
+  }
+}
+
+function renderMyPayoutsV2() {
+  return renderWalletHistory();
+}
+
 function _wireWithdrawJump() {
   document.querySelector('[data-jump-payout-settings]')?.addEventListener('click', (e) => {
     e.preventDefault();
@@ -6154,14 +6586,77 @@ function _wireWithdrawJump() {
 
 function _wirePayoutFilters() {
   ['payoutFilterStatus', 'payoutFilterFrom', 'payoutFilterTo'].forEach(id => {
-    document.getElementById(id)?.addEventListener('input', _applyPayoutFilters);
-    document.getElementById(id)?.addEventListener('change', _applyPayoutFilters);
+    document.getElementById(id)?.addEventListener('change', () => renderWalletHistory({ resetPage: true }));
   });
   document.getElementById('payoutFiltersClear')?.addEventListener('click', () => {
-    ['payoutFilterStatus', 'payoutFilterFrom', 'payoutFilterTo'].forEach(id => {
-      const el = document.getElementById(id); if (el) el.value = '';
+    const status = document.getElementById('payoutFilterStatus');
+    const from = document.getElementById('payoutFilterFrom');
+    const to = document.getElementById('payoutFilterTo');
+    if (status) status.value = WALLET_HISTORY_CONFIG[_walletHistoryState.category].statuses[0][0];
+    if (from) from.value = '';
+    if (to) to.value = '';
+    renderWalletHistory({ resetPage: true });
+  });
+}
+
+function _wireWalletHistory() {
+  _setWalletHistoryStatusOptions();
+  const hint = document.getElementById('walletHistoryHint');
+  if (hint) hint.textContent = WALLET_HISTORY_CONFIG[_walletHistoryState.category].hint;
+  document.querySelectorAll('[data-wallet-history-category]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const category = btn.dataset.walletHistoryCategory;
+      _walletHistoryState.category = category;
+      _walletHistoryState.page = 1;
+      document.querySelectorAll('[data-wallet-history-category]').forEach(tab => {
+        const on = tab === btn;
+        tab.classList.toggle('is-active', on);
+        tab.setAttribute('aria-selected', String(on));
+        tab.tabIndex = on ? 0 : -1;
+      });
+      _setWalletHistoryStatusOptions();
+      if (hint) hint.textContent = WALLET_HISTORY_CONFIG[category].hint;
+      renderWalletHistory({ resetPage: true });
     });
-    _applyPayoutFilters();
+    btn.addEventListener('keydown', event => {
+      const tabs = [...document.querySelectorAll('[data-wallet-history-category]')];
+      const current = tabs.indexOf(btn);
+      let next = null;
+      if (event.key === 'ArrowRight') next = tabs[(current + 1) % tabs.length];
+      if (event.key === 'ArrowLeft') next = tabs[(current - 1 + tabs.length) % tabs.length];
+      if (event.key === 'Home') next = tabs[0];
+      if (event.key === 'End') next = tabs[tabs.length - 1];
+      if (!next) return;
+      event.preventDefault();
+      next.focus();
+      next.click();
+    });
+  });
+  document.getElementById('walletHistoryPrev')?.addEventListener('click', () => {
+    if (_walletHistoryState.page <= 1) return;
+    _walletHistoryState.page -= 1;
+    renderWalletHistory();
+  });
+  document.getElementById('walletHistoryNext')?.addEventListener('click', () => {
+    if (_walletHistoryState.page * WALLET_HISTORY_PAGE_SIZE >= _walletHistoryState.total) return;
+    _walletHistoryState.page += 1;
+    renderWalletHistory();
+  });
+  document.getElementById('walletHistoryRetry')?.addEventListener('click', () => renderWalletHistory());
+}
+
+function _wirePendingReleaseHelp() {
+  const button = document.querySelector('.money-card__info[data-tooltip]');
+  if (!button) return;
+  button.addEventListener('click', event => {
+    event.stopPropagation();
+    const open = !button.classList.contains('is-open');
+    button.classList.toggle('is-open', open);
+    button.setAttribute('aria-expanded', String(open));
+  });
+  document.addEventListener('click', () => {
+    button.classList.remove('is-open');
+    button.setAttribute('aria-expanded', 'false');
   });
 }
 
@@ -6207,6 +6702,7 @@ function activateEarnSubTab(name) {
     const on = btn.dataset.earnTab === name;
     btn.classList.toggle('is-active', on);
     btn.setAttribute('aria-selected', on ? 'true' : 'false');
+    btn.tabIndex = on ? 0 : -1;
   });
   panel.querySelectorAll('.earn-view').forEach(view => {
     const on = view.dataset.earnView === name;
@@ -6222,6 +6718,19 @@ function wireEarnSubnav() {
       activateEarnSubTab(target);
       if (target === 'payouts') renderMyPayoutsV2().catch(() => { });
     });
+    btn.addEventListener('keydown', event => {
+      const tabs = [...document.querySelectorAll('#panel-earnings .earn-subnav__tab:not([hidden])')];
+      const current = tabs.indexOf(btn);
+      let next = null;
+      if (event.key === 'ArrowRight') next = tabs[(current + 1) % tabs.length];
+      if (event.key === 'ArrowLeft') next = tabs[(current - 1 + tabs.length) % tabs.length];
+      if (event.key === 'Home') next = tabs[0];
+      if (event.key === 'End') next = tabs[tabs.length - 1];
+      if (!next) return;
+      event.preventDefault();
+      next.focus();
+      next.click();
+    });
   });
   document.querySelectorAll('#panel-earnings [data-earn-view-jump]').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -6231,6 +6740,62 @@ function wireEarnSubnav() {
       document.getElementById('panel-earnings')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   });
+}
+
+function _jumpToWalletHistory(category) {
+  activateEarnSubTab('payouts');
+  const btn = document.querySelector(`[data-wallet-history-category="${category}"]`);
+  if (btn && !btn.classList.contains('is-active')) {
+    btn.click();
+  } else {
+    renderWalletHistory({ resetPage: true }).catch(() => {});
+  }
+  document.getElementById('panel-earnings')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function _wireTileDeepLinks() {
+  const pendingTile = document.getElementById('pendingCard');
+  if (pendingTile) {
+    pendingTile.classList.add('eog-tile--clickable');
+    pendingTile.setAttribute('role', 'button');
+    pendingTile.setAttribute('tabindex', '0');
+    const handler = (e) => {
+      if (e.target.closest('.money-card__info, button, a')) return;
+      _jumpToWalletHistory('releases');
+    };
+    pendingTile.addEventListener('click', handler);
+    pendingTile.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); _jumpToWalletHistory('releases'); }
+    });
+  }
+
+  const liabilityTile = document.getElementById('liabilityCard');
+  if (liabilityTile) {
+    liabilityTile.classList.add('eog-tile--clickable');
+    liabilityTile.setAttribute('role', 'button');
+    liabilityTile.setAttribute('tabindex', '0');
+    liabilityTile.addEventListener('click', (e) => {
+      if (e.target.closest('button, a, summary, details')) return;
+      _jumpToWalletHistory('fees');
+    });
+    liabilityTile.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); _jumpToWalletHistory('fees'); }
+    });
+  }
+
+  const heldTile = document.getElementById('heldCard');
+  if (heldTile) {
+    heldTile.classList.add('eog-tile--clickable');
+    heldTile.setAttribute('role', 'button');
+    heldTile.setAttribute('tabindex', '0');
+    const goDisputes = () => {
+      document.querySelector('[data-tab="disputes"]')?.click();
+    };
+    heldTile.addEventListener('click', goDisputes);
+    heldTile.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goDisputes(); }
+    });
+  }
 }
 
 async function initPlan2EarningsTab() {
@@ -6260,7 +6825,10 @@ async function initPlan2EarningsTab() {
   wireDebtActionsV2();
   wireEarnSubnav();
   _wirePayoutFilters();
+  _wireWalletHistory();
+  _wirePendingReleaseHelp();
   _wireWithdrawJump();
+  _wireTileDeepLinks();
   wireEarnErrorBanner();
 }
 
@@ -6268,158 +6836,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initPlan2EarningsTab().catch(err => console.error('[plan2 earnings]', err));
 });
 
-// ──────────────── Plan 2 Task 20: Transactions tab ────────────────
-
-const TX_TYPE_META = {
-  release: { label: 'Money released to you', icon: 'in', desc: 'Customer payment cleared — money sent to your balance' },
-  hold: { label: 'Held in escrow', icon: 'hold', desc: 'Customer paid online — held safely until job is done' },
-  fee: { label: 'Platform fee', icon: 'out', desc: 'Servio platform fee on this job' },
-  charge: { label: 'Charge', icon: 'out', desc: 'Charge applied to your wallet' },
-  refund: { label: 'Refund', icon: 'out', desc: 'Money returned to the customer' },
-  dispute: { label: 'Dispute', icon: 'neutral', desc: 'Funds held while a dispute is resolved' },
-  cash_debt_auto_deduct: { label: 'Cash debt — auto paid', icon: 'out', desc: 'Owed platform fee on a cash job, taken from your payout' },
-  cash_debt_manual_payment: { label: 'Cash debt — you paid', icon: 'out', desc: 'You settled platform fees on cash jobs manually' }
-};
-
-function _txTypeMeta(type) {
-  return TX_TYPE_META[type] || { label: (type || 'Transaction'), icon: 'neutral', desc: '' };
-}
-
-function _txTypeIconSvg(kind) {
-  if (kind === 'in') return '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12l7 7 7-7"/></svg>';
-  if (kind === 'out') return '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 19V5M19 12l-7-7-7 7"/></svg>';
-  if (kind === 'hold') return '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
-  return '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>';
-}
-
-function _txFmtAmount(n, opts) {
-  if (n === null || n === undefined || Number.isNaN(Number(n))) return '—';
-  const v = Number(n);
-  const showSign = !(opts && opts.neutral);
-  const sign = showSign ? (v > 0 ? '+' : v < 0 ? '−' : '') : '';
-  return sign + Math.abs(v).toLocaleString('en-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function _txCleanNote(raw) {
-  if (!raw) return '';
-  let s = String(raw).replace(/[<>&]/g, '');
-  s = s
-    .replace(/^Demo\s+/i, '')
-    .replace(/\bbooking\s+([0-9a-f]{20,})\b/i, (_, id) => 'booking #' + id.slice(-6))
-    .replace(/escrow released to worker for/i, 'Payment released to you for')
-    .replace(/escrow hold for/i, 'Customer payment held for')
-    .replace(/auto-settled cash debt/i, 'Cash-job fee auto-paid')
-    .replace(/\(gross\s+([\d.,]+),?\s*after debt offset\s+([\d.,]+)\)/i, '(you collected $1, $2 sent to your wallet after fees)')
-    .replace(/\bafter debt offset\b/gi, 'after fees deducted');
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
-async function renderTransactions() {
-  const tbody = document.getElementById('txTbody');
-  if (!tbody) return;
-  const params = {
-    type: document.getElementById('txType')?.value || undefined,
-    from: document.getElementById('txFrom')?.value || undefined,
-    to: document.getElementById('txTo')?.value || undefined,
-  };
-  tbody.innerHTML = '<tr><td colspan="4" class="tx-table__loading">Loading…</td></tr>';
-  let r;
-  try {
-    r = await getMyTransactions(params);
-  } catch (err) {
-    console.error('[tech tx]', err);
-    tbody.innerHTML = '<tr><td colspan="4" class="tx-table__empty" style="color:#b00;">Failed to load transactions.</td></tr>';
-    return;
-  }
-  const rows = Array.isArray(r?.data) ? r.data : [];
-  if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="4" class="tx-table__empty">No transactions yet. Complete a job to see money movement here.</td></tr>';
-  } else {
-    tbody.innerHTML = rows.map(t => {
-      const isHold = t.type === 'hold';
-      const amt = t.direction === 'debit' ? -Number(t.amount || 0) : Number(t.amount || 0);
-      const meta = _txTypeMeta(t.type);
-      const amtCls = isHold ? 'neutral' : (amt > 0 ? 'pos' : amt < 0 ? 'neg' : 'neutral');
-      const dateObj = t.createdAt ? new Date(t.createdAt) : null;
-      const dateStr = dateObj ? dateObj.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
-      const timeStr = dateObj ? dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '';
-      const bookingId = t.payment && t.payment.booking ? String(t.payment.booking).slice(-6) : '';
-      const bookingCell = bookingId
-        ? `<code>#${bookingId}</code>`
-        : `<span class="tx-table__booking--empty">—</span>`;
-
-      const note = _txCleanNote(t.note);
-      const noteLine = note && note.toLowerCase() !== meta.desc.toLowerCase() ? note : meta.desc;
-      const amtStr = _txFmtAmount(amt, { neutral: isHold });
-
-      return `
-        <tr>
-          <td>
-            <div class="tx-table__date">
-              <strong>${dateStr}</strong>
-              <span>${timeStr}</span>
-            </div>
-          </td>
-          <td>
-            <div class="tx-table__type">
-              <span class="tx-type-icon tx-type-icon--${meta.icon}">${_txTypeIconSvg(meta.icon)}</span>
-              <div class="tx-table__type-text">
-                <span class="tx-table__type-label">${meta.label}</span>
-                ${noteLine ? `<span class="tx-table__type-note">${noteLine}</span>` : ''}
-              </div>
-            </div>
-          </td>
-          <td class="tx-table__booking">${bookingCell}</td>
-          <td class="tx-amount-cell tx-amount-cell--${amtCls}">${amtStr} <em>EGP</em></td>
-        </tr>`;
-    }).join('');
-  }
-  const pag = document.getElementById('txPagination');
-  if (pag) {
-    const meta = r?.meta || {};
-    pag.textContent = meta.total != null ? (meta.total + ' transactions') : '';
-  }
-}
-
-function _wireTxQuickChips() {
-  const chips = document.querySelectorAll('#panel-transactions .tx-chip[data-tx-range]');
-  chips.forEach(chip => {
-    chip.addEventListener('click', () => {
-      chips.forEach(c => c.classList.remove('is-active'));
-      chip.classList.add('is-active');
-      const range = chip.dataset.txRange;
-      const fromEl = document.getElementById('txFrom');
-      const toEl = document.getElementById('txTo');
-      if (!fromEl || !toEl) return;
-      if (range === 'all') {
-        fromEl.value = '';
-        toEl.value = '';
-      } else {
-        const days = parseInt(range, 10);
-        const now = new Date();
-        const past = new Date(now.getTime() - days * 86400000);
-        const iso = d => d.toISOString().slice(0, 10);
-        fromEl.value = iso(past);
-        toEl.value = iso(now);
-      }
-      renderTransactions();
-    });
-  });
-}
-
-function initTxTab() {
-  const btn = document.querySelector('[data-tab="transactions"]');
-  btn?.addEventListener('click', () => setTimeout(renderTransactions, 100));
-  document.getElementById('txType')?.addEventListener('change', renderTransactions);
-  document.getElementById('txFrom')?.addEventListener('change', renderTransactions);
-  document.getElementById('txTo')?.addEventListener('change', renderTransactions);
-  document.getElementById('txRefresh')?.addEventListener('click', renderTransactions);
-  _wireTxQuickChips();
-  if (!document.getElementById('panel-transactions')?.hidden) renderTransactions();
-}
-
 document.addEventListener('DOMContentLoaded', () => {
-  try { initTxTab(); } catch (err) { console.error('[tech tx init]', err); }
   try { bindTechNotifChannelPrefs(); } catch (err) { console.error('[tech notif prefs]', err); }
 });
 

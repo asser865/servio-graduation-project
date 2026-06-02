@@ -13,6 +13,7 @@ a static web frontend, a Flutter mobile app, and Python FastAPI AI services.
 | `servio_frontend/` | Browser web app | HTML, CSS, vanilla JavaScript ES modules, Motion package, static assets |
 | `mobile-app/` | Customer and technician mobile app | Flutter, Dart, Provider, Material, shared preferences, secure storage, HTTP APIs |
 | `ai-service/` | AI microservices for room analysis, recommendations, and cost estimates | Python, FastAPI, Uvicorn, Gemini/Groq integrations, Diffusers/Transformers, Torch |
+| `ai-service/room_finishing_website/` | Website-only AI Finisher room analysis and render service | Python, FastAPI, Uvicorn, Gemini, Diffusers/Transformers, Torch |
 
 ## Main Features
 
@@ -52,6 +53,7 @@ JWT_EXPIRES_IN=7d
 CLIENT_URL=http://127.0.0.1:5173,http://localhost:5173
 FRONTEND_URL=http://127.0.0.1:5173
 AI_SERVICE_URL=http://127.0.0.1:8000
+AI_FINISHER_SERVICE_URL=http://127.0.0.1:8765
 PAYMENT_GATEWAY=demo
 ```
 
@@ -197,6 +199,26 @@ ai-service/ai_recommender_mobile/
 ```
 
 Each has its own lightweight `requirements.txt` and development scripts.
+
+## Website AI Finisher Service
+
+The browser AI Finisher uses an isolated Python runtime so website changes do
+not affect the Flutter application's room-finishing service.
+
+```bash
+cd ai-service/room_finishing_website
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn main:app --reload --host 127.0.0.1 --port 8765
+```
+
+Create `ai-service/room_finishing_website/.env` and set `GEMINI_API_KEY`. The Node backend
+routes website requests to this service through:
+
+```env
+AI_FINISHER_SERVICE_URL=http://127.0.0.1:8765
+```
 
 ## API Overview
 

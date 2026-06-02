@@ -3229,6 +3229,16 @@ html.no-intro .dash-panel *::after {
   background: rgba(154, 140, 115, 0.04);
 }
 
+[data-theme="light"] .notif-card-v2 {
+  background: #FFFFFF;
+  border-color: var(--dash-card-border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .notif-card-v2.is-unread {
+  background: rgba(154, 140, 115, 0.08);
+}
+
 [data-theme="dark"] .notif-card-v2 {
   background: var(--dash-card-bg);
   border-color: var(--dash-card-border);
@@ -3248,6 +3258,10 @@ html.no-intro .dash-panel *::after {
   width: 40px;
   color: var(--color-text-secondary);
   border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="light"] .notif-card-v2__icon {
+  border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .notif-card-v2__icon--booking {
@@ -3295,6 +3309,18 @@ html.no-intro .dash-panel *::after {
   color: var(--color-text-light);
   margin-top: 10px;
   display: block;
+}
+
+[data-theme="light"] .notif-card-v2__title {
+  color: #1A1D23;
+}
+
+[data-theme="light"] .notif-card-v2__desc {
+  color: #4a4a52;
+}
+
+[data-theme="light"] .notif-card-v2__time {
+  color: #8b8780;
 }
 
 .notif-card-v2__actions {
@@ -4857,6 +4883,15 @@ html.no-intro .dash-panel *::after {
   font-weight: 800;
   border: 1px solid rgba(166, 110, 88, 0.25);
   transition: all 0.2s ease;
+}
+
+.nav-badge[hidden] {
+  display: none !important;
+}
+
+.dash-nav__btn[aria-selected="true"] .nav-badge,
+.dash-mobile-tab.is-active .nav-badge {
+  display: none;
 }
 
 [data-theme="dark"] .dash-nav .nav-badge,

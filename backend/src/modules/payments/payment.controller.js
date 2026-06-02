@@ -17,7 +17,10 @@ const holdPayment = async (req, res) => {
 const confirmCompletion = async (req, res) => {
   const { bookingId } = req.params;
   const booking = await paymentService.requestReleaseByCustomer(bookingId, req.user.id);
-  return ApiResponse.success(res, StatusCodes.OK, 'Completion confirmed. Pending admin review.', booking);
+  const message = booking.paymentMethod === 'cash' && booking.status === 'completed'
+    ? 'Completion confirmed. Cash platform fee recorded for settlement.'
+    : 'Completion confirmed. Pending admin review.';
+  return ApiResponse.success(res, StatusCodes.OK, message, booking);
 };
 
 const adminApproveCompletion = async (req, res) => {
@@ -72,6 +75,12 @@ const getMyPayment = async (req, res) => {
 const getWorkerEarnings = async (req, res) => {
   const result = await paymentService.getWorkerEarnings(req.user.id, req.query);
   return ApiResponse.success(res, StatusCodes.OK, 'Earnings retrieved.', result);
+};
+
+const getWorkerEarningsHistory = async (req, res) => {
+  const earningsHistoryService = require('./earnings-history.service');
+  const result = await earningsHistoryService.listWorkerHistory(req.user.id, req.query);
+  return ApiResponse.success(res, StatusCodes.OK, 'Earnings history retrieved.', result);
 };
 
 const adminRefund = async (req, res) => {
@@ -298,22 +307,48 @@ const adminListCashDebtsGrouped = async (req, res) => {
     { $group: {
         _id: '$worker',
         totalOwed: { $sum: '$remaining' },
+        originalTotal: { $sum: '$amount' },
+        amountRecovered: { $sum: '$paidAmount' },
         debtCount: { $sum: 1 },
         oldest: { $min: '$createdAt' },
+        latest: { $max: '$createdAt' },
         statuses: { $addToSet: '$status' },
+        debtTypes: { $addToSet: '$debtType' },
     }},
     { $sort: { totalOwed: -1 } },
   ]);
   const workerIds = rows.map(r => r._id);
-  const workers = await User.find({ _id: { $in: workerIds } }).select('name email');
+  const [workers, pendingSettlements] = await Promise.all([
+    User.find({ _id: { $in: workerIds } }).select('name email'),
+    DebtSettlement.find({ worker: { $in: workerIds }, status: 'pending_verification' })
+      .select('worker totalAmount method submittedAt'),
+  ]);
   const wmap = Object.fromEntries(workers.map(w => [String(w._id), w]));
+  const smap = {};
+  pendingSettlements.forEach(settlement => {
+    const workerId = String(settlement.worker);
+    const summary = smap[workerId] || { count: 0, amount: 0, methods: new Set(), latestAt: null };
+    summary.count += 1;
+    summary.amount += settlement.totalAmount || 0;
+    summary.methods.add(settlement.method);
+    if (!summary.latestAt || settlement.submittedAt > summary.latestAt) summary.latestAt = settlement.submittedAt;
+    smap[workerId] = summary;
+  });
   const data = rows.map(r => ({
     workerId: r._id,
     worker: wmap[String(r._id)] || null,
     totalOwed: r2(r.totalOwed || 0),
+    originalTotal: r2(r.originalTotal || 0),
+    amountRecovered: r2(r.amountRecovered || 0),
     debtCount: r.debtCount,
     oldest: r.oldest,
+    latest: r.latest,
     statusMix: r.statuses,
+    debtTypes: r.debtTypes,
+    pendingSettlementCount: smap[String(r._id)]?.count || 0,
+    pendingSettlementAmount: r2(smap[String(r._id)]?.amount || 0),
+    pendingSettlementMethods: [...(smap[String(r._id)]?.methods || [])],
+    latestSettlementAt: smap[String(r._id)]?.latestAt || null,
   }));
   return res.json({ data });
 };
@@ -323,6 +358,39 @@ const adminListWorkerDebts = async (req, res) => {
   const debts = await CashDebt.find({ worker: workerId }).sort({ createdAt: -1 });
   const settlements = await DebtSettlement.find({ worker: workerId, status: 'pending_verification' }).sort({ createdAt: -1 });
   return res.json({ data: { debts, settlements } });
+};
+
+const { createNotification } = require('../notifications/notification.service');
+
+const adminSendDebtReminder = async (req, res) => {
+  const { workerId } = req.params;
+  const worker = await User.findById(workerId).select('name email role');
+  if (!worker) return res.status(404).json({ error: { message: 'Worker not found' } });
+
+  const agg = await CashDebt.aggregate([
+    { $match: { worker: worker._id, status: { $in: ['outstanding', 'partially_paid'] } } },
+    { $group: { _id: null, total: { $sum: '$remaining' }, count: { $sum: 1 }, oldest: { $min: '$createdAt' } } },
+  ]);
+  const total = r2(agg[0]?.total || 0);
+  const count = agg[0]?.count || 0;
+  if (total <= 0 || count === 0) {
+    return res.status(400).json({ error: { message: 'Worker has no outstanding debt' } });
+  }
+
+  await createNotification(
+    worker._id,
+    'system',
+    'Outstanding platform fees',
+    `You have ${count} unpaid cash-job fee${count === 1 ? '' : 's'} totalling ${total.toFixed(2)} EGP. Please settle to keep accepting larger jobs.`,
+    null,
+    './technician-dashboard.html#earnings'
+  );
+
+  try {
+    logEvent({ req, type: 'finance', action: 'Admin sent debt reminder', target: String(worker._id) });
+  } catch (_) { /* audit best-effort */ }
+
+  return res.json({ data: { workerId: worker._id, total, count, sentAt: new Date() } });
 };
 
 const adminSettlementHistoryCsv = async (req, res) => {
@@ -585,6 +653,7 @@ module.exports = {
   adminRejectSettlement,
   adminListCashDebtsGrouped,
   adminListWorkerDebts,
+  adminSendDebtReminder,
   adminSettlementHistoryCsv,
   createPayoutRequest,
   myPayouts,
@@ -599,6 +668,7 @@ module.exports = {
   getMyTransactions,
   getMyPayment,
   getWorkerEarnings,
+  getWorkerEarningsHistory,
   adminRefund,
   openDispute,
   resolveDispute,

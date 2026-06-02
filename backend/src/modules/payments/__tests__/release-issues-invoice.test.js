@@ -29,6 +29,7 @@ async function holdAndApprove() {
   await Booking.findByIdAndUpdate(booking._id, {
     status: 'pending_admin_review',
     customerConfirmedAt: new Date(),
+    completionOutcome: { afterPhotos: ['https://example.com/after.jpg'] },
   });
   await service.adminApproveCompletion(booking._id, id());
   return { booking };

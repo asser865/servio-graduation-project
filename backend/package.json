@@ -8,6 +8,7 @@
     "dev": "nodemon src/server.js",
     "test": "jest --runInBand",
     "migrate:escrow": "node src/migrations/2026-05-19-escrow-cashdebt.js",
+    "migrate:payments-overhaul": "node src/migrations/2026-06-01-payments-overhaul.js",
     "migrate:wallet-reconcile": "node src/migrations/2026-05-28-reconcile-worker-wallets.js"
   },
   "jest": {

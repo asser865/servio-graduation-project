@@ -70,6 +70,13 @@ export const getWorkerEarnings = (params = {}) => {
   return api.get(`/payments/earnings${qs ? '?' + qs : ''}`);
 };
 
+export const getWorkerEarningsHistory = (params = {}, opts = {}) => {
+  const qs = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  ).toString();
+  return api.get(`/payments/earnings/history${qs ? '?' + qs : ''}`, opts);
+};
+
 export const adminRefund = (paymentId, body) =>
   api.post(`/payments/refund/${paymentId}`, body);
 
@@ -145,9 +152,13 @@ export const adminApprovePayout    = (id, body = {}) => api.patch(`/payments/adm
 export const adminMarkPayoutPaid   = (id, body)      => api.patch(`/payments/admin/payout-requests/${id}/mark-paid`, body);
 export const adminRejectPayout     = (id, body)      => api.patch(`/payments/admin/payout-requests/${id}/reject`, body);
 
+export const adminSendDebtReminder = (workerId) =>
+  api.post(`/payments/admin/cash-debts/remind/${workerId}`);
+
 export const adminForceRelease = (paymentId, body) => api.post(`/payments/admin/${paymentId}/force-release`, body);
 export const adminForceLock    = (paymentId, body) => api.post(`/payments/admin/${paymentId}/force-lock`, body);
 export const adminForceUnlock  = (paymentId, body) => api.post(`/payments/admin/${paymentId}/force-unlock`, body);
+export const bulkReleaseFinance = (ids) => api.post('/finance/bulk/release', { ids });
 
 export const getMyTransactions = (params = {}) => {
   const qs = Object.entries(params)

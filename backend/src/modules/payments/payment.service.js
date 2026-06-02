@@ -86,6 +86,35 @@ function validPendingBooking(booking) {
   return !['released', 'refunded', 'cash_pending_settlement', 'cash_settled', 'not_required'].includes(booking.paymentStatus);
 }
 
+function assertAdminApprovalBookingEligible(booking) {
+  if (booking.status !== 'pending_admin_review') {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      `Booking must be in 'pending_admin_review' status. Current: '${booking.status}'.`
+    );
+  }
+  if (booking.paymentMethod === 'cash') {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'Manual cash approval is disabled. Cash platform fees are created automatically after a clean customer confirmation.'
+    );
+  }
+  if (['card', 'online'].includes(booking.paymentMethod)) {
+    if (!(booking.completionOutcome?.afterPhotos?.length > 0)) {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        'Missing completion evidence. At least one after photo is required before releasing card funds.'
+      );
+    }
+    if (booking.customerFeedback?.action === 'reported_issue') {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        'Cannot release card funds while a customer-reported issue is open.'
+      );
+    }
+  }
+}
+
 class PaymentService {
   async holdPayment(bookingId, customerId, { savedCardId, useCredit = false }) {
     const booking = await Booking.findById(bookingId);
@@ -284,7 +313,7 @@ class PaymentService {
     booking.customerConfirmedBy = customerId;
     booking.status = 'pending_admin_review';
 
-    if (booking.paymentMethod === 'online') {
+    if (['card', 'online'].includes(booking.paymentMethod)) {
       const payment = await Payment.findOne({ booking: bookingId });
       if (!payment || payment.status !== 'held') {
         throw new ApiError(StatusCodes.BAD_REQUEST, 'No held payment found for this booking.');
@@ -295,6 +324,10 @@ class PaymentService {
     }
 
     await booking.save();
+    if (booking.paymentMethod === 'cash') {
+      const result = await require('./auto-fee-debt.service').createIfClean(booking._id);
+      return result.booking || booking;
+    }
     events.emitPaymentPendingReview({ booking });
     return booking;
   }
@@ -302,57 +335,58 @@ class PaymentService {
   async adminApproveCompletion(bookingId, adminId, { reasonCode = 'customer_confirmed', note = '' } = {}) {
     const booking = await Booking.findById(bookingId);
     if (!booking) throw new ApiError(StatusCodes.NOT_FOUND, 'Booking not found.');
-    if (booking.status !== 'pending_admin_review') {
-      throw new ApiError(
-        StatusCodes.BAD_REQUEST,
-        `Booking must be in 'pending_admin_review' status. Current: '${booking.status}'.`
-      );
-    }
+    assertAdminApprovalBookingEligible(booking);
 
     const session = await mongoose.startSession();
     let result;
+    let pendingInvoiceId = null;
 
-    await session.withTransaction(async () => {
-      if (booking.paymentMethod === 'online') {
-        const payment = await Payment.findOne({ booking: bookingId }).session(session);
-        if (!payment || payment.status !== 'held') {
-          throw new ApiError(StatusCodes.BAD_REQUEST, 'No held payment found for this booking.');
+    try {
+      await session.withTransaction(async () => {
+        if (['card', 'online'].includes(booking.paymentMethod)) {
+          const payment = await Payment.findOne({ booking: bookingId }).session(session);
+          if (!payment || payment.status !== 'held') {
+            throw new ApiError(StatusCodes.BAD_REQUEST, 'No held payment found for this booking.');
+          }
+          const release = await this.releaseHeldPayment(payment, booking, adminId, session, { reasonCode, note });
+          pendingInvoiceId = release.invoiceId;
+          booking.paymentStatus = 'released';
         }
-        await this.releaseHeldPayment(payment, booking, adminId, session, { reasonCode, note });
-        booking.paymentStatus = 'released';
-      } else {
-        const CashDebt = require('./cash-debt.model');
-        await CashDebt.create([{
-          worker: booking.worker,
-          booking: booking._id,
-          amount: booking.platformFeeAmount,
-        }], { session });
 
-        booking.paymentStatus = 'cash_pending_settlement';
-      }
-
-      booking.status = 'completed';
-      await booking.save({ session });
-      result = booking;
-    });
-
-    await session.endSession();
-
-    // Generate receipt PDF outside transaction (Plan 3 Task 14)
-    if (booking._pendingInvoiceId) {
-      const Invoice = require('./invoice.model');
-      const receiptSvc = require('./receipt.service');
-      Invoice.findById(booking._pendingInvoiceId)
-        .then(inv => inv && receiptSvc.generate(inv))
-        .catch(() => {});
+        booking.status = 'completed';
+        await booking.save({ session });
+        result = booking;
+      });
+    } finally {
+      await session.endSession();
     }
 
-    // Check thresholds outside transaction (non-critical)
-    if (booking.paymentMethod === 'cash') {
-      getCashDebtSvc().checkDebtThresholds(booking.worker).catch(() => {});
+    // Generate receipt PDF outside transaction (Plan 3 Task 14)
+    if (pendingInvoiceId) {
+      const Invoice = require('./invoice.model');
+      const receiptSvc = require('./receipt.service');
+      try {
+        const invoice = await Invoice.findById(pendingInvoiceId);
+        if (invoice) await receiptSvc.generate(invoice);
+      } catch (_) { /* receipt can be generated lazily by the download endpoint */ }
     }
 
     return result;
+  }
+
+  async validateAdminApproveCompletion(bookingOrId) {
+    const booking = typeof bookingOrId === 'object' && bookingOrId?._id
+      ? bookingOrId
+      : await Booking.findById(bookingOrId);
+    if (!booking) throw new ApiError(StatusCodes.NOT_FOUND, 'Booking not found.');
+    assertAdminApprovalBookingEligible(booking);
+    if (['card', 'online'].includes(booking.paymentMethod)) {
+      const payment = await Payment.findOne({ booking: booking._id });
+      if (!payment || payment.status !== 'held') {
+        throw new ApiError(StatusCodes.BAD_REQUEST, 'No held payment found for this booking.');
+      }
+    }
+    return booking;
   }
 
   async releaseHeldPayment(payment, booking, adminId, session, { reasonCode = 'customer_confirmed', note = '' } = {}) {
@@ -405,8 +439,6 @@ class PaymentService {
       });
       invoiceId = inv?._id;
     } catch (e) { /* non-fatal */ }
-    if (invoiceId) booking._pendingInvoiceId = invoiceId;
-
     await adminAction.record({
       adminId,
       actionType: 'payment_release',
@@ -446,6 +478,8 @@ class PaymentService {
       actor: adminId,
       note: `Platform fee for booking ${payment.booking}`,
     }, session);
+
+    return { invoiceId };
   }
 
   async adminRejectCash(bookingId, adminId, reason) {
@@ -543,8 +577,13 @@ class PaymentService {
   }
 
   async getPendingApprovals({ paymentMethod, page = 1, limit = 20 } = {}) {
-    const filter = { status: 'pending_admin_review' };
-    if (paymentMethod) filter.paymentMethod = paymentMethod;
+    const filter = {
+      status: 'pending_admin_review',
+      paymentMethod: { $ne: 'cash' },
+    };
+    if (paymentMethod) {
+      filter.paymentMethod = paymentMethod === 'cash' ? { $in: [] } : paymentMethod;
+    }
 
     const skip = (Number(page) - 1) * Number(limit);
     const [bookings, total] = await Promise.all([
@@ -573,9 +612,9 @@ class PaymentService {
         service:             b.service?.title || b.serviceCategory,
         amount:              b.totalPrice,
         paymentMethod:       b.paymentMethod,
-        workerEarning:       p?.workerEarning ?? null,
-        platformFee:         p?.platformFee ?? null,
-        totalPaid:           p?.amount || 0,
+        workerEarning:       p?.workerEarning ?? (b.totalPrice != null && b.platformFeeAmount != null ? b.totalPrice - b.platformFeeAmount : null),
+        platformFee:         p?.platformFee ?? b.platformFeeAmount ?? null,
+        totalPaid:           p?.amount ?? b.totalPrice ?? 0,
         customerConfirmedAt: b.customerConfirmedAt,
         paymentStatus:       b.paymentStatus,
       };
@@ -635,9 +674,16 @@ class PaymentService {
     const missingEvidence = [];
     if (!booking?.actualCompletedAt) missingEvidence.push('worker_completion_timestamp');
     if (!booking?.customerConfirmedAt) missingEvidence.push('customer_confirmation');
+    if (
+      ['card', 'online'].includes(booking?.paymentMethod)
+      && !(booking?.completionOutcome?.afterPhotos?.length > 0)
+    ) {
+      missingEvidence.push('worker_completion_after_photo');
+    }
 
     const hasOpenDispute = disputes.length > 0;
     const hasOpenSupportIssue = supportIssues.length > 0;
+    const hasReportedIssue = booking?.customerFeedback?.action === 'reported_issue';
     const isLocked = Boolean(payment.lockedAt);
     const isHighValue = amount >= highRiskThreshold;
     const isFlagged = Boolean(booking?.flaggedForReview);
@@ -646,6 +692,7 @@ class PaymentService {
     if (isLocked) policyFlags.push('payment_locked');
     if (hasOpenDispute) policyFlags.push('active_dispute');
     if (hasOpenSupportIssue) policyFlags.push('active_support_issue');
+    if (hasReportedIssue) policyFlags.push('customer_reported_issue');
     if (isHighValue) policyFlags.push('high_value_payment');
     if (isFlagged) policyFlags.push('booking_flagged_for_review');
     if (missingEvidence.length) policyFlags.push('missing_required_evidence');
@@ -659,7 +706,13 @@ class PaymentService {
       allowedActions.add('request_evidence');
       allowedActions.add('lock');
       allowedActions.add('emergency_release');
-      if (booking?.status === 'pending_admin_review' && !hasOpenDispute && !hasOpenSupportIssue && !missingEvidence.length) {
+      if (
+        booking?.status === 'pending_admin_review'
+        && !hasOpenDispute
+        && !hasOpenSupportIssue
+        && !hasReportedIssue
+        && !missingEvidence.length
+      ) {
         allowedActions.add('release');
       }
     }
@@ -667,7 +720,7 @@ class PaymentService {
     if (hasOpenDispute || hasOpenSupportIssue || isHighValue || isFlagged) allowedActions.add('escalate');
 
     let recommendedAction = 'release';
-    if (isLocked || hasOpenDispute || hasOpenSupportIssue) recommendedAction = 'escalate';
+    if (isLocked || hasOpenDispute || hasOpenSupportIssue || hasReportedIssue) recommendedAction = 'escalate';
     else if (missingEvidence.length) recommendedAction = 'request_evidence';
     else if (isHighValue || isFlagged) recommendedAction = 'manual_review';
 
@@ -701,6 +754,8 @@ class PaymentService {
         address: booking.address,
         workerNotes: booking.workerNotes || '',
         workerCompletionImages: booking.workerCompletionImages || [],
+        completionOutcome: booking.completionOutcome || {},
+        customerFeedback: booking.customerFeedback || {},
         flaggedForReview: booking.flaggedForReview,
         flagReason: booking.flagReason || '',
       } : null,
@@ -727,6 +782,8 @@ class PaymentService {
       evidence: {
         workerNotes: booking?.workerNotes || '',
         workerCompletionImages: booking?.workerCompletionImages || [],
+        completionAfterPhotos: booking?.completionOutcome?.afterPhotos || [],
+        customerFeedback: booking?.customerFeedback || {},
         bookingImages: booking?.images || [],
         disputes: disputes.map(d => ({
           id: d._id,

@@ -407,3 +407,17 @@
 .site-footer .footer__input:focus {
   border-color: #fec195;
 }
+
+/* ── Social icons: always white on the dark-gradient footer ── */
+.site-footer .social-link {
+  color: rgba(240, 230, 216, 0.85);
+  border-color: rgba(240, 230, 216, 0.2);
+  background: transparent;
+}
+
+.site-footer .social-link:hover {
+  background: rgba(254, 193, 149, 0.18);
+  color: #fec195;
+  border-color: rgba(254, 193, 149, 0.5);
+  box-shadow: 0 4px 14px -4px rgba(254, 193, 149, 0.35);
+}
