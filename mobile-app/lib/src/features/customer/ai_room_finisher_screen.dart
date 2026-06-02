@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/api/ai_api.dart';
 import '../dev/ai_performance_dashboard.dart';
+import 'ai_smart_match_screen.dart';
 import '../../core/knowledge/finishing_knowledge_graph.dart';
 import '../../core/state/room_finishing_provider.dart';
 import '../../design_system/servio_theme_extension.dart';
@@ -150,12 +151,28 @@ class _AiRoomFinisherScreenState extends State<AiRoomFinisherScreen> {
         title: const Text('AI Room Finisher'),
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         actions: <Widget>[
-          if (provider.phase == RoomFinishingPhase.success)
+          if (provider.phase == RoomFinishingPhase.success) ...<Widget>[
+            IconButton(
+              icon: const Icon(Icons.save_alt_rounded),
+              tooltip: 'Plan saved automatically',
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Plan saved — tap "Analyse another room" to start fresh.'),
+                    duration: Duration(seconds: 3),
+                  ),
+                );
+              },
+            ),
             IconButton(
               icon: const Icon(Icons.refresh_rounded),
               tooltip: 'Start over',
-              onPressed: provider.reset,
+              onPressed: () {
+                provider.reset();
+                provider.clearSavedPlan();
+              },
             ),
+          ],
           if (kDebugMode)
             IconButton(
               icon: const Icon(Icons.bar_chart_rounded),
@@ -232,6 +249,8 @@ class _AiRoomFinisherScreenState extends State<AiRoomFinisherScreen> {
           formError: _formError,
           onPickImage: _showSourceSheet,
           onSubmit: _submit,
+          onRestorePlan: () =>
+              context.read<RoomFinishingProvider>().loadSavedPlan(),
         );
     }
   }
@@ -251,6 +270,7 @@ class _IdleView extends StatelessWidget {
     required this.formError,
     required this.onPickImage,
     required this.onSubmit,
+    required this.onRestorePlan,
   });
 
   final RoomFinishingProvider provider;
@@ -263,6 +283,7 @@ class _IdleView extends StatelessWidget {
   final String? formError;
   final VoidCallback onPickImage;
   final VoidCallback onSubmit;
+  final VoidCallback onRestorePlan;
 
   @override
   Widget build(BuildContext context) {
@@ -274,6 +295,30 @@ class _IdleView extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
+          // ── Restore last plan banner ──────────────────────────────────
+          if (provider.planSaved) ...<Widget>[
+            ServioCard(
+              backgroundColor: servio.accent.withValues(alpha: 0.06),
+              borderColor: servio.accent.withValues(alpha: 0.3),
+              child: Row(
+                children: <Widget>[
+                  Icon(Icons.history_rounded, color: servio.accent, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'You have a saved plan from last session.',
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: onRestorePlan,
+                    child: const Text('Restore'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
           ServioAnimatedEntry(
             child: Row(
               children: <Widget>[
@@ -820,6 +865,7 @@ class _ResultViewState extends State<_ResultView> {
     final plans = widget.response.plans;
     final selectedPlan =
         plans.isNotEmpty ? plans[_selectedIdx] : widget.response.recommendedPlan;
+    final envelope = widget.response.consistencyEnvelope;
 
     return ListView(
       padding: const EdgeInsets.all(ServioSpacing.screenPadding),
@@ -829,11 +875,27 @@ class _ResultViewState extends State<_ResultView> {
           type: ServioStatusChipType.success,
         ),
         const SizedBox(height: 16),
+
+        // ── AI render ────────────────────────────────────────────────────
         _BeforeAfter(
           generatedBase64: widget.response.generatedImageBase64,
+          sdPromptUsed: envelope.sdPromptUsed,
           reduceMotion: widget.reduceMotion,
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
+
+        // ── Room analysis card ───────────────────────────────────────────
+        _RoomAnalysisCard(analysis: widget.response.roomAnalysis),
+        const SizedBox(height: 16),
+
+        // ── Cross-plan comparison ────────────────────────────────────────
+        if (plans.length > 1) ...<Widget>[
+          _PlanComparisonTable(
+            plans: plans,
+            recommendedName: widget.response.recommendedPlanName,
+          ),
+          const SizedBox(height: 16),
+        ],
 
         // ── Plan selector tabs ───────────────────────────────────────────
         if (plans.length > 1) ...<Widget>[
@@ -843,7 +905,21 @@ class _ResultViewState extends State<_ResultView> {
             recommendedName: widget.response.recommendedPlanName,
             onSelect: (int i) => setState(() => _selectedIdx = i),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
+        ],
+
+        // ── Recommendation reason ────────────────────────────────────────
+        if (widget.response.recommendationReason.isNotEmpty) ...<Widget>[
+          _RecommendationReasonCard(
+            reason: widget.response.recommendationReason,
+          ),
+          const SizedBox(height: 12),
+        ],
+
+        // ── Consistency warnings ─────────────────────────────────────────
+        if (envelope.consistencyWarnings.isNotEmpty) ...<Widget>[
+          _ConsistencyWarningsBanner(warnings: envelope.consistencyWarnings),
+          const SizedBox(height: 12),
         ],
 
         // ── Full plan detail ─────────────────────────────────────────────
@@ -853,6 +929,12 @@ class _ResultViewState extends State<_ResultView> {
           isRecommended:
               selectedPlan.name == widget.response.recommendedPlanName,
         ),
+
+        // ── Consistency panel ────────────────────────────────────────────
+        if (envelope.budgetTier.isNotEmpty) ...<Widget>[
+          const SizedBox(height: 20),
+          _ConsistencyPanel(envelope: envelope),
+        ],
 
         // ── Knowledge graph ──────────────────────────────────────────────
         const SizedBox(height: 24),
@@ -930,8 +1012,23 @@ class _PlanTabBar extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+                    if (plans[i].planStyle.isNotEmpty) ...<Widget>[
+                      const SizedBox(height: 1),
+                      Text(
+                        plans[i].planStyle,
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: i == selectedIdx
+                              ? Colors.white70
+                              : servio.textSecondary,
+                          fontSize: 9,
+                        ),
+                      ),
+                    ],
                     if (plans[i].name == recommendedName) ...<Widget>[
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 1),
                       Text(
                         'AI Pick',
                         style: theme.textTheme.labelSmall?.copyWith(
@@ -1030,6 +1127,24 @@ class _FullPlanDetail extends StatelessWidget {
                 ],
               ],
             ),
+          ),
+          const SizedBox(height: 12),
+          // Book a technician CTA
+          OutlinedButton.icon(
+            icon: const Icon(Icons.search_rounded, size: 18),
+            label: const Text('Find a Technician on SERVIO'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: servio.accent,
+              side: BorderSide(color: servio.accent),
+              minimumSize: const Size.fromHeight(44),
+            ),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const AiSmartMatchScreen(),
+                ),
+              );
+            },
           ),
         ],
 
@@ -1184,10 +1299,12 @@ class _BeforeAfter extends StatefulWidget {
   const _BeforeAfter({
     required this.generatedBase64,
     required this.reduceMotion,
+    this.sdPromptUsed = '',
   });
 
   final String? generatedBase64;
   final bool reduceMotion;
+  final String sdPromptUsed;
 
   @override
   State<_BeforeAfter> createState() => _BeforeAfterState();
@@ -1199,7 +1316,6 @@ class _BeforeAfterState extends State<_BeforeAfter> {
   static Uint8List? _decode(String? b64) {
     if (b64 == null || b64.isEmpty) return null;
     try {
-      // The model may already return raw base64 or a data URI.
       final clean = b64.contains(',') ? b64.split(',').last : b64;
       return base64Decode(clean);
     } catch (_) {
@@ -1207,10 +1323,21 @@ class _BeforeAfterState extends State<_BeforeAfter> {
     }
   }
 
+  void _openFullscreen(BuildContext context) {
+    if (_decoded == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => _FullscreenImageViewer(
+          imageBytes: _decoded,
+          sdPromptUsed: widget.sdPromptUsed,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_decoded == null) {
-      // No render returned. Show graceful fallback rather than blank space.
       final servio = context.servio;
       return ServioCard(
         backgroundColor: servio.backgroundSoft,
@@ -1229,46 +1356,89 @@ class _BeforeAfterState extends State<_BeforeAfter> {
       );
     }
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(ServioRadius.lg),
-      child: AspectRatio(
-        aspectRatio: 16 / 10,
-        child: widget.reduceMotion
-            ? Image.memory(_decoded, fit: BoxFit.cover, gaplessPlayback: true)
-            : TweenAnimationBuilder<double>(
-                tween: Tween<double>(begin: 0, end: 1),
-                duration: const Duration(milliseconds: 900),
-                curve: Curves.easeOutCubic,
-                builder: (BuildContext _, double t, Widget? child) {
-                  return Stack(
-                    fit: StackFit.expand,
-                    children: <Widget>[
-                      Container(color: Colors.black12),
-                      ClipPath(
-                        clipper: _RevealClipper(progress: t),
-                        child: child,
-                      ),
-                      Positioned(
-                        left: 12,
-                        top: 12,
-                        child: AnimatedOpacity(
-                          duration: const Duration(milliseconds: 400),
-                          opacity: t > 0.95 ? 1.0 : 0.0,
-                          child: const ServioStatusChip(
-                            label: 'AFTER',
-                            type: ServioStatusChipType.success,
+    return GestureDetector(
+      onTap: () => _openFullscreen(context),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(ServioRadius.lg),
+        child: AspectRatio(
+          aspectRatio: 16 / 10,
+          child: widget.reduceMotion
+              ? Stack(
+                  fit: StackFit.expand,
+                  children: <Widget>[
+                    Image.memory(_decoded, fit: BoxFit.cover, gaplessPlayback: true),
+                    Positioned(
+                      right: 12,
+                      bottom: 12,
+                      child: _FullscreenHint(),
+                    ),
+                  ],
+                )
+              : TweenAnimationBuilder<double>(
+                  tween: Tween<double>(begin: 0, end: 1),
+                  duration: const Duration(milliseconds: 900),
+                  curve: Curves.easeOutCubic,
+                  builder: (BuildContext _, double t, Widget? child) {
+                    return Stack(
+                      fit: StackFit.expand,
+                      children: <Widget>[
+                        Container(color: Colors.black12),
+                        ClipPath(
+                          clipper: _RevealClipper(progress: t),
+                          child: child,
+                        ),
+                        Positioned(
+                          left: 12,
+                          top: 12,
+                          child: AnimatedOpacity(
+                            duration: const Duration(milliseconds: 400),
+                            opacity: t > 0.95 ? 1.0 : 0.0,
+                            child: const ServioStatusChip(
+                              label: 'AFTER',
+                              type: ServioStatusChipType.success,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  );
-                },
-                child: Image.memory(
-                  _decoded,
-                  fit: BoxFit.cover,
-                  gaplessPlayback: true,
+                        Positioned(
+                          right: 12,
+                          bottom: 12,
+                          child: AnimatedOpacity(
+                            duration: const Duration(milliseconds: 400),
+                            opacity: t > 0.95 ? 1.0 : 0.0,
+                            child: _FullscreenHint(),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                  child: Image.memory(
+                    _decoded,
+                    fit: BoxFit.cover,
+                    gaplessPlayback: true,
+                  ),
                 ),
-              ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FullscreenHint extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(ServioRadius.full),
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Icon(Icons.fullscreen_rounded, size: 14, color: Colors.white),
+          SizedBox(width: 4),
+          Text('Tap to zoom', style: TextStyle(color: Colors.white, fontSize: 11)),
+        ],
       ),
     );
   }
@@ -1332,6 +1502,35 @@ class _PlanSummary extends StatelessWidget {
                         );
                       },
                     ),
+                    // Vendor-adjusted price diff badge
+                    Builder(builder: (BuildContext ctx) {
+                      final adj = plan.vendorAdjustedTotalEgp;
+                      final diff = adj - plan.totalCostEgp;
+                      if (adj <= 0 || diff.abs() < 1) return const SizedBox.shrink();
+                      final up = diff > 0;
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 3),
+                        child: Row(
+                          children: <Widget>[
+                            Icon(
+                              Icons.storefront_outlined,
+                              size: 11,
+                              color: servio.textSecondary,
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              'Vendor est. ${_fmt(adj.round())} EGP'
+                              ' (${up ? '+' : ''}${_fmt(diff.round())})',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: up
+                                    ? const Color(0xFFE65100)
+                                    : const Color(0xFF2E7D32),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
                   ],
                 ),
               ),
@@ -1477,43 +1676,132 @@ class _MaterialRow extends StatelessWidget {
 
   final PlanMaterial material;
 
+  static const Map<String, Color> _categoryColors = <String, Color>{
+    'flooring': Color(0xFF2196F3),
+    'walls': Color(0xFF4CAF50),
+    'painting': Color(0xFF4CAF50),
+    'ceiling': Color(0xFF9C27B0),
+    'electrical': Color(0xFFFF9800),
+    'plumbing': Color(0xFF00BCD4),
+    'doors': Color(0xFF795548),
+    'windows': Color(0xFF795548),
+  };
+
+  Color _dot(String cat) =>
+      _categoryColors[cat.toLowerCase()] ?? const Color(0xFF9E9E9E);
+
   @override
   Widget build(BuildContext context) {
     final servio = context.servio;
+    final theme = Theme.of(context);
+    final hasExtra =
+        material.notes.isNotEmpty || material.vendors.isNotEmpty;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Expanded(
-            flex: 3,
-            child: Text(
-              material.name,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              if (material.category.isNotEmpty) ...<Widget>[
+                Padding(
+                  padding: const EdgeInsets.only(top: 5, right: 6),
+                  child: Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: _dot(material.category),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              ],
+              Expanded(
+                flex: 3,
+                child: Text(
+                  material.name,
+                  style: theme.textTheme.bodyMedium,
+                ),
+              ),
+              Expanded(
+                flex: 2,
+                child: Text(
+                  '${material.quantity} ${material.unit}'.trim(),
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: servio.textSecondary),
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: <Widget>[
+                  Text(
+                    material.estimatedCostEgp > 0
+                        ? '${_fmt(material.estimatedCostEgp.round())} EGP'
+                        : '—',
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(color: servio.accent),
+                  ),
+                  if (material.unitPriceEgp > 0)
+                    Text(
+                      '${_fmt(material.unitPriceEgp.round())}/${material.unit}',
+                      style: theme.textTheme.labelSmall
+                          ?.copyWith(color: servio.textSecondary),
+                    ),
+                ],
+              ),
+            ],
           ),
-          Expanded(
-            flex: 2,
-            child: Text(
-              '${material.quantity} ${material.unit}'.trim(),
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: servio.textSecondary),
+          if (hasExtra) ...<Widget>[
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.only(left: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  if (material.notes.isNotEmpty)
+                    Text(
+                      material.notes,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: servio.textSecondary,
+                        fontStyle: FontStyle.italic,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  if (material.vendors.isNotEmpty) ...<Widget>[
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 4,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: <Widget>[
+                        Icon(Icons.storefront_outlined,
+                            size: 12, color: servio.textSecondary),
+                        for (final v in material.vendors)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: servio.backgroundSoft,
+                              borderRadius:
+                                  BorderRadius.circular(ServioRadius.full),
+                              border: Border.all(color: servio.border),
+                            ),
+                            child: Text(
+                              v.name,
+                              style: theme.textTheme.labelSmall
+                                  ?.copyWith(color: servio.textSecondary),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
             ),
-          ),
-          Expanded(
-            flex: 2,
-            child: Text(
-              material.estimatedCostEgp > 0
-                  ? '${_fmt(material.estimatedCostEgp.round())} EGP'
-                  : '—',
-              textAlign: TextAlign.right,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: servio.accent),
-            ),
-          ),
+          ],
         ],
       ),
     );
@@ -1656,6 +1944,587 @@ class _ErrorView extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ── Cross-plan comparison table ──────────────────────────────────────────────
+
+class _PlanComparisonTable extends StatelessWidget {
+  const _PlanComparisonTable({
+    required this.plans,
+    required this.recommendedName,
+  });
+
+  final List<FinishingPlan> plans;
+  final String recommendedName;
+
+  @override
+  Widget build(BuildContext context) {
+    final servio = context.servio;
+    final theme = Theme.of(context);
+
+    return ServioCard(
+      backgroundColor: servio.backgroundSoft,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Icon(Icons.compare_arrows_rounded, size: 16, color: servio.accent),
+              const SizedBox(width: 6),
+              Text('Compare Plans', style: theme.textTheme.titleSmall),
+            ],
+          ),
+          const SizedBox(height: 10),
+          // Header row — plan names
+          _CompRow(
+            label: '',
+            values: plans.map((FinishingPlan p) => p.name).toList(),
+            plans: plans,
+            recommendedName: recommendedName,
+            isHeader: true,
+          ),
+          Divider(height: 8, color: servio.border),
+          _CompRow(
+            label: 'Total',
+            values: plans
+                .map((FinishingPlan p) => '${_fmt(p.totalCostEgp.round())} EGP')
+                .toList(),
+            plans: plans,
+            recommendedName: recommendedName,
+          ),
+          _CompRow(
+            label: 'Materials',
+            values: plans.map((FinishingPlan p) {
+              final v = p.breakdown['materials'] ?? 0;
+              return v > 0 ? '${_fmt(v.round())} EGP' : '—';
+            }).toList(),
+            plans: plans,
+            recommendedName: recommendedName,
+          ),
+          _CompRow(
+            label: 'Labor',
+            values: plans.map((FinishingPlan p) {
+              final v = p.breakdown['labor'] ?? 0;
+              return v > 0 ? '${_fmt(v.round())} EGP' : '—';
+            }).toList(),
+            plans: plans,
+            recommendedName: recommendedName,
+          ),
+          _CompRow(
+            label: 'Timeline',
+            values: plans
+                .map((FinishingPlan p) =>
+                    p.durationDays > 0 ? '${p.durationDays} days' : '—')
+                .toList(),
+            plans: plans,
+            recommendedName: recommendedName,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CompRow extends StatelessWidget {
+  const _CompRow({
+    required this.label,
+    required this.values,
+    required this.plans,
+    required this.recommendedName,
+    this.isHeader = false,
+  });
+
+  final String label;
+  final List<String> values;
+  final List<FinishingPlan> plans;
+  final String recommendedName;
+  final bool isHeader;
+
+  @override
+  Widget build(BuildContext context) {
+    final servio = context.servio;
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: <Widget>[
+          SizedBox(
+            width: 68,
+            child: Text(
+              label,
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: servio.textSecondary),
+            ),
+          ),
+          for (var i = 0; i < values.length; i++) ...<Widget>[
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 4),
+                decoration: isHeader && plans[i].name == recommendedName
+                    ? BoxDecoration(
+                        color: servio.accent.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(ServioRadius.sm),
+                      )
+                    : null,
+                child: Text(
+                  values[i],
+                  textAlign: TextAlign.center,
+                  style: (isHeader
+                          ? theme.textTheme.labelSmall
+                          : theme.textTheme.bodySmall)
+                      ?.copyWith(
+                    color: plans[i].name == recommendedName ? servio.accent : null,
+                    fontWeight: plans[i].name == recommendedName
+                        ? FontWeight.w700
+                        : null,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ── Fullscreen image viewer ──────────────────────────────────────────────────
+
+class _FullscreenImageViewer extends StatelessWidget {
+  const _FullscreenImageViewer({
+    required this.imageBytes,
+    this.sdPromptUsed = '',
+  });
+
+  final Uint8List imageBytes;
+  final String sdPromptUsed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        title: const Text('AI Render', style: TextStyle(color: Colors.white)),
+        actions: <Widget>[
+          if (sdPromptUsed.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.info_outline_rounded, color: Colors.white),
+              tooltip: 'How was this generated?',
+              onPressed: () => _showPromptSheet(context),
+            ),
+        ],
+      ),
+      body: Center(
+        child: InteractiveViewer(
+          minScale: 0.5,
+          maxScale: 4.0,
+          child: Image.memory(imageBytes, fit: BoxFit.contain),
+        ),
+      ),
+    );
+  }
+
+  void _showPromptSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext ctx) {
+        return SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(ServioSpacing.screenPadding),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'How was this generated?',
+                  style: Theme.of(ctx).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Stable Diffusion prompt:',
+                  style: Theme.of(ctx).textTheme.bodySmall
+                      ?.copyWith(color: ctx.servio.textSecondary),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: ctx.servio.backgroundSoft,
+                    borderRadius: BorderRadius.circular(ServioRadius.md),
+                  ),
+                  child: Text(
+                    sdPromptUsed,
+                    style: Theme.of(ctx).textTheme.bodySmall,
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ── Room analysis card ───────────────────────────────────────────────────────
+
+class _RoomAnalysisCard extends StatelessWidget {
+  const _RoomAnalysisCard({required this.analysis});
+
+  final RoomAnalysis analysis;
+
+  @override
+  Widget build(BuildContext context) {
+    final servio = context.servio;
+    final theme = Theme.of(context);
+    final wallCond = analysis.wallCondition.isNotEmpty
+        ? analysis.wallCondition
+        : analysis.currentCondition;
+
+    return ServioCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Icon(Icons.camera_indoor_outlined, size: 18, color: servio.accent),
+              const SizedBox(width: 6),
+              Text('Room Analysis', style: theme.textTheme.titleSmall),
+              const Spacer(),
+              if (analysis.roomType.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: servio.accent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(ServioRadius.full),
+                  ),
+                  child: Text(
+                    analysis.roomType.replaceAll('_', ' ').toUpperCase(),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: servio.accent,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          if (wallCond.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 8),
+            _AnalysisRow(
+              label: 'Wall condition',
+              value: wallCond.replaceAll('_', ' '),
+            ),
+          ],
+          if (analysis.estimatedCeilingHeightM > 0) ...<Widget>[
+            const SizedBox(height: 4),
+            _AnalysisRow(
+              label: 'Ceiling height',
+              value:
+                  '${analysis.estimatedCeilingHeightM.toStringAsFixed(1)} m',
+            ),
+          ],
+          if (analysis.detectedFeatures.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 8),
+            Text(
+              'Detected features',
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: servio.textSecondary),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: <Widget>[
+                for (final f in analysis.detectedFeatures)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: servio.backgroundSoft,
+                      borderRadius: BorderRadius.circular(ServioRadius.full),
+                      border: Border.all(color: servio.border),
+                    ),
+                    child: Text(f, style: theme.textTheme.bodySmall),
+                  ),
+              ],
+            ),
+          ],
+          if (analysis.specialNotes.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Icon(Icons.lightbulb_outline_rounded,
+                    size: 14, color: servio.accent),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    analysis.specialNotes,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: servio.textSecondary,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _AnalysisRow extends StatelessWidget {
+  const _AnalysisRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+    return Row(
+      children: <Widget>[
+        Text(
+          '$label: ',
+          style: theme.textTheme.bodySmall
+              ?.copyWith(color: servio.textSecondary),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: theme.textTheme.bodySmall
+                ?.copyWith(fontWeight: FontWeight.w600),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Recommendation reason card ───────────────────────────────────────────────
+
+class _RecommendationReasonCard extends StatelessWidget {
+  const _RecommendationReasonCard({required this.reason});
+
+  final String reason;
+
+  @override
+  Widget build(BuildContext context) {
+    final servio = context.servio;
+    return ServioCard(
+      backgroundColor: servio.accent.withValues(alpha: 0.06),
+      borderColor: servio.accent.withValues(alpha: 0.3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Icon(Icons.recommend_outlined, size: 18, color: servio.accent),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(reason, style: Theme.of(context).textTheme.bodyMedium),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Consistency warnings banner ──────────────────────────────────────────────
+
+class _ConsistencyWarningsBanner extends StatelessWidget {
+  const _ConsistencyWarningsBanner({required this.warnings});
+
+  final List<String> warnings;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return ServioCard(
+      backgroundColor: const Color(0xFFFFF8E1),
+      borderColor: const Color(0xFFFFCC02),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Row(
+            children: <Widget>[
+              Icon(Icons.warning_amber_rounded,
+                  size: 16, color: Color(0xFFE65100)),
+              SizedBox(width: 6),
+              Text(
+                'AI notes',
+                style: TextStyle(
+                  color: Color(0xFFE65100),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          for (final w in warnings)
+            Padding(
+              padding: const EdgeInsets.only(top: 3),
+              child: Text(
+                '• $w',
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: const Color(0xFFE65100)),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Consistency / AI insights panel ─────────────────────────────────────────
+
+class _ConsistencyPanel extends StatelessWidget {
+  const _ConsistencyPanel({required this.envelope});
+
+  final ConsistencyEnvelope envelope;
+
+  static const Map<String, Color> _tierColors = <String, Color>{
+    'ultra_economy': Color(0xFF4CAF50),
+    'economy': Color(0xFF8BC34A),
+    'standard': Color(0xFF2196F3),
+    'premium': Color(0xFF9C27B0),
+    'luxury': Color(0xFFFF6F00),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final servio = context.servio;
+    final theme = Theme.of(context);
+    final tierColor = _tierColors[envelope.budgetTier] ?? servio.accent;
+    final costDiff =
+        (envelope.vendorAdjustedCost - envelope.geminiTotalCost).abs();
+    final showDiff = envelope.vendorAdjustedCost > 0 &&
+        envelope.geminiTotalCost > 0 &&
+        costDiff > 1;
+
+    return ServioCard(
+      backgroundColor: servio.backgroundSoft,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Icon(Icons.analytics_outlined, size: 18, color: servio.accent),
+              const SizedBox(width: 6),
+              Text('AI Insights', style: theme.textTheme.titleSmall),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: <Widget>[
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: tierColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(ServioRadius.full),
+                  border: Border.all(color: tierColor.withValues(alpha: 0.4)),
+                ),
+                child: Text(
+                  envelope.budgetTier.replaceAll('_', ' ').toUpperCase(),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: tierColor,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Budget tier · ${envelope.floorAreaM2.toStringAsFixed(0)} m²',
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: servio.textSecondary),
+                ),
+              ),
+            ],
+          ),
+          if (envelope.styleUsed.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 6),
+            _InsightRow(label: 'Style applied', value: envelope.styleUsed),
+          ],
+          if (envelope.primaryFlooring.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 4),
+            _InsightRow(
+                label: 'Primary flooring', value: envelope.primaryFlooring),
+          ],
+          if (envelope.primaryWall.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 4),
+            _InsightRow(label: 'Primary wall', value: envelope.primaryWall),
+          ],
+          if (showDiff) ...<Widget>[
+            const SizedBox(height: 8),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: servio.backgroundSoft,
+                borderRadius: BorderRadius.circular(ServioRadius.md),
+                border: Border.all(color: servio.border),
+              ),
+              child: Row(
+                children: <Widget>[
+                  Icon(Icons.store_outlined, size: 14, color: servio.accent),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Vendor-adjusted: ${_fmt(envelope.vendorAdjustedCost.round())} EGP'
+                      '  (AI estimate: ${_fmt(envelope.geminiTotalCost.round())} EGP)',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _InsightRow extends StatelessWidget {
+  const _InsightRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          '$label: ',
+          style: theme.textTheme.bodySmall
+              ?.copyWith(color: servio.textSecondary),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: theme.textTheme.bodySmall
+                ?.copyWith(fontWeight: FontWeight.w600),
+          ),
+        ),
+      ],
     );
   }
 }

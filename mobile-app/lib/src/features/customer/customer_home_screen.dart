@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -15,18 +13,15 @@ import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_section_heading.dart';
 import '../../design_system/widgets/servio_status_chip.dart';
 import '../../design_system/widgets/servio_tab_shell.dart';
-import 'ai_finishing_estimator_screen.dart';
 import 'ai_room_finisher_screen.dart';
 import 'ai_smart_match_screen.dart';
 import 'customer_profile_screen.dart';
-import 'my_addresses_screen.dart';
 import 'my_bookings_screen.dart';
 import 'service_detail_screen.dart';
-import 'services_marketplace_screen.dart';
+import '../shared/search_results_screen.dart';
 import 'technician_listing_screen.dart';
 import 'technician_profile_screen.dart';
 import '../shared/notifications_screen.dart';
-import '../shared/search_results_screen.dart';
 import '../booking/booking_flow_data.dart';
 
 class CustomerHomeScreen extends StatelessWidget {
@@ -73,10 +68,11 @@ class _HomeBodyState extends State<_HomeBody>
       curve: const Interval(0.0, 0.8, curve: ServioMotion.spring),
     );
     _entranceSlide = Tween<Offset>(
-      begin: const Offset(0, 0.055),
+      begin: const Offset(0, 0.04),
       end: Offset.zero,
-    ).animate(CurvedAnimation(
-        parent: _entranceController, curve: ServioMotion.spring));
+    ).animate(
+      CurvedAnimation(parent: _entranceController, curve: ServioMotion.spring),
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _entranceController.forward();
@@ -114,401 +110,171 @@ class _HomeBodyState extends State<_HomeBody>
         .map((String e) => e.isNotEmpty ? e[0].toUpperCase() : '')
         .where((String c) => c.isNotEmpty)
         .join();
-    final recentBookings = context.watch<BookingsProvider>().upcoming;
+
+    final upcomingBookings = context.watch<BookingsProvider>().upcoming;
+    final pastBookings = context.watch<BookingsProvider>().past;
     final featuredTechs =
         context.watch<WorkersProvider>().workers.take(4).toList();
     final locale = context.watch<LocaleProvider>().locale.languageCode;
 
-    final hour = DateTime.now().hour;
-    String greeting = 'Good evening';
-    if (hour < 12) {
-      greeting = 'Good morning';
-    } else if (hour < 17) {
-      greeting = 'Good afternoon';
-    }
+    final now = DateTime.now();
+    final hour = now.hour;
+    final timeWord = locale == 'ar'
+        ? (hour < 12 ? 'صباح' : hour < 17 ? 'ظهر' : 'مساء')
+        : (hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening');
+    final hasUpcoming = upcomingBookings.isNotEmpty;
 
-    return Stack(
-      children: <Widget>[
-        // ── Layer 1: Animated full-screen gradient + floating icons ──
-        AnimatedBuilder(
-          animation: _scrollController,
-          builder: (BuildContext context, Widget? child) {
-            double offset = 0;
-            if (_scrollController.hasClients) {
-              offset = _scrollController.offset;
-              if (offset < 0) offset = 0;
-            }
-            return Positioned(
-              top: -offset * 0.3,
-              left: 0,
-              right: 0,
-              height: MediaQuery.of(context).size.height * 1.8,
-              child: child!,
-            );
-          },
-          child: _BackgroundLayer(isDark: isDark),
-        ),
+    // Cycle through 4 greeting styles daily so the screen feels fresh
+    final List<(String, String)> greetingVariants = <(String, String)>[
+      // (small muted line, big headline)
+      (
+        locale == 'ar' ? 'صباح الخير،' : 'Good $timeWord,',
+        locale == 'ar' ? 'مرحباً، $firstName!' : 'Hello, $firstName!',
+      ),
+      (
+        '',
+        locale == 'ar'
+            ? 'صباح الخير، $firstName!'
+            : 'Good $timeWord, $firstName!',
+      ),
+      (
+        '',
+        locale == 'ar'
+            ? (hasUpcoming ? 'أهلاً بعودتك، $firstName!' : 'أهلاً، $firstName!')
+            : (hasUpcoming ? 'Welcome back, $firstName!' : 'Welcome, $firstName!'),
+      ),
+      (
+        locale == 'ar' ? 'يسعدنا رؤيتك،' : 'Good to see you,',
+        '$firstName!',
+      ),
+    ];
+    final (greetingTop, greetingHead) =
+        greetingVariants[now.day % greetingVariants.length];
 
-        // ── Layer 2: Scrollable dashboard content ────────────────────
-        RefreshIndicator(
-          color: servio.accent,
-          onRefresh: () async {
-            await Future.wait(<Future<void>>[
-              context.read<BookingsProvider>().refresh(),
-              context.read<NotificationsProvider>().refresh(),
-            ]);
-          },
-          child: SingleChildScrollView(
-            controller: _scrollController,
-            physics: const AlwaysScrollableScrollPhysics(),
-            child: Column(
+    // Merge: show up to 2 upcoming then fill with past (cap 4 total)
+    final activityBookings = [
+      ...upcomingBookings.take(2),
+      if (upcomingBookings.length < 2) ...pastBookings.take(2 - upcomingBookings.length),
+    ].take(4).toList();
+
+    return RefreshIndicator(
+      color: servio.accent,
+      onRefresh: () async {
+        await Future.wait(<Future<void>>[
+          context.read<BookingsProvider>().refresh(),
+          context.read<NotificationsProvider>().refresh(),
+        ]);
+      },
+      child: CustomScrollView(
+        controller: _scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: <Widget>[
+          // ── Pinned app bar ─────────────────────────────────────
+          SliverAppBar(
+            pinned: true,
+            automaticallyImplyLeading: false,
+            backgroundColor: isDark
+                ? ServioColors.backgroundDark
+                : ServioColors.backgroundSoftLight,
+            surfaceTintColor: Colors.transparent,
+            scrolledUnderElevation: 0,
+            toolbarHeight: 60,
+            title: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: <Widget>[
-                // ── Dashboard header ─────────────────────────────────
-                SafeArea(
-                  bottom: false,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      ServioSpacing.screenPadding,
-                      12,
-                      ServioSpacing.screenPadding,
-                      0,
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.asset(
+                    'assets/images/servio_logo.png',
+                    width: 32,
+                    height: 32,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'SERVIO',
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w800,
+                    fontSize: 20,
+                    letterSpacing: 3.0,
+                    color: isDark
+                        ? ServioColors.textPrimaryDark
+                        : ServioColors.navyDark,
+                    height: 1,
+                  ),
+                ),
+                const Spacer(),
+                // Notifications bell
+                GestureDetector(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const NotificationsScreen(),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  ),
+                  child: Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: (isDark ? Colors.white : ServioColors.navyDark)
+                          .withValues(alpha: 0.06),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: ServioColors.accent.withValues(alpha: 0.2),
+                      ),
+                    ),
+                    child: Stack(
+                      alignment: Alignment.center,
                       children: <Widget>[
-                        // ── Wordmark + actions ───────────────────────
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: <Widget>[
-                            _ServioWordmark(isDark: isDark),
-                            const Spacer(),
-                            GestureDetector(
-                              onTap: () => Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                  builder: (_) => const NotificationsScreen(),
-                                ),
-                              ),
-                              child: _HeaderIconButton(
-                                isDark: isDark,
-                                child: Stack(
-                                  alignment: Alignment.center,
-                                  children: <Widget>[
-                                    Icon(
-                                      Icons.notifications_none_rounded,
-                                      color: isDark
-                                          ? ServioColors.navyDark
-                                          : Colors.white,
-                                      size: 22,
-                                    ),
-                                    // Pulsing notification badge
-                                    const Positioned(
-                                      top: 9,
-                                      right: 9,
-                                      child: _PulsingDot(),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            _ProfileAvatar(
-                              initials: initials,
-                              isDark: isDark,
-                              onTap: () => Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                  builder: (_) => const CustomerProfileScreen(),
-                                ),
-                              ),
-                            ),
-                          ],
+                        Icon(
+                          Icons.notifications_none_rounded,
+                          size: 21,
+                          color: isDark
+                              ? ServioColors.textPrimaryDark
+                              : ServioColors.navyDark,
                         ),
-
-                        const SizedBox(height: 28),
-
-                        // ── Greeting + location pill ─────────────────
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: <Widget>[
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: <Widget>[
-                                  Text(
-                                    greeting,
-                                    style: theme.textTheme.bodyMedium?.copyWith(
-                                      color: isDark
-                                          ? ServioColors.navyDark
-                                              .withValues(alpha: 0.58)
-                                          : Colors.white
-                                              .withValues(alpha: 0.72),
-                                      letterSpacing: 0.2,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    firstName,
-                                    style:
-                                        theme.textTheme.headlineLarge?.copyWith(
-                                      color: isDark
-                                          ? ServioColors.navyDark
-                                          : Colors.white,
-                                      fontWeight: FontWeight.w700,
-                                      height: 1.1,
-                                      letterSpacing: -0.5,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            _LocationPill(
-                              isDark: isDark,
-                              onTap: () => Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                  builder: (_) => const MyAddressesScreen(),
-                                ),
-                              ),
-                            ),
-                          ],
+                        const Positioned(
+                          top: 9,
+                          right: 9,
+                          child: _PulsingDot(),
                         ),
-
-                        const SizedBox(height: 28),
-
-                        // ── Search bar ───────────────────────────────
-                        _HeroSearchBar(isDark: isDark),
-                        const SizedBox(height: 16),
                       ],
                     ),
                   ),
                 ),
-
-                // ── Animated content card ────────────────────────────
-                FadeTransition(
-                  opacity: _entranceFade,
-                  child: SlideTransition(
-                    position: _entranceSlide,
-                    child: Container(
-                      margin: const EdgeInsets.only(top: 40),
-                      decoration: BoxDecoration(
-                        color: theme.scaffoldBackgroundColor,
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(32),
-                        ),
-                        boxShadow: <BoxShadow>[
-                          BoxShadow(
-                            color: isDark
-                                ? Colors.black.withValues(alpha: 0.45)
-                                : Colors.black.withValues(alpha: 0.08),
-                            blurRadius: 32,
-                            offset: const Offset(0, -6),
-                          ),
-                        ],
+                const SizedBox(width: 10),
+                // Profile avatar
+                GestureDetector(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const CustomerProfileScreen(),
+                    ),
+                  ),
+                  child: Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? ServioColors.backgroundSoftDark
+                          : ServioColors.backgroundSoftLight,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: ServioColors.accent.withValues(alpha: 0.35),
+                        width: 1.5,
                       ),
-                      child: Transform.translate(
-                        offset: const Offset(0, -48),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            // ── Booking card (active bookings only) ──
-                            AnimatedSize(
-                              duration: ServioMotion.bottomSheet,
-                              curve: ServioMotion.spring,
-                              alignment: Alignment.topCenter,
-                              child: AnimatedSwitcher(
-                                duration: ServioMotion.normal,
-                                switchInCurve: ServioMotion.spring,
-                                switchOutCurve: ServioMotion.standard,
-                                transitionBuilder:
-                                    (Widget child, Animation<double> anim) {
-                                  return FadeTransition(
-                                    opacity: anim,
-                                    child: SizeTransition(
-                                      sizeFactor: anim,
-                                      axisAlignment: -1,
-                                      child: child,
-                                    ),
-                                  );
-                                },
-                                child: recentBookings.isNotEmpty
-                                    ? Padding(
-                                        key: ValueKey<String>(
-                                          'booking-${recentBookings.first.id}-${recentBookings.first.status.name}',
-                                        ),
-                                        padding: const EdgeInsets.only(
-                                          left: ServioSpacing.screenPadding,
-                                          right: ServioSpacing.screenPadding,
-                                          bottom: 28,
-                                        ),
-                                        child: ServioAnimatedEntry(
-                                          delay:
-                                              const Duration(milliseconds: 80),
-                                          child: _FloatingBookingCard(
-                                            booking: recentBookings.first,
-                                            locale: locale,
-                                          ),
-                                        ),
-                                      )
-                                    : const SizedBox(
-                                        key: ValueKey<String>('no-booking'),
-                                        width: double.infinity,
-                                      ),
-                              ),
-                            ),
-
-                            // ── Services grid ─────────────────────────
-                            ServioAnimatedEntry(
-                              delay: const Duration(milliseconds: 160),
-                              child: Container(
-                                color: isDark
-                                    ? Colors.white.withValues(alpha: 0.015)
-                                    : servio.backgroundSoft,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: ServioSpacing.screenPadding,
-                                  vertical: 28,
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: <Widget>[
-                                    ServioSectionHeading(
-                                      title: locale == 'ar'
-                                          ? 'الخدمات'
-                                          : 'Services',
-                                      actionLabel: locale == 'ar'
-                                          ? 'عرض الكل'
-                                          : 'See All',
-                                      onActionTap: () =>
-                                          Navigator.of(context).push(
-                                        MaterialPageRoute<void>(
-                                          builder: (_) =>
-                                              const ServicesMarketplaceScreen(),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 20),
-                                    _CategoriesGrid(locale: locale),
-                                  ],
-                                ),
-                              ),
-                            ),
-
-                            // ── AI Smart Match banner ─────────────────
-                            ServioAnimatedEntry(
-                              delay: const Duration(milliseconds: 240),
-                              child: Container(
-                                color: theme.scaffoldBackgroundColor,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: ServioSpacing.screenPadding,
-                                  vertical: 28,
-                                ),
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: <Widget>[
-                                    _HeroBannerCard(
-                                      badgeLabel: 'NEW FEATURE',
-                                      title: 'AI Smart Match',
-                                      body:
-                                          'Snap a photo and let AI find the perfect pro.',
-                                      ctaLabel: 'Try AI Assistant',
-                                      icon: Icons.auto_awesome_rounded,
-                                      onTap: () => Navigator.of(context).push(
-                                        MaterialPageRoute<void>(
-                                          builder: (_) =>
-                                              const AiSmartMatchScreen(),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    _HeroBannerCard(
-                                      badgeLabel: 'AI ESTIMATE',
-                                      title: 'AI Cost Estimator',
-                                      body:
-                                          'Get a room finishing budget before you book.',
-                                      ctaLabel: 'Estimate Cost',
-                                      icon: Icons.calculate_rounded,
-                                      onTap: () => Navigator.of(context).push(
-                                        MaterialPageRoute<void>(
-                                          builder: (_) =>
-                                              const AiFinishingEstimatorScreen(),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    _HeroBannerCard(
-                                      badgeLabel: 'AI FINISH',
-                                      title: 'AI Room Finisher',
-                                      body:
-                                          'Upload a photo. Get a finishing plan + AI render.',
-                                      ctaLabel: 'Finish My Room',
-                                      icon: Icons.auto_fix_high_rounded,
-                                      onTap: () => Navigator.of(context).push(
-                                        MaterialPageRoute<void>(
-                                          builder: (_) =>
-                                              const AiRoomFinisherScreen(),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-
-                            // ── Recommended professionals ─────────────
-                            ServioAnimatedEntry(
-                              delay: const Duration(milliseconds: 320),
-                              child: Container(
-                                width: double.infinity,
-                                decoration: BoxDecoration(
-                                  color: isDark
-                                      ? Colors.white.withValues(alpha: 0.01)
-                                      : servio.backgroundSoft
-                                          .withValues(alpha: 0.5),
-                                  border: Border(
-                                    top: BorderSide(
-                                      color:
-                                          servio.border.withValues(alpha: 0.3),
-                                    ),
-                                  ),
-                                ),
-                                padding: const EdgeInsets.fromLTRB(
-                                  ServioSpacing.screenPadding,
-                                  28,
-                                  0,
-                                  48,
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: <Widget>[
-                                    Padding(
-                                      padding: const EdgeInsets.only(
-                                        right: ServioSpacing.screenPadding,
-                                      ),
-                                      child: ServioSectionHeading(
-                                        title: locale == 'ar'
-                                            ? 'موصى بهم لك'
-                                            : 'Recommended For You',
-                                        actionLabel: locale == 'ar'
-                                            ? 'عرض الكل'
-                                            : 'See All',
-                                        onActionTap: () =>
-                                            Navigator.of(context).push(
-                                          MaterialPageRoute<void>(
-                                            builder: (_) =>
-                                                const TechnicianListingScreen(),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 20),
-                                    _FeaturedProfessionals(
-                                      featuredTechs: featuredTechs,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-
-                            SizedBox(height: 40 + bottomInset),
-                          ],
+                    ),
+                    child: Center(
+                      child: Text(
+                        initials.isEmpty ? '?' : initials,
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                          color: isDark
+                              ? ServioColors.textPrimaryDark
+                              : ServioColors.navyDark,
+                          height: 1,
                         ),
                       ),
                     ),
@@ -516,410 +282,84 @@ class _HomeBodyState extends State<_HomeBody>
                 ),
               ],
             ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Background — gradient + floating ambient service icons
-// ─────────────────────────────────────────────────────────────────────────────
-
-@immutable
-class _FloatingIconDef {
-  const _FloatingIconDef({
-    required this.icon,
-    required this.xFrac,
-    required this.yFrac,
-    required this.size,
-    required this.phase,
-    required this.periodMs,
-    this.hAmplitude = 7.0,
-    this.hPhase = 0.0,
-    this.opacity = 1.0,
-  });
-
-  final IconData icon;
-  final double xFrac;
-  final double yFrac;
-  final double size;
-
-  /// 0.0–1.0 starting phase so icons are never in sync.
-  final double phase;
-
-  /// Float cycle duration in milliseconds.
-  final int periodMs;
-
-  /// Horizontal drift amplitude in pixels. Driven by math.sin for
-  /// an independent X-axis path that doesn't mirror vertical movement.
-  final double hAmplitude;
-
-  /// Radians offset for the horizontal sine wave.
-  final double hPhase;
-
-  /// Per-icon opacity multiplier (0.0–1.0) to simulate depth layers.
-  final double opacity;
-}
-
-class _BackgroundLayer extends StatefulWidget {
-  const _BackgroundLayer({required this.isDark});
-
-  final bool isDark;
-
-  @override
-  State<_BackgroundLayer> createState() => _BackgroundLayerState();
-}
-
-class _BackgroundLayerState extends State<_BackgroundLayer>
-    with TickerProviderStateMixin {
-  // Ambient service icons scattered across the gradient header zone.
-  // 15 icons ALL within the visible gradient header zone (yFrac ≤ 0.28).
-  // Icons with yFrac > ~0.30 are hidden behind the opaque content card.
-  // Three depth layers create parallax depth: near (large/fast/opaque),
-  // mid (medium), far (small/slow/subtle).
-  static const List<_FloatingIconDef> _icons = <_FloatingIconDef>[
-    // ── Near layer — large, fast, full opacity ───────────────────────────────
-    _FloatingIconDef(
-        icon: Icons.cleaning_services_rounded,
-        xFrac: 0.82,
-        yFrac: 0.04,
-        size: 34,
-        phase: 0.00,
-        periodMs: 4800,
-        hAmplitude: 9,
-        hPhase: 0.80,
-        opacity: 1.0),
-    _FloatingIconDef(
-        icon: Icons.plumbing_rounded,
-        xFrac: 0.06,
-        yFrac: 0.11,
-        size: 32,
-        phase: 0.44,
-        periodMs: 5200,
-        hAmplitude: 8,
-        hPhase: 2.10,
-        opacity: 1.0),
-    _FloatingIconDef(
-        icon: Icons.handyman_rounded,
-        xFrac: 0.90,
-        yFrac: 0.23,
-        size: 30,
-        phase: 0.71,
-        periodMs: 4600,
-        hAmplitude: 10,
-        hPhase: 3.60,
-        opacity: 1.0),
-    _FloatingIconDef(
-        icon: Icons.home_repair_service_rounded,
-        xFrac: 0.44,
-        yFrac: 0.16,
-        size: 32,
-        phase: 0.28,
-        periodMs: 5400,
-        hAmplitude: 7,
-        hPhase: 1.40,
-        opacity: 1.0),
-    _FloatingIconDef(
-        icon: Icons.construction_rounded,
-        xFrac: 0.20,
-        yFrac: 0.05,
-        size: 28,
-        phase: 0.55,
-        periodMs: 4200,
-        hAmplitude: 11,
-        hPhase: 4.20,
-        opacity: 1.0),
-
-    // ── Mid layer — medium, moderate, 80 % opacity ───────────────────────────
-    _FloatingIconDef(
-        icon: Icons.electrical_services_rounded,
-        xFrac: 0.18,
-        yFrac: 0.21,
-        size: 26,
-        phase: 0.62,
-        periodMs: 6400,
-        hAmplitude: 10,
-        hPhase: 0.30,
-        opacity: 0.80),
-    _FloatingIconDef(
-        icon: Icons.format_paint_rounded,
-        xFrac: 0.63,
-        yFrac: 0.07,
-        size: 27,
-        phase: 0.18,
-        periodMs: 5800,
-        hAmplitude: 9,
-        hPhase: 4.20,
-        opacity: 0.80),
-    _FloatingIconDef(
-        icon: Icons.ac_unit_rounded,
-        xFrac: 0.34,
-        yFrac: 0.26,
-        size: 25,
-        phase: 0.85,
-        periodMs: 6800,
-        hAmplitude: 8,
-        hPhase: 1.80,
-        opacity: 0.80),
-    _FloatingIconDef(
-        icon: Icons.local_laundry_service_rounded,
-        xFrac: 0.72,
-        yFrac: 0.19,
-        size: 24,
-        phase: 0.36,
-        periodMs: 6200,
-        hAmplitude: 12,
-        hPhase: 3.00,
-        opacity: 0.80),
-    _FloatingIconDef(
-        icon: Icons.carpenter,
-        xFrac: 0.52,
-        yFrac: 0.27,
-        size: 26,
-        phase: 0.57,
-        periodMs: 5600,
-        hAmplitude: 7,
-        hPhase: 5.00,
-        opacity: 0.80),
-
-    // ── Far layer — small, slow, 55 % opacity ────────────────────────────────
-    _FloatingIconDef(
-        icon: Icons.auto_awesome_rounded,
-        xFrac: 0.55,
-        yFrac: 0.02,
-        size: 20,
-        phase: 0.90,
-        periodMs: 7800,
-        hAmplitude: 13,
-        hPhase: 2.50,
-        opacity: 0.55),
-    _FloatingIconDef(
-        icon: Icons.security_rounded,
-        xFrac: 0.27,
-        yFrac: 0.13,
-        size: 19,
-        phase: 0.13,
-        periodMs: 8200,
-        hAmplitude: 14,
-        hPhase: 0.60,
-        opacity: 0.55),
-    _FloatingIconDef(
-        icon: Icons.grass_rounded,
-        xFrac: 0.78,
-        yFrac: 0.27,
-        size: 21,
-        phase: 0.48,
-        periodMs: 7400,
-        hAmplitude: 11,
-        hPhase: 4.80,
-        opacity: 0.55),
-    _FloatingIconDef(
-        icon: Icons.wifi_rounded,
-        xFrac: 0.09,
-        yFrac: 0.27,
-        size: 18,
-        phase: 0.76,
-        periodMs: 8600,
-        hAmplitude: 10,
-        hPhase: 2.20,
-        opacity: 0.55),
-    _FloatingIconDef(
-        icon: Icons.pest_control_rounded,
-        xFrac: 0.38,
-        yFrac: 0.08,
-        size: 17,
-        phase: 0.33,
-        periodMs: 9000,
-        hAmplitude: 12,
-        hPhase: 1.10,
-        opacity: 0.55),
-  ];
-
-  late final List<AnimationController> _controllers;
-  late final List<Animation<double>> _offsets;
-  late final List<Animation<double>> _rotations;
-  late final List<Animation<double>> _scales;
-
-  // Alternate rotation direction per icon for organic feel.
-  static const List<double> _rotDir = <double>[
-    1,
-    -1,
-    1,
-    -1,
-    1,
-    -1,
-    1,
-    -1,
-    1,
-    -1,
-    1,
-    -1,
-    1,
-    -1,
-    1,
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    // value: def.phase pre-positions each controller before repeat() starts,
-    // avoiding the stop() side-effect of the .value setter on a live controller.
-    _controllers = _icons
-        .map((def) => AnimationController(
-              vsync: this,
-              duration: Duration(milliseconds: def.periodMs),
-              value: def.phase,
-            )..repeat(reverse: true))
-        .toList();
-
-    // Vertical float ±18 px.
-    _offsets = List<Animation<double>>.generate(
-      _icons.length,
-      (i) => Tween<double>(begin: -18.0, end: 18.0).animate(
-        CurvedAnimation(parent: _controllers[i], curve: Curves.easeInOutSine),
-      ),
-    );
-
-    // Gentle ±4° rotation — alternating direction per icon.
-    _rotations = List<Animation<double>>.generate(
-      _icons.length,
-      (i) => Tween<double>(
-        begin: -0.07 * _rotDir[i],
-        end: 0.07 * _rotDir[i],
-      ).animate(
-        CurvedAnimation(parent: _controllers[i], curve: Curves.easeInOutSine),
-      ),
-    );
-
-    // Subtle scale breath 0.88 → 1.0 — makes icons feel alive, not stamped.
-    _scales = List<Animation<double>>.generate(
-      _icons.length,
-      (i) => Tween<double>(begin: 0.86, end: 1.0).animate(
-        CurvedAnimation(parent: _controllers[i], curve: Curves.easeInOutSine),
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    for (final c in _controllers) {
-      c.dispose();
-    }
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final screenSize = MediaQuery.of(context).size;
-    final isDark = widget.isDark;
-    final iconColor = isDark ? ServioColors.navyDark : Colors.white;
-    // Base opacity — multiplied by each icon's per-layer depth opacity.
-    const double baseOpacity = 0.18;
-
-    final gradient = isDark
-        ? const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: <Color>[
-              Color(0xFFEDE0D5),
-              ServioColors.neutralWarm,
-              Color(0xFFA68B7B),
-              Color(0xFF907060),
-            ],
-            stops: <double>[0.0, 0.3, 0.7, 1.0],
-          )
-        : const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: <Color>[
-              Color(0xFF4A2418),
-              ServioColors.deepBrown,
-              ServioColors.navyDark,
-              Color(0xFF1A1F2E),
-            ],
-            stops: <double>[0.0, 0.28, 0.65, 1.0],
-          );
-
-    return Container(
-      decoration: BoxDecoration(gradient: gradient),
-      child: Stack(
-        children: <Widget>[
-          // ── Static radial blobs ────────────────────────────────────
-          Positioned(
-            top: -70,
-            right: -90,
-            child: _DecorativeBlob(
-              size: 340,
-              color: (isDark ? ServioColors.navyDark : Colors.white)
-                  .withValues(alpha: isDark ? 0.07 : 0.09),
-            ),
-          ),
-          Positioned(
-            top: 200,
-            left: -110,
-            child: _DecorativeBlob(
-              size: 280,
-              color: (isDark ? ServioColors.accent : Colors.white)
-                  .withValues(alpha: 0.05),
-            ),
-          ),
-          Positioned(
-            bottom: 80,
-            right: 20,
-            child: _DecorativeBlob(
-              size: 200,
-              color: (isDark ? ServioColors.navyDark : ServioColors.accent)
-                  .withValues(alpha: isDark ? 0.05 : 0.08),
-            ),
-          ),
-          Positioned(
-            bottom: -60,
-            left: -40,
-            child: _DecorativeBlob(
-              size: 260,
-              color: Colors.white.withValues(alpha: isDark ? 0.04 : 0.03),
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(1),
+              child: Container(
+                height: 1,
+                color: ServioColors.accent.withValues(alpha: 0.15),
+              ),
             ),
           ),
 
-          // ── Floating ambient service icons (composited layer) ──────
-          RepaintBoundary(
-            child: Stack(
-              children: List<Widget>.generate(_icons.length, (i) {
-                final def = _icons[i];
-                return Positioned(
-                  left: screenSize.width * def.xFrac - def.size / 2,
-                  top: screenSize.height * def.yFrac,
-                  child: AnimatedBuilder(
-                    animation: _controllers[i],
-                    builder: (_, Widget? child) {
-                      // Horizontal drift via math.sin — fully independent from
-                      // the vertical easeInOutSine, giving each icon a unique
-                      // Lissajous-like path through the background.
-                      final dx = def.hAmplitude *
-                          math.sin(
-                              _controllers[i].value * math.pi * 2 + def.hPhase);
-                      return Transform.translate(
-                        offset: Offset(dx, _offsets[i].value),
-                        child: Transform.rotate(
-                          angle: _rotations[i].value,
-                          child: Transform.scale(
-                            scale: _scales[i].value,
-                            child: child,
-                          ),
-                        ),
-                      );
-                    },
-                    child: Icon(
-                      def.icon,
-                      size: def.size,
-                      color: iconColor.withValues(
-                          alpha: baseOpacity * def.opacity),
+          // ── Main content ────────────────────────────────────────
+          SliverToBoxAdapter(
+            child: FadeTransition(
+              opacity: _entranceFade,
+              child: SlideTransition(
+                position: _entranceSlide,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    // ── Greeting ───────────────────────────────────
+                    _GreetingSection(
+                      topLine: greetingTop,
+                      headline: greetingHead,
+                      isDark: isDark,
+                      locale: locale,
                     ),
-                  ),
-                );
-              }),
+
+                    const SizedBox(height: 32),
+
+                    // ── Intelligent Tools ──────────────────────────
+                    ServioAnimatedEntry(
+                      delay: const Duration(milliseconds: 80),
+                      child: _IntelligentToolsSection(
+                        isDark: isDark,
+                        locale: locale,
+                      ),
+                    ),
+
+                    const SizedBox(height: 32),
+
+                    // ── Popular Services ───────────────────────────
+                    ServioAnimatedEntry(
+                      delay: const Duration(milliseconds: 160),
+                      child: _PopularServicesSection(
+                        isDark: isDark,
+                        locale: locale,
+                      ),
+                    ),
+
+                    const SizedBox(height: 32),
+
+                    // ── Recent Activity ────────────────────────────
+                    ServioAnimatedEntry(
+                      delay: const Duration(milliseconds: 240),
+                      child: _RecentActivitySection(
+                        bookings: activityBookings,
+                        isDark: isDark,
+                        locale: locale,
+                      ),
+                    ),
+
+                    const SizedBox(height: 32),
+
+                    // ── Recommended Professionals ──────────────────
+                    if (featuredTechs.isNotEmpty) ...<Widget>[
+                      ServioAnimatedEntry(
+                        delay: const Duration(milliseconds: 320),
+                        child: _RecommendedProsSection(
+                          featuredTechs: featuredTechs,
+                          isDark: isDark,
+                          locale: locale,
+                        ),
+                      ),
+                    ],
+
+                    SizedBox(height: 40 + bottomInset),
+                  ],
+                ),
+              ),
             ),
           ),
         ],
@@ -928,21 +368,349 @@ class _BackgroundLayerState extends State<_BackgroundLayer>
   }
 }
 
-class _DecorativeBlob extends StatelessWidget {
-  const _DecorativeBlob({required this.size, required this.color});
+// ─────────────────────────────────────────────────────────────────────────────
+// Greeting
+// ─────────────────────────────────────────────────────────────────────────────
 
-  final double size;
-  final Color color;
+class _GreetingSection extends StatelessWidget {
+  const _GreetingSection({
+    required this.topLine,
+    required this.headline,
+    required this.isDark,
+    required this.locale,
+  });
+
+  final String topLine;
+  final String headline;
+  final bool isDark;
+  final String locale;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: RadialGradient(
-          colors: <Color>[color, color.withValues(alpha: 0)],
+    final theme = Theme.of(context);
+    final textPrimary =
+        isDark ? ServioColors.textPrimaryDark : ServioColors.navyDark;
+    final textMuted = isDark
+        ? ServioColors.textSecondaryDark
+        : ServioColors.textSecondaryLight;
+
+    final subtitle = locale == 'ar'
+        ? 'كيف يمكننا تحسين منزلك اليوم؟'
+        : 'How can we elevate your home sanctuary today?';
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        ServioSpacing.screenPadding,
+        24,
+        ServioSpacing.screenPadding,
+        0,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          if (topLine.isNotEmpty) ...<Widget>[
+            Text(
+              topLine,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: textMuted,
+                letterSpacing: 0.1,
+              ),
+            ),
+            const SizedBox(height: 4),
+          ],
+          Text(
+            headline,
+            style: theme.textTheme.headlineLarge?.copyWith(
+              color: textPrimary,
+              fontWeight: FontWeight.w700,
+              height: 1.15,
+              letterSpacing: -0.3,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            subtitle,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: textMuted,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Intelligent Tools — horizontal scroll
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _IntelligentToolsSection extends StatelessWidget {
+  const _IntelligentToolsSection({
+    required this.isDark,
+    required this.locale,
+  });
+
+  final bool isDark;
+  final String locale;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textPrimary =
+        isDark ? ServioColors.textPrimaryDark : ServioColors.navyDark;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: ServioSpacing.screenPadding,
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: <Widget>[
+              Text(
+                locale == 'ar' ? 'أدوات ذكية' : 'Intelligent Tools',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  color: textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const Spacer(),
+              Row(
+                children: <Widget>[
+                  Text(
+                    locale == 'ar' ? 'بالذكاء الاصطناعي' : 'Powered by AI',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: ServioColors.accent,
+                    ),
+                  ),
+                  const SizedBox(width: 3),
+                  const Icon(
+                    Icons.auto_awesome_rounded,
+                    size: 13,
+                    color: ServioColors.accent,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          height: 170,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            clipBehavior: Clip.none,
+            padding: const EdgeInsets.symmetric(
+              horizontal: ServioSpacing.screenPadding,
+            ),
+            children: <Widget>[
+              _AIToolCard(
+                icon: Icons.psychology_rounded,
+                title: locale == 'ar' ? 'المطابقة الذكية' : 'Smart Match',
+                description: locale == 'ar'
+                    ? 'صف مشكلتك وسنجد لك الحرفي المناسب.'
+                    : 'Describe your issue naturally. We\'ll find the perfect artisan.',
+                isDark: isDark,
+                variant: _AIToolVariant.warm,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const AiSmartMatchScreen(),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              _AIToolCard(
+                icon: Icons.chair_rounded,
+                title: locale == 'ar' ? 'مشطّب الغرف' : 'Room Finisher',
+                description: locale == 'ar'
+                    ? 'تخيّل تغييرات المساحة وتصميمات النجارة.'
+                    : 'Visualize layout changes and custom carpentry.',
+                isDark: isDark,
+                variant: _AIToolVariant.dark,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const AiRoomFinisherScreen(),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+enum _AIToolVariant { warm, light, dark }
+
+class _AIToolCard extends StatefulWidget {
+  const _AIToolCard({
+    required this.icon,
+    required this.title,
+    required this.description,
+    required this.isDark,
+    required this.variant,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String description;
+  final bool isDark;
+  final _AIToolVariant variant;
+  final VoidCallback onTap;
+
+  @override
+  State<_AIToolCard> createState() => _AIToolCardState();
+}
+
+class _AIToolCardState extends State<_AIToolCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller =
+        AnimationController(vsync: this, duration: ServioMotion.fast);
+    _scale = Tween<double>(begin: 1.0, end: 0.97).animate(
+      CurvedAnimation(parent: _controller, curve: ServioMotion.spring),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = widget.isDark;
+
+    Color cardBg;
+    Color titleColor;
+    Color descColor;
+    Color iconBg;
+    Color iconColor;
+
+    switch (widget.variant) {
+      case _AIToolVariant.warm:
+        cardBg = isDark ? ServioColors.surfaceDark : ServioColors.backgroundSoftLight;
+        titleColor = isDark ? ServioColors.textPrimaryDark : ServioColors.navyDark;
+        descColor = isDark ? ServioColors.textSecondaryDark : ServioColors.textSecondaryLight;
+        iconBg = isDark ? ServioColors.navySoft : Colors.white;
+        iconColor = isDark ? ServioColors.textPrimaryDark : ServioColors.navyDark;
+      case _AIToolVariant.light:
+        cardBg = isDark ? ServioColors.surfaceAltDark : ServioColors.surfaceLight;
+        titleColor = isDark ? ServioColors.textPrimaryDark : ServioColors.navyDark;
+        descColor = isDark ? ServioColors.textSecondaryDark : ServioColors.textSecondaryLight;
+        iconBg = isDark ? ServioColors.backgroundSoftDark : ServioColors.backgroundSoftLight;
+        iconColor = isDark ? ServioColors.textPrimaryDark : ServioColors.navyDark;
+      case _AIToolVariant.dark:
+        cardBg = isDark ? ServioColors.navySoft : ServioColors.navyDark;
+        titleColor = ServioColors.textPrimaryDark;
+        descColor = ServioColors.textSecondaryDark;
+        iconBg = Colors.white.withValues(alpha: 0.12);
+        iconColor = ServioColors.textPrimaryDark;
+    }
+
+    return GestureDetector(
+      onTapDown: (_) => _controller.forward(),
+      onTapUp: (_) {
+        _controller.reverse();
+        widget.onTap();
+      },
+      onTapCancel: () => _controller.reverse(),
+      child: ScaleTransition(
+        scale: _scale,
+        child: Container(
+          width: 220,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(20),
+            border: widget.variant != _AIToolVariant.dark
+                ? Border.all(
+                    color: ServioColors.accent.withValues(alpha: 0.15),
+                  )
+                : null,
+            boxShadow: <BoxShadow>[
+              BoxShadow(
+                color: widget.variant == _AIToolVariant.dark
+                    ? Colors.black.withValues(alpha: 0.15)
+                    : Colors.black.withValues(alpha: 0.04),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Stack(
+            children: <Widget>[
+              // Decorative corner
+              Positioned(
+                top: -20,
+                right: -20,
+                child: Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: <Color>[
+                        ServioColors.accent.withValues(
+                          alpha: widget.variant == _AIToolVariant.dark
+                              ? 0.2
+                              : 0.1,
+                        ),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: iconBg,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.15),
+                      ),
+                    ),
+                    child: Icon(widget.icon, size: 22, color: iconColor),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    widget.title,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: titleColor,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    widget.description,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: descColor,
+                      height: 1.5,
+                    ),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -950,56 +718,830 @@ class _DecorativeBlob extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Header components
+// Popular Services — bento grid with images
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _ServioWordmark extends StatelessWidget {
-  const _ServioWordmark({required this.isDark});
+class _PopularServicesSection extends StatelessWidget {
+  const _PopularServicesSection({
+    required this.isDark,
+    required this.locale,
+  });
 
   final bool isDark;
+  final String locale;
+
+  // Stitch-generated service images (AI public images from Google CDN)
+  static const String _plumbingImg =
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuCAXnVTJSgyqKCKwnAyCpwoUocw0KMCqRMDWq-KvvQ2WH6tFzSBaLW6g6o9tGxDjEpxuB5sQeHsmjg_oA1k9MmlaJ4fwFqixjFjU0m4ttjNTCO-Y4kTTd6B9wO8vW9EGpWGxNgi-qQbu-c6J2dshe3-z1ojsQQeZl7a9mtFoUJ9gg7Dl_QMstW5sB056Bn5hryzH5fZWZwunNyqM3-w-zqSf4r6vKNDy-roWQ9ddrfTUuDnah_Iw7Xkjsznbjv7vqDNW6QEv1tacKOp';
+  static const String _electricalImg =
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuC7XGTH3WO7yqXSfefF2gWDNbwxRiUGjF1NwxfHyrj9eeo7fCJeq1sC5kmYkP04jRCYMy0KzpLNwv8fO9tdtS8kQau2Mg_kJwSORz7xwnrdPby0sPGy7Ki72Buk3CDECjW_7ohhhSTPkt_MgyBPmbAw-1ClX4--DYfxFgwz9YJ3G_FN2tWdKD9niLDNOB4HmQayXhgSTa_Y2ne51W29IrPNEMRajaZNeHJiQNExq06qHKY_S3IGK5rbmbROrUB7kMYeZy6J8Un8T0Ma';
+  static const String _cleaningImg =
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuDTBg2qZVzsTPmw-tcMbDtHSp_WfBAS58zb8guCX10_60TuEebvmL-kCVDLkFe1muL9VSZQbiQium_XROa2yq9JuqkC77bLcZX9yHo7RAtAG3RNGjIgRHZ4K6R6TUn_Mx7qcTr1Ynw9W46RBKaGupubg90HizLCnHcCBA-ptkFV8tUdIZRQ-kjMIzvZ2BSs6mEqAzvDBYB9bmrPsFgbGKxMtQ05nwxHt2KjiA_4zIOo4Fw0bf0pZg3QyiIkU4T5BCH2ZRRz75CLs_Pm';
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      'SERVIO',
-      style: TextStyle(
-        fontFamily: 'Poppins',
-        fontWeight: FontWeight.w800,
-        fontSize: 21,
-        letterSpacing: 3.2,
-        color: isDark ? ServioColors.navyDark : Colors.white,
-        height: 1,
+    final theme = Theme.of(context);
+    final textPrimary =
+        isDark ? ServioColors.textPrimaryDark : ServioColors.navyDark;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: ServioSpacing.screenPadding,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: <Widget>[
+              Text(
+                locale == 'ar' ? 'الخدمات الشائعة' : 'Popular Services',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  color: textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const Spacer(),
+              GestureDetector(
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const SearchResultsScreen(query: ''),
+                  ),
+                ),
+                child: Text(
+                  locale == 'ar' ? 'عرض الكل' : 'See all',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: ServioColors.accent,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // Large card — Plumbing
+          _ServiceImageCard(
+            imageUrl: _plumbingImg,
+            label: locale == 'ar' ? 'السباكة' : 'Plumbing',
+            badge: locale == 'ar' ? 'طلب عالٍ' : 'High Demand',
+            height: 180,
+            fullWidth: true,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) =>
+                    const ServiceDetailScreen(serviceId: 'plumbing'),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Two small cards
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: _ServiceImageCard(
+                  imageUrl: _electricalImg,
+                  label: locale == 'ar' ? 'الكهرباء' : 'Electrical',
+                  height: 150,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          const ServiceDetailScreen(serviceId: 'electrical'),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _ServiceImageCard(
+                  imageUrl: _cleaningImg,
+                  label: locale == 'ar' ? 'تنظيف عميق' : 'Deep Clean',
+                  height: 150,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          const ServiceDetailScreen(serviceId: 'cleaning'),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 }
 
-class _HeaderIconButton extends StatelessWidget {
-  const _HeaderIconButton({required this.isDark, required this.child});
+class _ServiceImageCard extends StatefulWidget {
+  const _ServiceImageCard({
+    required this.imageUrl,
+    required this.label,
+    required this.height,
+    required this.onTap,
+    this.badge,
+    this.fullWidth = false,
+  });
 
-  final bool isDark;
-  final Widget child;
+  final String imageUrl;
+  final String label;
+  final String? badge;
+  final double height;
+  final bool fullWidth;
+  final VoidCallback onTap;
+
+  @override
+  State<_ServiceImageCard> createState() => _ServiceImageCardState();
+}
+
+class _ServiceImageCardState extends State<_ServiceImageCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller =
+        AnimationController(vsync: this, duration: ServioMotion.fast);
+    _scale = Tween<double>(begin: 1.0, end: 0.97).animate(
+      CurvedAnimation(parent: _controller, curve: ServioMotion.spring),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final onColor = isDark ? ServioColors.navyDark : Colors.white;
+    final theme = Theme.of(context);
+
+    return GestureDetector(
+      onTapDown: (_) => _controller.forward(),
+      onTapUp: (_) {
+        _controller.reverse();
+        widget.onTap();
+      },
+      onTapCancel: () => _controller.reverse(),
+      child: ScaleTransition(
+        scale: _scale,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(
+            widget.fullWidth ? 20 : 16,
+          ),
+          child: SizedBox(
+            height: widget.height,
+            child: Stack(
+              fit: StackFit.expand,
+              children: <Widget>[
+                // Network image with placeholder
+                Image.network(
+                  widget.imageUrl,
+                  fit: BoxFit.cover,
+                  loadingBuilder: (_, Widget child,
+                      ImageChunkEvent? loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: <Color>[
+                            ServioColors.accent.withValues(alpha: 0.3),
+                            ServioColors.navyDark.withValues(alpha: 0.5),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                  errorBuilder: (_, __, ___) => Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: <Color>[
+                          ServioColors.accent.withValues(alpha: 0.4),
+                          ServioColors.navyDark,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                // Gradient overlay
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: <Color>[
+                        Colors.transparent,
+                        ServioColors.navyDark.withValues(alpha: 0.55),
+                        ServioColors.navyDark.withValues(alpha: 0.88),
+                      ],
+                      stops: const <double>[0.0, 0.55, 1.0],
+                    ),
+                  ),
+                ),
+                // Label + badge
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Padding(
+                    padding: EdgeInsets.all(widget.fullWidth ? 20 : 14),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: <Widget>[
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: <Widget>[
+                              if (widget.badge != null) ...<Widget>[
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color:
+                                        Colors.white.withValues(alpha: 0.18),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    widget.badge!.toUpperCase(),
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      letterSpacing: 0.8,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                              ],
+                              Text(
+                                widget.label,
+                                style: (widget.fullWidth
+                                        ? theme.textTheme.titleMedium
+                                        : theme.textTheme.labelLarge)
+                                    ?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: widget.fullWidth ? 18 : 15,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (widget.fullWidth) ...<Widget>[
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.arrow_forward_rounded,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Recent Activity
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _RecentActivitySection extends StatelessWidget {
+  const _RecentActivitySection({
+    required this.bookings,
+    required this.isDark,
+    required this.locale,
+  });
+
+  final List<BookingModel> bookings;
+  final bool isDark;
+  final String locale;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textPrimary =
+        isDark ? ServioColors.textPrimaryDark : ServioColors.navyDark;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: ServioSpacing.screenPadding,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: <Widget>[
+              Text(
+                locale == 'ar' ? 'النشاط الأخير' : 'Recent Activity',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  color: textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const Spacer(),
+              if (bookings.isNotEmpty)
+                GestureDetector(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const MyBookingsScreen(),
+                    ),
+                  ),
+                  child: Text(
+                    locale == 'ar' ? 'عرض الكل' : 'See all',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: ServioColors.accent,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (bookings.isEmpty)
+            _EmptyActivityState(isDark: isDark, locale: locale)
+          else
+            ...bookings.map(
+              (b) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _ActivityItem(
+                  booking: b,
+                  isDark: isDark,
+                  locale: locale,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyActivityState extends StatelessWidget {
+  const _EmptyActivityState({required this.isDark, required this.locale});
+
+  final bool isDark;
+  final String locale;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
-      width: 44,
-      height: 44,
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 32),
       decoration: BoxDecoration(
-        color: onColor.withValues(alpha: 0.14),
-        shape: BoxShape.circle,
+        color: isDark
+            ? ServioColors.surfaceDark
+            : ServioColors.backgroundSoftLight,
+        borderRadius: BorderRadius.circular(ServioRadius.xl),
         border: Border.all(
-          color: onColor.withValues(alpha: 0.18),
-          width: 1,
+          color: ServioColors.accent.withValues(alpha: 0.12),
         ),
       ),
-      child: child,
+      child: Column(
+        children: <Widget>[
+          Icon(
+            Icons.check_circle_outline_rounded,
+            size: 40,
+            color: ServioColors.accent.withValues(alpha: 0.5),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            locale == 'ar' ? 'كل شيء على ما يرام!' : 'All caught up!',
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: isDark
+                  ? ServioColors.textSecondaryDark
+                  : ServioColors.textSecondaryLight,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            locale == 'ar'
+                ? 'لا توجد حجوزات قادمة.'
+                : 'No upcoming bookings.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: (isDark
+                      ? ServioColors.textSecondaryDark
+                      : ServioColors.textSecondaryLight)
+                  .withValues(alpha: 0.7),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-/// Notification badge dot that slowly pulses to draw attention.
+class _ActivityItem extends StatelessWidget {
+  const _ActivityItem({
+    required this.booking,
+    required this.isDark,
+    required this.locale,
+  });
+
+  final BookingModel booking;
+  final bool isDark;
+  final String locale;
+
+  IconData _iconForBooking(BookingModel b) {
+    final cat = b.serviceCategory.toLowerCase();
+    if (cat.contains('plumb') || cat.contains('water')) {
+      return Icons.water_drop_rounded;
+    } else if (cat.contains('electric')) {
+      return Icons.electrical_services_rounded;
+    } else if (cat.contains('clean')) {
+      return Icons.cleaning_services_rounded;
+    } else if (cat.contains('ac') || cat.contains('hvac') || cat.contains('cool')) {
+      return Icons.ac_unit_rounded;
+    } else if (cat.contains('paint')) {
+      return Icons.format_paint_rounded;
+    } else if (cat.contains('carp') || cat.contains('wood')) {
+      return Icons.handyman_rounded;
+    }
+    return Icons.build_circle_outlined;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isActive = booking.status.isActive;
+
+    final surfaceColor = isDark ? ServioColors.surfaceDark : Colors.white;
+    final cardOpacity = isActive ? 1.0 : 0.75;
+
+    final statusLabel = _homeStatusLabel(booking.status);
+    final chipType = _homeChipType(booking.status);
+
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => BookingDetailsScreen(
+            data: _flowDataFromBooking(booking),
+          ),
+        ),
+      ),
+      child: Opacity(
+        opacity: cardOpacity,
+        child: Container(
+          padding: const EdgeInsets.all(ServioSpacing.cardPadding),
+          decoration: BoxDecoration(
+            color: surfaceColor,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: ServioColors.accent.withValues(alpha: isActive ? 0.12 : 0.06),
+            ),
+            boxShadow: <BoxShadow>[
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: <Widget>[
+              // Service icon
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: isActive
+                      ? ServioColors.backgroundSoftLight
+                      : (isDark
+                          ? ServioColors.backgroundSoftDark
+                          : ServioColors.surfaceAltLight),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: isDark ? 0.0 : 1.0),
+                  ),
+                ),
+                child: Icon(
+                  _iconForBooking(booking),
+                  size: 22,
+                  color: isActive
+                      ? ServioColors.accent
+                      : (isDark
+                          ? ServioColors.textSecondaryDark
+                          : ServioColors.textSecondaryLight),
+                ),
+              ),
+              const SizedBox(width: 14),
+              // Content
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      booking.serviceName,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: isDark
+                            ? ServioColors.textPrimaryDark
+                            : ServioColors.navyDark,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      booking.technicianName.isNotEmpty
+                          ? '${booking.date} • ${booking.technicianName}'
+                          : booking.date,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: isDark
+                            ? ServioColors.textSecondaryDark
+                            : ServioColors.textSecondaryLight,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Status chip
+              _AnimatedBookingStatusChip(
+                status: booking.status,
+                label: statusLabel,
+                type: chipType,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+BookingFlowData _flowDataFromBooking(BookingModel booking) {
+  return BookingFlowData(
+    backendId: booking.id,
+    serviceName: booking.serviceName,
+    serviceId: booking.serviceId,
+    category: booking.serviceCategory,
+    technicianName: booking.technicianName,
+    technicianId: booking.technicianId,
+    date: booking.date,
+    time: booking.time,
+    location: booking.location,
+    amount: booking.amount,
+    reference: booking.reference,
+    pin: booking.pin,
+    paymentMethod: booking.paymentMethod,
+    paymentMethodCode:
+        booking.paymentMethod.toLowerCase().contains('card') ? 'card' : 'cash',
+    savedCardLabel: _cardLabelFor(booking),
+    savedCardLast4: booking.paymentCardLast4,
+    statusLabel: _homeStatusLabel(booking.status),
+    statusCode: _statusCodeFromStatus(booking.status),
+  );
+}
+
+String _cardLabelFor(BookingModel booking) {
+  if (booking.paymentCardLabel.isNotEmpty) return booking.paymentCardLabel;
+  if (booking.paymentCardLast4.isNotEmpty) {
+    return 'Card ending ${booking.paymentCardLast4}';
+  }
+  return '';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Recommended Professionals
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _RecommendedProsSection extends StatelessWidget {
+  const _RecommendedProsSection({
+    required this.featuredTechs,
+    required this.isDark,
+    required this.locale,
+  });
+
+  final List<dynamic> featuredTechs;
+  final bool isDark;
+  final String locale;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: ServioSpacing.screenPadding,
+          ),
+          child: ServioSectionHeading(
+            title: locale == 'ar' ? 'موصى بهم لك' : 'Recommended For You',
+            actionLabel: locale == 'ar' ? 'عرض الكل' : 'See All',
+            onActionTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const TechnicianListingScreen(),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          height: 240,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            clipBehavior: Clip.none,
+            padding: const EdgeInsets.symmetric(
+              horizontal: ServioSpacing.screenPadding,
+            ),
+            itemCount: featuredTechs.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 16),
+            itemBuilder: (BuildContext context, int index) {
+              return _ProfessionalCard(tech: featuredTechs[index]);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProfessionalCard extends StatefulWidget {
+  const _ProfessionalCard({required this.tech});
+
+  final dynamic tech;
+
+  @override
+  State<_ProfessionalCard> createState() => _ProfessionalCardState();
+}
+
+class _ProfessionalCardState extends State<_ProfessionalCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller =
+        AnimationController(vsync: this, duration: ServioMotion.fast);
+    _scale = Tween<double>(begin: 1.0, end: 0.97).animate(
+      CurvedAnimation(parent: _controller, curve: ServioMotion.spring),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final servio = context.servio;
+    final tech = widget.tech;
+    final name = tech.name as String;
+    final specialty =
+        tech.skills.isNotEmpty ? tech.skills.first as String : 'Specialist';
+    final selectedCategory = normalizeServiceCategory(specialty);
+
+    return GestureDetector(
+      onTapDown: (_) => _controller.forward(),
+      onTapUp: (_) {
+        _controller.reverse();
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => TechnicianProfileScreen(
+              technicianId: tech.id,
+              selectedServiceCategory:
+                  selectedCategory.isEmpty ? null : selectedCategory,
+              selectedServiceName: selectedCategory.isEmpty
+                  ? (specialty == 'Specialist' ? null : specialty)
+                  : serviceCategoryLabel(selectedCategory),
+            ),
+          ),
+        );
+      },
+      onTapCancel: () => _controller.reverse(),
+      child: ScaleTransition(
+        scale: _scale,
+        child: SizedBox(
+          width: 200,
+          child: ServioCard(
+            radius: ServioRadius.xl,
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        gradient: ServioGradients.warm,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: servio.border, width: 1),
+                      ),
+                      child: Center(
+                        child: Text(
+                          name
+                              .split(' ')
+                              .take(2)
+                              .map((String e) => e[0])
+                              .join(),
+                          style: theme.textTheme.titleMedium
+                              ?.copyWith(color: ServioColors.deepBrown),
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: ServioColors.tint(servio.success),
+                        borderRadius: BorderRadius.circular(ServioRadius.full),
+                      ),
+                      child: Row(
+                        children: <Widget>[
+                          Icon(Icons.verified_rounded,
+                              size: 12, color: servio.success),
+                          const SizedBox(width: 3),
+                          Text(
+                            'Verified',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: servio.success,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  name,
+                  style: theme.textTheme.titleSmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  specialty,
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: servio.textSecondary),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const Spacer(),
+                Row(
+                  children: <Widget>[
+                    Icon(Icons.star_rounded,
+                        size: 15, color: const Color(0xFFF59E0B)),
+                    const SizedBox(width: 3),
+                    Text(tech.rating.toStringAsFixed(1),
+                        style: theme.textTheme.labelMedium),
+                    const SizedBox(width: 5),
+                    Text(
+                      '(${tech.reviewCount})',
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: servio.textSecondary),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared widgets
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _PulsingDot extends StatefulWidget {
   const _PulsingDot();
 
@@ -1046,463 +1588,6 @@ class _PulsingDotState extends State<_PulsingDot>
   }
 }
 
-/// Profile avatar with spring press animation.
-class _ProfileAvatar extends StatefulWidget {
-  const _ProfileAvatar({
-    required this.initials,
-    required this.isDark,
-    required this.onTap,
-  });
-
-  final String initials;
-  final bool isDark;
-  final VoidCallback onTap;
-
-  @override
-  State<_ProfileAvatar> createState() => _ProfileAvatarState();
-}
-
-class _ProfileAvatarState extends State<_ProfileAvatar>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scale;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(vsync: this, duration: ServioMotion.fast);
-    _scale = Tween<double>(begin: 1.0, end: 0.92).animate(
-      CurvedAnimation(parent: _controller, curve: ServioMotion.spring),
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final onColor = widget.isDark ? ServioColors.navyDark : Colors.white;
-    return GestureDetector(
-      onTapDown: (_) => _controller.forward(),
-      onTapUp: (_) {
-        _controller.reverse();
-        widget.onTap();
-      },
-      onTapCancel: () => _controller.reverse(),
-      child: ScaleTransition(
-        scale: _scale,
-        child: Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            gradient: ServioGradients.warm,
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: onColor.withValues(alpha: 0.35),
-              width: 2,
-            ),
-            boxShadow: <BoxShadow>[
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.15),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Center(
-            child: Text(
-              widget.initials.isEmpty ? '?' : widget.initials,
-              style: const TextStyle(
-                fontFamily: 'Poppins',
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
-                color: ServioColors.deepBrown,
-                height: 1,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Location pill with fade-on-press feedback.
-class _LocationPill extends StatefulWidget {
-  const _LocationPill({required this.isDark, required this.onTap});
-
-  final bool isDark;
-  final VoidCallback onTap;
-
-  @override
-  State<_LocationPill> createState() => _LocationPillState();
-}
-
-class _LocationPillState extends State<_LocationPill>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _opacity;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(vsync: this, duration: ServioMotion.fast);
-    _opacity = Tween<double>(begin: 1.0, end: 0.55).animate(_controller);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final onColor = widget.isDark ? ServioColors.navyDark : Colors.white;
-
-    return GestureDetector(
-      onTapDown: (_) => _controller.forward(),
-      onTapUp: (_) {
-        _controller.reverse();
-        widget.onTap();
-      },
-      onTapCancel: () => _controller.reverse(),
-      child: FadeTransition(
-        opacity: _opacity,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-          decoration: BoxDecoration(
-            color: onColor.withValues(alpha: 0.14),
-            borderRadius: BorderRadius.circular(ServioRadius.full),
-            border: Border.all(
-              color: onColor.withValues(alpha: 0.2),
-              width: 1,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Icon(Icons.location_on_rounded, size: 15, color: onColor),
-              const SizedBox(width: 5),
-              Text(
-                'Cairo',
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: onColor,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(width: 3),
-              Icon(Icons.keyboard_arrow_down_rounded, size: 15, color: onColor),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Search bar — AI sparkle icon independently navigates to Smart Match
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _HeroSearchBar extends StatelessWidget {
-  const _HeroSearchBar({required this.isDark});
-
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final servio = context.servio;
-
-    return GestureDetector(
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute<void>(
-            builder: (_) => const SearchResultsScreen(query: '')),
-      ),
-      child: Container(
-        height: 56,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(ServioRadius.full),
-          boxShadow: <BoxShadow>[
-            BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.12),
-              blurRadius: 24,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Row(
-          children: <Widget>[
-            Icon(Icons.search_rounded, color: servio.textSecondary, size: 22),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'What do you need help with?',
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(color: servio.textSecondary),
-              ),
-            ),
-            // AI icon — independently tappable + slowly breathes
-            GestureDetector(
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const AiSmartMatchScreen(),
-                ),
-              ),
-              child: const _BreathingAiIcon(),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// AI sparkle icon with a slow inhale/exhale scale animation.
-class _BreathingAiIcon extends StatefulWidget {
-  const _BreathingAiIcon();
-
-  @override
-  State<_BreathingAiIcon> createState() => _BreathingAiIconState();
-}
-
-class _BreathingAiIconState extends State<_BreathingAiIcon>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scale;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2200),
-    )..repeat(reverse: true);
-    _scale = Tween<double>(begin: 0.92, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOutSine),
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ScaleTransition(
-      scale: _scale,
-      child: Container(
-        width: 36,
-        height: 36,
-        decoration: const BoxDecoration(
-          gradient: ServioGradients.accent,
-          shape: BoxShape.circle,
-        ),
-        child: const Icon(
-          Icons.auto_awesome_rounded,
-          color: Colors.white,
-          size: 17,
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Booking cards
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _FloatingBookingCard extends StatelessWidget {
-  const _FloatingBookingCard({
-    required this.booking,
-    required this.locale,
-  });
-
-  final BookingModel booking;
-  final String locale;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final servio = context.servio;
-
-    final isInProgress = booking.status == BookingStatus.inProgress;
-    final statusType = _homeChipType(booking.status);
-    final statusLabel = isInProgress
-        ? (locale == 'ar' ? 'قيد التنفيذ' : 'En Route')
-        : (locale == 'ar' ? 'قادم' : 'Upcoming');
-
-    final displayStatusLabel = _homeStatusLabel(booking.status).isNotEmpty
-        ? _homeStatusLabel(booking.status)
-        : statusLabel;
-
-    return ServioCard(
-      radius: ServioRadius.xl,
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: <Color>[
-                      ServioColors.tint(servio.accent),
-                      servio.backgroundSoft,
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(ServioRadius.md),
-                ),
-                child: Icon(Icons.build_circle_outlined,
-                    color: servio.accent, size: 24),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      booking.serviceName,
-                      style: theme.textTheme.titleMedium,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      booking.date,
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: servio.textSecondary),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      booking.technicianName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: servio.textSecondary),
-                    ),
-                  ],
-                ),
-              ),
-              _AnimatedBookingStatusChip(
-                status: booking.status,
-                label: displayStatusLabel,
-                type: statusType,
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Divider(height: 1, color: servio.border),
-          const SizedBox(height: 16),
-          Row(
-            children: <Widget>[
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                        builder: (_) => const MyBookingsScreen()),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(ServioRadius.full)),
-                  ),
-                  child: Text(locale == 'ar' ? 'التفاصيل' : 'View Details'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => BookingDetailsScreen(
-                          data: _flowDataFromBooking(booking),
-                        ),
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: servio.accent,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(ServioRadius.full)),
-                  ),
-                  child: Text(locale == 'ar' ? 'تتبع الطلب' : 'Track Status'),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  BookingFlowData _flowDataFromBooking(BookingModel booking) {
-    return BookingFlowData(
-      backendId: booking.id,
-      serviceName: booking.serviceName,
-      serviceId: booking.serviceId,
-      category: booking.serviceCategory,
-      technicianName: booking.technicianName,
-      technicianId: booking.technicianId,
-      date: booking.date,
-      time: booking.time,
-      location: booking.location,
-      amount: booking.amount,
-      reference: booking.reference,
-      pin: booking.pin,
-      paymentMethod: booking.paymentMethod,
-      paymentMethodCode: booking.paymentMethod.toLowerCase().contains('card')
-          ? 'card'
-          : 'cash',
-      savedCardLabel: _cardLabelFor(booking),
-      savedCardLast4: booking.paymentCardLast4,
-      statusLabel: _homeStatusLabel(booking.status),
-      statusCode: _statusCodeFromStatus(booking.status),
-    );
-  }
-
-  String _cardLabelFor(BookingModel booking) {
-    if (booking.paymentCardLabel.isNotEmpty) return booking.paymentCardLabel;
-    if (booking.paymentCardLast4.isNotEmpty) {
-      return 'Card ending ${booking.paymentCardLast4}';
-    }
-    return '';
-  }
-
-  String _statusCodeFromStatus(BookingStatus status) => switch (status) {
-        BookingStatus.pending => 'pending',
-        BookingStatus.confirmed => 'confirmed',
-        BookingStatus.enRoute => 'en_route',
-        BookingStatus.arrived => 'arrived',
-        BookingStatus.inProgress => 'in_progress',
-        BookingStatus.awaitingCustomerConfirmation =>
-          'awaiting_customer_confirmation',
-        BookingStatus.completed => 'completed',
-        BookingStatus.cancelled => 'cancelled',
-        BookingStatus.rejected => 'rejected',
-        BookingStatus.disputed => 'disputed',
-        BookingStatus.pendingAdminReview => 'pending_admin_review',
-      };
-}
-
 class _AnimatedBookingStatusChip extends StatefulWidget {
   const _AnimatedBookingStatusChip({
     required this.status,
@@ -1519,7 +1604,8 @@ class _AnimatedBookingStatusChip extends StatefulWidget {
       _AnimatedBookingStatusChipState();
 }
 
-class _AnimatedBookingStatusChipState extends State<_AnimatedBookingStatusChip>
+class _AnimatedBookingStatusChipState
+    extends State<_AnimatedBookingStatusChip>
     with SingleTickerProviderStateMixin {
   late final AnimationController _pulse;
 
@@ -1584,6 +1670,10 @@ class _AnimatedBookingStatusChipState extends State<_AnimatedBookingStatusChip>
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Status helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
 String _homeStatusLabel(BookingStatus status) {
   return switch (status) {
     BookingStatus.pending => 'Pending',
@@ -1597,6 +1687,9 @@ String _homeStatusLabel(BookingStatus status) {
     BookingStatus.rejected => 'Rejected',
     BookingStatus.disputed => 'Disputed',
     BookingStatus.pendingAdminReview => 'Under Review',
+    BookingStatus.cancelledNoShow => 'Cancelled (No-Show)',
+    BookingStatus.customerNoShow => 'Customer No-Show',
+    BookingStatus.workerNoShow => 'Worker No-Show',
   };
 }
 
@@ -1613,525 +1706,26 @@ ServioStatusChipType _homeChipType(BookingStatus status) {
     BookingStatus.rejected => ServioStatusChipType.danger,
     BookingStatus.disputed => ServioStatusChipType.warning,
     BookingStatus.pendingAdminReview => ServioStatusChipType.warning,
+    BookingStatus.cancelledNoShow => ServioStatusChipType.danger,
+    BookingStatus.customerNoShow => ServioStatusChipType.danger,
+    BookingStatus.workerNoShow => ServioStatusChipType.danger,
   };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Services grid
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _CategoriesGrid extends StatelessWidget {
-  const _CategoriesGrid({required this.locale});
-
-  final String locale;
-
-  @override
-  Widget build(BuildContext context) {
-    return GridView.count(
-      crossAxisCount: 4,
-      childAspectRatio: 0.82,
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 18,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: EdgeInsets.zero,
-      children: <Widget>[
-        _CategoryItem(
-          icon: Icons.cleaning_services_rounded,
-          label: locale == 'ar' ? 'تنظيف' : 'Cleaning',
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-                builder: (_) =>
-                    const ServiceDetailScreen(serviceId: 'cleaning')),
-          ),
-        ),
-        _CategoryItem(
-          icon: Icons.plumbing_rounded,
-          label: locale == 'ar' ? 'سباكة' : 'Plumbing',
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-                builder: (_) =>
-                    const ServiceDetailScreen(serviceId: 'plumbing')),
-          ),
-        ),
-        _CategoryItem(
-          icon: Icons.electrical_services_rounded,
-          label: locale == 'ar' ? 'كهرباء' : 'Electrical',
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-                builder: (_) =>
-                    const ServiceDetailScreen(serviceId: 'electrical')),
-          ),
-        ),
-        _CategoryItem(
-          icon: Icons.format_paint_rounded,
-          label: locale == 'ar' ? 'دهان' : 'Painting',
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-                builder: (_) =>
-                    const ServiceDetailScreen(serviceId: 'painting')),
-          ),
-        ),
-        _CategoryItem(
-          icon: Icons.ac_unit_rounded,
-          label: locale == 'ar' ? 'تكييف' : 'HVAC',
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-                builder: (_) =>
-                    const ServiceDetailScreen(serviceId: 'ac-maintenance')),
-          ),
-        ),
-        _CategoryItem(
-          icon: Icons.handyman_rounded,
-          label: locale == 'ar' ? 'نجارة' : 'Carpentry',
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-                builder: (_) =>
-                    const ServiceDetailScreen(serviceId: 'carpentry')),
-          ),
-        ),
-        _CategoryItem(
-          icon: Icons.local_shipping_rounded,
-          label: locale == 'ar' ? 'نقل' : 'Moving',
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-                builder: (_) => const ServicesMarketplaceScreen()),
-          ),
-        ),
-        _CategoryItem(
-          icon: Icons.apps_rounded,
-          label: locale == 'ar' ? 'المزيد' : 'More',
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-                builder: (_) => const ServicesMarketplaceScreen()),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _CategoryItem extends StatefulWidget {
-  const _CategoryItem({
-    required this.icon,
-    required this.label,
-    this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback? onTap;
-
-  @override
-  State<_CategoryItem> createState() => _CategoryItemState();
-}
-
-class _CategoryItemState extends State<_CategoryItem>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scale;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(vsync: this, duration: ServioMotion.fast);
-    _scale = Tween<double>(begin: 1.0, end: 0.93).animate(
-      CurvedAnimation(parent: _controller, curve: ServioMotion.spring),
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final servio = context.servio;
-
-    return GestureDetector(
-      onTapDown: (_) => _controller.forward(),
-      onTapUp: (_) {
-        _controller.reverse();
-        widget.onTap?.call();
-      },
-      onTapCancel: () => _controller.reverse(),
-      child: ScaleTransition(
-        scale: _scale,
-        child: Column(
-          children: <Widget>[
-            Container(
-              width: 62,
-              height: 62,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: <Color>[
-                    servio.accent.withValues(alpha: 0.13),
-                    servio.backgroundSoft,
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(ServioRadius.lg),
-                border: Border.all(
-                  color: servio.border.withValues(alpha: 0.7),
-                  width: 1,
-                ),
-                boxShadow: <BoxShadow>[
-                  BoxShadow(
-                    color: servio.accent.withValues(alpha: 0.06),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Icon(widget.icon, color: servio.accent, size: 27),
-            ),
-            const SizedBox(height: 8),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                widget.label,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  fontWeight: FontWeight.w500,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Featured professionals
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _FeaturedProfessionals extends StatelessWidget {
-  const _FeaturedProfessionals({required this.featuredTechs});
-
-  final List<dynamic> featuredTechs;
-
-  @override
-  Widget build(BuildContext context) {
-    if (featuredTechs.isEmpty) return const SizedBox.shrink();
-
-    return SizedBox(
-      height: 240,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: featuredTechs.length,
-        clipBehavior: Clip.none,
-        separatorBuilder: (_, __) => const SizedBox(width: 16),
-        itemBuilder: (BuildContext context, int index) {
-          return _ProfessionalCard(tech: featuredTechs[index]);
-        },
-      ),
-    );
-  }
-}
-
-class _ProfessionalCard extends StatefulWidget {
-  const _ProfessionalCard({required this.tech});
-
-  final dynamic tech;
-
-  @override
-  State<_ProfessionalCard> createState() => _ProfessionalCardState();
-}
-
-class _ProfessionalCardState extends State<_ProfessionalCard>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scale;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(vsync: this, duration: ServioMotion.fast);
-    _scale = Tween<double>(begin: 1.0, end: 0.97).animate(
-      CurvedAnimation(parent: _controller, curve: ServioMotion.spring),
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final servio = context.servio;
-    final tech = widget.tech;
-    final name = tech.name as String;
-    final specialty =
-        tech.skills.isNotEmpty ? tech.skills.first as String : 'Specialist';
-    final selectedCategory = normalizeServiceCategory(specialty);
-
-    return GestureDetector(
-      onTapDown: (_) => _controller.forward(),
-      onTapUp: (_) {
-        _controller.reverse();
-        Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => TechnicianProfileScreen(
-              technicianId: tech.id,
-              selectedServiceCategory:
-                  selectedCategory.isEmpty ? null : selectedCategory,
-              selectedServiceName: selectedCategory.isEmpty
-                  ? (specialty == 'Specialist' ? null : specialty)
-                  : serviceCategoryLabel(selectedCategory),
-            ),
-          ),
-        );
-      },
-      onTapCancel: () => _controller.reverse(),
-      child: ScaleTransition(
-        scale: _scale,
-        child: SizedBox(
-          width: 240,
-          child: ServioCard(
-            radius: ServioRadius.xl,
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        gradient: ServioGradients.warm,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: servio.border, width: 1),
-                      ),
-                      child: Center(
-                        child: Text(
-                          name
-                              .split(' ')
-                              .take(2)
-                              .map((String e) => e[0])
-                              .join(),
-                          style: theme.textTheme.titleMedium
-                              ?.copyWith(color: ServioColors.deepBrown),
-                        ),
-                      ),
-                    ),
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: ServioColors.tint(servio.success),
-                        borderRadius: BorderRadius.circular(ServioRadius.full),
-                      ),
-                      child: Row(
-                        children: <Widget>[
-                          Icon(Icons.verified_rounded,
-                              size: 13, color: servio.success),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Verified',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: servio.success,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                Text(name,
-                    style: theme.textTheme.titleMedium,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 3),
-                Text(
-                  specialty,
-                  style: theme.textTheme.bodyMedium
-                      ?.copyWith(color: servio.textSecondary),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const Spacer(),
-                Row(
-                  children: <Widget>[
-                    Icon(Icons.star_rounded,
-                        size: 17, color: const Color(0xFFF59E0B)),
-                    const SizedBox(width: 4),
-                    Text(tech.rating.toStringAsFixed(1),
-                        style: theme.textTheme.labelLarge),
-                    const SizedBox(width: 6),
-                    Text(
-                      '(${tech.reviewCount})',
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: servio.textSecondary),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// AI hero banner — with press scale animation
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _HeroBannerCard extends StatefulWidget {
-  const _HeroBannerCard({
-    required this.title,
-    required this.body,
-    required this.ctaLabel,
-    required this.icon,
-    required this.onTap,
-    this.badgeLabel,
-  });
-
-  final String title;
-  final String body;
-  final String ctaLabel;
-  final IconData icon;
-  final VoidCallback onTap;
-  final String? badgeLabel;
-
-  @override
-  State<_HeroBannerCard> createState() => _HeroBannerCardState();
-}
-
-class _HeroBannerCardState extends State<_HeroBannerCard>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scale;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(vsync: this, duration: ServioMotion.fast);
-    _scale = Tween<double>(begin: 1.0, end: 0.98).animate(
-      CurvedAnimation(parent: _controller, curve: ServioMotion.spring),
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final servio = context.servio;
-    final isDark = theme.brightness == Brightness.dark;
-
-    return GestureDetector(
-      onTapDown: (_) => _controller.forward(),
-      onTapUp: (_) {
-        _controller.reverse();
-        widget.onTap();
-      },
-      onTapCancel: () => _controller.reverse(),
-      child: ScaleTransition(
-        scale: _scale,
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            gradient:
-                isDark ? ServioGradients.brandDark : ServioGradients.brand,
-            borderRadius: BorderRadius.circular(ServioRadius.xl),
-            boxShadow:
-                isDark ? ServioShadows.elevatedDark : ServioShadows.elevated,
-          ),
-          child: Stack(
-            children: <Widget>[
-              Positioned(
-                right: -10,
-                bottom: -10,
-                child: Icon(
-                  widget.icon,
-                  size: 120,
-                  color: Colors.white.withValues(alpha: 0.05),
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  if (widget.badgeLabel != null) ...<Widget>[
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: servio.accent,
-                        borderRadius: BorderRadius.circular(ServioRadius.full),
-                      ),
-                      child: Text(
-                        widget.badgeLabel!,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                  Text(
-                    widget.title,
-                    style: theme.textTheme.headlineMedium?.copyWith(
-                      color: isDark ? ServioColors.navyDark : Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    widget.body,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: (isDark ? ServioColors.navyDark : Colors.white)
-                          .withValues(alpha: 0.75),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    children: <Widget>[
-                      Text(
-                        widget.ctaLabel,
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          color: isDark
-                              ? ServioColors.navyDark.withValues(alpha: 0.8)
-                              : Colors.white.withValues(alpha: 0.9),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Icon(
-                        Icons.arrow_forward_rounded,
-                        size: 16,
-                        color: isDark
-                            ? ServioColors.navyDark.withValues(alpha: 0.8)
-                            : Colors.white.withValues(alpha: 0.9),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
+String _statusCodeFromStatus(BookingStatus status) => switch (status) {
+      BookingStatus.pending => 'pending',
+      BookingStatus.confirmed => 'confirmed',
+      BookingStatus.enRoute => 'en_route',
+      BookingStatus.arrived => 'arrived',
+      BookingStatus.inProgress => 'in_progress',
+      BookingStatus.awaitingCustomerConfirmation =>
+        'awaiting_customer_confirmation',
+      BookingStatus.completed => 'completed',
+      BookingStatus.cancelled => 'cancelled',
+      BookingStatus.rejected => 'rejected',
+      BookingStatus.disputed => 'disputed',
+      BookingStatus.pendingAdminReview => 'pending_admin_review',
+      BookingStatus.cancelledNoShow => 'cancelled_no_show',
+      BookingStatus.customerNoShow => 'customer_no_show',
+      BookingStatus.workerNoShow => 'worker_no_show',
+    };

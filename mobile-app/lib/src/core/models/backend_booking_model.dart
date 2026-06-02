@@ -25,6 +25,9 @@ class BackendBooking {
     this.paymentStatus = 'unpaid',
     required this.createdAt,
     this.workerAvailability = const <AvailabilitySlot>[],
+    this.paymentDeadline,
+    this.lateFeeAmount = 0,
+    this.noShowMarkedAt,
   });
 
   final String id;
@@ -54,6 +57,9 @@ class BackendBooking {
 
   final DateTime createdAt;
   final List<AvailabilitySlot> workerAvailability;
+  final DateTime? paymentDeadline;
+  final double lateFeeAmount;
+  final DateTime? noShowMarkedAt;
 
   factory BackendBooking.fromJson(Map<String, dynamic> json) {
     // worker is a raw ObjectId string (not populated by getWorkerBookings)
@@ -162,13 +168,18 @@ class BackendBooking {
       createdAt: DateTime.tryParse((json['createdAt'] as String?) ?? '') ??
           DateTime.now(),
       workerAvailability: workerAvailability,
+      paymentDeadline:
+          DateTime.tryParse((json['paymentDeadline'] as String?) ?? ''),
+      lateFeeAmount: ((json['lateFeeAmount'] as num?) ?? 0).toDouble(),
+      noShowMarkedAt:
+          DateTime.tryParse((json['noShowMarkedAt'] as String?) ?? ''),
     );
   }
 
   /// Creates a copy of this booking with the given fields replaced.
   /// Used by optimistic UI updates to immediately reflect a new status
   /// in local state before the API call completes.
-  BackendBooking copyWith({String? status}) {
+  BackendBooking copyWith({String? status, DateTime? paymentDeadline}) {
     return BackendBooking(
       id: id,
       status: status ?? this.status,
@@ -193,6 +204,9 @@ class BackendBooking {
       paymentCardLabel: paymentCardLabel,
       createdAt: createdAt,
       workerAvailability: workerAvailability,
+      paymentDeadline: paymentDeadline ?? this.paymentDeadline,
+      lateFeeAmount: lateFeeAmount,
+      noShowMarkedAt: noShowMarkedAt,
     );
   }
 }

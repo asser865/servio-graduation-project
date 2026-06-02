@@ -17,11 +17,10 @@ import '../../design_system/widgets/servio_status_chip.dart';
 import '../booking/booking_flow_data.dart';
 import '../messages/chat_screen.dart';
 import '../shared/notifications_screen.dart';
-import 'ai_finishing_estimator_screen.dart';
 import 'customer_profile_screen.dart';
 import 'my_bookings_screen.dart';
 
-import 'services_marketplace_screen.dart';
+import '../shared/search_results_screen.dart';
 
 enum _DashboardSection { overview, bookings, history }
 
@@ -490,7 +489,7 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
   void _openBooking() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => const ServicesMarketplaceScreen(),
+        builder: (_) => const SearchResultsScreen(query: ''),
       ),
     );
   }
@@ -535,6 +534,9 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
               BookingStatus.disputed => 'disputed',
               BookingStatus.pending => 'pending',
               BookingStatus.pendingAdminReview => 'under review',
+              BookingStatus.cancelledNoShow => 'cancelled (no-show)',
+              BookingStatus.customerNoShow => 'customer no-show',
+              BookingStatus.workerNoShow => 'worker no-show',
             }}.'),
             duration: const Duration(seconds: 3),
           ),
@@ -628,8 +630,6 @@ class _OverviewSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         _WelcomeCard(userName: userName, onBookService: onBookService),
-        const SizedBox(height: 18),
-        const _EstimatorPromptCard(),
         const SizedBox(height: 18),
         _StatsGrid(
           totalBookings: bookings.length,
@@ -970,66 +970,6 @@ class _WelcomeCard extends StatelessWidget {
           const SizedBox(height: 18),
           ServioPrimaryButton(
               label: 'Book a Service', onPressed: onBookService),
-        ],
-      ),
-    );
-  }
-}
-
-class _EstimatorPromptCard extends StatelessWidget {
-  const _EstimatorPromptCard();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final servio = context.servio;
-
-    return ServioCard(
-      radius: ServioRadius.lg,
-      child: Row(
-        children: <Widget>[
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: ServioColors.tint(servio.accent),
-              borderRadius: BorderRadius.circular(ServioRadius.md),
-            ),
-            child: Icon(
-              Icons.calculate_rounded,
-              color: servio.accent,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text('AI Cost Estimator', style: theme.textTheme.titleMedium),
-                const SizedBox(height: 4),
-                Text(
-                  'Get a room finishing budget before you book.',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: servio.textSecondary,
-                    height: 1.35,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          IconButton(
-            tooltip: 'Open estimator',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const AiFinishingEstimatorScreen(),
-              ),
-            ),
-            icon: Icon(
-              Icons.arrow_forward_rounded,
-              color: servio.accent,
-            ),
-          ),
         ],
       ),
     );
@@ -1638,6 +1578,9 @@ class _BookingProgressTracker extends StatelessWidget {
       BookingStatus.rejected => 0,
       BookingStatus.disputed => 0,
       BookingStatus.pendingAdminReview => 4,
+      BookingStatus.cancelledNoShow => 0,
+      BookingStatus.customerNoShow => 0,
+      BookingStatus.workerNoShow => 0,
     };
 
     return Column(
@@ -2298,6 +2241,9 @@ String _statusLabel(BookingStatus status) {
     BookingStatus.rejected => 'Rejected',
     BookingStatus.disputed => 'Disputed',
     BookingStatus.pendingAdminReview => 'Under Review',
+    BookingStatus.cancelledNoShow => 'Cancelled (No-Show)',
+    BookingStatus.customerNoShow => 'Customer No-Show',
+    BookingStatus.workerNoShow => 'Worker No-Show',
   };
 }
 
@@ -2314,6 +2260,9 @@ ServioStatusChipType _chipType(BookingStatus status) {
     BookingStatus.rejected => ServioStatusChipType.danger,
     BookingStatus.disputed => ServioStatusChipType.warning,
     BookingStatus.pendingAdminReview => ServioStatusChipType.warning,
+    BookingStatus.cancelledNoShow => ServioStatusChipType.danger,
+    BookingStatus.customerNoShow => ServioStatusChipType.danger,
+    BookingStatus.workerNoShow => ServioStatusChipType.danger,
   };
 }
 
@@ -2330,6 +2279,9 @@ String _statusCodeFromStatus(BookingStatus status) => switch (status) {
       BookingStatus.rejected => 'rejected',
       BookingStatus.disputed => 'disputed',
       BookingStatus.pendingAdminReview => 'pending_admin_review',
+      BookingStatus.cancelledNoShow => 'cancelled_no_show',
+      BookingStatus.customerNoShow => 'customer_no_show',
+      BookingStatus.workerNoShow => 'worker_no_show',
     };
 
 String _paymentLabelFor(BookingModel booking) {

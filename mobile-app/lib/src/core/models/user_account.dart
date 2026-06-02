@@ -50,6 +50,27 @@ class UserAccount {
     this.isVerified = false,
     this.completedJobs = 0,
     this.createdAt,
+    this.idFrontUrl = '',
+    this.idFrontName = '',
+    this.idBackUrl = '',
+    this.idBackName = '',
+    this.idSelfieUrl = '',
+    this.idSelfieName = '',
+    this.cvUrl = '',
+    this.cvName = '',
+    this.portfolioFiles = const <Map<String, String>>[],
+    this.verificationRejectionReason = '',
+    this.verificationSubmittedAt,
+    this.verificationReviewedAt,
+    this.serviceIds = const <String>[],
+    this.pendingCategories = const <String>[],
+    this.minFee = 0.0,
+    this.travelFee = 0.0,
+    this.emergencyMultiplier = 1.0,
+    this.acceptCash = false,
+    this.acceptCard = false,
+    this.acceptInstapay = false,
+    this.acceptWallet = false,
   });
 
   final String id;
@@ -75,12 +96,53 @@ class UserAccount {
   final bool isVerified;
   final int completedJobs;
   final DateTime? createdAt;
+  final String idFrontUrl;
+  final String idFrontName;
+  final String idBackUrl;
+  final String idBackName;
+  final String idSelfieUrl;
+  final String idSelfieName;
+  final String cvUrl;
+  final String cvName;
+  final List<Map<String, String>> portfolioFiles;
+  final String verificationRejectionReason;
+  final DateTime? verificationSubmittedAt;
+  final DateTime? verificationReviewedAt;
+  final List<String> serviceIds;
+  final List<String> pendingCategories;
+  final double minFee;
+  final double travelFee;
+  final double emergencyMultiplier;
+  final bool acceptCash;
+  final bool acceptCard;
+  final bool acceptInstapay;
+  final bool acceptWallet;
 
   String get initials {
     if (avatarInitials.isNotEmpty) return avatarInitials;
     final parts = name.trim().split(' ');
     if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
     return name.isNotEmpty ? name[0].toUpperCase() : 'U';
+  }
+
+  String get verificationUiStatus {
+    if (status == 'approved') return 'approved';
+    if (status == 'rejected') {
+      if (verificationRejectionReason.toLowerCase().contains('additional')) {
+        return 'additional_docs_required';
+      }
+      return 'rejected';
+    }
+    final hasAny = idFrontUrl.isNotEmpty ||
+        idBackUrl.isNotEmpty ||
+        idSelfieUrl.isNotEmpty ||
+        cvUrl.isNotEmpty ||
+        portfolioFiles.isNotEmpty;
+    if (!hasAny) return 'not_submitted';
+    final hasAllRequired = idFrontUrl.isNotEmpty &&
+        idBackUrl.isNotEmpty &&
+        idSelfieUrl.isNotEmpty;
+    return hasAllRequired ? 'under_review' : 'pending_review';
   }
 
   UserAccount copyWith({
@@ -107,6 +169,27 @@ class UserAccount {
     bool? isVerified,
     int? completedJobs,
     DateTime? createdAt,
+    String? idFrontUrl,
+    String? idFrontName,
+    String? idBackUrl,
+    String? idBackName,
+    String? idSelfieUrl,
+    String? idSelfieName,
+    String? cvUrl,
+    String? cvName,
+    List<Map<String, String>>? portfolioFiles,
+    String? verificationRejectionReason,
+    DateTime? verificationSubmittedAt,
+    DateTime? verificationReviewedAt,
+    List<String>? serviceIds,
+    List<String>? pendingCategories,
+    double? minFee,
+    double? travelFee,
+    double? emergencyMultiplier,
+    bool? acceptCash,
+    bool? acceptCard,
+    bool? acceptInstapay,
+    bool? acceptWallet,
   }) =>
       UserAccount(
         id: id ?? this.id,
@@ -132,6 +215,27 @@ class UserAccount {
         isVerified: isVerified ?? this.isVerified,
         completedJobs: completedJobs ?? this.completedJobs,
         createdAt: createdAt ?? this.createdAt,
+        idFrontUrl: idFrontUrl ?? this.idFrontUrl,
+        idFrontName: idFrontName ?? this.idFrontName,
+        idBackUrl: idBackUrl ?? this.idBackUrl,
+        idBackName: idBackName ?? this.idBackName,
+        idSelfieUrl: idSelfieUrl ?? this.idSelfieUrl,
+        idSelfieName: idSelfieName ?? this.idSelfieName,
+        cvUrl: cvUrl ?? this.cvUrl,
+        cvName: cvName ?? this.cvName,
+        portfolioFiles: portfolioFiles ?? this.portfolioFiles,
+        verificationRejectionReason: verificationRejectionReason ?? this.verificationRejectionReason,
+        verificationSubmittedAt: verificationSubmittedAt ?? this.verificationSubmittedAt,
+        verificationReviewedAt: verificationReviewedAt ?? this.verificationReviewedAt,
+        serviceIds: serviceIds ?? this.serviceIds,
+        pendingCategories: pendingCategories ?? this.pendingCategories,
+        minFee: minFee ?? this.minFee,
+        travelFee: travelFee ?? this.travelFee,
+        emergencyMultiplier: emergencyMultiplier ?? this.emergencyMultiplier,
+        acceptCash: acceptCash ?? this.acceptCash,
+        acceptCard: acceptCard ?? this.acceptCard,
+        acceptInstapay: acceptInstapay ?? this.acceptInstapay,
+        acceptWallet: acceptWallet ?? this.acceptWallet,
       );
 
   Map<String, dynamic> toJson() => {
@@ -158,6 +262,27 @@ class UserAccount {
         'isVerified': isVerified,
         'completedJobs': completedJobs,
         'createdAt': createdAt?.toIso8601String(),
+        'idFrontUrl': idFrontUrl,
+        'idFrontName': idFrontName,
+        'idBackUrl': idBackUrl,
+        'idBackName': idBackName,
+        'idSelfieUrl': idSelfieUrl,
+        'idSelfieName': idSelfieName,
+        'cvUrl': cvUrl,
+        'cvName': cvName,
+        'portfolioFiles': portfolioFiles,
+        'verificationRejectionReason': verificationRejectionReason,
+        'verificationSubmittedAt': verificationSubmittedAt?.toIso8601String(),
+        'verificationReviewedAt': verificationReviewedAt?.toIso8601String(),
+        'services': serviceIds,
+        'pendingCategories': pendingCategories,
+        'minFee': minFee,
+        'travelFee': travelFee,
+        'emergencyMultiplier': emergencyMultiplier,
+        'acceptCash': acceptCash,
+        'acceptCard': acceptCard,
+        'acceptInstapay': acceptInstapay,
+        'acceptWallet': acceptWallet,
       };
 
   factory UserAccount.fromJson(Map<String, dynamic> json) => UserAccount(
@@ -189,6 +314,27 @@ class UserAccount {
         isVerified: (json['isVerified'] as bool?) ?? false,
         completedJobs: ((json['completedJobs'] as num?) ?? 0).toInt(),
         createdAt: DateTime.tryParse((json['createdAt'] as String?) ?? ''),
+        idFrontUrl: (json['idFrontUrl'] as String?) ?? '',
+        idFrontName: (json['idFrontName'] as String?) ?? '',
+        idBackUrl: (json['idBackUrl'] as String?) ?? '',
+        idBackName: (json['idBackName'] as String?) ?? '',
+        idSelfieUrl: (json['idSelfieUrl'] as String?) ?? '',
+        idSelfieName: (json['idSelfieName'] as String?) ?? '',
+        cvUrl: (json['cvUrl'] as String?) ?? '',
+        cvName: (json['cvName'] as String?) ?? '',
+        portfolioFiles: _portfolioFromJson(json['portfolioFiles']),
+        verificationRejectionReason: (json['verificationRejectionReason'] as String?) ?? '',
+        verificationSubmittedAt: DateTime.tryParse((json['verificationSubmittedAt'] as String?) ?? ''),
+        verificationReviewedAt: DateTime.tryParse((json['verificationReviewedAt'] as String?) ?? ''),
+        serviceIds: List<String>.from((json['services'] as List<dynamic>?) ?? []),
+        pendingCategories: List<String>.from((json['pendingCategories'] as List<dynamic>?) ?? []),
+        minFee: ((json['minFee'] as num?) ?? 0).toDouble(),
+        travelFee: ((json['travelFee'] as num?) ?? 0).toDouble(),
+        emergencyMultiplier: ((json['emergencyMultiplier'] as num?) ?? 1.0).toDouble(),
+        acceptCash: (json['acceptCash'] as bool?) ?? false,
+        acceptCard: (json['acceptCard'] as bool?) ?? false,
+        acceptInstapay: (json['acceptInstapay'] as bool?) ?? false,
+        acceptWallet: (json['acceptWallet'] as bool?) ?? false,
       );
 
   // Maps backend API response (uses _id, role: 'user'|'worker', nested address)
@@ -222,6 +368,34 @@ class UserAccount {
       isVerified: (json['isVerified'] as bool?) ?? false,
       completedJobs: ((json['completedJobs'] as num?) ?? 0).toInt(),
       createdAt: DateTime.tryParse((json['createdAt'] as String?) ?? ''),
+      idFrontUrl: (json['idFrontUrl'] as String?) ?? '',
+      idFrontName: (json['idFrontName'] as String?) ?? '',
+      idBackUrl: (json['idBackUrl'] as String?) ?? '',
+      idBackName: (json['idBackName'] as String?) ?? '',
+      idSelfieUrl: (json['idSelfieUrl'] as String?) ?? '',
+      idSelfieName: (json['idSelfieName'] as String?) ?? '',
+      cvUrl: (json['cvUrl'] as String?) ?? '',
+      cvName: (json['cvName'] as String?) ?? '',
+      portfolioFiles: _portfolioFromJson(json['portfolioFiles']),
+      verificationRejectionReason:
+          (json['verificationRejectionReason'] as String?) ?? '',
+      verificationSubmittedAt: DateTime.tryParse(
+          (json['verificationSubmittedAt'] as String?) ?? ''),
+      verificationReviewedAt: DateTime.tryParse(
+          (json['verificationReviewedAt'] as String?) ?? ''),
+      // services may be populated objects {_id, title} OR plain ID strings
+      serviceIds: _stringListFromJson(json['services']),
+      // pendingCategories is always a plain string array in the backend schema
+      pendingCategories: List<String>.from(
+          (json['pendingCategories'] as List<dynamic>?) ?? []),
+      minFee: ((json['minFee'] as num?) ?? 0).toDouble(),
+      travelFee: ((json['travelFee'] as num?) ?? 0).toDouble(),
+      emergencyMultiplier:
+          ((json['emergencyMultiplier'] as num?) ?? 1.0).toDouble(),
+      acceptCash: (json['acceptCash'] as bool?) ?? false,
+      acceptCard: (json['acceptCard'] as bool?) ?? false,
+      acceptInstapay: (json['acceptInstapay'] as bool?) ?? false,
+      acceptWallet: (json['acceptWallet'] as bool?) ?? false,
     );
   }
 }
@@ -232,5 +406,23 @@ List<AvailabilitySlot> _availabilityFromJson(dynamic value) {
       .whereType<Map<String, dynamic>>()
       .map(AvailabilitySlot.fromJson)
       .where((slot) => slot.day.isNotEmpty)
+      .toList();
+}
+
+List<Map<String, String>> _portfolioFromJson(dynamic value) {
+  if (value is! List<dynamic>) return const <Map<String, String>>[];
+  return value.whereType<Map<String, dynamic>>().map((m) {
+    return <String, String>{
+      'url': (m['url'] as String?) ?? '',
+      'name': (m['name'] as String?) ?? '',
+    };
+  }).toList();
+}
+
+List<String> _stringListFromJson(dynamic value) {
+  if (value is! List<dynamic>) return const <String>[];
+  return value
+      .map((e) => e is Map ? (e['_id'] as String?) ?? '' : (e as String?) ?? '')
+      .where((s) => s.isNotEmpty)
       .toList();
 }

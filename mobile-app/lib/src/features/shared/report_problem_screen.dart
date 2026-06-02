@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/api/api_client.dart';
+import '../../core/api/problem_report_api.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
 import '../../design_system/widgets/servio_card.dart';
@@ -37,24 +40,33 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
 
     if (!_formKey.currentState!.validate()) {
       setState(() {
-        _errorMessage =
-            'Please complete the required fields before submitting.';
+        _errorMessage = 'Please complete the required fields before submitting.';
       });
       return;
     }
 
     setState(() => _isSubmitting = true);
-    await Future<void>.delayed(const Duration(milliseconds: 700));
-    if (!mounted) return;
-
-    setState(() {
-      _isSubmitting = false;
-      _successMessage =
-          'Report submitted. Our team will investigate and follow up if needed.';
-      _selectedCategory = null;
-      _screenshotFileName = null;
-      _descriptionController.clear();
-    });
+    try {
+      final api = ProblemReportApi(context.read<ApiClient>());
+      await api.submitReport(
+        category: _selectedCategory!,
+        description: _descriptionController.text.trim(),
+      );
+      if (!mounted) return;
+      setState(() {
+        _isSubmitting = false;
+        _successMessage = 'Report submitted. Our team will investigate and follow up if needed.';
+        _selectedCategory = null;
+        _screenshotFileName = null;
+        _descriptionController.clear();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isSubmitting = false;
+        _errorMessage = 'Failed to submit report. Please try again.';
+      });
+    }
   }
 
   void _attachScreenshot() {

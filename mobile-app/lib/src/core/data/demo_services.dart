@@ -265,7 +265,7 @@ const List<ServiceModel> kDemoServices = <ServiceModel>[
     priceBadge:
         BilingualText(en: 'avg. 400 – 2,500 EGP', ar: 'متوسط 400 – 2,500 جنيه'),
     heroImageUrl:
-        'https://images.unsplash.com/photo-1631545806609-5a1e3d9d5ff4?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1621905252507-b354bc25edac?auto=format&fit=crop&w=800&q=80',
     ctaTitle: BilingualText(
         en: 'Ready to book AC service?', ar: 'جاهز لحجز صيانة تكييف؟'),
     ctaSub: BilingualText(

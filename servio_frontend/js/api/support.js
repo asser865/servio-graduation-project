@@ -21,3 +21,21 @@ export const resolveSupportIssue = (id, body) =>
 
 export const escalateSupportIssueToDispute = (id, body = {}) =>
   api.patch(`/support/issues/${id}/escalate-dispute`, body);
+
+// ── Problem Reports ───────────────────────────────────────────────────────────
+export const getAdminProblemReports = (params = {}) => {
+  const qs = new URLSearchParams(params).toString();
+  return api.get(`/reports/problems${qs ? '?' + qs : ''}`);
+};
+
+export const updateProblemReport = (id, body) =>
+  api.patch(`/reports/problems/${id}`, body);
+
+// ── Contact Messages ──────────────────────────────────────────────────────────
+export const getAdminContactMessages = (params = {}) => {
+  const qs = new URLSearchParams(params).toString();
+  return api.get(`/contact${qs ? '?' + qs : ''}`);
+};
+
+export const updateContactMessage = (id, body) =>
+  api.patch(`/contact/${id}`, body);

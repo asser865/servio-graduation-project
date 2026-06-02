@@ -15,6 +15,9 @@ enum BookingStatus {
   cancelled,
   rejected,
   disputed,
+  cancelledNoShow,
+  customerNoShow,
+  workerNoShow,
 }
 
 extension BookingStatusX on BookingStatus {
@@ -30,7 +33,10 @@ extension BookingStatusX on BookingStatus {
         BookingStatus.completed ||
         BookingStatus.cancelled ||
         BookingStatus.rejected ||
-        BookingStatus.disputed =>
+        BookingStatus.disputed ||
+        BookingStatus.cancelledNoShow ||
+        BookingStatus.customerNoShow ||
+        BookingStatus.workerNoShow =>
           false,
       };
 
@@ -57,6 +63,9 @@ class BookingModel {
     required this.paymentCardLast4,
     this.notes = '',
     this.technicianAvailability = const <AvailabilitySlot>[],
+    this.paymentDeadline,
+    this.lateFeeAmount = 0,
+    this.noShowMarkedAt,
   });
 
   final String id;
@@ -77,8 +86,16 @@ class BookingModel {
   final String paymentCardLast4;
   final String notes;
   final List<AvailabilitySlot> technicianAvailability;
+  final DateTime? paymentDeadline;
+  final double lateFeeAmount;
+  final DateTime? noShowMarkedAt;
 
-  BookingModel copyWith({BookingStatus? status}) {
+  BookingModel copyWith({
+    BookingStatus? status,
+    DateTime? paymentDeadline,
+    double? lateFeeAmount,
+    DateTime? noShowMarkedAt,
+  }) {
     return BookingModel(
       id: id,
       reference: reference,
@@ -98,6 +115,9 @@ class BookingModel {
       paymentCardLast4: paymentCardLast4,
       notes: notes,
       technicianAvailability: technicianAvailability,
+      paymentDeadline: paymentDeadline ?? this.paymentDeadline,
+      lateFeeAmount: lateFeeAmount ?? this.lateFeeAmount,
+      noShowMarkedAt: noShowMarkedAt ?? this.noShowMarkedAt,
     );
   }
 
@@ -145,6 +165,9 @@ class BookingModel {
         paymentCardLast4: b.paymentCardLast4,
         notes: b.notes,
         technicianAvailability: b.workerAvailability,
+        paymentDeadline: b.paymentDeadline,
+        lateFeeAmount: b.lateFeeAmount,
+        noShowMarkedAt: b.noShowMarkedAt,
       );
 
   factory BookingModel.fromJson(Map<String, dynamic> json) => BookingModel(
@@ -196,6 +219,9 @@ BookingStatus _parseBookingStatus(String s) => switch (s.toLowerCase()) {
       'cancelled' || 'canceled' => BookingStatus.cancelled,
       'rejected' => BookingStatus.rejected,
       'disputed' => BookingStatus.disputed,
+      'cancelled_no_show' || 'cancellednoshow' => BookingStatus.cancelledNoShow,
+      'customer_no_show' || 'customernoshow' => BookingStatus.customerNoShow,
+      'worker_no_show' || 'workernoshow' => BookingStatus.workerNoShow,
       _ => BookingStatus.pending,
     };
 

@@ -1,3 +1,11 @@
+# DEPRECATED — DO NOT USE.
+#
+# This is a stale duplicate of services/gemini_service.py but uses Groq/Llama-4
+# instead of Google Gemini Vision. It is not imported by any active route.
+#
+# The canonical service is: services/gemini_service.py (Gemini 2.5-flash with fallback chain).
+# This file should be deleted once the project is stable.
+
 import base64
 import json
 import os

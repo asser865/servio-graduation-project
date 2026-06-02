@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+import '../../core/api/api_client.dart';
+import '../../core/api/contact_api.dart';
 
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
-import '../../design_system/widgets/servio_card.dart';
-import '../../design_system/widgets/servio_primary_button.dart';
 
 class ContactScreen extends StatefulWidget {
   const ContactScreen({super.key});
@@ -48,17 +50,30 @@ class _ContactScreenState extends State<ContactScreen> {
     }
 
     setState(() => _isSubmitting = true);
-    await Future<void>.delayed(const Duration(milliseconds: 700));
-    if (!mounted) return;
-
-    setState(() {
-      _isSubmitting = false;
-      _successMessage = 'Message sent. We will reply within 2 business hours.';
-      _nameController.clear();
-      _emailController.clear();
-      _subjectController.clear();
-      _messageController.clear();
-    });
+    try {
+      final api = ContactApi(context.read<ApiClient>());
+      await api.sendMessage(
+        name: _nameController.text.trim(),
+        email: _emailController.text.trim(),
+        subject: _subjectController.text.trim(),
+        message: _messageController.text.trim(),
+      );
+      if (!mounted) return;
+      setState(() {
+        _isSubmitting = false;
+        _successMessage = 'Message sent. We will reply within 2 hours.';
+        _nameController.clear();
+        _emailController.clear();
+        _subjectController.clear();
+        _messageController.clear();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isSubmitting = false;
+        _errorMessage = 'Failed to send message. Please try again.';
+      });
+    }
   }
 
   Future<void> _launchContact(Uri uri) async {
@@ -73,247 +88,266 @@ class _ContactScreenState extends State<ContactScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final servio = context.servio;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Contact Us'),
         backgroundColor: theme.scaffoldBackgroundColor,
-      ),
-      body: SafeArea(
-        top: false,
-        child: CustomScrollView(
-          slivers: <Widget>[
-            const SliverToBoxAdapter(child: _ContactHero()),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate(
-                  <Widget>[
-                    _ContactFormCard(
-                      formKey: _formKey,
-                      nameController: _nameController,
-                      emailController: _emailController,
-                      subjectController: _subjectController,
-                      messageController: _messageController,
-                      isSubmitting: _isSubmitting,
-                      successMessage: _successMessage,
-                      errorMessage: _errorMessage,
-                      onSubmit: _submit,
-                    ),
-                    const SizedBox(height: 18),
-                    _ContactDetailsCard(onLaunch: _launchContact),
-                    const SizedBox(height: 14),
-                    const _SupportHoursCard(),
-                    const SizedBox(height: 14),
-                    const _ResponsePromiseCard(),
-                    const SizedBox(height: 28),
-                  ],
-                ),
-              ),
-            ),
-          ],
+        elevation: 0,
+        centerTitle: true,
+        iconTheme: IconThemeData(color: isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23)),
+        titleTextStyle: theme.textTheme.headlineMedium?.copyWith(
+          fontFamily: 'Poppins',
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+          color: isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23),
         ),
       ),
-    );
-  }
-}
-
-class _ContactHero extends StatelessWidget {
-  const _ContactHero();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 42, 20, 38),
-      decoration: const BoxDecoration(gradient: ServioGradients.brand),
-      child: Stack(
-        children: <Widget>[
-          PositionedDirectional(
-            top: -52,
-            start: -42,
-            child: _SoftDisc(size: 142, color: ServioColors.accentLight),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.only(
+            left: ServioSpacing.screenPadding,
+            right: ServioSpacing.screenPadding,
+            top: 16,
+            bottom: 40,
           ),
-          PositionedDirectional(
-            bottom: -58,
-            end: -46,
-            child: _SoftDisc(size: 160, color: ServioColors.accent),
-          ),
-          Column(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              Center(
-                child: _HeroKicker(
-                  icon: Icons.chat_bubble_outline_rounded,
-                  label: 'Get in touch',
+              // Hero Section
+              Text(
+                'Get in touch',
+                style: theme.textTheme.displaySmall?.copyWith(
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.bold,
+                  fontSize: 32,
+                  color: isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23),
                 ),
               ),
-              const SizedBox(height: 18),
-              Text(
-                "We'd love to",
-                textAlign: TextAlign.center,
-                style:
-                    theme.textTheme.displayLarge?.copyWith(color: Colors.white),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'hear from you.',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.displayLarge?.copyWith(
-                  color: ServioColors.accentLight,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                "Have a question, feedback, or need support? Send us a message and we'll get back to you within 24 hours, usually sooner.",
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.78),
-                  height: 1.6,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
+              const SizedBox(height: 5),
 
-class _ContactFormCard extends StatelessWidget {
-  const _ContactFormCard({
-    required this.formKey,
-    required this.nameController,
-    required this.emailController,
-    required this.subjectController,
-    required this.messageController,
-    required this.isSubmitting,
-    required this.onSubmit,
-    this.successMessage,
-    this.errorMessage,
-  });
-
-  final GlobalKey<FormState> formKey;
-  final TextEditingController nameController;
-  final TextEditingController emailController;
-  final TextEditingController subjectController;
-  final TextEditingController messageController;
-  final bool isSubmitting;
-  final String? successMessage;
-  final String? errorMessage;
-  final VoidCallback onSubmit;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final servio = context.servio;
-
-    return ServioCard(
-      radius: ServioRadius.lg,
-      padding: const EdgeInsets.all(20),
-      child: Form(
-        key: formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            Row(
-              children: <Widget>[
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: ServioColors.tint(servio.accent),
-                    borderRadius: BorderRadius.circular(ServioRadius.sm),
-                    border: Border.all(
-                        color: servio.accent.withValues(alpha: 0.22)),
+              // Form Card
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: theme.cardColor,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: const Color(0xFF9A8C73).withValues(alpha: 0.2),
+                    width: 1,
                   ),
-                  child: Icon(Icons.mail_outline_rounded, color: servio.accent),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color.fromRGBO(26, 29, 37, 0.04),
+                      blurRadius: 24,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
+                child: Form(
+                  key: _formKey,
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: <Widget>[
-                      Text('Send a message',
-                          style: theme.textTheme.titleMedium),
-                      const SizedBox(height: 4),
-                      Text(
-                        "Fill out the form below and we'll reply to your email.",
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: servio.textSecondary,
+                      Row(
+                        children: [
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF9A8C73).withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.mail_outline_rounded, color: Color(0xFF9A8C73), size: 18),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Send a message',
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontFamily: 'Poppins',
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 16,
+                                    color: isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23),
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  "Fill out the form below and we'll reply to your email.",
+                                  style: TextStyle(
+                                    fontFamily: 'Inter',
+                                    fontSize: 11,
+                                    color: servio.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      TextFormField(
+                        controller: _nameController,
+                        textInputAction: TextInputAction.next,
+                        decoration: _buildInputDecoration(
+                          label: 'Full Name',
+                          hint: 'Mostafa Abdelaal',
+                          prefixIcon: Icons.person_outline_rounded,
+                          isDark: isDark,
                         ),
+                        validator: _requiredValidator,
+                      ),
+                      const SizedBox(height: 14),
+                      TextFormField(
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        textInputAction: TextInputAction.next,
+                        decoration: _buildInputDecoration(
+                          label: 'Email Address',
+                          hint: 'mostafa@example.com',
+                          prefixIcon: Icons.alternate_email_rounded,
+                          isDark: isDark,
+                        ),
+                        validator: _emailValidator,
+                      ),
+                      const SizedBox(height: 14),
+                      TextFormField(
+                        controller: _subjectController,
+                        textInputAction: TextInputAction.next,
+                        decoration: _buildInputDecoration(
+                          label: 'Subject',
+                          hint: 'How can we help?',
+                          prefixIcon: Icons.subject_rounded,
+                          isDark: isDark,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      TextFormField(
+                        controller: _messageController,
+                        minLines: 5,
+                        maxLines: 7,
+                        textInputAction: TextInputAction.newline,
+                        decoration: _buildInputDecoration(
+                          label: 'Message',
+                          hint: 'Please provide details...',
+                          prefixIcon: Icons.chat_bubble_outline_rounded,
+                          isDark: isDark,
+                        ),
+                        validator: _requiredValidator,
+                      ),
+                      if (_successMessage != null || _errorMessage != null) ...<Widget>[
+                        const SizedBox(height: 14),
+                        _InlineMessage(
+                          message: _successMessage ?? _errorMessage!,
+                          color: _successMessage != null ? servio.success : servio.danger,
+                          icon: _successMessage != null
+                              ? Icons.check_circle_outline_rounded
+                              : Icons.error_outline_rounded,
+                        ),
+                      ],
+                      const SizedBox(height: 20),
+                      ElevatedButton(
+                        onPressed: _isSubmitting ? null : _submit,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF9A8C73),
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor: const Color(0xFF9A8C73).withValues(alpha: 0.5),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: _isSubmitting
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                              )
+                            : const Text(
+                                'Send Message',
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
                       ),
                     ],
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            TextFormField(
-              controller: nameController,
-              textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(
-                labelText: 'Full Name',
-                hintText: 'Your name',
-                prefixIcon: Icon(Icons.person_outline_rounded),
               ),
-              validator: _requiredValidator,
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: emailController,
-              keyboardType: TextInputType.emailAddress,
-              textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(
-                labelText: 'Email Address',
-                hintText: 'you@example.com',
-                prefixIcon: Icon(Icons.alternate_email_rounded),
+              const SizedBox(height: 5),
+
+              // Contact Details (Bento-style Cards)
+              _BentoContactCard(
+                icon: Icons.mail_rounded,
+                title: 'Email Us',
+                subtitle: 'Drop us a line anytime.',
+                value: 'support@servio.com',
+                onTap: () => _launchContact(Uri(scheme: 'mailto', path: 'support@servio.com')),
+                isDark: isDark,
+                servio: servio,
               ),
-              validator: _emailValidator,
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: subjectController,
-              textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(
-                labelText: 'Subject',
-                hintText: 'How can we help?',
-                prefixIcon: Icon(Icons.subject_rounded),
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: messageController,
-              minLines: 5,
-              maxLines: 7,
-              textInputAction: TextInputAction.newline,
-              decoration: const InputDecoration(
-                labelText: 'Message',
-                hintText: 'Tell us what you need...',
-                alignLabelWithHint: true,
-              ),
-              validator: _requiredValidator,
-            ),
-            if (successMessage != null || errorMessage != null) ...<Widget>[
-              const SizedBox(height: 14),
-              _InlineMessage(
-                message: successMessage ?? errorMessage!,
-                color: successMessage != null ? servio.success : servio.danger,
-                icon: successMessage != null
-                    ? Icons.check_circle_outline_rounded
-                    : Icons.error_outline_rounded,
+              const SizedBox(height: 10),
+              _BentoContactCard(
+                icon: Icons.phone_rounded,
+                title: 'Call Us',
+                subtitle: 'Everyday from 8am to 12pm.',
+                value: '+20 1006665555',
+                onTap: () => _launchContact(Uri(scheme: 'tel', path: '+201006665555')),
+                isDark: isDark,
+                servio: servio,
               ),
             ],
-            const SizedBox(height: 18),
-            ServioPrimaryButton(
-              label: 'Send Message',
-              isLoading: isSubmitting,
-              onPressed: isSubmitting ? null : onSubmit,
-            ),
-          ],
+          ),
         ),
+      ),
+    );
+  }
+
+  InputDecoration _buildInputDecoration({
+    required String label,
+    required String hint,
+    required IconData prefixIcon,
+    required bool isDark,
+  }) {
+    return InputDecoration(
+      labelText: label.toUpperCase(),
+      labelStyle: TextStyle(
+        fontFamily: 'Inter',
+        fontSize: 10,
+        fontWeight: FontWeight.bold,
+        letterSpacing: 1.2,
+        color: isDark ? const Color(0xFFE3D5CA).withValues(alpha: 0.7) : const Color(0xFF1A1D23).withValues(alpha: 0.7),
+      ),
+      hintText: hint,
+      prefixIcon: Icon(prefixIcon, size: 18, color: const Color(0xFF9A8C73)),
+      filled: true,
+      fillColor: isDark ? const Color(0xFF1A1D23) : const Color(0xFFF5F3F0),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide.none,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: const Color(0xFF9A8C73).withValues(alpha: 0.1), width: 1),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFF9A8C73), width: 1.5),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.redAccent, width: 1),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.red, width: 1.5),
       ),
     );
   }
@@ -333,246 +367,105 @@ class _ContactFormCard extends StatelessWidget {
   }
 }
 
-class _ContactDetailsCard extends StatelessWidget {
-  const _ContactDetailsCard({required this.onLaunch});
-
-  final ValueChanged<Uri> onLaunch;
-
-  @override
-  Widget build(BuildContext context) {
-    return ServioCard(
-      radius: ServioRadius.lg,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text('Contact Details',
-              style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 16),
-          _ContactDetailRow(
-            icon: Icons.mail_outline_rounded,
-            label: 'Email',
-            value: 'support@servio.com',
-            onTap: () =>
-                onLaunch(Uri(scheme: 'mailto', path: 'support@servio.com')),
-          ),
-          _ContactDetailRow(
-            icon: Icons.phone_outlined,
-            label: 'Phone',
-            value: '+20 100 000 0000',
-            onTap: () => onLaunch(Uri(scheme: 'tel', path: '+201000000000')),
-          ),
-          _ContactDetailRow(
-            icon: Icons.location_on_outlined,
-            label: 'Office',
-            value: '123 Service Lane, Cairo, Egypt',
-            onTap: () => onLaunch(
-              Uri.https('www.google.com', '/maps/search/', <String, String>{
-                'api': '1',
-                'query': '123 Service Lane Cairo Egypt',
-              }),
-            ),
-            bottomPadding: 0,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SupportHoursCard extends StatelessWidget {
-  const _SupportHoursCard();
-
-  @override
-  Widget build(BuildContext context) {
-    final servio = context.servio;
-
-    return ServioCard(
-      radius: ServioRadius.lg,
-      borderColor: servio.info.withValues(alpha: 0.38),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: const <Widget>[
-          _CardTitle(icon: Icons.schedule_rounded, title: 'Support Hours'),
-          SizedBox(height: 14),
-          _HoursRow(day: 'Mon - Fri', time: '9:00 AM - 6:00 PM'),
-          _HoursRow(day: 'Saturday', time: '10:00 AM - 4:00 PM'),
-          _HoursRow(day: 'Sunday', time: 'Closed', isClosed: true),
-        ],
-      ),
-    );
-  }
-}
-
-class _ResponsePromiseCard extends StatelessWidget {
-  const _ResponsePromiseCard();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final servio = context.servio;
-
-    return ServioCard(
-      radius: ServioRadius.lg,
-      backgroundColor: servio.backgroundSoft,
-      borderColor: servio.accent.withValues(alpha: 0.3),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: servio.accent,
-              borderRadius: BorderRadius.circular(ServioRadius.sm),
-            ),
-            child: const Icon(Icons.bolt_rounded, color: Colors.white),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text('Fast Response Guarantee',
-                    style: theme.textTheme.titleMedium),
-                const SizedBox(height: 4),
-                Text(
-                  'We reply within 2 business hours. Urgent? Mention it in your message.',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: servio.textSecondary,
-                    height: 1.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ContactDetailRow extends StatelessWidget {
-  const _ContactDetailRow({
+class _BentoContactCard extends StatelessWidget {
+  const _BentoContactCard({
     required this.icon,
-    required this.label,
+    required this.title,
+    required this.subtitle,
     required this.value,
-    required this.onTap,
-    this.bottomPadding = 16,
+    required this.isDark,
+    required this.servio,
+    this.onTap,
   });
 
   final IconData icon;
-  final String label;
+  final String title;
+  final String subtitle;
   final String value;
-  final VoidCallback onTap;
-  final double bottomPadding;
+  final bool isDark;
+  final ServioThemeExtension servio;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final servio = context.servio;
-
-    return Padding(
-      padding: EdgeInsets.only(bottom: bottomPadding),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(ServioRadius.sm),
-        onTap: onTap,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF262B34) : const Color(0xFFF3EDE7),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: const Color(0xFF9A8C73).withValues(alpha: 0.2),
+            width: 1,
+          ),
+        ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Container(
-              width: 42,
-              height: 42,
+              width: 38,
+              height: 38,
               decoration: BoxDecoration(
-                color: ServioColors.tint(servio.accent),
-                borderRadius: BorderRadius.circular(ServioRadius.sm),
-                border:
-                    Border.all(color: servio.accent.withValues(alpha: 0.22)),
+                color: isDark ? const Color(0xFF1A1D23) : Colors.white,
+                shape: BoxShape.circle,
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color.fromRGBO(26, 29, 37, 0.03),
+                    blurRadius: 6,
+                    offset: Offset(0, 2),
+                  ),
+                ],
               ),
-              child: Icon(icon, color: servio.accent, size: 20),
+              child: Icon(icon, color: isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23), size: 18),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
+                children: [
                   Text(
-                    label.toUpperCase(),
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: servio.textSecondary,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
+                    title,
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23),
                     ),
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 13,
+                      color: servio.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
                   Text(
                     value,
-                    style: theme.textTheme.bodyMedium?.copyWith(
+                    style: TextStyle(
+                      fontFamily: 'Inter',
                       fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: onTap != null ? const Color(0xFF9A8C73) : (isDark ? Colors.white : const Color(0xFF262B34)),
                     ),
                   ),
                 ],
               ),
             ),
-            Icon(Icons.open_in_new_rounded,
-                color: servio.textSecondary, size: 18),
+            if (onTap != null) ...[
+              const SizedBox(width: 8),
+              Icon(
+                Icons.open_in_new_rounded,
+                color: servio.textSecondary.withValues(alpha: 0.7),
+                size: 16,
+              ),
+            ],
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _CardTitle extends StatelessWidget {
-  const _CardTitle({
-    required this.icon,
-    required this.title,
-  });
-
-  final IconData icon;
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    final servio = context.servio;
-
-    return Row(
-      children: <Widget>[
-        Icon(icon, color: servio.info, size: 20),
-        const SizedBox(width: 10),
-        Text(title, style: Theme.of(context).textTheme.titleMedium),
-      ],
-    );
-  }
-}
-
-class _HoursRow extends StatelessWidget {
-  const _HoursRow({
-    required this.day,
-    required this.time,
-    this.isClosed = false,
-  });
-
-  final String day;
-  final String time;
-  final bool isClosed;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final servio = context.servio;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        children: <Widget>[
-          Expanded(child: Text(day, style: theme.textTheme.bodyMedium)),
-          Text(
-            time,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: isClosed ? servio.danger : theme.colorScheme.onSurface,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -595,7 +488,7 @@ class _InlineMessage extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(ServioRadius.sm),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
@@ -605,75 +498,15 @@ class _InlineMessage extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: color,
-                    fontWeight: FontWeight.w600,
-                  ),
+              style: TextStyle(
+                fontFamily: 'Inter',
+                color: color,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _HeroKicker extends StatelessWidget {
-  const _HeroKicker({
-    required this.icon,
-    required this.label,
-  });
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: ServioColors.accentLight.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(ServioRadius.full),
-        border:
-            Border.all(color: ServioColors.accentLight.withValues(alpha: 0.22)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Icon(icon, size: 16, color: ServioColors.accentLight),
-          const SizedBox(width: 8),
-          Text(
-            label.toUpperCase(),
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: ServioColors.accentLight,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.2,
-                ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SoftDisc extends StatelessWidget {
-  const _SoftDisc({
-    required this.size,
-    required this.color,
-  });
-
-  final double size;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: color.withValues(alpha: 0.14),
-        ),
       ),
     );
   }

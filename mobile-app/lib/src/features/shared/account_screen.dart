@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -5,7 +7,6 @@ import 'package:provider/provider.dart';
 import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
-import '../../design_system/widgets/servio_card.dart';
 import '../auth/auth_landing_screen.dart';
 
 const String _deleteConfirmationWord = 'delete';
@@ -15,51 +16,57 @@ class AccountScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final servio = context.servio;
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    // Premium custom colors matching Settings page
+    final accountBg = isDark ? const Color(0xFF7F1D1D).withValues(alpha: 0.2) : const Color(0xFFFEF2F2);
+    final accountIcon = isDark ? const Color(0xFFF87171) : const Color(0xFFBA1A1A);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Account'),
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        backgroundColor: theme.scaffoldBackgroundColor,
+        elevation: 0,
+        centerTitle: false,
+        titleTextStyle: theme.textTheme.headlineMedium?.copyWith(
+          fontFamily: 'Poppins',
+          fontSize: 24,
+          fontWeight: FontWeight.w600,
+          color: isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23),
+        ),
+        iconTheme: IconThemeData(
+          color: isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23),
+        ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(ServioSpacing.screenPadding),
+        padding: const EdgeInsets.symmetric(
+          horizontal: ServioSpacing.screenPadding,
+          vertical: 20,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            ServioCard(
-              radius: ServioRadius.lg,
-              child: Column(
-                children: <Widget>[
-                  _AccountTile(
-                    label: 'Deactivate Account',
-                    icon: Icons.pause_circle_outline_rounded,
-                    description: 'Temporarily disable your account.',
-                    onTap: () => _showDeactivateDialog(context),
-                  ),
-                  Divider(
-                    height: 1,
-                    color: servio.border.withValues(alpha: 0.5),
-                  ),
-                  _AccountTile(
-                    label: 'Delete Account',
-                    icon: Icons.delete_outline_rounded,
-                    description:
-                        'Permanently delete your account and all data.',
-                    isDestructive: true,
-                    onTap: () => _showDeleteDialog(context),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'Deleting your account is permanent and cannot be undone. '
-              'All bookings, reviews, and personal data will be removed.',
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: servio.textSecondary),
-              textAlign: TextAlign.center,
+            _SettingsGroup(
+              borderColor: accountIcon.withValues(alpha: 0.2),
+              children: <Widget>[
+                _NavTile(
+                  icon: Icons.pause_circle_outline_rounded,
+                  iconColor: accountIcon,
+                  backgroundColor: accountBg,
+                  label: 'Deactivate Account',
+                  subtitle: 'Temporarily disable your account.',
+                  onTap: () => _showDeactivateDialog(context),
+                ),
+                _NavTile(
+                  icon: Icons.delete_outline_rounded,
+                  iconColor: accountIcon,
+                  backgroundColor: accountBg,
+                  label: 'Delete Account',
+                  subtitle: 'Permanently delete your account and all data.',
+                  onTap: () => _showDeleteDialog(context),
+                ),
+              ],
             ),
           ],
         ),
@@ -68,18 +75,36 @@ class AccountScreen extends StatelessWidget {
   }
 
   void _showDeactivateDialog(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showDialog<void>(
       context: context,
       builder: (BuildContext ctx) => AlertDialog(
-        title: const Text('Deactivate Account'),
+        title: const Text(
+          'Deactivate Account',
+          style: TextStyle(
+            fontFamily: 'Poppins',
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         content: const Text(
           'Your account will be temporarily deactivated. '
           'You can reactivate it by logging in again.',
+          style: TextStyle(
+            fontFamily: 'Inter',
+            height: 1.45,
+          ),
         ),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel'),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontWeight: FontWeight.bold,
+                color: isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23),
+              ),
+            ),
           ),
           TextButton(
             onPressed: () async {
@@ -94,7 +119,14 @@ class AccountScreen extends StatelessWidget {
                 );
               }
             },
-            child: const Text('Deactivate'),
+            child: const Text(
+              'Deactivate',
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontWeight: FontWeight.bold,
+                color: Colors.red,
+              ),
+            ),
           ),
         ],
       ),
@@ -210,6 +242,7 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
                                 Text(
                                   'Delete Account',
                                   style: theme.textTheme.titleMedium?.copyWith(
+                                    fontFamily: 'Poppins',
                                     color: servio.danger,
                                     fontWeight: FontWeight.w700,
                                   ),
@@ -220,6 +253,7 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
                                   'and all associated data. This action '
                                   'cannot be undone.',
                                   style: theme.textTheme.bodySmall?.copyWith(
+                                    fontFamily: 'Inter',
                                     color: dialogSecondaryColor,
                                     height: 1.45,
                                   ),
@@ -255,6 +289,7 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
                         Text(
                           'TYPE DELETE TO CONFIRM',
                           style: theme.textTheme.labelLarge?.copyWith(
+                            fontFamily: 'Inter',
                             color: servio.accent,
                             fontWeight: FontWeight.w700,
                           ),
@@ -274,11 +309,13 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
                           onSubmitted: (_) => _deleteAccountIfConfirmed(),
                           cursorColor: servio.danger,
                           style: theme.textTheme.bodyMedium?.copyWith(
+                            fontFamily: 'Inter',
                             color: dialogTextColor,
                           ),
                           decoration: InputDecoration(
                             hintText: 'DELETE',
                             hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                              fontFamily: 'Inter',
                               color: dialogSecondaryColor,
                             ),
                             filled: true,
@@ -306,6 +343,7 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
                           Text(
                             _deleteError!,
                             style: theme.textTheme.bodySmall?.copyWith(
+                              fontFamily: 'Inter',
                               color: servio.danger,
                             ),
                           ),
@@ -332,6 +370,10 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
                                         Navigator.of(context).pop(),
                                     style: TextButton.styleFrom(
                                       foregroundColor: dialogTextColor,
+                                      textStyle: const TextStyle(
+                                        fontFamily: 'Inter',
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                     child: const Text('Cancel'),
                                   ),
@@ -363,6 +405,10 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
                                         borderRadius: BorderRadius.circular(
                                           ServioRadius.sm,
                                         ),
+                                      ),
+                                      textStyle: const TextStyle(
+                                        fontFamily: 'Inter',
+                                        fontWeight: FontWeight.bold,
                                       ),
                                     ),
                                     child: Text(
@@ -501,6 +547,7 @@ class _DeleteWarning extends StatelessWidget {
               'You will lose all your bookings, earnings history, reviews, '
               'and profile data.',
               style: theme.textTheme.bodyMedium?.copyWith(
+                fontFamily: 'Inter',
                 color: danger,
                 height: 1.45,
               ),
@@ -555,65 +602,170 @@ class _DeleteConfirmationMeter extends StatelessWidget {
   }
 }
 
-class _AccountTile extends StatelessWidget {
-  const _AccountTile({
-    required this.label,
-    required this.icon,
-    required this.description,
-    required this.onTap,
-    this.isDestructive = false,
+// ── Grouped card container ────────────────────────────────────────────────────
+
+class _SettingsGroup extends StatelessWidget {
+  const _SettingsGroup({
+    required this.children,
+    this.borderColor,
   });
 
-  final String label;
-  final IconData icon;
-  final String description;
-  final VoidCallback onTap;
-  final bool isDestructive;
+  final List<Widget> children;
+  final Color? borderColor;
 
   @override
   Widget build(BuildContext context) {
     final servio = context.servio;
-    final color = isDestructive ? servio.danger : null;
+    final theme = Theme.of(context);
+    final dividerColor = servio.border.withValues(alpha: 0.2);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: borderColor ?? servio.border.withValues(alpha: 0.3),
+          width: 1,
+        ),
+        boxShadow: const <BoxShadow>[
+          BoxShadow(
+            color: Color.fromRGBO(34, 40, 49, 0.04),
+            blurRadius: 16,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Column(
+          children: <Widget>[
+            for (var i = 0; i < children.length; i++) ...<Widget>[
+              children[i],
+              if (i != children.length - 1)
+                Divider(
+                  height: 1,
+                  indent: 64,
+                  endIndent: 16,
+                  color: dividerColor,
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Navigation tile (chevron) ─────────────────────────────────────────────────
+
+class _NavTile extends StatelessWidget {
+  const _NavTile({
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+    required this.onTap,
+    this.subtitle,
+    this.backgroundColor,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String label;
+  final String? subtitle;
+  final VoidCallback onTap;
+  final Color? backgroundColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final servio = context.servio;
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
 
     return Semantics(
       button: true,
       label: label,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
+      child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 14),
+          padding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 10,
+          ),
           child: Row(
             children: <Widget>[
-              Icon(icon, size: 22, color: color ?? servio.textSecondary),
-              const SizedBox(width: 14),
+              _IconBox(
+                icon: icon,
+                color: iconColor,
+                backgroundColor: backgroundColor,
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
                     Text(
                       label,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: color,
-                            fontWeight: FontWeight.w500,
-                          ),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontFamily: 'Inter',
+                        fontWeight: FontWeight.w600,
+                        color: isDarkMode ? null : const Color(0xFF262B34),
+                      ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      description,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: servio.textSecondary,
-                          ),
-                    ),
+                    if (subtitle != null) ...<Widget>[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontFamily: 'Inter',
+                          fontSize: 13,
+                          color: servio.textSecondary,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded,
-                  color: color ?? servio.textSecondary),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: servio.textSecondary.withValues(alpha: 0.7),
+                size: 22,
+              ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+// ── Icon box ──────────────────────────────────────────────────────────────────
+
+class _IconBox extends StatelessWidget {
+  const _IconBox({
+    required this.icon,
+    required this.color,
+    this.backgroundColor,
+  });
+
+  final IconData icon;
+  final Color color;
+  final Color? backgroundColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = backgroundColor ?? color.withValues(alpha: 0.12);
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Icon(icon, size: 18, color: color),
     );
   }
 }

@@ -8,8 +8,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:servio_mobile_app/src/core/api/api_client.dart';
 import 'package:servio_mobile_app/src/core/api/users_api.dart';
+import 'package:servio_mobile_app/src/core/api/payments_api.dart';
 import 'package:servio_mobile_app/src/core/services/storage_service.dart';
 import 'package:servio_mobile_app/src/core/state/customer_addresses_state.dart';
+import 'package:servio_mobile_app/src/core/state/payments_provider.dart';
 import 'package:servio_mobile_app/src/core/models/user_account.dart';
 import 'package:servio_mobile_app/src/design_system/servio_theme.dart';
 import 'package:servio_mobile_app/src/features/booking/booking_flow_data.dart';
@@ -136,8 +138,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('200 EGP'), findsWidgets);
-    expect(find.text('10 EGP (5%)'), findsOneWidget);
-    expect(find.text('210 EGP'), findsWidgets);
+    expect(find.text('20 EGP (10%)'), findsOneWidget);
+    expect(find.text('220 EGP'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 }
@@ -160,6 +162,9 @@ Future<Widget> _wrap(Widget child) async {
       Provider<ApiClient>.value(value: apiClient),
       ChangeNotifierProvider<CustomerAddressesProvider>(
         create: (_) => CustomerAddressesProvider(UsersApi(apiClient)),
+      ),
+      ChangeNotifierProvider<PaymentsProvider>(
+        create: (_) => PaymentsProvider(PaymentsApi(apiClient)),
       ),
     ],
     child: MaterialApp(

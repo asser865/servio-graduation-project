@@ -335,10 +335,42 @@ class _AvailabilityManagerScreenState extends State<AvailabilityManagerScreen> {
     final account = context.watch<SessionProvider>().account;
     final bottomInset = ServioTabShell.bottomOverlayInsetOf(context);
 
+    final activeDaysCount = _days.where((d) => d.enabled).length * 4;
+
+    int totalWeeklyMinutes = 0;
+    for (final day in _days) {
+      if (day.enabled) {
+        totalWeeklyMinutes += _minutes(day.end) - _minutes(day.start);
+      }
+    }
+    final weeklyHours = totalWeeklyMinutes / 60;
+    final monthlyHours = (weeklyHours * 4).round();
+
+    final blockedDaysCount = account?.blockedDates.length ?? 0;
+
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: const Text(
+          'Technician Portal',
+          style: TextStyle(
+            fontFamily: 'Poppins',
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+            color: Color(0xFF1A1D23),
+          ),
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        automaticallyImplyLeading: false,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF1A1D23)),
+          onPressed: () => Navigator.of(context).maybePop(),
+        ),
+        actions: const <Widget>[], // Removed profile photo at the top right as requested!
+      ),
       body: SafeArea(
-        top: false,
         child: Stack(
           fit: StackFit.expand,
           children: <Widget>[
@@ -347,7 +379,7 @@ class _AvailabilityManagerScreenState extends State<AvailabilityManagerScreen> {
                 return SingleChildScrollView(
                   padding: EdgeInsets.fromLTRB(
                     ServioSpacing.screenPadding,
-                    MediaQuery.paddingOf(context).top + 12,
+                    12,
                     ServioSpacing.screenPadding,
                     112 + bottomInset,
                   ),
@@ -363,6 +395,9 @@ class _AvailabilityManagerScreenState extends State<AvailabilityManagerScreen> {
                             saving: _savingAvailableNow,
                             loading: _loadingProfile,
                             onChanged: _toggleAvailableNow,
+                            availableDays: activeDaysCount,
+                            workingHours: monthlyHours,
+                            blockedDays: blockedDaysCount,
                           ),
                           if (_error != null) ...<Widget>[
                             const SizedBox(height: 12),
@@ -429,13 +464,6 @@ class _AvailabilityManagerScreenState extends State<AvailabilityManagerScreen> {
                   ),
                 );
               },
-            ),
-            Positioned(
-              top: MediaQuery.paddingOf(context).top + 12,
-              left: ServioSpacing.screenPadding,
-              child: _FloatingBackButton(
-                onPressed: () => Navigator.of(context).maybePop(),
-              ),
             ),
             Positioned(
               left: 0,
@@ -560,6 +588,9 @@ class _AvailabilityHeaderCard extends StatelessWidget {
     required this.saving,
     required this.loading,
     required this.onChanged,
+    required this.availableDays,
+    required this.workingHours,
+    required this.blockedDays,
   });
 
   final String locale;
@@ -567,6 +598,9 @@ class _AvailabilityHeaderCard extends StatelessWidget {
   final bool saving;
   final bool loading;
   final ValueChanged<bool> onChanged;
+  final int availableDays;
+  final int workingHours;
+  final int blockedDays;
 
   @override
   Widget build(BuildContext context) {
@@ -667,6 +701,31 @@ class _AvailabilityHeaderCard extends StatelessWidget {
                     ),
                   ],
                 ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: _MetricItem(
+                      value: '$availableDays',
+                      label: 'Available Days',
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _MetricItem(
+                      value: '$workingHours',
+                      label: 'Working Hours',
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _MetricItem(
+                      value: '$blockedDays',
+                      label: 'Blocked Days',
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -1037,25 +1096,48 @@ class _ScheduleDayRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final servio = context.servio;
     final enabled = day.enabled;
     final invalid = enabled && _minutes(day.end) <= _minutes(day.start);
+
+    final Color bg = invalid
+        ? const Color(0xFFFDEDEC) // error-bg
+        : enabled
+            ? Colors.white
+            : const Color(0xFFF8F3EF); // surface-container-low
+
+    final Border borderStyle = invalid
+        ? Border.all(
+            color: const Color(0xFFBA1A1A).withValues(alpha: 0.2), // error border
+            width: 2.0,
+          )
+        : enabled
+            ? Border.all(
+                color: const Color(0xFF665A44).withValues(alpha: 0.2), // primary border
+                width: 2.0,
+              )
+            : Border.all(
+                color: Colors.transparent,
+                width: 1.0,
+              );
 
     return AnimatedContainer(
       duration: _motion(context, ServioMotion.normal),
       curve: ServioMotion.spring,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
       decoration: BoxDecoration(
-        color: enabled ? theme.colorScheme.surface : servio.surfaceAlt,
+        color: bg,
         borderRadius: BorderRadius.circular(ServioRadius.md),
-        border: Border.all(
-          color: invalid
-              ? servio.danger
-              : enabled
-                  ? servio.accent.withValues(alpha: 0.36)
-                  : servio.border.withValues(alpha: 0.72),
-        ),
+        border: borderStyle,
+        boxShadow: enabled && !invalid
+            ? const [
+                BoxShadow(
+                  color: Color.fromRGBO(26, 29, 37, 0.04),
+                  blurRadius: 16,
+                  offset: Offset(0, 4),
+                ),
+              ]
+            : null,
       ),
       child: AnimatedSize(
         duration: _motion(context, ServioMotion.normal),
@@ -1635,4 +1717,52 @@ String _categoryLabel(String value, String locale) {
     'other' => _copy(locale, en: 'Other', ar: 'Other'),
     _ => value,
   };
+}
+
+class _MetricItem extends StatelessWidget {
+  const _MetricItem({
+    required this.value,
+    required this.label,
+  });
+
+  final String value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.18),
+          width: 1.0,
+        ),
+      ),
+      child: Column(
+        children: <Widget>[
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label.toUpperCase(),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: Colors.white70,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

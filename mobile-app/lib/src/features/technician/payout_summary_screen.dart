@@ -3,14 +3,16 @@ import 'package:provider/provider.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/api/payments_api.dart';
+import '../../core/state/payments_provider.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
-import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
+import 'payout_request_screen.dart';
+import 'settle_debt_screen.dart';
 
 /// Worker-only Payout Summary screen.
 ///
-/// Mirrors the website's technician-dashboard payout/earnings sections.
+/// Matches the Stitch premium redesign visual standards.
 /// Data is fetched from `GET /payments/earnings` via [PaymentsApi].
 class PayoutSummaryScreen extends StatefulWidget {
   const PayoutSummaryScreen({super.key});
@@ -54,8 +56,12 @@ class _PayoutSummaryScreenState extends State<PayoutSummaryScreen>
       _error = null;
     });
     try {
-      final client = context.read<ApiClient>();
-      _summary = await PaymentsApi(client).getEarnings();
+      final payments = context.read<PaymentsProvider>();
+      await Future.wait([
+        payments.loadEarnings(),
+        payments.loadDebtSummary(),
+      ]);
+      _summary = payments.earnings;
     } catch (e) {
       _error = 'Unable to load payout summary.';
     } finally {
@@ -71,18 +77,34 @@ class _PayoutSummaryScreenState extends State<PayoutSummaryScreen>
 
   @override
   Widget build(BuildContext context) {
-    final servio = context.servio;
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    // Stitch design token colors adjusted for light & dark mode
+    final stitchBg = isDark ? const Color(0xFF131518) : const Color(0xFFFBF9F6);
+    final stitchNavy = isDark ? const Color(0xFFE4E2DF) : const Color(0xFF1A1D23);
 
     return Scaffold(
+      backgroundColor: stitchBg,
       appBar: AppBar(
         title: const Text('Payout Summary'),
-        backgroundColor: theme.scaffoldBackgroundColor,
+        backgroundColor: stitchBg,
         elevation: 0,
+        centerTitle: false,
+        titleTextStyle: theme.textTheme.headlineMedium?.copyWith(
+          fontFamily: 'Poppins',
+          fontSize: 22,
+          fontWeight: FontWeight.w700,
+          color: stitchNavy,
+        ),
+        iconTheme: IconThemeData(
+          color: stitchNavy,
+        ),
       ),
       body: RefreshIndicator(
         onRefresh: _load,
-        color: servio.accent,
+        color: isDark ? const Color(0xFFBA1A1A) : const Color(0xFF1A1D23),
+        backgroundColor: isDark ? const Color(0xFF1E2124) : Colors.white,
         child: FadeTransition(
           opacity: _fade,
           child: SlideTransition(
@@ -102,7 +124,7 @@ class _PayoutSummaryScreenState extends State<PayoutSummaryScreen>
   }
 }
 
-// â”€â”€ Shimmer loading state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Shimmer loading state ──────────────────────────────────────────────────
 
 class _ShimmerBody extends StatelessWidget {
   const _ShimmerBody();
@@ -110,25 +132,21 @@ class _ShimmerBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.all(ServioSpacing.screenPadding),
+      padding: const EdgeInsets.all(20),
       children: [
-        _ShimmerBox(height: 140, radius: ServioRadius.xl),
-        const SizedBox(height: 20),
+        _ShimmerBox(height: 150, radius: 16),
+        const SizedBox(height: 16),
         Row(
           children: [
-            Expanded(child: _ShimmerBox(height: 110, radius: ServioRadius.lg)),
+            Expanded(child: _ShimmerBox(height: 80, radius: 12)),
             const SizedBox(width: 12),
-            Expanded(child: _ShimmerBox(height: 110, radius: ServioRadius.lg)),
+            Expanded(child: _ShimmerBox(height: 80, radius: 12)),
           ],
         ),
         const SizedBox(height: 24),
-        _ShimmerBox(height: 24, width: 120, radius: ServioRadius.sm),
-        const SizedBox(height: 8),
-        _ShimmerBox(height: 220, radius: ServioRadius.lg),
-        const SizedBox(height: 24),
-        _ShimmerBox(height: 24, width: 120, radius: ServioRadius.sm),
-        const SizedBox(height: 8),
-        _ShimmerBox(height: 260, radius: ServioRadius.lg),
+        _ShimmerBox(height: 24, width: 140, radius: 4),
+        const SizedBox(height: 12),
+        _ShimmerBox(height: 380, radius: 16),
       ],
     );
   }
@@ -138,10 +156,11 @@ class _ShimmerBox extends StatefulWidget {
   final double height;
   final double width;
   final double radius;
-  const _ShimmerBox(
-      {required this.height,
-      this.width = double.infinity,
-      required this.radius});
+  const _ShimmerBox({
+    required this.height,
+    this.width = double.infinity,
+    required this.radius,
+  });
 
   @override
   State<_ShimmerBox> createState() => _ShimmerBoxState();
@@ -166,6 +185,9 @@ class _ShimmerBoxState extends State<_ShimmerBox>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final baseColor = isDark ? const Color(0xFF26292D) : const Color(0xFFECEAEA);
+
     return AnimatedBuilder(
       animation: _ctrl,
       builder: (context, child) {
@@ -173,8 +195,7 @@ class _ShimmerBoxState extends State<_ShimmerBox>
           width: widget.width,
           height: widget.height,
           decoration: BoxDecoration(
-            color: context.servio.border
-                .withValues(alpha: 0.3 + (_ctrl.value * 0.3)),
+            color: baseColor.withValues(alpha: 0.4 + (_ctrl.value * 0.4)),
             borderRadius: BorderRadius.circular(widget.radius),
           ),
         );
@@ -183,7 +204,7 @@ class _ShimmerBoxState extends State<_ShimmerBox>
   }
 }
 
-// â”€â”€ Error state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Error state ─────────────────────────────────────────────────────────────
 
 class _ErrorBody extends StatelessWidget {
   const _ErrorBody({required this.message, required this.onRetry});
@@ -192,20 +213,23 @@ class _ErrorBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final servio = context.servio;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final stitchNavy = isDark ? const Color(0xFFE4E2DF) : const Color(0xFF1A1D23);
+
     return ListView(
-      padding: const EdgeInsets.all(ServioSpacing.screenPadding),
+      padding: const EdgeInsets.all(20),
       children: [
         const SizedBox(height: 80),
-        Icon(Icons.cloud_off_rounded, size: 48, color: servio.textSecondary),
+        Icon(Icons.cloud_off_rounded, size: 48, color: theme.disabledColor),
         const SizedBox(height: 16),
         Text(
           message,
           textAlign: TextAlign.center,
-          style: Theme.of(context)
-              .textTheme
-              .bodyMedium
-              ?.copyWith(color: servio.textSecondary),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontFamily: 'Inter',
+            color: theme.hintColor,
+          ),
         ),
         const SizedBox(height: 24),
         Center(
@@ -215,6 +239,14 @@ class _ErrorBody extends StatelessWidget {
               onPressed: null, // Tap handled by _ScaleButton
               icon: const Icon(Icons.refresh_rounded, size: 18),
               label: const Text('Try again'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: stitchNavy,
+                side: BorderSide(color: stitchNavy.withValues(alpha: 0.3)),
+                textStyle: const TextStyle(
+                  fontFamily: 'Inter',
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ),
         ),
@@ -223,7 +255,7 @@ class _ErrorBody extends StatelessWidget {
   }
 }
 
-// â”€â”€ Success body (Stateful for forms) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Success body (Stateful for forms) ───────────────────────────────────────
 
 class _SuccessBody extends StatefulWidget {
   const _SuccessBody({required this.summary});
@@ -241,6 +273,7 @@ class _SuccessBodyState extends State<_SuccessBody> {
   late TextEditingController _accountNumberCtrl;
   late TextEditingController _walletNumberCtrl;
   bool _isLocked = false;
+  bool _obscureAccountNumber = true;
 
   @override
   void initState() {
@@ -322,7 +355,7 @@ class _SuccessBodyState extends State<_SuccessBody> {
       setState(() => _isLocked = true);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Payout settings saved.'),
+          content: const Text('Payout settings saved securely.'),
           backgroundColor: context.servio.success,
           behavior: SnackBarBehavior.floating,
         ),
@@ -350,42 +383,78 @@ class _SuccessBodyState extends State<_SuccessBody> {
     required String hint,
     required TextEditingController controller,
     bool isNumeric = false,
+    bool isPassword = false,
   }) {
     final theme = Theme.of(context);
-    final servio = context.servio;
+    final isDark = theme.brightness == Brightness.dark;
+    final stitchNavy = isDark ? const Color(0xFFE4E2DF) : const Color(0xFF1A1D23);
+    final stitchMuted = isDark ? const Color(0xFF9EA3AE) : const Color(0xFF6B6560);
+    final inputBg = isDark ? const Color(0xFF1E2124) : const Color(0xFFFBF9F6);
+    final borderColor = isDark ? const Color(0xFF383A40) : const Color(0xFFC6C6CB);
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label,
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(fontWeight: FontWeight.w600)),
+          Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 11,
+              letterSpacing: 1.0,
+              fontWeight: FontWeight.bold,
+              color: stitchNavy,
+            ),
+          ),
           const SizedBox(height: 6),
           TextField(
             controller: controller,
+            obscureText: isPassword && _obscureAccountNumber,
             keyboardType: isNumeric ? TextInputType.number : TextInputType.text,
-            style: theme.textTheme.bodyMedium,
+            cursorColor: stitchNavy,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontFamily: 'Inter',
+              color: stitchNavy,
+            ),
             decoration: InputDecoration(
               hintText: hint,
-              hintStyle: theme.textTheme.bodyMedium
-                  ?.copyWith(color: servio.textSecondary),
+              hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                fontFamily: 'Inter',
+                color: stitchMuted,
+              ),
               filled: true,
-              fillColor: servio.backgroundSoft,
+              fillColor: inputBg,
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(ServioRadius.sm),
-                borderSide: BorderSide(color: servio.border),
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: borderColor),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(ServioRadius.sm),
-                borderSide: BorderSide(color: servio.border),
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: borderColor),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(ServioRadius.sm),
-                borderSide: BorderSide(color: servio.accent, width: 1.5),
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: stitchNavy, width: 1.5),
               ),
+              suffixIcon: isPassword
+                  ? IconButton(
+                      onPressed: () {
+                        setState(() {
+                          _obscureAccountNumber = !_obscureAccountNumber;
+                        });
+                      },
+                      icon: Icon(
+                        _obscureAccountNumber
+                            ? Icons.visibility_off_rounded
+                            : Icons.visibility_rounded,
+                        color: stitchMuted,
+                        size: 20,
+                      ),
+                    )
+                  : null,
             ),
           ),
         ],
@@ -401,43 +470,68 @@ class _SuccessBodyState extends State<_SuccessBody> {
     required List<String> items,
   }) {
     final theme = Theme.of(context);
-    final servio = context.servio;
+    final isDark = theme.brightness == Brightness.dark;
+    final stitchNavy = isDark ? const Color(0xFFE4E2DF) : const Color(0xFF1A1D23);
+    final stitchMuted = isDark ? const Color(0xFF9EA3AE) : const Color(0xFF6B6560);
+    final inputBg = isDark ? const Color(0xFF1E2124) : const Color(0xFFFBF9F6);
+    final borderColor = isDark ? const Color(0xFF383A40) : const Color(0xFFC6C6CB);
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label,
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(fontWeight: FontWeight.w600)),
+          Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 11,
+              letterSpacing: 1.0,
+              fontWeight: FontWeight.bold,
+              color: stitchNavy,
+            ),
+          ),
           const SizedBox(height: 6),
           DropdownButtonFormField<String>(
             value: value,
-            hint: Text(hint,
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(color: servio.textSecondary)),
-            style: theme.textTheme.bodyMedium
-                ?.copyWith(color: theme.colorScheme.onSurface),
+            hint: Text(
+              hint,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontFamily: 'Inter',
+                color: stitchMuted,
+              ),
+            ),
+            dropdownColor: isDark ? const Color(0xFF1E2124) : Colors.white,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontFamily: 'Inter',
+              color: stitchNavy,
+            ),
             decoration: InputDecoration(
               filled: true,
-              fillColor: servio.backgroundSoft,
+              fillColor: inputBg,
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(ServioRadius.sm),
-                borderSide: BorderSide(color: servio.border),
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: borderColor),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(ServioRadius.sm),
-                borderSide: BorderSide(color: servio.border),
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: borderColor),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(ServioRadius.sm),
-                borderSide: BorderSide(color: servio.accent, width: 1.5),
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: stitchNavy, width: 1.5),
               ),
             ),
             items: items
-                .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                .map((e) => DropdownMenuItem(
+                      value: e,
+                      child: Text(
+                        e,
+                        style: const TextStyle(fontFamily: 'Inter'),
+                      ),
+                    ))
                 .toList(),
             onChanged: onChanged,
           ),
@@ -448,100 +542,224 @@ class _SuccessBodyState extends State<_SuccessBody> {
 
   @override
   Widget build(BuildContext context) {
-    final servio = context.servio;
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    // HSL Stitch Color Definitions
+    final stitchBg = isDark ? const Color(0xFF131518) : const Color(0xFFFBF9F6);
+    final stitchWarm = isDark ? const Color(0xFF2C2520) : const Color(0xFFF3EDE7);
+    final stitchNavy = isDark ? const Color(0xFFE4E2DF) : const Color(0xFF1A1D23);
+    final stitchTaupe = isDark ? const Color(0xFF9A8C73) : const Color(0xFF9A8C73);
+    final stitchMuted = isDark ? const Color(0xFF9EA3AE) : const Color(0xFF6B6560);
+    final stitchWhite = isDark ? const Color(0xFF1E2124) : Colors.white;
+    final borderColor = isDark ? const Color(0xFF383A40) : const Color(0xFFE4E2DF);
 
     final bottomInset = MediaQuery.paddingOf(context).bottom;
+
     return Stack(
       children: <Widget>[
         ListView(
           padding: EdgeInsets.fromLTRB(
-            ServioSpacing.screenPadding,
-            ServioSpacing.screenPadding,
-            ServioSpacing.screenPadding,
+            20,
+            16,
+            20,
             120 + bottomInset,
           ),
           children: [
-            // â”€â”€ Wallet header card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // ── Wallet header card (Bento Stat Primary) ──────────────────────────
             _StaggeredItem(
               index: 0,
               child: Container(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(22),
                 decoration: BoxDecoration(
-                  gradient: ServioGradients.brand,
-                  borderRadius: BorderRadius.circular(ServioRadius.xl),
-                  boxShadow: ServioShadows.rest,
+                  color: stitchWarm,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: stitchTaupe.withValues(alpha: isDark ? 0.35 : 0.20),
+                    width: 1,
+                  ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.18),
-                            borderRadius:
-                                BorderRadius.circular(ServioRadius.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'PENDING PAYOUT',
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: stitchMuted,
+                              letterSpacing: 1.5,
+                            ),
                           ),
-                          child: const Icon(
-                            Icons.account_balance_wallet_rounded,
-                            size: 22,
-                            color: Colors.white,
+                          const SizedBox(height: 8),
+                          _CountUpText(
+                            value: widget.summary.pendingPayout,
+                            suffix: ' EGP',
+                            style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 32,
+                              fontWeight: FontWeight.w800,
+                              color: stitchNavy,
+                              letterSpacing: -0.5,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          'Total Earned',
-                          style: theme.textTheme.labelLarge?.copyWith(
-                              color: Colors.white.withValues(alpha: 0.85)),
-                        ),
-                      ],
+                          const SizedBox(height: 8),
+                          Text(
+                            'Scheduled for transfer: ${widget.summary.payoutSchedule.toUpperCase()}',
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 13,
+                              color: stitchMuted,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 16),
-                    _CountUpText(
-                      value: widget.summary.totalEarnings,
-                      suffix: ' EGP',
-                      style: theme.textTheme.displaySmall?.copyWith(
-                          color: Colors.white, fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 8),
-                    _CountUpText(
-                      value: widget.summary.pendingPayout,
-                      prefix: 'Pending: ',
-                      suffix: ' EGP',
-                      style: theme.textTheme.bodyMedium
-                          ?.copyWith(color: ServioColors.accentLight),
+                    const SizedBox(width: 12),
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E2124) : Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: borderColor),
+                      ),
+                      child: Icon(
+                        Icons.account_balance_wallet_outlined,
+                        size: 22,
+                        color: stitchNavy,
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
 
-            // â”€â”€ Metric cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // ── Bento Metric Row ─────────────────────────────────────────────────
             _StaggeredItem(
               index: 1,
               child: Row(
                 children: [
                   Expanded(
-                    child: _MetricCard(
-                      icon: Icons.check_circle_outline_rounded,
-                      label: 'Completed Jobs',
-                      value: widget.summary.completedJobs.toDouble(),
-                      isCurrency: false,
-                      color: servio.success,
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: stitchWhite,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: borderColor),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: stitchWarm,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.task_alt_rounded,
+                              size: 20,
+                              color: Color(0xFF3E2723),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'COMPLETED JOBS',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontFamily: 'Inter',
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: stitchMuted,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${widget.summary.completedJobs}',
+                                  style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                    color: stitchNavy,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: _MetricCard(
-                      icon: Icons.schedule_rounded,
-                      label: 'Pending Payout',
-                      value: widget.summary.pendingPayout,
-                      isCurrency: true,
-                      color: servio.warning,
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: stitchWhite,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: borderColor),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: stitchWarm,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.trending_up_rounded,
+                              size: 20,
+                              color: Color(0xFF3E2723),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'YTD EARNINGS',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontFamily: 'Inter',
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: stitchMuted,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                _CountUpText(
+                                  value: widget.summary.totalEarnings,
+                                  suffix: ' EGP',
+                                  style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                    color: stitchNavy,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -549,10 +767,10 @@ class _SuccessBodyState extends State<_SuccessBody> {
             ),
             const SizedBox(height: 24),
 
-            // â”€â”€ Saved-state banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // ── Saved state alert ────────────────────────────────────────────────
             AnimatedSize(
-              duration: ServioMotion.normal,
-              curve: ServioMotion.spring,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
               child: _isLocked
                   ? Padding(
                       padding: const EdgeInsets.only(bottom: 16),
@@ -560,23 +778,32 @@ class _SuccessBodyState extends State<_SuccessBody> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 14, vertical: 12),
                         decoration: BoxDecoration(
-                          color: ServioColors.tint(servio.success),
-                          borderRadius: BorderRadius.circular(ServioRadius.md),
+                          color: isDark
+                              ? const Color(0xFF1E3A24).withValues(alpha: 0.4)
+                              : const Color(0xFFEFFDF4),
+                          borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: servio.success.withValues(alpha: 0.4),
+                            color: isDark
+                                ? const Color(0xFF1B6A2E)
+                                : const Color(0xFFD1FAE5),
                           ),
                         ),
                         child: Row(
                           children: <Widget>[
-                            Icon(Icons.check_circle_rounded,
-                                size: 18, color: servio.success),
+                            Icon(
+                              Icons.check_circle_outline_rounded,
+                              size: 18,
+                              color: isDark ? const Color(0xFF34D399) : const Color(0xFF10B981),
+                            ),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
-                                'Payout settings saved. Tap Edit to change.',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: servio.success,
-                                  fontWeight: FontWeight.w600,
+                                'Payout settings are securely saved. Tap Edit to update.',
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 13,
+                                  color: isDark ? const Color(0xFF34D399) : const Color(0xFF065F46),
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ),
@@ -587,76 +814,106 @@ class _SuccessBodyState extends State<_SuccessBody> {
                   : const SizedBox.shrink(),
             ),
 
-            // â”€â”€ Payout Method form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // ── Select Payout Method Form ────────────────────────────────────────
             IgnorePointer(
               ignoring: _isLocked,
               child: AnimatedOpacity(
-                duration: ServioMotion.normal,
+                duration: const Duration(milliseconds: 250),
                 opacity: _isLocked ? 0.6 : 1,
                 child: _StaggeredItem(
                   index: 2,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const _SectionTitle(label: 'Payout Method'),
-                      const SizedBox(height: 8),
-                      ServioCard(
-                        radius: ServioRadius.lg,
+                      Text(
+                        'Select Payout Method',
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: stitchNavy,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _ScaleButton(
+                        onTap: () => setState(() => _payoutMethod = 'bank'),
+                        child: _PayoutMethodOptionCard(
+                          icon: Icons.account_balance_rounded,
+                          label: 'Bank Transfer',
+                          subtitle: 'Direct deposit to checking/savings. 1-2 business days.',
+                          selected: _payoutMethod == 'bank',
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      _ScaleButton(
+                        onTap: () => setState(() => _payoutMethod = 'instapay'),
+                        child: _PayoutMethodOptionCard(
+                          icon: Icons.bolt_rounded,
+                          label: 'Instapay',
+                          subtitle: 'Instant transfer to debit card. 1.5% fee applies.',
+                          selected: _payoutMethod == 'instapay',
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      _ScaleButton(
+                        onTap: () => setState(() => _payoutMethod = 'vodafone'),
+                        child: _PayoutMethodOptionCard(
+                          icon: Icons.phone_android_rounded,
+                          label: 'Vodafone Cash',
+                          subtitle: 'Transfer directly to integrated mobile wallet.',
+                          selected: _payoutMethod == 'vodafone',
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      _ScaleButton(
+                        onTap: () => setState(() => _payoutMethod = 'orange'),
+                        child: _PayoutMethodOptionCard(
+                          icon: Icons.phone_android_rounded,
+                          label: 'Orange Cash',
+                          subtitle: 'Transfer directly to integrated mobile wallet.',
+                          selected: _payoutMethod == 'orange',
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // ── Secure Details Card ──────────────────────────────────────
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: stitchWhite,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: borderColor),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color.fromRGBO(34, 40, 49, 0.03),
+                              blurRadius: 16,
+                              offset: Offset(0, 4),
+                            ),
+                          ],
+                        ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              'Choose how you receive your earnings from completed jobs.',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                  color: servio.textSecondary, height: 1.5),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.lock_outline_rounded,
+                                  color: stitchTaupe,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Secure Account Details',
+                                  style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: stitchNavy,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 16),
-                            _ScaleButton(
-                              onTap: () =>
-                                  setState(() => _payoutMethod = 'bank'),
-                              child: _PayoutMethodOption(
-                                icon: Icons.account_balance_rounded,
-                                label: 'Bank Transfer',
-                                selected: _payoutMethod == 'bank',
-                                servio: servio,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            _ScaleButton(
-                              onTap: () =>
-                                  setState(() => _payoutMethod = 'instapay'),
-                              child: _PayoutMethodOption(
-                                icon: Icons.flash_on_rounded,
-                                label: 'Instapay',
-                                selected: _payoutMethod == 'instapay',
-                                servio: servio,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            _ScaleButton(
-                              onTap: () =>
-                                  setState(() => _payoutMethod = 'vodafone'),
-                              child: _PayoutMethodOption(
-                                icon: Icons.phone_android_rounded,
-                                label: 'Vodafone Cash',
-                                selected: _payoutMethod == 'vodafone',
-                                servio: servio,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            _ScaleButton(
-                              onTap: () =>
-                                  setState(() => _payoutMethod = 'orange'),
-                              child: _PayoutMethodOption(
-                                icon: Icons.phone_android_rounded,
-                                label: 'Orange Cash',
-                                selected: _payoutMethod == 'orange',
-                                servio: servio,
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            const _SectionTitle(label: 'Account Details'),
-                            const SizedBox(height: 16),
+                            Divider(height: 32, color: borderColor),
                             AnimatedSwitcher(
                               duration: const Duration(milliseconds: 300),
                               transitionBuilder: (child, animation) {
@@ -664,37 +921,40 @@ class _SuccessBodyState extends State<_SuccessBody> {
                                   sizeFactor: animation,
                                   axisAlignment: -1,
                                   child: FadeTransition(
-                                      opacity: animation, child: child),
+                                    opacity: animation,
+                                    child: child,
+                                  ),
                                 );
                               },
                               child: _payoutMethod == 'bank'
                                   ? Column(
-                                      key: const ValueKey('bank_form'),
+                                      key: const ValueKey('bank_form_fields'),
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
                                         _buildDropdown(
-                                            label: 'Bank Name',
-                                            hint: 'Select bank...',
-                                            value: _selectedBank,
-                                            onChanged: (val) => setState(
-                                                () => _selectedBank = val),
-                                            items: _kBankNames),
+                                          label: 'Bank Name',
+                                          hint: 'Select bank...',
+                                          value: _selectedBank,
+                                          onChanged: (val) => setState(
+                                              () => _selectedBank = val),
+                                          items: _kBankNames,
+                                        ),
                                         _buildTextField(
                                           label: 'Account Holder Name',
-                                          hint: 'Exactly as on your bank card',
+                                          hint: 'Name exactly as on bank card',
                                           controller: _accountHolderCtrl,
                                         ),
                                         _buildTextField(
                                           label: 'Account Number / IBAN',
-                                          hint:
-                                              'EG00 0000 0000 0000 0000 0000 0000',
+                                          hint: 'EG00 0000 0000 0000 0000 0000',
                                           controller: _accountNumberCtrl,
+                                          isPassword: true,
                                         ),
                                       ],
                                     )
                                   : Column(
-                                      key: const ValueKey('wallet_form'),
+                                      key: const ValueKey('wallet_form_fields'),
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
@@ -706,14 +966,56 @@ class _SuccessBodyState extends State<_SuccessBody> {
                                         ),
                                         Text(
                                           'Must match the number registered with your wallet provider.',
-                                          style: theme.textTheme.bodySmall
-                                              ?.copyWith(
-                                                  color: servio.textSecondary),
+                                          style: TextStyle(
+                                            fontFamily: 'Inter',
+                                            fontSize: 12,
+                                            color: stitchMuted,
+                                            height: 1.4,
+                                          ),
                                         ),
                                         const SizedBox(height: 16),
                                       ],
                                     ),
                             ),
+
+                            // Mini inline button modeled on Stitch
+                            if (!_isLocked) ...[
+                              const SizedBox(height: 8),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton.icon(
+                                  onPressed: _isSaving ? null : _handleSave,
+                                  icon: _isSaving
+                                      ? const SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : const Icon(Icons.shield_outlined, size: 16),
+                                  label: Text(
+                                    _isSaving ? 'Saving...' : 'Save Securely',
+                                    style: const TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: isDark
+                                        ? const Color(0xFFBA1A1A)
+                                        : const Color(0xFF1A1D23),
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    minimumSize: const Size(0, 48),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -724,67 +1026,73 @@ class _SuccessBodyState extends State<_SuccessBody> {
             ),
             const SizedBox(height: 24),
 
-            // â”€â”€ Payout Schedule card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // ── Payout Schedule card ─────────────────────────────────────────────
             IgnorePointer(
               ignoring: _isLocked,
               child: AnimatedOpacity(
-                duration: ServioMotion.normal,
+                duration: const Duration(milliseconds: 250),
                 opacity: _isLocked ? 0.6 : 1,
                 child: _StaggeredItem(
                   index: 3,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const _SectionTitle(label: 'Payout Schedule'),
-                      const SizedBox(height: 8),
-                      ServioCard(
-                        radius: ServioRadius.lg,
+                      Text(
+                        'Payout Schedule',
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: stitchNavy,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: stitchWhite,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: borderColor),
+                        ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               'Choose how often you want your earnings transferred.',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                  color: servio.textSecondary, height: 1.5),
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 13,
+                                color: stitchMuted,
+                                height: 1.45,
+                              ),
                             ),
                             const SizedBox(height: 16),
                             _ScaleButton(
-                              onTap: () =>
-                                  setState(() => _payoutSchedule = 'weekly'),
-                              child: _ScheduleOption(
+                              onTap: () => setState(() => _payoutSchedule = 'weekly'),
+                              child: _PayoutScheduleCard(
                                 label: 'Weekly',
-                                subtitle:
-                                    'Every Sunday â€” earnings from the past 7 days.',
+                                subtitle: 'Every Sunday — earnings from the past 7 days.',
                                 selected: _payoutSchedule == 'weekly',
-                                servio: servio,
                               ),
                             ),
                             const SizedBox(height: 10),
                             _ScaleButton(
-                              onTap: () =>
-                                  setState(() => _payoutSchedule = 'monthly'),
-                              child: _ScheduleOption(
+                              onTap: () => setState(() => _payoutSchedule = 'monthly'),
+                              child: _PayoutScheduleCard(
                                 label: 'Monthly',
-                                subtitle:
-                                    '1st of each month â€” previous month\'s earnings.',
+                                subtitle: '1st of each month — previous month\'s earnings.',
                                 selected: _payoutSchedule == 'monthly',
-                                servio: servio,
                               ),
                             ),
                             const SizedBox(height: 10),
                             _ScaleButton(
-                              onTap: () =>
-                                  setState(() => _payoutSchedule = 'instant'),
-                              child: _ScheduleOption(
+                              onTap: () => setState(() => _payoutSchedule = 'instant'),
+                              child: _PayoutScheduleCard(
                                 label: 'Instant',
-                                subtitle:
-                                    'Request a payout at any time (small processing fee applies).',
+                                subtitle: 'Request payout at any time (processing fee applies).',
                                 selected: _payoutSchedule == 'instant',
-                                servio: servio,
                               ),
                             ),
-                            const SizedBox(height: 16),
-                            // Form button moved to bottom
                           ],
                         ),
                       ),
@@ -795,53 +1103,204 @@ class _SuccessBodyState extends State<_SuccessBody> {
             ),
             const SizedBox(height: 24),
 
-            // â”€â”€ Security hint â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // ── Request Payout button & Security hint ───────────────────────────
             _StaggeredItem(
               index: 4,
-              child: Row(
+              child: Column(
                 children: [
-                  Icon(Icons.lock_outline_rounded,
-                      size: 16, color: servio.textSecondary),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Your payout information is encrypted and secure.',
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: servio.textSecondary),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.lock_outline_rounded,
+                        size: 15,
+                        color: stitchMuted,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Your payout information is encrypted and secure.',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 12,
+                          color: stitchMuted,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute<void>(
+                          builder: (_) => const PayoutRequestScreen(),
+                        ),
+                      ),
+                      icon: const Icon(Icons.account_balance_wallet_outlined, size: 18),
+                      label: const Text('Request Payout'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: stitchNavy,
+                        side: BorderSide(color: stitchNavy.withValues(alpha: 0.35)),
+                        minimumSize: const Size(0, 48),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        textStyle: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 32),
+
+            // ── Cash Debt Section ───────────────────────────────────────────────
+            Consumer<PaymentsProvider>(
+              builder: (ctx, payments, _) {
+                final summary = payments.debtSummary;
+                if (summary == null || summary.debts.isEmpty) {
+                  return const SizedBox.shrink();
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 32),
+                    Text(
+                      'Cash Debt',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: stitchNavy,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (summary.isBlocked)
+                      _DebtBanner(
+                        icon: Icons.lock_outline_rounded,
+                        color: const Color(0xFFBA1A1A),
+                        message:
+                            'Cash bookings locked. Outstanding: EGP ${summary.totalOutstanding.toStringAsFixed(2)}',
+                      )
+                    else if (summary.isWarning)
+                      _DebtBanner(
+                        icon: Icons.warning_amber_rounded,
+                        color: const Color(0xFFF97316),
+                        message:
+                            'Warning: EGP ${summary.totalOutstanding.toStringAsFixed(2)} outstanding cash debt.',
+                      ),
+                    const SizedBox(height: 12),
+                    ...summary.debts.where((d) => !d.isPaid).map((debt) => Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          decoration: BoxDecoration(
+                            color: stitchWhite,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: borderColor),
+                          ),
+                          child: ListTile(
+                            dense: true,
+                            title: Text(
+                              'Booking #${debt.bookingId.length >= 8 ? debt.bookingId.substring(0, 8).toUpperCase() : debt.bookingId.toUpperCase()}',
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontWeight: FontWeight.bold,
+                                color: stitchNavy,
+                              ),
+                            ),
+                            subtitle: Text(
+                              debt.status.toUpperCase(),
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 11,
+                                color: stitchMuted,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            trailing: Text(
+                              'EGP ${debt.remaining.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontFamily: 'Poppins',
+                                color: Color(0xFFBA1A1A),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        )),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () => Navigator.push(
+                          ctx,
+                          MaterialPageRoute<void>(
+                            builder: (_) => SettleDebtScreen(summary: summary),
+                          ),
+                        ),
+                        icon: const Icon(Icons.payment_outlined, size: 18),
+                        label: const Text('Settle Debt'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFBA1A1A),
+                          side: const BorderSide(color: Color(0xFFFFDAD6)),
+                          minimumSize: const Size(0, 48),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          textStyle: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
           ],
         ),
+
+        // ── Floating Action Bar Footer ──────────────────────────────────────
         Positioned(
           left: 0,
           right: 0,
           bottom: 0,
-          child: SafeArea(
-            top: false,
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                ServioSpacing.screenPadding,
-                10,
-                ServioSpacing.screenPadding,
-                12,
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  stitchBg.withValues(alpha: 0.0),
+                  stitchBg.withValues(alpha: 0.95),
+                  stitchBg,
+                ],
+                stops: const [0.0, 0.3, 1.0],
               ),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 520),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ServioPrimaryButton(
-                      label: _isLocked
-                          ? 'Edit Payout Settings'
-                          : (_isSaving ? 'Saving...' : 'Save Changes'),
-                      onPressed: _isLocked
-                          ? _handleEdit
-                          : (_isSaving ? null : _handleSave),
-                      isLoading: _isSaving,
+            ),
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 520),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ServioPrimaryButton(
+                        label: _isLocked
+                            ? 'Edit Payout Settings'
+                            : (_isSaving ? 'Saving...' : 'Save Changes'),
+                        onPressed: _isLocked
+                            ? _handleEdit
+                            : (_isSaving ? null : _handleSave),
+                        isLoading: _isSaving,
+                      ),
                     ),
                   ),
                 ),
@@ -854,7 +1313,7 @@ class _SuccessBodyState extends State<_SuccessBody> {
   }
 }
 
-// â”€â”€ Reusable helpers & animations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Reusable helpers & animations ───────────────────────────────────────────
 
 class _StaggeredItem extends StatefulWidget {
   final int index;
@@ -876,7 +1335,7 @@ class _StaggeredItemState extends State<_StaggeredItem>
     _ctrl = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 500));
     _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
-    _slide = Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero)
+    _slide = Tween<Offset>(begin: const Offset(0, 0.08), end: Offset.zero)
         .animate(CurvedAnimation(parent: _ctrl, curve: ServioMotion.spring));
     Future.delayed(Duration(milliseconds: widget.index * 80), () {
       if (mounted) _ctrl.forward();
@@ -903,25 +1362,23 @@ class _CountUpText extends StatelessWidget {
   const _CountUpText({
     required this.value,
     required this.style,
-    this.prefix = '',
     this.suffix = '',
   });
   final double value;
   final TextStyle? style;
-  final String prefix;
   final String suffix;
 
   @override
   Widget build(BuildContext context) {
     if (MediaQuery.disableAnimationsOf(context)) {
-      return Text('$prefix${value.toStringAsFixed(0)}$suffix', style: style);
+      return Text('${value.toStringAsFixed(2)}$suffix', style: style);
     }
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0, end: value),
-      duration: const Duration(milliseconds: 900),
+      duration: const Duration(milliseconds: 800),
       curve: ServioMotion.spring,
       builder: (context, val, child) {
-        return Text('$prefix${val.toStringAsFixed(0)}$suffix', style: style);
+        return Text('${val.toStringAsFixed(2)}$suffix', style: style);
       },
     );
   }
@@ -945,7 +1402,7 @@ class _ScaleButtonState extends State<_ScaleButton>
   void initState() {
     super.initState();
     _controller = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 150));
+        vsync: this, duration: const Duration(milliseconds: 120));
     _scale = Tween<double>(begin: 1.0, end: 0.98)
         .animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
   }
@@ -982,147 +1439,145 @@ class _ScaleButtonState extends State<_ScaleButton>
   }
 }
 
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle({required this.label});
-  final String label;
+// ── Stitch Custom Form Widgets ──────────────────────────────────────────────
 
-  @override
-  Widget build(BuildContext context) =>
-      Text(label, style: Theme.of(context).textTheme.titleMedium);
-}
-
-class _MetricCard extends StatelessWidget {
-  const _MetricCard({
+class _PayoutMethodOptionCard extends StatelessWidget {
+  const _PayoutMethodOptionCard({
     required this.icon,
-    required this.label,
-    required this.value,
-    required this.isCurrency,
-    required this.color,
-  });
-  final IconData icon;
-  final String label;
-  final double value;
-  final bool isCurrency;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    final servio = context.servio;
-    return ServioCard(
-      radius: ServioRadius.lg,
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: ServioColors.tint(color),
-              borderRadius: BorderRadius.circular(ServioRadius.sm),
-            ),
-            child: Icon(icon, size: 18, color: color),
-          ),
-          const SizedBox(height: 12),
-          _CountUpText(
-            value: value,
-            suffix: isCurrency ? ' EGP' : '',
-            style: Theme.of(context)
-                .textTheme
-                .titleLarge
-                ?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.copyWith(color: servio.textSecondary),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PayoutMethodOption extends StatelessWidget {
-  const _PayoutMethodOption({
-    required this.icon,
-    required this.label,
-    required this.selected,
-    required this.servio,
-  });
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final ServioThemeExtension servio;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      curve: Curves.easeOut,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(ServioRadius.sm),
-        border: Border.all(
-          color: selected ? servio.accent : servio.border,
-          width: selected ? 1.5 : 1,
-        ),
-        color: selected
-            ? servio.accent.withValues(alpha: 0.06)
-            : Colors.transparent,
-      ),
-      child: Row(
-        children: [
-          Icon(icon,
-              size: 20, color: selected ? servio.accent : servio.textSecondary),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                    color: selected ? servio.accent : null,
-                  ),
-            ),
-          ),
-          if (selected)
-            Icon(Icons.check_circle_rounded, size: 20, color: servio.accent),
-        ],
-      ),
-    );
-  }
-}
-
-class _ScheduleOption extends StatelessWidget {
-  const _ScheduleOption({
     required this.label,
     required this.subtitle,
     required this.selected,
-    required this.servio,
+  });
+  final IconData icon;
+  final String label;
+  final String subtitle;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    final stitchWarm = isDark ? const Color(0xFF2C2520) : const Color(0xFFF3EDE7);
+    final stitchNavy = isDark ? const Color(0xFFE4E2DF) : const Color(0xFF1A1D23);
+    final stitchMuted = isDark ? const Color(0xFF9EA3AE) : const Color(0xFF6B6560);
+    final stitchWhite = isDark ? const Color(0xFF1E2124) : Colors.white;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOut,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: stitchWhite,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: selected ? stitchNavy : (isDark ? const Color(0xFF383A40) : const Color(0xFFC6C6CB)),
+          width: selected ? 2.0 : 1.0,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: selected ? stitchWarm : (isDark ? const Color(0xFF26292D) : const Color(0xFFF1F3F5)),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              size: 20,
+              color: selected ? stitchNavy : stitchMuted,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: selected ? stitchNavy : theme.textTheme.bodyMedium?.color,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 12,
+                    color: stitchMuted,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Container(
+            width: 22,
+            height: 22,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: selected ? stitchNavy : stitchMuted.withValues(alpha: 0.5),
+                width: 2,
+              ),
+            ),
+            alignment: Alignment.center,
+            child: selected
+                ? Container(
+                    width: 11,
+                    height: 11,
+                    decoration: BoxDecoration(
+                      color: stitchNavy,
+                      shape: BoxShape.circle,
+                    ),
+                  )
+                : null,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PayoutScheduleCard extends StatelessWidget {
+  const _PayoutScheduleCard({
+    required this.label,
+    required this.subtitle,
+    required this.selected,
   });
   final String label;
   final String subtitle;
   final bool selected;
-  final ServioThemeExtension servio;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    final stitchNavy = isDark ? const Color(0xFFE4E2DF) : const Color(0xFF1A1D23);
+    final stitchMuted = isDark ? const Color(0xFF9EA3AE) : const Color(0xFF6B6560);
+    final stitchWhite = isDark ? const Color(0xFF1E2124) : Colors.white;
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       curve: Curves.easeOut,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(ServioRadius.sm),
+        color: stitchWhite,
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: selected ? servio.accent : servio.border,
-          width: selected ? 1.5 : 1,
+          color: selected ? stitchNavy : (isDark ? const Color(0xFF383A40) : const Color(0xFFE4E2DF)),
+          width: selected ? 1.5 : 1.0,
         ),
-        color: selected
-            ? servio.accent.withValues(alpha: 0.06)
-            : Colors.transparent,
       ),
       child: Row(
         children: [
@@ -1131,29 +1586,72 @@ class _ScheduleOption extends StatelessWidget {
                 ? Icons.radio_button_checked_rounded
                 : Icons.radio_button_off_rounded,
             size: 20,
-            color: selected ? servio.accent : servio.textSecondary,
+            color: selected ? stitchNavy : stitchMuted,
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   label,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: selected ? servio.accent : null,
-                      ),
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: selected ? stitchNavy : theme.textTheme.bodyMedium?.color,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: servio.textSecondary),
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 12,
+                    color: stitchMuted,
+                  ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DebtBanner extends StatelessWidget {
+  const _DebtBanner({
+    required this.icon,
+    required this.color,
+    required this.message,
+  });
+  final IconData icon;
+  final Color color;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                fontFamily: 'Inter',
+                color: color,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],

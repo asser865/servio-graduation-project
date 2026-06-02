@@ -7,10 +7,6 @@ import '../../core/models/service_category.dart';
 import '../../core/services/location_service.dart';
 import '../../core/state/customer_addresses_state.dart';
 import '../../core/state/workers_state.dart';
-import '../../design_system/servio_theme_extension.dart';
-import '../../design_system/servio_tokens.dart';
-import '../../design_system/widgets/servio_card.dart';
-import '../../design_system/widgets/servio_status_chip.dart';
 import 'technician_profile_screen.dart';
 
 class TechnicianListingScreen extends StatefulWidget {
@@ -31,18 +27,9 @@ class TechnicianListingScreen extends StatefulWidget {
 }
 
 class _TechnicianListingScreenState extends State<TechnicianListingScreen> {
-  static const List<String> _filters = <String>[
-    'Rating 4+',
-    'Available Today',
-    'Under 200 EGP/hr',
-    'Verified Only',
-  ];
+  bool _verifiedOnly = false;
 
-  // Maps a locationLabel string to its geocoded LatLng (null = geocoding failed).
-  // A missing key means geocoding hasn't been attempted yet.
   final Map<String, LatLng?> _geocodeCache = <String, LatLng?>{};
-
-  // The customer's reference LatLng used for distance calculation.
   LatLng? _customerLatLng;
 
   @override
@@ -50,14 +37,12 @@ class _TechnicianListingScreenState extends State<TechnicianListingScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _resolveCustomerLocation();
-
       final serviceId =
           _looksLikeMongoId(widget.serviceId) ? widget.serviceId : null;
       final category = normalizeServiceCategory(
         widget.category ??
             (_looksLikeMongoId(widget.serviceId) ? null : widget.serviceId),
       );
-
       context.read<WorkersProvider>().fetchAll(
             serviceId: serviceId,
             category: category.isEmpty ? null : category,
@@ -65,9 +50,6 @@ class _TechnicianListingScreenState extends State<TechnicianListingScreen> {
     });
   }
 
-  /// Resolves the customer's reference location.
-  /// Uses the first saved address that has lat/lng coordinates.
-  /// Falls back to no distance labels if none is available.
   void _resolveCustomerLocation() {
     CustomerAddressesProvider addressesProvider;
     try {
@@ -76,8 +58,6 @@ class _TechnicianListingScreenState extends State<TechnicianListingScreen> {
       return;
     }
     _pickCustomerLatLng(addressesProvider);
-
-    // If addresses haven't loaded yet, trigger a load then re-pick.
     if (addressesProvider.addresses.isEmpty && !addressesProvider.loading) {
       addressesProvider.load().then((_) {
         if (!mounted) return;
@@ -100,7 +80,6 @@ class _TechnicianListingScreenState extends State<TechnicianListingScreen> {
     }
   }
 
-  /// Kicks off geocoding for any worker locationLabels not yet in the cache.
   void _geocodePendingWorkers(List<BackendWorker> workers) {
     if (_customerLatLng == null) return;
     final uniqueLabels = workers
@@ -122,24 +101,17 @@ class _TechnicianListingScreenState extends State<TechnicianListingScreen> {
     });
   }
 
-  /// Returns a formatted distance string for [worker] relative to the customer,
-  /// or null if the distance cannot be computed yet (still loading or no data).
   String? _distanceLabelFor(BackendWorker worker) {
     final customerPos = _customerLatLng;
     if (customerPos == null) return null;
-
     final label = worker.locationLabel.trim();
     if (label.isEmpty) return null;
-
     if (!_geocodeCache.containsKey(label)) {
-      // Not geocoded yet — trigger geocoding and return null for now.
       _geocodeLabel(label);
       return null;
     }
-
     final workerPos = _geocodeCache[label];
-    if (workerPos == null) return null; // geocoding failed for this label
-
+    if (workerPos == null) return null;
     final km =
         const Distance().as(LengthUnit.Kilometer, customerPos, workerPos);
     return '${km.toStringAsFixed(1)} km away';
@@ -147,8 +119,6 @@ class _TechnicianListingScreenState extends State<TechnicianListingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final servio = context.servio;
     final provider = context.watch<WorkersProvider>();
     final serviceId =
         _looksLikeMongoId(widget.serviceId) ? widget.serviceId!.trim() : '';
@@ -156,13 +126,15 @@ class _TechnicianListingScreenState extends State<TechnicianListingScreen> {
       widget.category ??
           (_looksLikeMongoId(widget.serviceId) ? null : widget.serviceId),
     );
-    final workers = _filterWorkersForSelection(
+    var workers = _filterWorkersForSelection(
       provider.workers,
       serviceId: serviceId,
       category: category,
     );
+    if (_verifiedOnly) {
+      workers = workers.where((w) => w.isVerified).toList();
+    }
 
-    // Trigger geocoding whenever the worker list changes.
     if (!provider.loading && workers.isNotEmpty) {
       _geocodePendingWorkers(workers);
     }
@@ -179,100 +151,177 @@ class _TechnicianListingScreenState extends State<TechnicianListingScreen> {
             : null;
 
     return Scaffold(
-      body: SafeArea(
-        child: CustomScrollView(
-          slivers: <Widget>[
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                child: Row(
-                  children: <Widget>[
-                    Expanded(
-                      child: Text(
-                        '$listingTitle\n${workers.length} Technicians Available',
-                        style: theme.textTheme.headlineMedium,
+      backgroundColor: const Color(0xFFFBF9F6),
+      extendBodyBehindAppBar: true,
+      appBar: _buildAppBar(context),
+      body: CustomScrollView(
+        slivers: <Widget>[
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: MediaQuery.of(context).padding.top + kToolbarHeight + 8,
+            ),
+          ),
+          // Context header
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Row(
+                    children: <Widget>[
+                      const Icon(
+                        Icons.handyman_rounded,
+                        color: Color(0xFF9A8C73),
+                        size: 20,
                       ),
+                      const SizedBox(width: 8),
+                      Text(
+                        listingTitle,
+                        style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontWeight: FontWeight.w500,
+                          fontSize: 20,
+                          color: Color(0xFF1A1D23),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Showing available professionals near you.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF6B6560),
                     ),
-                    Text(
-                      'Sort: Rating',
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: servio.textSecondary),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
-            SliverToBoxAdapter(
-              child: SizedBox(
-                height: 60,
-                child: ListView.separated(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _filters.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 10),
-                  itemBuilder: (BuildContext context, int index) {
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: servio.backgroundSoft,
-                        borderRadius: BorderRadius.circular(ServioRadius.full),
-                      ),
-                      child: Text(
-                        _filters[index],
-                        style: theme.textTheme.labelLarge
-                            ?.copyWith(color: servio.textSecondary),
+          ),
+          // Filter bar
+          SliverToBoxAdapter(
+            child: _FilterBar(
+              verifiedOnly: _verifiedOnly,
+              onVerifiedToggle: () =>
+                  setState(() => _verifiedOnly = !_verifiedOnly),
+            ),
+          ),
+          // Content
+          if (provider.loading)
+            const SliverFillRemaining(
+              child: Center(
+                child: CircularProgressIndicator(
+                  color: Color(0xFF9A8C73),
+                ),
+              ),
+            )
+          else if (provider.error != null)
+            SliverFillRemaining(
+              child: Center(
+                child: Text(
+                  provider.error!,
+                  style: const TextStyle(color: Color(0xFF6B6560)),
+                ),
+              ),
+            )
+          else if (workers.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: _TechnicianEmptyState(
+                hasFilter: _verifiedOnly,
+                onClearFilters: () => setState(() => _verifiedOnly = false),
+              ),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (BuildContext context, int index) {
+                    final worker = workers[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: _TechnicianCard(
+                        worker: worker,
+                        distanceLabel: _distanceLabelFor(worker),
+                        onViewProfile: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => TechnicianProfileScreen(
+                                technicianId: worker.id,
+                                selectedServiceId:
+                                    serviceId.isNotEmpty ? serviceId : null,
+                                selectedServiceCategory:
+                                    category.isNotEmpty ? category : null,
+                                selectedServiceName: selectedServiceName,
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     );
                   },
+                  childCount: workers.length,
                 ),
               ),
             ),
-            if (provider.loading)
-              const SliverFillRemaining(
-                  child: Center(child: CircularProgressIndicator()))
-            else if (provider.error != null)
-              SliverFillRemaining(child: Center(child: Text(provider.error!)))
-            else if (workers.isEmpty)
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: _TechnicianEmptyState(category: listingTitle),
-              )
-            else
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (BuildContext context, int index) {
-                      final worker = workers[index];
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: _TechnicianListCard(
-                          worker: worker,
-                          distanceLabel: _distanceLabelFor(worker),
-                          onViewProfile: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => TechnicianProfileScreen(
-                                  technicianId: worker.id,
-                                  selectedServiceId:
-                                      serviceId.isNotEmpty ? serviceId : null,
-                                  selectedServiceCategory:
-                                      category.isNotEmpty ? category : null,
-                                  selectedServiceName: selectedServiceName,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      );
-                    },
-                    childCount: workers.length,
-                  ),
-                ),
+        ],
+      ),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
+    return PreferredSize(
+      preferredSize: const Size.fromHeight(kToolbarHeight),
+      child: ClipRect(
+        child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFFFBF9F6).withValues(alpha: 0.85),
+            boxShadow: <BoxShadow>[
+              BoxShadow(
+                color: const Color(0xFF1A1D23).withValues(alpha: 0.06),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
               ),
-          ],
+            ],
+          ),
+          child: SafeArea(
+            bottom: false,
+            child: SizedBox(
+              height: kToolbarHeight,
+              child: Row(
+                children: <Widget>[
+                  // Back button
+                  SizedBox(
+                    width: 56,
+                    height: 56,
+                    child: IconButton(
+                      icon: const Icon(Icons.arrow_back_rounded),
+                      color: const Color(0xFF1A1D23),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ),
+                  // Title
+                  const Expanded(
+                    child: Text(
+                      'Technicians',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 20,
+                        color: Color(0xFF1A1D23),
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                  ),
+                  // Trailing placeholder to balance layout
+                  const SizedBox(width: 56),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -297,36 +346,127 @@ List<BackendWorker> _filterWorkersForSelection(
   }).toList();
 }
 
-class _TechnicianEmptyState extends StatelessWidget {
-  const _TechnicianEmptyState({required this.category});
+// ---------------------------------------------------------------------------
+// Filter bar
+// ---------------------------------------------------------------------------
 
-  final String category;
+class _FilterBar extends StatelessWidget {
+  const _FilterBar({
+    required this.verifiedOnly,
+    required this.onVerifiedToggle,
+  });
+
+  final bool verifiedOnly;
+  final VoidCallback onVerifiedToggle;
 
   @override
   Widget build(BuildContext context) {
-    final servio = context.servio;
-    final theme = Theme.of(context);
+    return SizedBox(
+      height: 68,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        children: <Widget>[
+          // Filters button
+          _FilterChip(
+            label: 'Filters',
+            icon: Icons.tune_rounded,
+            active: false,
+            onTap: () {},
+          ),
+          const SizedBox(width: 10),
+          // Verified Only toggle
+          _FilterChip(
+            label: 'Verified Only',
+            icon: Icons.verified_rounded,
+            active: verifiedOnly,
+            onTap: onVerifiedToggle,
+          ),
+          const SizedBox(width: 10),
+          // Distance (placeholder)
+          _FilterChip(
+            label: 'Distance',
+            trailingIcon: Icons.expand_more_rounded,
+            active: false,
+            onTap: () {},
+          ),
+          const SizedBox(width: 10),
+          // Rating (placeholder)
+          _FilterChip(
+            label: 'Rating',
+            trailingIcon: Icons.expand_more_rounded,
+            active: false,
+            onTap: () {},
+          ),
+        ],
+      ),
+    );
+  }
+}
 
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(ServioSpacing.screenPadding),
-        child: Column(
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({
+    required this.label,
+    required this.onTap,
+    this.icon,
+    this.trailingIcon,
+    this.active = false,
+  });
+
+  final String label;
+  final IconData? icon;
+  final IconData? trailingIcon;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = active ? const Color(0xFF1A1D23) : const Color(0xFFF3EDE7);
+    final fg = active ? Colors.white : const Color(0xFF1A1D23);
+    final borderColor = active
+        ? const Color(0xFF1A1D23)
+        : const Color(0xFF9A8C73).withValues(alpha: 0.3);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        height: 44,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(9999),
+          border: Border.all(color: borderColor, width: 2),
+          boxShadow: active
+              ? <BoxShadow>[
+                  BoxShadow(
+                    color: const Color(0xFF1A1D23).withValues(alpha: 0.12),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(
-              Icons.person_search_rounded,
-              size: 42,
-              color: servio.textSecondary,
-            ),
-            const SizedBox(height: 12),
-            Text('No technicians found', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 6),
+            if (icon != null) ...<Widget>[
+              Icon(icon, size: 16, color: fg),
+              const SizedBox(width: 6),
+            ],
             Text(
-              'There are no available technicians for $category right now.',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(color: servio.textSecondary),
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: fg,
+                letterSpacing: 0.1,
+              ),
             ),
+            if (trailingIcon != null) ...<Widget>[
+              const SizedBox(width: 4),
+              Icon(trailingIcon, size: 16, color: fg),
+            ],
           ],
         ),
       ),
@@ -334,8 +474,12 @@ class _TechnicianEmptyState extends StatelessWidget {
   }
 }
 
-class _TechnicianListCard extends StatelessWidget {
-  const _TechnicianListCard({
+// ---------------------------------------------------------------------------
+// Technician card (Stitch redesign)
+// ---------------------------------------------------------------------------
+
+class _TechnicianCard extends StatelessWidget {
+  const _TechnicianCard({
     required this.worker,
     required this.onViewProfile,
     this.distanceLabel,
@@ -343,99 +487,250 @@ class _TechnicianListCard extends StatelessWidget {
 
   final BackendWorker worker;
   final VoidCallback onViewProfile;
-
-  /// Optional "X.X km away" label. Null means distance is unavailable.
   final String? distanceLabel;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final servio = context.servio;
-
-    return ServioCard(
-      radius: ServioRadius.lg,
-      child: Column(
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3EDE7),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFF9A8C73).withValues(alpha: 0.10),
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
         children: <Widget>[
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  gradient: ServioGradients.warm,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: servio.accent, width: 2),
+          // Decorative gradient corner
+          Positioned(
+            top: 0,
+            right: 0,
+            child: Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  colors: <Color>[
+                    const Color(0xFF9A8C73).withValues(alpha: 0.18),
+                    Colors.transparent,
+                  ],
                 ),
-                clipBehavior: Clip.antiAlias,
-                child: worker.profileImage.isEmpty
-                    ? _WorkerInitials(initials: worker.initials)
-                    : Image.network(
-                        worker.profileImage,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
-                            _WorkerInitials(initials: worker.initials),
-                      ),
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(80),
+                ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
+            ),
+          ),
+          // Card content
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                // Avatar row
+                Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text(worker.name, style: theme.textTheme.titleMedium),
-                    const SizedBox(height: 4),
-                    Text(
-                      worker.skills.take(2).join(', '),
-                      style: theme.textTheme.bodyMedium
-                          ?.copyWith(color: servio.textSecondary),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      '${worker.rating.toStringAsFixed(1)} rating - (${worker.reviewCount} reviews)',
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: servio.textSecondary),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: <Widget>[
-                        Text(
-                          'EGP ${worker.hourlyRate}/hr',
-                          style: theme.textTheme.titleMedium
-                              ?.copyWith(color: servio.accent),
-                        ),
-                        if (distanceLabel != null) ...<Widget>[
-                          const SizedBox(width: 10),
+                    // Avatar + verified badge
+                    _WorkerAvatar(worker: worker),
+                    const SizedBox(width: 16),
+                    // Name / specialty / distance
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
                           Row(
-                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: <Widget>[
-                              Icon(
-                                Icons.location_on_outlined,
-                                size: 13,
-                                color: servio.textSecondary,
+                              Expanded(
+                                child: Text(
+                                  worker.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 18,
+                                    color: Color(0xFF1A1D23),
+                                    height: 1.2,
+                                  ),
+                                ),
                               ),
-                              const SizedBox(width: 2),
-                              Text(
-                                distanceLabel!,
-                                style: theme.textTheme.bodySmall
-                                    ?.copyWith(color: servio.textSecondary),
+                              const SizedBox(width: 8),
+                              // Rating badge
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF3EDE7),
+                                  borderRadius: BorderRadius.circular(9999),
+                                  border: Border.all(
+                                    color: const Color(0xFF9A8C73)
+                                        .withValues(alpha: 0.2),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: <Widget>[
+                                    const Icon(
+                                      Icons.star_rounded,
+                                      size: 13,
+                                      color: Color(0xFF9A8C73),
+                                    ),
+                                    const SizedBox(width: 2),
+                                    Text(
+                                      worker.rating.toStringAsFixed(1),
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF1A1D23),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
+                          const SizedBox(height: 4),
+                          // Specialty
+                          Text(
+                            worker.skills.isNotEmpty
+                                ? worker.skills.first
+                                : 'General Services',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFF6B6560),
+                            ),
+                          ),
+                          // Distance
+                          if (distanceLabel != null) ...<Widget>[
+                            const SizedBox(height: 6),
+                            Row(
+                              children: <Widget>[
+                                const Icon(
+                                  Icons.location_on_rounded,
+                                  size: 14,
+                                  color: Color(0xFF6B6560),
+                                ),
+                                const SizedBox(width: 2),
+                                Text(
+                                  distanceLabel!,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFF6B6560),
+                                    letterSpacing: 0.1,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   ],
                 ),
-              ),
-              if (worker.isVerified) const ServioStatusChip(label: 'Verified'),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerRight,
-            child: OutlinedButton(
-              onPressed: onViewProfile,
-              child: const Text('View Profile'),
+                // Skills chips
+                if (worker.skills.length > 1) ...<Widget>[
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: worker.skills
+                        .skip(1)
+                        .take(3)
+                        .map(
+                          (skill) => Container(
+                            height: 28,
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF9A8C73)
+                                  .withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              skill,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF1A1D23),
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ],
+                // Action row
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.only(top: 14),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      top: BorderSide(
+                        color: const Color(0xFF9A8C73).withValues(alpha: 0.10),
+                      ),
+                    ),
+                  ),
+                  child: Row(
+                    children: <Widget>[
+                      // View Profile button
+                      Expanded(
+                        child: SizedBox(
+                          height: 44,
+                          child: ElevatedButton(
+                            onPressed: onViewProfile,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF1A1D23),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            child: const Text(
+                              'View Profile',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                letterSpacing: 0.1,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      // Bookmark button
+                      SizedBox(
+                        width: 44,
+                        height: 44,
+                        child: OutlinedButton(
+                          onPressed: () {},
+                          style: OutlinedButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            side: BorderSide(
+                              color: const Color(0xFF9A8C73)
+                                  .withValues(alpha: 0.3),
+                              width: 2,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.bookmark_outline_rounded,
+                            size: 20,
+                            color: Color(0xFF1A1D23),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -444,8 +739,67 @@ class _TechnicianListCard extends StatelessWidget {
   }
 }
 
-class _WorkerInitials extends StatelessWidget {
-  const _WorkerInitials({required this.initials});
+class _WorkerAvatar extends StatelessWidget {
+  const _WorkerAvatar({required this.worker});
+
+  final BackendWorker worker;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: <Widget>[
+        Container(
+          width: 64,
+          height: 64,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: const Color(0xFF9A8C73).withValues(alpha: 0.18),
+            border: Border.all(color: Colors.white, width: 2),
+            boxShadow: <BoxShadow>[
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: worker.profileImage.isEmpty
+              ? _Initials(initials: worker.initials)
+              : Image.network(
+                  worker.profileImage,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) =>
+                      _Initials(initials: worker.initials),
+                ),
+        ),
+        if (worker.isVerified)
+          Positioned(
+            bottom: -2,
+            right: -2,
+            child: Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3EDE7),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              child: const Icon(
+                Icons.verified_rounded,
+                size: 12,
+                color: Color(0xFF1A1D23),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _Initials extends StatelessWidget {
+  const _Initials({required this.initials});
 
   final String initials;
 
@@ -454,10 +808,106 @@ class _WorkerInitials extends StatelessWidget {
     return Center(
       child: Text(
         initials,
-        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              color: ServioColors.deepBrown,
-              fontWeight: FontWeight.w700,
+        style: const TextStyle(
+          fontFamily: 'Poppins',
+          fontWeight: FontWeight.w700,
+          fontSize: 20,
+          color: Color(0xFF1A1D23),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Empty state
+// ---------------------------------------------------------------------------
+
+class _TechnicianEmptyState extends StatelessWidget {
+  const _TechnicianEmptyState({
+    required this.hasFilter,
+    required this.onClearFilters,
+  });
+
+  final bool hasFilter;
+  final VoidCallback onClearFilters;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: const Color(0xFF9A8C73).withValues(alpha: 0.1),
+                ),
+                boxShadow: <BoxShadow>[
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.search_off_rounded,
+                size: 36,
+                color: Color(0xFF9A8C73),
+              ),
             ),
+            const SizedBox(height: 20),
+            const Text(
+              'No technicians found',
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontWeight: FontWeight.w500,
+                fontSize: 18,
+                color: Color(0xFF1A1D23),
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Try adjusting your filters or expanding your search radius to find available professionals.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: Color(0xFF6B6560),
+                height: 1.5,
+              ),
+            ),
+            if (hasFilter) ...<Widget>[
+              const SizedBox(height: 24),
+              SizedBox(
+                height: 44,
+                child: ElevatedButton(
+                  onPressed: onClearFilters,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1A1D23),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    shape: const StadiumBorder(),
+                  ),
+                  child: const Text(
+                    'Clear Filters',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

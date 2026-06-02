@@ -13,20 +13,22 @@ import 'package:servio_mobile_app/src/core/state/app_state.dart';
 import 'package:servio_mobile_app/src/design_system/servio_theme_extension.dart';
 import 'package:servio_mobile_app/src/design_system/servio_tokens.dart';
 import 'package:servio_mobile_app/src/features/auth/login_screen.dart';
-import 'package:servio_mobile_app/src/features/auth/widgets/auth_background.dart';
-import 'package:servio_mobile_app/src/features/auth/widgets/auth_card.dart';
 
-Future<Widget> _build({Brightness brightness = Brightness.dark}) async {
+Future<Widget> _build({
+  Brightness brightness = Brightness.light,
+  http.Client? httpClient,
+}) async {
   final storage = await StorageService.init();
   final client = ApiClient(
     storage: storage,
-    httpClient: MockClient((http.Request request) async {
-      return http.Response(
-        jsonEncode(<String, Object?>{'success': false, 'message': 'mock'}),
-        401,
-        headers: <String, String>{'content-type': 'application/json'},
-      );
-    }),
+    httpClient: httpClient ??
+        MockClient((http.Request request) async {
+          return http.Response(
+            jsonEncode(<String, Object?>{'success': false, 'message': 'mock'}),
+            401,
+            headers: <String, String>{'content-type': 'application/json'},
+          );
+        }),
     baseUrl: 'http://localhost',
   );
   return ChangeNotifierProvider<SessionProvider>(
@@ -65,35 +67,69 @@ void main() {
   });
 
   group('LoginScreen redesign', () {
-    testWidgets('shows Welcome back heading', (tester) async {
+    testWidgets('shows SERVIO header and welcome copy', (tester) async {
       await tester.pumpWidget(await _build());
       await tester.pumpAndSettle();
-      expect(find.textContaining('Welcome back'), findsOneWidget);
-    });
-
-    testWidgets('uses AuthBackground', (tester) async {
-      await tester.pumpWidget(await _build());
-      await tester.pumpAndSettle();
-      expect(find.byType(AuthBackground), findsOneWidget);
-    });
-
-    testWidgets('uses AuthCard for form', (tester) async {
-      await tester.pumpWidget(await _build());
-      await tester.pumpAndSettle();
-      expect(find.byType(AuthCard), findsOneWidget);
+      expect(find.text('SERVIO'), findsOneWidget);
+      expect(
+        find.text('Welcome back. Enter your details to access your sanctuary.'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('has email and password fields', (tester) async {
       await tester.pumpWidget(await _build());
       await tester.pumpAndSettle();
-      expect(find.widgetWithText(TextField, 'Email address'), findsOneWidget);
-      expect(find.widgetWithText(TextField, 'Password'), findsOneWidget);
+      expect(find.text('Email Address'), findsOneWidget);
+      expect(find.text('Password'), findsOneWidget);
+      expect(find.byType(TextField), findsNWidgets(2));
     });
 
-    testWidgets('has Log In button', (tester) async {
+    testWidgets('has login and social buttons', (tester) async {
       await tester.pumpWidget(await _build());
       await tester.pumpAndSettle();
-      expect(find.text('Log In'), findsOneWidget);
+      expect(find.text('Login'), findsOneWidget);
+      expect(find.text('Google'), findsOneWidget);
+      expect(find.text('Apple'), findsOneWidget);
+    });
+
+    testWidgets('shows validation before backend call', (tester) async {
+      await tester.pumpWidget(await _build());
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Login'));
+      await tester.pump();
+      expect(
+        find.text('Please enter your email and password.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('valid credentials submit through backend API path',
+        (tester) async {
+      var requestedLogin = false;
+      await tester.pumpWidget(
+        await _build(
+          httpClient: MockClient((http.Request request) async {
+            requestedLogin =
+                request.method == 'POST' && request.url.path.endsWith('/login');
+            return http.Response(
+              jsonEncode(<String, Object?>{
+                'success': false,
+                'message': 'Invalid email or password.',
+              }),
+              401,
+              headers: <String, String>{'content-type': 'application/json'},
+            );
+          }),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final fields = find.byType(TextField);
+      await tester.enterText(fields.at(0), 'customer@example.com');
+      await tester.enterText(fields.at(1), 'password123');
+      await tester.tap(find.text('Login'));
+      await tester.pump();
+      expect(requestedLogin, isTrue);
     });
   });
 }

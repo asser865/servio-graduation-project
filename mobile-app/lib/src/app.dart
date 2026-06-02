@@ -5,15 +5,21 @@ import 'package:provider/provider.dart';
 import 'core/api/ai_api.dart';
 import 'core/api/api_client.dart';
 import 'core/api/bookings_api.dart';
+import 'core/api/disputes_api.dart';
 import 'core/api/messages_api.dart';
+import 'core/api/payments_api.dart';
+import 'core/api/support_issues_api.dart';
 import 'core/api/token_storage.dart';
 import 'core/api/users_api.dart';
 import 'core/services/storage_service.dart';
 import 'core/state/app_state.dart';
 import 'core/state/customer_addresses_state.dart';
+import 'core/state/disputes_provider.dart';
+import 'core/state/notifications_provider.dart';
+import 'core/state/payments_provider.dart';
 import 'core/state/room_finishing_provider.dart';
 import 'core/state/services_state.dart';
-import 'core/state/notifications_provider.dart';
+import 'core/state/support_provider.dart';
 import 'core/state/workers_state.dart';
 import 'design_system/servio_theme.dart';
 import 'design_system/servio_tokens.dart';
@@ -73,10 +79,27 @@ class ServioApp extends StatelessWidget {
           create: (ctx) => NotificationsProvider(
             storage,
             ctx.read<ApiClient>(),
+            tokenStorage: ctx.read<TokenStorage>(),
           ),
         ),
         ChangeNotifierProvider<RoomFinishingProvider>(
           create: (ctx) => RoomFinishingProvider(AiApi(ctx.read<ApiClient>())),
+        ),
+        ChangeNotifierProvider<PaymentsProvider>(
+          create: (ctx) => PaymentsProvider(
+            PaymentsApi(ctx.read<ApiClient>()),
+          ),
+        ),
+        ChangeNotifierProvider<DisputesProvider>(
+          create: (ctx) => DisputesProvider(
+            DisputesApi(ctx.read<ApiClient>()),
+          ),
+        ),
+        ChangeNotifierProvider<SupportProvider>(
+          create: (ctx) => SupportProvider(
+            issuesApi: SupportIssuesApi(ctx.read<ApiClient>()),
+            disputesApi: DisputesApi(ctx.read<ApiClient>()),
+          ),
         ),
       ],
       child: const _AppView(),

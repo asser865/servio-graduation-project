@@ -10,18 +10,21 @@ import '../../core/models/user_account.dart';
 import '../../core/state/app_state.dart';
 import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
-import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_tab_shell.dart';
-import '../../design_system/widgets/servio_status_chip.dart';
+import 'availability_manager_screen.dart';
 import 'job_details_screen.dart';
+import 'technician_shell.dart';
+import 'widgets/duration_estimation_sheet.dart';
 
 class JobQueueScreen extends StatefulWidget {
   const JobQueueScreen({
     super.key,
     this.autoRefreshInterval = const Duration(seconds: 20),
+    this.showBackButton = false,
   });
 
   final Duration? autoRefreshInterval;
+  final bool showBackButton;
 
   @override
   State<JobQueueScreen> createState() => _JobQueueScreenState();
@@ -29,18 +32,7 @@ class JobQueueScreen extends StatefulWidget {
 
 class _JobQueueScreenState extends State<JobQueueScreen>
     with WidgetsBindingObserver {
-  int _tabIndex = 0;
-  bool _historyExpanded = false;
-  static const List<String> _tabs = <String>[
-    'Pending',
-    'Confirmed',
-    'In Progress',
-    'Completed',
-    'Cancelled',
-    'Rejected',
-  ];
-  static const List<int> _primaryTabs = <int>[0, 1, 2];
-  static const List<int> _historyTabs = <int>[3, 4, 5];
+  int _historyFilterIndex = -1; // -1: All History, 3: Completed, 4: Cancelled, 5: Rejected
 
   List<BackendBooking> _jobs = [];
   bool _loading = true;
@@ -150,7 +142,6 @@ class _JobQueueScreenState extends State<JobQueueScreen>
       if (!mounted) return;
       setState(() {
         _jobs = assignedJobs;
-        _tabIndex = _firstTabWithJobs(assignedJobs) ?? _tabIndex;
         _error = null;
         _loading = false;
         _loadedOnce = true;
@@ -227,650 +218,1058 @@ class _JobQueueScreenState extends State<JobQueueScreen>
         .toList();
   }
 
-  int? _firstTabWithJobs(List<BackendBooking> jobs) {
-    if (_jobsForTabFrom(jobs, _tabIndex).isNotEmpty) return _tabIndex;
-    for (var index = 0; index < _tabs.length; index += 1) {
-      if (_jobsForTabFrom(jobs, index).isNotEmpty) return index;
-    }
-    return null;
+  List<BackendBooking> _activeScheduleJobs() {
+    return [
+      ..._jobsForTab(1),
+      ..._jobsForTab(2),
+    ]..sort((a, b) {
+      final aInProgress = _isInProgress(a);
+      final bInProgress = _isInProgress(b);
+      if (aInProgress && !bInProgress) return -1;
+      if (!aInProgress && bInProgress) return 1;
+
+      final dateCompare = a.scheduledDate.compareTo(b.scheduledDate);
+      if (dateCompare != 0) return dateCompare;
+      return a.scheduledTime.compareTo(b.scheduledTime);
+    });
   }
 
-  Future<void> _updateJobStatus(String jobId, String newStatus) async {
-    // ── Optimistic update ────────────────────────────────────────────────────
-    // Immediately reflect the new status in local state so the card moves
-    // tabs without waiting for the network round-trip.
+  bool _isInProgress(BackendBooking job) {
+    const statuses = <String>{
+      'arrived',
+      'en_route',
+      'enroute',
+      'in_progress',
+      'inprogress',
+      'active',
+      'started',
+    };
+    return statuses.contains(_normalizedStatus(job.status));
+  }
+
+  List<BackendBooking> _historyJobs() {
+    if (_historyFilterIndex == -1) {
+      return [
+        ..._jobsForTab(3),
+        ..._jobsForTab(4),
+        ..._jobsForTab(5),
+      ]..sort((a, b) => b.scheduledDate.compareTo(a.scheduledDate));
+    }
+    return _jobsForTab(_historyFilterIndex);
+  }
+
+  String _formatCurrentDate() {
+    final now = DateTime.now();
+    final weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    final months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December'
+    ];
+    return '${weekdays[now.weekday % 7]}, ${months[now.month - 1]} ${now.day}';
+  }
+
+  Future<void> _acceptJob(BackendBooking job) async {
+    final durationMin = await showDurationEstimationSheet(context);
+    if (durationMin == null) return; // User dismissed
+
+    if (!mounted) return;
+    final client = context.read<ApiClient>();
+
+    // Optimistic update
     final originalJobs = List<BackendBooking>.from(_jobs);
-    final idx = _jobs.indexWhere((j) => j.id == jobId);
+    final idx = _jobs.indexWhere((j) => j.id == job.id);
     if (idx != -1) {
       setState(() {
         _jobs = List<BackendBooking>.from(_jobs)
-          ..[idx] = _jobs[idx].copyWith(status: newStatus);
-        // Auto-advance to the tab that now contains the updated job.
-        _tabIndex = _firstTabWithJobs(_jobs) ?? _tabIndex;
+          ..[idx] = _jobs[idx].copyWith(status: 'accepted');
       });
     }
-
-    // ── API call ─────────────────────────────────────────────────────────────
-    final client = context.read<ApiClient>();
     try {
-      await BookingsApi(client).updateStatus(jobId, newStatus);
-      // Silently refresh in the background to sync any server-side changes
-      // (e.g. timestamps, populated fields) without blocking the UI.
+      await BookingsApi(client).acceptBooking(
+        job.id,
+        estimatedDurationMin: durationMin,
+      );
       if (mounted) await _fetchJobs(silent: true);
     } catch (_) {
-      // ── Rollback on failure ───────────────────────────────────────────────
       if (!mounted) return;
       setState(() {
         _jobs = originalJobs;
-        _tabIndex = _firstTabWithJobs(originalJobs) ?? _tabIndex;
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Could not update job status. Please try again.'),
+          content: Text('Could not accept job. Please try again.'),
           duration: Duration(seconds: 3),
         ),
       );
     }
   }
 
+  Future<void> _declineJob(BackendBooking job) async {
+    final reason = await _showDeclineReasonSheet();
+    if (reason == null) return; // User dismissed
+
+    if (!mounted) return;
+    final client = context.read<ApiClient>();
+
+    // Optimistic update
+    final originalJobs = List<BackendBooking>.from(_jobs);
+    final idx = _jobs.indexWhere((j) => j.id == job.id);
+    if (idx != -1) {
+      setState(() {
+        _jobs = List<BackendBooking>.from(_jobs)
+          ..[idx] = _jobs[idx].copyWith(status: 'rejected');
+      });
+    }
+    try {
+      await BookingsApi(client).updateStatus(job.id, 'rejected', reason: reason);
+      if (mounted) await _fetchJobs(silent: true);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _jobs = originalJobs;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not decline job. Please try again.'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+  Future<String?> _showDeclineReasonSheet() async {
+    String? selectedReason;
+    return showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => Padding(
+          padding: const EdgeInsets.all(20),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Decline Job',
+                  style: Theme.of(ctx)
+                      .textTheme
+                      .titleLarge
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 16),
+                ...([
+                  "I'm busy at this time",
+                  'Location is too far',
+                  'Outside my skill set',
+                  'Personal emergency',
+                  'Other',
+                ].map((reason) => RadioListTile<String>(
+                      title: Text(reason),
+                      value: reason,
+                      groupValue: selectedReason,
+                      onChanged: (v) => setS(() => selectedReason = v),
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ))),
+                const SizedBox(height: 12),
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: selectedReason == null
+                            ? null
+                            : () => Navigator.of(ctx).pop(selectedReason),
+                        style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red),
+                        child: const Text('Decline'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final servio = context.servio;
     final bottomInset = ServioTabShell.bottomOverlayInsetOf(context);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    final navyAnchor = isDark ? const Color(0xFFE3D5CA) : const Color(0xFF1A1D23);
+    final taupeAccent = const Color(0xFF9A8C73);
+
+    final pendingJobs = _jobsForTab(0);
+    final activeSchedule = _activeScheduleJobs();
+    final historyJobsList = _historyJobs();
+
+    final activeRemainingCount = pendingJobs.length + activeSchedule.length;
+    final dynamicSubtitle =
+        '${_formatCurrentDate()} • $activeRemainingCount ${activeRemainingCount == 1 ? 'Job' : 'Jobs'} Remaining';
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Job Queue'),
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(ServioSpacing.screenPadding),
-        child: Column(
-          children: <Widget>[
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: servio.backgroundSoft,
-                borderRadius: BorderRadius.circular(ServioRadius.lg),
-              ),
-              child: LayoutBuilder(
-                builder: (BuildContext context, BoxConstraints constraints) {
-                  const spacing = 6.0;
-                  final tabWidth = (constraints.maxWidth - spacing * 2) / 3;
-
-                  return Row(
-                    children:
-                        List<Widget>.generate(_primaryTabs.length, (int slot) {
-                      final int index = _primaryTabs[slot];
-                      final bool active = index == _tabIndex;
-                      final String count = _jobsForTab(index).length.toString();
-                      final Color tabColor = _tabColor(index, servio);
-
-                      return Padding(
-                        padding: EdgeInsets.only(
-                          right: slot == _primaryTabs.length - 1 ? 0 : spacing,
+      body: SafeArea(
+        child: RefreshIndicator(
+        onRefresh: () => _fetchJobs(silent: false),
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : _error != null
+                ? SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: Container(
+                      height: MediaQuery.of(context).size.height - 200,
+                      alignment: Alignment.center,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          Text(
+                            'Something went wrong',
+                            style: theme.textTheme.bodyMedium,
+                          ),
+                          const SizedBox(height: 12),
+                          OutlinedButton(
+                            onPressed: () => _fetchJobs(silent: false),
+                            child: const Text('Retry'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: EdgeInsets.only(
+                      left: ServioSpacing.screenPadding,
+                      right: ServioSpacing.screenPadding,
+                      top: 24,
+                      bottom: bottomInset + 32,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        // ── Header: back button + title + availability ────────
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            // Back button
+                            GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () {
+                                final nav = Navigator.of(context);
+                                if (nav.canPop()) {
+                                  nav.pop();
+                                } else {
+                                  nav.pushAndRemoveUntil(
+                                    MaterialPageRoute<void>(
+                                        builder: (_) =>
+                                            const TechnicianShell()),
+                                    (Route<dynamic> route) => false,
+                                  );
+                                }
+                              },
+                              child: Container(
+                                width: 40,
+                                height: 40,
+                                margin: const EdgeInsets.only(right: 14),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.surface,
+                                  shape: BoxShape.circle,
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Color.fromRGBO(34, 40, 49, 0.08),
+                                      blurRadius: 12,
+                                      offset: Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: Icon(
+                                  Icons.arrow_back_ios_new_rounded,
+                                  size: 16,
+                                  color: navyAnchor,
+                                ),
+                              ),
+                            ),
+                            // Title + subtitle
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Job Queue',
+                                    style: TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.bold,
+                                      color: navyAnchor,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    dynamicSubtitle,
+                                    style: TextStyle(
+                                      fontFamily: 'Inter',
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: servio.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // Availability button
+                            Builder(
+                              builder: (ctx) {
+                                final account =
+                                    ctx.watch<SessionProvider>().account;
+                                final isAvailable =
+                                    account?.isAvailable ?? false;
+                                final statusColor = isAvailable
+                                    ? const Color(0xFF1B8A5A)
+                                    : const Color(0xFFD32F2F);
+                                return Tooltip(
+                                  message: isAvailable
+                                      ? 'Available – tap to manage schedule'
+                                      : 'Offline/Busy – tap to manage schedule',
+                                  child: GestureDetector(
+                                    onTap: () => Navigator.of(ctx).push(
+                                      MaterialPageRoute<void>(
+                                        builder: (_) =>
+                                            const AvailabilityManagerScreen(),
+                                      ),
+                                    ),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 12, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: statusColor.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(
+                                          color:
+                                              statusColor.withValues(alpha: 0.3),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Container(
+                                            width: 8,
+                                            height: 8,
+                                            decoration: BoxDecoration(
+                                              color: statusColor,
+                                              shape: BoxShape.circle,
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: statusColor.withValues(
+                                                      alpha: 0.4),
+                                                  blurRadius: 4,
+                                                  spreadRadius: 1,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Icon(
+                                            Icons.calendar_month_rounded,
+                                            size: 18,
+                                            color: navyAnchor,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
                         ),
-                        child: SizedBox(
-                          width: tabWidth,
-                          child: _PrimaryTabChip(
-                            label: _tabs[index],
-                            count: count,
-                            tabColor: tabColor,
-                            active: active,
-                            onTap: () => setState(() => _tabIndex = index),
+                        const SizedBox(height: 24),
+
+                        // ── New Requests (Pending) ──────────────────────────────
+                        _buildSectionHeader(
+                          title: 'New Requests',
+                          badgeCount: pendingJobs.length,
+                          badgeLabel: 'Pending',
+                          taupeAccent: taupeAccent,
+                        ),
+                        const SizedBox(height: 12),
+                        if (pendingJobs.isEmpty)
+                          _buildEmptyCard(
+                            icon: Icons.assignment_late_outlined,
+                            message: 'No new requests pending.',
+                            taupeAccent: taupeAccent,
+                            theme: theme,
+                          )
+                        else
+                          ...pendingJobs.map((job) => _buildNewRequestCard(
+                                job: job,
+                                theme: theme,
+                                isDark: isDark,
+                                navyAnchor: navyAnchor,
+                                taupeAccent: taupeAccent,
+                                servio: servio,
+                              )),
+                        const SizedBox(height: 28),
+
+                        // ── Today's Schedule ────────────────────────────────────
+                        Text(
+                          "Today's Schedule",
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: navyAnchor,
                           ),
                         ),
-                      );
-                    }),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 10),
-            _HistorySection(
-              tabs: _tabs,
-              historyTabs: _historyTabs,
-              activeIndex: _tabIndex,
-              expanded: _historyExpanded,
-              onToggle: () =>
-                  setState(() => _historyExpanded = !_historyExpanded),
-              onSelect: (int idx) => setState(() => _tabIndex = idx),
-              countFor: (int idx) => _jobsForTab(idx).length,
-              colorFor: (int idx) => _tabColor(idx, servio),
-            ),
-            const SizedBox(height: 14),
-            Expanded(
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _error != null
-                      ? Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: <Widget>[
-                              Text(
-                                'Something went wrong',
-                                style: Theme.of(context).textTheme.bodyMedium,
+                        const SizedBox(height: 12),
+                        if (activeSchedule.isEmpty)
+                          _buildEmptyCard(
+                            icon: Icons.calendar_today_outlined,
+                            message: 'No jobs scheduled for today.',
+                            taupeAccent: taupeAccent,
+                            theme: theme,
+                          )
+                        else
+                          ...activeSchedule.map((job) => _buildScheduleCard(
+                                job: job,
+                                theme: theme,
+                                isDark: isDark,
+                                navyAnchor: navyAnchor,
+                                taupeAccent: taupeAccent,
+                                servio: servio,
+                              )),
+                        const SizedBox(height: 28),
+
+                        // ── Job History ─────────────────────────────────────────
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Job History',
+                              style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: navyAnchor,
                               ),
-                              const SizedBox(height: 12),
-                              OutlinedButton(
-                                onPressed: _fetchJobs,
-                                child: const Text('Retry'),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                setState(() => _historyFilterIndex = -1);
+                              },
+                              child: Text(
+                                'View All',
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontWeight: FontWeight.w600,
+                                  color: taupeAccent,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        // Horizontal scroll chips
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              _buildHistoryFilterChip(
+                                label: 'All History',
+                                isSelected: _historyFilterIndex == -1,
+                                onTap: () => setState(() => _historyFilterIndex = -1),
+                                taupeAccent: taupeAccent,
+                                navyAnchor: navyAnchor,
+                                isDark: isDark,
+                                theme: theme,
+                              ),
+                              const SizedBox(width: 8),
+                              _buildHistoryFilterChip(
+                                label: 'Completed',
+                                isSelected: _historyFilterIndex == 3,
+                                onTap: () => setState(() => _historyFilterIndex = 3),
+                                taupeAccent: taupeAccent,
+                                navyAnchor: navyAnchor,
+                                isDark: isDark,
+                                theme: theme,
+                              ),
+                              const SizedBox(width: 8),
+                              _buildHistoryFilterChip(
+                                label: 'Cancelled',
+                                isSelected: _historyFilterIndex == 4,
+                                onTap: () => setState(() => _historyFilterIndex = 4),
+                                taupeAccent: taupeAccent,
+                                navyAnchor: navyAnchor,
+                                isDark: isDark,
+                                theme: theme,
+                              ),
+                              const SizedBox(width: 8),
+                              _buildHistoryFilterChip(
+                                label: 'Rejected',
+                                isSelected: _historyFilterIndex == 5,
+                                onTap: () => setState(() => _historyFilterIndex = 5),
+                                taupeAccent: taupeAccent,
+                                navyAnchor: navyAnchor,
+                                isDark: isDark,
+                                theme: theme,
                               ),
                             ],
                           ),
-                        )
-                      : Builder(
-                          builder: (context) {
-                            final filteredJobs = _jobsForTab(_tabIndex);
-                            if (filteredJobs.isEmpty) {
-                              return Center(
-                                child: Text(
-                                  _jobs.isEmpty
-                                      ? 'No jobs assigned to you yet.'
-                                      : 'No ${_tabs[_tabIndex].toLowerCase()} jobs assigned to you.',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodyMedium
-                                      ?.copyWith(color: servio.textSecondary),
-                                ),
-                              );
-                            }
-                            return ListView.separated(
-                              padding: EdgeInsets.only(bottom: bottomInset),
-                              itemCount: filteredJobs.length,
-                              separatorBuilder:
-                                  (BuildContext context, int index) =>
-                                      const SizedBox(height: 12),
-                              itemBuilder: (BuildContext context, int index) {
-                                final job = filteredJobs[index];
-                                return _JobCard(
-                                  job: job,
-                                  onOpen: () {
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute<void>(
-                                        builder: (_) =>
-                                            JobDetailsScreen(jobId: job.id),
-                                      ),
-                                    );
-                                  },
-                                  onAccept: _tabIndex == 0
-                                      ? () =>
-                                          _updateJobStatus(job.id, 'accepted')
-                                      : null,
-                                  onDecline: _tabIndex == 0
-                                      ? () =>
-                                          _updateJobStatus(job.id, 'rejected')
-                                      : null,
-                                );
-                              },
-                            );
-                          },
                         ),
-            ),
-          ],
+                        const SizedBox(height: 16),
+                        if (historyJobsList.isEmpty)
+                          _buildEmptyCard(
+                            icon: Icons.history_outlined,
+                            message: 'No history records found.',
+                            taupeAccent: taupeAccent,
+                            theme: theme,
+                          )
+                        else
+                          ...historyJobsList.map((job) => _buildScheduleCard(
+                                job: job,
+                                theme: theme,
+                                isDark: isDark,
+                                navyAnchor: navyAnchor,
+                                taupeAccent: taupeAccent,
+                                servio: servio,
+                              )),
+                      ],
+                    ),
+                  ),
         ),
       ),
     );
   }
-}
 
-class _JobCard extends StatelessWidget {
-  const _JobCard({
-    required this.job,
-    required this.onOpen,
-    this.onAccept,
-    this.onDecline,
-  });
-
-  final BackendBooking job;
-  final VoidCallback onOpen;
-  final VoidCallback? onAccept;
-  final VoidCallback? onDecline;
-
-  ServioStatusChipType _chipType(String status) {
-    switch (_normalizedStatus(status)) {
-      case 'pending':
-        return ServioStatusChipType.warning;
-      case 'accepted':
-      case 'confirmed':
-      case 'scheduled':
-        return ServioStatusChipType.info;
-      case 'arrived':
-      case 'en_route':
-      case 'enroute':
-      case 'in_progress':
-      case 'inprogress':
-      case 'active':
-      case 'started':
-        return ServioStatusChipType.info;
-      case 'completed':
-      case 'done':
-      case 'awaiting_customer_confirmation':
-      case 'pending_admin_review':
-        return ServioStatusChipType.success;
-      case 'cancelled':
-      case 'canceled':
-      case 'cancelled_by_customer':
-      case 'canceled_by_customer':
-      case 'cancelled_by_provider':
-      case 'canceled_by_provider':
-      case 'cancelled_by_worker':
-      case 'canceled_by_worker':
-      case 'rejected':
-      case 'declined':
-        return ServioStatusChipType.danger;
-      default:
-        return ServioStatusChipType.warning;
-    }
-  }
-
-  String _chipLabel(String status) {
-    switch (_normalizedStatus(status)) {
-      case 'pending':
-        return 'Pending';
-      case 'accepted':
-      case 'confirmed':
-      case 'scheduled':
-        return 'Confirmed';
-      case 'arrived':
-        return 'Arrived';
-      case 'en_route':
-      case 'enroute':
-        return 'En Route';
-      case 'in_progress':
-      case 'inprogress':
-      case 'active':
-      case 'started':
-        return 'In Progress';
-      case 'completed':
-      case 'done':
-        return 'Completed';
-      case 'awaiting_customer_confirmation':
-        return 'Awaiting Customer';
-      case 'pending_admin_review':
-        return 'Pending Review';
-      case 'cancelled':
-      case 'canceled':
-      case 'cancelled_by_customer':
-      case 'canceled_by_customer':
-      case 'cancelled_by_provider':
-      case 'canceled_by_provider':
-      case 'cancelled_by_worker':
-      case 'canceled_by_worker':
-        return 'Cancelled';
-      case 'rejected':
-      case 'declined':
-        return 'Rejected';
-      default:
-        return status;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final servio = context.servio;
-
-    return GestureDetector(
-      onTap: onOpen,
-      behavior: HitTestBehavior.opaque,
-      child: ServioCard(
-        radius: ServioRadius.lg,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Row(
-              children: <Widget>[
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    gradient: ServioGradients.warm,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: servio.accent, width: 2),
-                  ),
-                  child: Center(
-                    child: Text(
-                      job.serviceName.isNotEmpty
-                          ? job.serviceName[0].toUpperCase()
-                          : '?',
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(job.serviceName,
-                          style: Theme.of(context).textTheme.titleMedium),
-                      const SizedBox(height: 2),
-                      if (job.customerName.isNotEmpty)
-                        Text(
-                          job.customerName,
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
-                              ?.copyWith(color: servio.textSecondary),
-                        ),
-                    ],
-                  ),
-                ),
-                ServioStatusChip(
-                  label: _chipLabel(job.status),
-                  type: _chipType(job.status),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              '${job.addressCity} • EGP ${job.totalAmount.toStringAsFixed(0)}',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: servio.textSecondary),
-            ),
-            const SizedBox(height: 14),
-            if (onAccept != null || onDecline != null)
-              Row(
-                children: <Widget>[
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: onAccept,
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: servio.success),
-                        foregroundColor: servio.success,
-                      ),
-                      child: const Text('Accept'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: onDecline,
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: servio.danger),
-                        foregroundColor: servio.danger,
-                      ),
-                      child: const Text('Decline'),
-                    ),
-                  ),
-                ],
-              )
-            else
-              Align(
-                alignment: Alignment.centerRight,
-                child: OutlinedButton(
-                  onPressed: onOpen,
-                  child: const Text('View Details'),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-Color _tabColor(int index, ServioThemeExtension servio) {
-  return switch (index) {
-    0 => servio.warning,
-    3 => servio.success,
-    4 || 5 => servio.danger,
-    _ => servio.info,
-  };
-}
-
-bool _isAssignedToWorker(BackendBooking job, String workerId) {
-  final bookingWorkerId = job.workerId.trim();
-  return bookingWorkerId == workerId;
-}
-
-String _normalizedStatus(String status) =>
-    status.trim().toLowerCase().replaceAll('-', '_');
-
-class _PrimaryTabChip extends StatelessWidget {
-  const _PrimaryTabChip({
-    required this.label,
-    required this.count,
-    required this.tabColor,
-    required this.active,
-    required this.onTap,
-  });
-
-  final String label;
-  final String count;
-  final Color tabColor;
-  final bool active;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final servio = context.servio;
-
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: ServioMotion.micro,
-        curve: ServioMotion.curve,
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          color: active ? theme.colorScheme.surface : Colors.transparent,
-          borderRadius: BorderRadius.circular(ServioRadius.full),
-        ),
-        child: Column(
-          children: <Widget>[
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: active ? servio.accent : servio.textSecondary,
-                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 8,
-                vertical: 4,
-              ),
-              decoration: BoxDecoration(
-                color: ServioColors.tint(tabColor),
-                borderRadius: BorderRadius.circular(ServioRadius.full),
-              ),
-              child: Text(
-                count,
-                style: theme.textTheme.labelSmall?.copyWith(color: tabColor),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _HistorySection extends StatelessWidget {
-  const _HistorySection({
-    required this.tabs,
-    required this.historyTabs,
-    required this.activeIndex,
-    required this.expanded,
-    required this.onToggle,
-    required this.onSelect,
-    required this.countFor,
-    required this.colorFor,
-  });
-
-  final List<String> tabs;
-  final List<int> historyTabs;
-  final int activeIndex;
-  final bool expanded;
-  final VoidCallback onToggle;
-  final ValueChanged<int> onSelect;
-  final int Function(int index) countFor;
-  final Color Function(int index) colorFor;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final servio = context.servio;
-    final int total =
-        historyTabs.fold<int>(0, (int sum, int i) => sum + countFor(i));
-    final bool historyActive = historyTabs.contains(activeIndex);
-    final bool open = expanded || historyActive;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        InkWell(
-          onTap: onToggle,
-          borderRadius: BorderRadius.circular(ServioRadius.full),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-            child: Row(
-              children: <Widget>[
-                Icon(
-                  Icons.history_rounded,
-                  size: 16,
-                  color: servio.textSecondary,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  'History',
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: servio.textSecondary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: ServioColors.tint(servio.textSecondary),
-                    borderRadius: BorderRadius.circular(ServioRadius.full),
-                  ),
-                  child: Text(
-                    '$total',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: servio.textSecondary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                const Spacer(),
-                AnimatedRotation(
-                  turns: open ? 0.5 : 0,
-                  duration: ServioMotion.normal,
-                  curve: ServioMotion.spring,
-                  child: Icon(
-                    Icons.expand_more_rounded,
-                    color: servio.textSecondary,
-                  ),
-                ),
-              ],
-            ),
+  Widget _buildSectionHeader({
+    required String title,
+    required int badgeCount,
+    required String badgeLabel,
+    required Color taupeAccent,
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontFamily: 'Poppins',
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: const Color(0xFF1A1D23),
           ),
         ),
-        AnimatedCrossFade(
-          firstChild: const SizedBox(width: double.infinity, height: 0),
-          secondChild: Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: <Widget>[
-                for (final int idx in historyTabs)
-                  _HistoryChip(
-                    label: tabs[idx],
-                    count: countFor(idx),
-                    color: colorFor(idx),
-                    active: idx == activeIndex,
-                    onTap: () => onSelect(idx),
-                  ),
-              ],
+        if (badgeCount > 0)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF2E0C4),
+              borderRadius: BorderRadius.circular(9999),
+            ),
+            child: Text(
+              '$badgeCount $badgeLabel',
+              style: const TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF231A09),
+              ),
             ),
           ),
-          crossFadeState:
-              open ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-          duration: ServioMotion.normal,
-          sizeCurve: ServioMotion.spring,
-        ),
       ],
     );
   }
-}
 
-class _HistoryChip extends StatelessWidget {
-  const _HistoryChip({
-    required this.label,
-    required this.count,
-    required this.color,
-    required this.active,
-    required this.onTap,
-  });
+  Widget _buildNewRequestCard({
+    required BackendBooking job,
+    required ThemeData theme,
+    required bool isDark,
+    required Color navyAnchor,
+    required Color taupeAccent,
+    required ServioThemeExtension servio,
+  }) {
+    final location = <String>[job.addressStreet, job.addressCity]
+        .where((s) => s.trim().isNotEmpty)
+        .join(', ');
 
-  final String label;
-  final int count;
-  final Color color;
-  final bool active;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final servio = context.servio;
-
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: ServioMotion.fast,
-        curve: ServioMotion.spring,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-        decoration: BoxDecoration(
-          color: active ? ServioColors.tint(color) : theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(ServioRadius.full),
-          border: Border.all(
-            color: active ? color : servio.border,
-            width: active ? 1.2 : 1,
-          ),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: taupeAccent.withValues(alpha: 0.2),
+          width: 1,
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Text(
-              label,
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: active ? color : servio.textSecondary,
-                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+        boxShadow: const [
+          BoxShadow(
+            color: Color.fromRGBO(26, 29, 37, 0.04),
+            blurRadius: 16,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: InkWell(
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => JobDetailsScreen(jobId: job.id),
               ),
-            ),
-            const SizedBox(width: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 6,
-                vertical: 1,
-              ),
-              decoration: BoxDecoration(
-                color: ServioColors.tint(color),
-                borderRadius: BorderRadius.circular(ServioRadius.full),
-              ),
-              child: Text(
-                '$count',
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w700,
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            job.serviceName,
+                            style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: navyAnchor,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(Icons.location_on_outlined,
+                                  size: 14, color: servio.textSecondary),
+                              const SizedBox(width: 3),
+                              Flexible(
+                                child: Text(
+                                  location,
+                                  style: TextStyle(
+                                    fontFamily: 'Inter',
+                                    fontSize: 14,
+                                    color: servio.textSecondary,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF262B34) : const Color(0xFFF3EDE7),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'High Priority',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: taupeAccent,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
+                // Metadata Row
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Icon(Icons.schedule_outlined, size: 16, color: servio.textSecondary),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        job.scheduledTime.isNotEmpty ? job.scheduledTime : 'ASAP',
+                        style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: servio.textSecondary),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Icon(Icons.person_outline, size: 16, color: servio.textSecondary),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        job.customerName,
+                        style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: servio.textSecondary),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 20),
+                // Actions
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => _acceptJob(job),
+                        icon: const Icon(Icons.check_circle_outline_rounded, size: 18, color: Colors.white),
+                        label: const Text('Accept Job'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: navyAnchor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          textStyle: const TextStyle(
+                            fontFamily: 'Inter',
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => _declineJob(job),
+                        icon: Icon(Icons.cancel_outlined, size: 18, color: navyAnchor),
+                        label: const Text('Decline'),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: taupeAccent.withValues(alpha: 0.3), width: 1.5),
+                          foregroundColor: navyAnchor,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          textStyle: const TextStyle(
+                            fontFamily: 'Inter',
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
+
+  Widget _buildScheduleCard({
+    required BackendBooking job,
+    required ThemeData theme,
+    required bool isDark,
+    required Color navyAnchor,
+    required Color taupeAccent,
+    required ServioThemeExtension servio,
+  }) {
+    final location = <String>[job.addressStreet, job.addressCity]
+        .where((s) => s.trim().isNotEmpty)
+        .join(', ');
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: taupeAccent.withValues(alpha: 0.15),
+          width: 1,
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color.fromRGBO(26, 29, 37, 0.03),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: InkWell(
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => JobDetailsScreen(jobId: job.id),
+              ),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top clock icon and time
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.schedule_rounded,
+                      size: 20,
+                      color: taupeAccent,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      job.scheduledTime.isNotEmpty ? job.scheduledTime : '00:00',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: navyAnchor,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                // Title and Address
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      job.serviceName,
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 20,
+                        color: navyAnchor,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    if (location.isNotEmpty)
+                      Text(
+                        location,
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 14,
+                          color: servio.textSecondary,
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                // Status Badge on the bottom-left
+                _buildStatusBadge(job.status, isDark),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusBadge(String status, bool isDark) {
+    String label;
+    Color bg;
+    Color fg;
+
+    switch (_normalizedStatus(status)) {
+      case 'pending':
+        label = 'Pending';
+        bg = isDark ? const Color(0xFF38322B) : const Color(0xFFFFF7ED);
+        fg = isDark ? const Color(0xFFFB923C) : const Color(0xFFF97316);
+        break;
+      case 'accepted':
+      case 'confirmed':
+      case 'scheduled':
+        label = 'Confirmed';
+        bg = isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF);
+        fg = isDark ? const Color(0xFF60A5FA) : const Color(0xFF3B82F6);
+        break;
+      case 'arrived':
+        label = 'Arrived';
+        bg = isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF);
+        fg = isDark ? const Color(0xFF60A5FA) : const Color(0xFF3B82F6);
+        break;
+      case 'en_route':
+      case 'enroute':
+        label = 'En Route';
+        bg = isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF);
+        fg = isDark ? const Color(0xFF60A5FA) : const Color(0xFF3B82F6);
+        break;
+      case 'in_progress':
+      case 'inprogress':
+      case 'active':
+      case 'started':
+        label = 'In Progress';
+        bg = isDark ? const Color(0xFF38322B) : const Color(0xFFF2ECE4);
+        fg = isDark ? const Color(0xFFD5C5A9) : const Color(0xFF5A4D35);
+        break;
+      case 'completed':
+      case 'done':
+        label = 'Completed';
+        bg = isDark ? const Color(0xFF14532D) : const Color(0xFFDCFCE7);
+        fg = isDark ? const Color(0xFF4ADE80) : const Color(0xFF16A34A);
+        break;
+      case 'awaiting_customer_confirmation':
+        label = 'Awaiting Customer';
+        bg = isDark ? const Color(0xFF38322B) : const Color(0xFFFFF7ED);
+        fg = isDark ? const Color(0xFFFB923C) : const Color(0xFFF97316);
+        break;
+      case 'pending_admin_review':
+        label = 'Pending Review';
+        bg = isDark ? const Color(0xFF38322B) : const Color(0xFFFFF7ED);
+        fg = isDark ? const Color(0xFFFB923C) : const Color(0xFFF97316);
+        break;
+      case 'cancelled':
+      case 'canceled':
+      case 'cancelled_by_customer':
+      case 'canceled_by_customer':
+      case 'cancelled_by_provider':
+      case 'canceled_by_provider':
+      case 'cancelled_by_worker':
+      case 'canceled_by_worker':
+        label = 'Cancelled';
+        bg = isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFEE2E2);
+        fg = isDark ? const Color(0xFFF87171) : const Color(0xFFEF4444);
+        break;
+      case 'rejected':
+      case 'declined':
+        label = 'Rejected';
+        bg = isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFEE2E2);
+        fg = isDark ? const Color(0xFFF87171) : const Color(0xFFEF4444);
+        break;
+      default:
+        label = status;
+        bg = isDark ? const Color(0xFF32363F) : const Color(0xFFE4E2DF);
+        fg = isDark ? const Color(0xFFE3D5CA) : const Color(0xFF45474B);
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(9999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+          color: fg,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyCard({
+    required IconData icon,
+    required String message,
+    required Color taupeAccent,
+    required ThemeData theme,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: taupeAccent.withValues(alpha: 0.12),
+        ),
+      ),
+      child: Column(
+        children: <Widget>[
+          Icon(icon, color: taupeAccent.withValues(alpha: 0.6), size: 28),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontFamily: 'Inter',
+              color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHistoryFilterChip({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+    required Color taupeAccent,
+    required Color navyAnchor,
+    required bool isDark,
+    required ThemeData theme,
+  }) {
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      label: label,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected ? navyAnchor : (isDark ? const Color(0xFF1E222B) : Colors.white),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isSelected ? Colors.transparent : taupeAccent.withValues(alpha: 0.3),
+              width: 1,
+            ),
+            boxShadow: isSelected
+                ? const [
+                    BoxShadow(
+                      color: Color.fromRGBO(26, 29, 37, 0.08),
+                      blurRadius: 4,
+                      offset: Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+              color: isSelected
+                  ? (isDark ? const Color(0xFF262B34) : Colors.white)
+                  : (isDark ? const Color(0xFFE3D5CA) : const Color(0xFF262B34)),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  bool _isAssignedToWorker(BackendBooking job, String workerId) {
+    final bookingWorkerId = job.workerId.trim();
+    return bookingWorkerId == workerId;
+  }
+
+  String _normalizedStatus(String status) => status.trim().toLowerCase().replaceAll('-', '_');
 }

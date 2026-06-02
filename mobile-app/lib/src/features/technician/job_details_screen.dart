@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -20,6 +21,9 @@ import '../../design_system/widgets/servio_card.dart';
 import '../../design_system/widgets/servio_primary_button.dart';
 import '../../shared/widgets/servio_map_widget.dart';
 import '../messages/chat_screen.dart';
+import 'transaction_details_sheet.dart';
+import 'widgets/duration_estimation_sheet.dart';
+import 'widgets/job_progress_stepper.dart';
 
 /// Technician job details screen — implements the full booking lifecycle:
 ///
@@ -70,6 +74,10 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
 
   // Completion notes (Phase 5)
   final TextEditingController _notesCtrl = TextEditingController();
+
+  // Completion image (Change 4)
+  List<int>? _completionImageBytes;
+  String? _completionImageFilename;
 
   // Map (Phase 7)
   LatLng? _customerLatLng;
@@ -274,10 +282,15 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
 
   Future<void> _acceptJob() async {
     if (_job == null || _updating) return;
+    final durationMin = await showDurationEstimationSheet(context);
+    if (durationMin == null || !mounted) return;
     setState(() => _updating = true);
     final client = context.read<ApiClient>();
     try {
-      await BookingsApi(client).updateStatus(widget.jobId, 'accepted');
+      await BookingsApi(client).acceptBooking(
+        widget.jobId,
+        estimatedDurationMin: durationMin,
+      );
       if (!mounted) return;
       await _goTo(JobSection.accepted);
       setState(() => _updating = false);
@@ -378,65 +391,61 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
     }
   }
 
-  Future<String?> _showDeclineDialog() => showDialog<String>(
-        context: context,
-        builder: (ctx) {
-          final reasonCtrl = TextEditingController();
-          final servio = ctx.servio;
-          return AlertDialog(
-            title: const Text('Decline Job'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  'Are you sure you want to decline this job?',
-                  style: Theme.of(ctx).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: reasonCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Reason (optional)',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 2,
-                ),
-              ],
-            ),
-            actions: <Widget>[
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(), // null → cancelled
-                child: const Text('Keep Job'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(reasonCtrl.text.trim()),
-                child: Text(
-                  'Decline',
-                  style: TextStyle(color: servio.danger),
-                ),
-              ),
+  Future<String?> _showDeclineDialog() async {
+    String? selectedReason;
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => AlertDialog(
+          title: const Text('Decline This Job?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              const Text('Select a reason:'),
+              const SizedBox(height: 12),
+              ...([
+                "I'm busy at this time",
+                'Location is too far',
+                'Outside my skill set',
+                'Personal emergency',
+                'Other',
+              ].map((reason) => RadioListTile<String>(
+                    title: Text(reason),
+                    value: reason,
+                    groupValue: selectedReason,
+                    onChanged: (v) => setS(() => selectedReason = v),
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ))),
             ],
-          );
-        },
-      );
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Keep Job'),
+            ),
+            ElevatedButton(
+              onPressed: selectedReason == null
+                  ? null
+                  : () => Navigator.of(ctx).pop(selectedReason),
+              child: const Text('Decline Job'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-  /// Validates PIN then transitions to in_progress.
-  Future<void> _verifyPinAndStart() async {
-    if (_job == null || _updating) return;
+  /// Submits the entered PIN to POST /bookings/:id/start and transitions to inProgress.
+  Future<void> _submitPin() async {
+    final job = _job;
+    if (job == null) return;
+    final pin = _pinCtrl.map((c) => c.text).join();
+    if (pin.length < 4) return;
 
-    final entered = _pinCtrl.map((c) => c.text).join();
-    if (entered.length < 4) {
-      setState(() => _pinError = true);
-      // Focus the first empty box.
-      final firstEmpty = _pinCtrl.indexWhere((c) => c.text.isEmpty);
-      if (firstEmpty != -1) _pinFocus[firstEmpty].requestFocus();
-      return;
-    }
-
-    final correctPin = _job!.pin.trim();
-    // Match website: skip validation when server PIN is absent.
-    if (correctPin.isNotEmpty && entered != correctPin) {
+    // Validate locally against the PIN the customer was shown.
+    if (job.pin.isNotEmpty && pin != job.pin) {
       setState(() => _pinError = true);
       _shakeCtrl.forward(from: 0);
       for (final c in _pinCtrl) {
@@ -446,28 +455,38 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
       return;
     }
 
-    setState(() {
-      _pinError = false;
-      _updating = true;
-    });
-    final client = context.read<ApiClient>();
+    setState(() => _updating = true);
     try {
-      final api = BookingsApi(client);
-      await _ensureBackendArrived(api);
-      await api.updateStatus(widget.jobId, 'in_progress');
-      _job = _job?.copyWith(status: 'in_progress');
-      if (!mounted) return;
-      final t0 = DateTime.now().millisecondsSinceEpoch;
-      await JobSessionService.setTimerStart(widget.jobId, t0);
-      _timerStart = t0;
-      await _goTo(JobSection.inProgress);
-      _startTicking();
-      setState(() => _updating = false);
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _updating = false);
-      _snack('Could not start job. Please try again.');
+      final client = context.read<ApiClient>();
+      await BookingsApi(client).startJob(job.id, pin);
+      for (final c in _pinCtrl) {
+        c.clear();
+      }
+      setState(() {
+        _pinError = false;
+        _section = JobSection.inProgress;
+        _updating = false;
+      });
+      await JobSessionService.setSection(job.id, JobSection.inProgress);
+      _startTimer(job.id);
+    } catch (e) {
+      setState(() {
+        _pinError = true;
+        _updating = false;
+      });
+      _shakeCtrl.forward(from: 0);
+      for (final c in _pinCtrl) {
+        c.clear();
+      }
+      _pinFocus[0].requestFocus();
     }
+  }
+
+  Future<void> _startTimer(String bookingId) async {
+    final t0 = DateTime.now().millisecondsSinceEpoch;
+    await JobSessionService.setTimerStart(bookingId, t0);
+    _timerStart = t0;
+    _startTicking();
   }
 
   Future<void> _submitCompletion() async {
@@ -476,12 +495,12 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
     final client = context.read<ApiClient>();
     final notes = _notesCtrl.text.trim();
     try {
-      await BookingsApi(client).updateStatus(
-        widget.jobId,
-        'awaiting_customer_confirmation',
-        notes: notes.isNotEmpty ? notes : null,
+      await BookingsApi(client).completeJobWithImage(
+        bookingId: widget.jobId,
+        workerNotes: notes.isNotEmpty ? notes : null,
+        imageBytes: _completionImageBytes,
+        imageFilename: _completionImageFilename,
       );
-      _job = _job?.copyWith(status: 'awaiting_customer_confirmation');
       if (!mounted) return;
       _tickTimer?.cancel();
       await JobSessionService.clearSession(widget.jobId);
@@ -494,6 +513,132 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
       if (!mounted) return;
       setState(() => _updating = false);
       _snack('Could not complete job. Please try again.');
+    }
+  }
+
+  Future<void> _pickCompletionImage() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1280,
+      maxHeight: 1280,
+      imageQuality: 85,
+    );
+    if (picked == null) return;
+    final bytes = await picked.readAsBytes();
+    // Validate: max 5 MB
+    if (bytes.length > 5 * 1024 * 1024) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Image must be under 5 MB.')),
+        );
+      }
+      return;
+    }
+    setState(() {
+      _completionImageBytes = bytes;
+      _completionImageFilename = picked.name;
+    });
+  }
+
+  Future<void> _showUpdateEstimateSheet() async {
+    final durationMin = await showDurationEstimationSheet(context);
+    if (durationMin == null || !mounted) return;
+    try {
+      await BookingsApi(context.read<ApiClient>())
+          .updateEstimate(widget.jobId, durationMin);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Estimate updated to ${durationMin < 60 ? "${durationMin}m" : "${durationMin ~/ 60}h${durationMin % 60 > 0 ? " ${durationMin % 60}m" : ""}"}',
+            ),
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) _snack('Could not update estimate. Please try again.');
+    }
+  }
+
+  Future<void> _showNoShowDialog() async {
+    final job = _job;
+    if (job == null) return;
+
+    final details = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        final ctrl = TextEditingController();
+        return AlertDialog(
+          title: const Text('Report Customer Absent'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Take a photo of the empty service location as evidence.',
+                style: TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: ctrl,
+                decoration: const InputDecoration(
+                  labelText: 'Additional details (optional)',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, ctrl.text),
+              child: const Text('Pick Photo & Submit'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (details == null || !mounted) return;
+    await _pickAndSubmitNoShow(job.id, details);
+  }
+
+  Future<void> _pickAndSubmitNoShow(String bookingId, String details) async {
+    final picker = ImagePicker();
+    final file = await picker.pickImage(source: ImageSource.camera, imageQuality: 70);
+    if (file == null || !mounted) return;
+
+    setState(() => _updating = true);
+    try {
+      final bytes = await file.readAsBytes();
+      if (!mounted) return;
+      final client = context.read<ApiClient>();
+      await BookingsApi(client).reportCustomerNoShow(
+        bookingId: bookingId,
+        details: details.trim(),
+        photoBytes: bytes,
+        photoFilename: 'noshow_${DateTime.now().millisecondsSinceEpoch}.jpg',
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Customer no-show reported. Compensation will be credited to your wallet.',
+          ),
+        ),
+      );
+      await _load();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to submit. Please try again.')),
+      );
+    } finally {
+      if (mounted) setState(() => _updating = false);
     }
   }
 
@@ -545,6 +690,12 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       actions: job != null
           ? <Widget>[
+              IconButton(
+                icon: const Icon(Icons.receipt_long_outlined),
+                tooltip: 'Payment Details',
+                onPressed: () =>
+                    showTransactionDetailsSheet(context, job: job),
+              ),
               TextButton.icon(
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
@@ -807,6 +958,9 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
         children: <Widget>[
           _statusBadge('Job Confirmed', servio.success),
           const SizedBox(height: 16),
+          if (stepFromStatus(_job!.status) != null)
+            JobProgressStepper(currentStep: stepFromStatus(_job!.status)!),
+          const SizedBox(height: 16),
           _jobInfoCard(),
           if (_job!.notes.isNotEmpty) ...<Widget>[
             const SizedBox(height: 16),
@@ -863,6 +1017,9 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
               ],
             ),
           ),
+          const SizedBox(height: 16),
+          if (stepFromStatus(_job!.status) != null)
+            JobProgressStepper(currentStep: stepFromStatus(_job!.status)!),
           const SizedBox(height: 16),
           ServioCard(
             radius: ServioRadius.lg,
@@ -962,7 +1119,10 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           _statusBadge('Arrived at Location', servio.accent),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
+          if (stepFromStatus(_job!.status) != null)
+            JobProgressStepper(currentStep: stepFromStatus(_job!.status)!),
+          const SizedBox(height: 16),
           ServioCard(
             radius: ServioRadius.lg,
             child: Column(
@@ -1003,8 +1163,17 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
                       ? const Center(child: CircularProgressIndicator())
                       : ServioPrimaryButton(
                           label: 'Verify & Start Job',
-                          onPressed: _verifyPinAndStart,
+                          onPressed: _submitPin,
                         ),
+                ),
+                const SizedBox(height: 8),
+                TextButton.icon(
+                  onPressed: _updating ? null : () => _showNoShowDialog(),
+                  icon: const Icon(Icons.person_off_outlined, size: 18),
+                  label: const Text('Report Customer Absent'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.red.shade400,
+                  ),
                 ),
               ],
             ),
@@ -1071,11 +1240,24 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
               ],
               onChanged: (v) {
                 setState(() => _pinError = false);
+                // Handle paste: if more than one character arrived, distribute
+                // all digits across boxes and auto-submit when complete.
+                final digits = v.replaceAll(RegExp(r'\D'), '');
+                if (digits.length > 1) {
+                  for (var j = 0; j < 4 && j < digits.length; j++) {
+                    _pinCtrl[j].text = digits[j];
+                  }
+                  final last =
+                      digits.length >= 4 ? 3 : digits.length - 1;
+                  _pinFocus[last].requestFocus();
+                  if (digits.length >= 4) _submitPin();
+                  return;
+                }
                 if (v.isNotEmpty && i < 3) {
                   _pinFocus[i + 1].requestFocus();
                 } else if (v.isNotEmpty && i == 3) {
                   // All four entered — attempt verify automatically.
-                  _verifyPinAndStart();
+                  _submitPin();
                 }
               },
               onTap: () => _pinCtrl[i].selection = TextSelection(
@@ -1089,10 +1271,8 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
     );
   }
 
-  // Paste handler is wired at the RawKeyboardListener level — for simplicity
-  // the TextField onChanged handles single-digit entry with auto-advance.
-  // Full paste support would require RawKeyboardListener or EditableText; the
-  // auto-advance covers the common case without extra complexity.
+  // Paste support: handled in onChanged — if >1 digit arrives (e.g. clipboard
+  // paste), digits are distributed across all boxes and auto-submit fires.
 
   // ── Section: inProgress ────────────────────────────────────────────────────
 
@@ -1132,11 +1312,20 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
             ),
           ),
           const SizedBox(height: 16),
+          if (stepFromStatus(_job!.status) != null)
+            JobProgressStepper(currentStep: stepFromStatus(_job!.status)!),
+          const SizedBox(height: 16),
           _jobInfoCard(),
           const SizedBox(height: 32),
           ServioPrimaryButton(
             label: 'Finish Job',
             onPressed: () => _goTo(JobSection.completeConfirm),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: _showUpdateEstimateSheet,
+            icon: const Icon(Icons.timer_outlined, size: 16),
+            label: const Text('Update Estimate'),
           ),
         ],
       ),
@@ -1190,6 +1379,7 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
                 TextField(
                   controller: _notesCtrl,
                   maxLines: 4,
+                  maxLength: 400,
                   decoration: InputDecoration(
                     hintText:
                         'Describe what was done, parts used, customer feedback…',
@@ -1202,6 +1392,61 @@ class _JobDetailsScreenState extends State<JobDetailsScreen>
                       borderRadius: BorderRadius.circular(ServioRadius.md),
                       borderSide: BorderSide(color: servio.accent, width: 2),
                     ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                GestureDetector(
+                  onTap: _pickCompletionImage,
+                  child: Container(
+                    height: 80,
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: _completionImageBytes != null
+                            ? servio.accent
+                            : servio.textSecondary.withValues(alpha: 0.3),
+                        width: 1.5,
+                      ),
+                      borderRadius:
+                          BorderRadius.circular(ServioRadius.md),
+                    ),
+                    child: _completionImageBytes != null
+                        ? Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: <Widget>[
+                              Icon(Icons.check_circle_outline_rounded,
+                                  color: servio.accent),
+                              const SizedBox(width: 8),
+                              Text(
+                                _completionImageFilename ?? 'Photo selected',
+                                style: TextStyle(
+                                    color: servio.accent,
+                                    fontWeight: FontWeight.w500),
+                              ),
+                              const SizedBox(width: 8),
+                              GestureDetector(
+                                onTap: () => setState(() {
+                                  _completionImageBytes = null;
+                                  _completionImageFilename = null;
+                                }),
+                                child: Icon(Icons.close_rounded,
+                                    size: 18,
+                                    color: servio.textSecondary),
+                              ),
+                            ],
+                          )
+                        : Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: <Widget>[
+                              Icon(Icons.add_photo_alternate_outlined,
+                                  color: servio.textSecondary),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Add completion photo (optional)',
+                                style:
+                                    TextStyle(color: servio.textSecondary),
+                              ),
+                            ],
+                          ),
                   ),
                 ),
               ],

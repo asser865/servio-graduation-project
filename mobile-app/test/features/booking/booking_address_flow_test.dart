@@ -10,8 +10,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:servio_mobile_app/src/core/api/api_client.dart';
 import 'package:servio_mobile_app/src/core/api/users_api.dart';
+import 'package:servio_mobile_app/src/core/api/payments_api.dart';
 import 'package:servio_mobile_app/src/core/services/storage_service.dart';
 import 'package:servio_mobile_app/src/core/state/customer_addresses_state.dart';
+import 'package:servio_mobile_app/src/core/state/payments_provider.dart';
 import 'package:servio_mobile_app/src/design_system/servio_theme.dart';
 import 'package:servio_mobile_app/src/features/booking/booking_flow_data.dart';
 import 'package:servio_mobile_app/src/features/booking/booking_step_two_screen.dart';
@@ -121,6 +123,9 @@ Future<Widget> _wrap(Widget child, http.Client httpClient) async {
       Provider<ApiClient>.value(value: apiClient),
       ChangeNotifierProvider<CustomerAddressesProvider>(
         create: (_) => CustomerAddressesProvider(UsersApi(apiClient)),
+      ),
+      ChangeNotifierProvider<PaymentsProvider>(
+        create: (_) => PaymentsProvider(PaymentsApi(apiClient)),
       ),
     ],
     child: MaterialApp(

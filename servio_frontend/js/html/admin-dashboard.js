@@ -25,6 +25,10 @@ import {
   updateSupportIssueStatus,
   resolveSupportIssue,
   escalateSupportIssueToDispute,
+  getAdminProblemReports,
+  updateProblemReport,
+  getAdminContactMessages,
+  updateContactMessage,
 } from '../api/support.js';
 
 // Auth guard
@@ -60,6 +64,10 @@ let _disputesLoadedOnce = false;
 let _adminSupportIssues = [];
 let _supportLoadedOnce = false;
 let _overviewRequest = null;
+let _adminProblemReports   = [];
+let _problemReportsLoadedOnce = false;
+let _adminContactMessages  = [];
+let _contactMessagesLoadedOnce = false;
 
 /* ── Sidebar nav indicators ────────────────────────────── */
 const ADMIN_NAV_SEEN_KEY = 'servio_admin_nav_seen_v1';
@@ -720,7 +728,12 @@ function initAdminDashboard() {
   navBtns.forEach(btn => {
     btn.addEventListener('click', () => {
       switchTab(btn.dataset.tab);
-      if (btn.dataset.tab === 'support') renderSupportIssues().catch(err => console.error('Error loading support issues:', err));
+      if (btn.dataset.tab === 'disputes') renderDisputes().catch(err => console.error('Error loading disputes:', err));
+      if (btn.dataset.tab === 'support') {
+        renderSupportIssues().catch(err => console.error('Error loading support issues:', err));
+        renderProblemReports().catch(err => console.error('Error loading problem reports:', err));
+        renderContactMessages().catch(err => console.error('Error loading contact messages:', err));
+      }
     });
   });
 
@@ -728,7 +741,15 @@ function initAdminDashboard() {
   document.querySelectorAll('[data-goto-tab]').forEach(btn => {
     btn.addEventListener('click', () => {
       switchTab(btn.dataset.gotoTab);
-      if (btn.dataset.gotoTab === 'support') renderSupportIssues().catch(err => console.error('Error loading support issues:', err));
+      if (btn.dataset.gotoTab === 'disputes') renderDisputes().catch(err => console.error('Error loading disputes:', err));
+      if (btn.dataset.gotoTab === 'support') {
+        renderSupportIssues().catch(err => console.error('Error loading support issues:', err));
+        renderProblemReports().catch(err => console.error('Error loading problem reports:', err));
+        renderContactMessages().catch(err => console.error('Error loading contact messages:', err));
+      }
+      if (btn.dataset.gotoFin && typeof switchFinanceTab === 'function') {
+        switchFinanceTab(btn.dataset.gotoFin);
+      }
     });
   });
   // ── Users: combined search + status filter ─
@@ -2563,6 +2584,8 @@ async function loadAdminData() {
     }
     if (!_supportLoadedOnce) {
       renderSupportIssues().catch(err => console.error('Error loading support issues:', err));
+      renderProblemReports().catch(err => console.error('Error loading problem reports:', err));
+      renderContactMessages().catch(err => console.error('Error loading contact messages:', err));
     }
 
     // Update pagination footer with actual count
@@ -2782,6 +2805,19 @@ function updateDisputeKpis(disputes) {
   setAdminText('disputeCount', actionable);
   setAdminText('qa-dispute-badge', actionable);
   setAdminNavBadge('disputes', actionable);
+}
+
+function updateSupportKpis(issues, disputes) {
+  const openIssues = issues.filter(i => !['resolved', 'closed'].includes(i.status)).length;
+  const activeDisputeStatuses = ['open', 'reviewing', 'awaiting_evidence', 'appealed', 'escalated'];
+  const openDisputes = disputes.filter(d => activeDisputeStatuses.includes(d.status)).length;
+  const resolvedIssues = issues.filter(i => ['resolved', 'closed'].includes(i.status)).length;
+  const resolvedDisputes = disputes.filter(d => String(d.status || '').startsWith('resolved_')).length;
+  const resolvedCases = resolvedIssues + resolvedDisputes;
+
+  setAdminText('kpi-support-issues', openIssues.toLocaleString());
+  setAdminText('kpi-support-disputes', openDisputes.toLocaleString());
+  setAdminText('kpi-support-resolved', resolvedCases.toLocaleString());
 }
 
 async function renderDisputes(options = {}) {
@@ -3299,9 +3335,25 @@ async function renderSupportIssues(options = {}) {
   const shouldFetch = options.force || !options.reuseCache || !_supportLoadedOnce;
   if (shouldFetch) {
     tbody.innerHTML = skTableRows(6, 8);
-    _adminSupportIssues = await fetchAdminSupportIssues();
+    const fetchDisputes = (options.force || !_disputesLoadedOnce)
+      ? fetchAdminDisputes()
+      : Promise.resolve(_adminDisputes);
+
+    const [issues, disputes] = await Promise.all([
+      fetchAdminSupportIssues(),
+      fetchDisputes
+    ]);
+
+    _adminSupportIssues = issues;
+    if (options.force || !_disputesLoadedOnce) {
+      _adminDisputes = disputes;
+      _disputesLoadedOnce = true;
+      updateDisputeKpis(_adminDisputes);
+    }
     _supportLoadedOnce = true;
   }
+
+  updateSupportKpis(_adminSupportIssues, _adminDisputes);
 
   const openCount = _adminSupportIssues.filter(item => !['resolved', 'closed'].includes(item.status)).length;
   setAdminNavBadge('support', openCount);
@@ -3385,6 +3437,160 @@ function bindSupportIssueActions() {
   });
 }
 
+// ── Problem Reports ──────────────────────────────────────────────────────────
+
+async function renderProblemReports(options = {}) {
+  const tbody = document.querySelector('#problemReportsTable tbody');
+  if (!tbody) return;
+
+  const shouldFetch = options.force || !options.reuseCache || !_problemReportsLoadedOnce;
+  if (shouldFetch) {
+    tbody.innerHTML = skTableRows(4, 6);
+    const params = {};
+    const status = document.getElementById('problemReportStatusFilter')?.value;
+    if (status) params.status = status;
+    params.limit = 100;
+    const result = await getAdminProblemReports(params);
+    _adminProblemReports = result?.reports || result?.data || [];
+    _problemReportsLoadedOnce = true;
+  }
+
+  const query = String(document.getElementById('problemReportSearch')?.value || '').trim().toLowerCase();
+  const visible = _adminProblemReports.filter(r => {
+    if (!query) return true;
+    return [
+      r.category, r.description,
+      r.reporter?.name, r.reporter?.email,
+    ].some(v => v && String(v).toLowerCase().includes(query));
+  });
+
+  if (!visible.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="center-align" style="padding: 3rem; color: var(--color-text-muted);">No problem reports match the current filters.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = visible.map(r => {
+    const canResolve = r.status !== 'resolved';
+    return `
+      <tr>
+        <td><span class="admin-support-priority">${escapeHtml(r.category || '-')}</span></td>
+        <td><div>${escapeHtml(r.reporter?.name || 'Anonymous')}</div><small>${escapeHtml(r.reporter?.email || '')}</small></td>
+        <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(r.description || '')}">${escapeHtml((r.description || '').substring(0, 80))}${(r.description || '').length > 80 ? '\u2026' : ''}</td>
+        <td><span class="admin-dispute-status">${escapeHtml(r.status || 'open')}</span></td>
+        <td>${escapeHtml(formatAdminDate(r.createdAt))}</td>
+        <td class="center-align">
+          <div class="admin-dispute-actions">
+            ${canResolve ? `<button class="bk-action-btn bk-action-btn--xs" type="button" data-problem-resolve="${escapeHtml(r._id)}">Resolve</button>` : ''}
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  // bind actions
+  document.querySelectorAll('[data-problem-resolve]').forEach(btn => {
+    btn.onclick = async () => {
+      const notes = prompt('Add a resolution note (optional):');
+      try {
+        await updateProblemReport(btn.dataset.problemResolve, { status: 'resolved', adminNotes: notes || '' });
+        showToast('Problem report resolved.', 'success');
+        await renderProblemReports({ force: true });
+      } catch (err) {
+        showToast(err?.data?.message || err.message || 'Failed to resolve.', 'error');
+      }
+    };
+  });
+}
+
+document.getElementById('problemReportStatusFilter')?.addEventListener('change', () => renderProblemReports({ force: true }).catch(console.error));
+document.getElementById('problemReportSearch')?.addEventListener('input', () => renderProblemReports({ reuseCache: true }).catch(console.error));
+document.getElementById('problemReportRefreshBtn')?.addEventListener('click', () => renderProblemReports({ force: true }).catch(console.error));
+
+// ── Contact Messages ──────────────────────────────────────────────────────────
+
+async function renderContactMessages(options = {}) {
+  const tbody = document.querySelector('#contactMessagesTable tbody');
+  if (!tbody) return;
+
+  const shouldFetch = options.force || !options.reuseCache || !_contactMessagesLoadedOnce;
+  if (shouldFetch) {
+    tbody.innerHTML = skTableRows(4, 7);
+    const params = {};
+    const status = document.getElementById('contactMessageStatusFilter')?.value;
+    if (status) params.status = status;
+    params.limit = 100;
+    const result = await getAdminContactMessages(params);
+    _adminContactMessages = result?.messages || result?.data || [];
+    _contactMessagesLoadedOnce = true;
+  }
+
+  const query = String(document.getElementById('contactMessageSearch')?.value || '').trim().toLowerCase();
+  const visible = _adminContactMessages.filter(m => {
+    if (!query) return true;
+    return [
+      m.name, m.email, m.subject, m.message,
+    ].some(v => v && String(v).toLowerCase().includes(query));
+  });
+
+  if (!visible.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="center-align" style="padding: 3rem; color: var(--color-text-muted);">No contact messages match the current filters.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = visible.map(m => {
+    const canUpdate = m.status !== 'closed';
+    const statusColor = m.status === 'new' ? 'var(--color-warning)' : m.status === 'replied' ? 'var(--color-success)' : 'var(--color-text-muted)';
+    return `
+      <tr>
+        <td>${escapeHtml(m.name || '-')}</td>
+        <td><a href="mailto:${escapeHtml(m.email)}" style="color:var(--color-accent)">${escapeHtml(m.email || '-')}</a></td>
+        <td>${escapeHtml(m.subject || '-')}</td>
+        <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(m.message || '')}">${escapeHtml((m.message || '').substring(0, 60))}${(m.message || '').length > 60 ? '\u2026' : ''}</td>
+        <td><span style="color:${statusColor};font-weight:600">${escapeHtml(m.status || 'new')}</span></td>
+        <td>${escapeHtml(formatAdminDate(m.createdAt))}</td>
+        <td class="center-align">
+          <div class="admin-dispute-actions">
+            <button class="bk-action-btn bk-action-btn--xs" type="button" data-contact-view="${escapeHtml(m._id)}">View & Reply</button>
+            ${canUpdate ? `<button class="bk-action-btn bk-action-btn--xs" type="button" data-contact-reply="${escapeHtml(m._id)}">Mark Replied</button>` : ''}
+            ${canUpdate ? `<button class="bk-action-btn bk-action-btn--xs" type="button" data-contact-close="${escapeHtml(m._id)}">Close</button>` : ''}
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  // bind actions
+  document.querySelectorAll('[data-contact-view]').forEach(btn => {
+    btn.onclick = () => openAdminContactModal(btn.dataset.contactView);
+  });
+  document.querySelectorAll('[data-contact-reply]').forEach(btn => {
+    btn.onclick = async () => {
+      try {
+        await updateContactMessage(btn.dataset.contactReply, { status: 'replied' });
+        showToast('Contact message marked as replied.', 'success');
+        await renderContactMessages({ force: true });
+      } catch (err) {
+        showToast(err?.data?.message || err.message || 'Failed to update.', 'error');
+      }
+    };
+  });
+  document.querySelectorAll('[data-contact-close]').forEach(btn => {
+    btn.onclick = async () => {
+      try {
+        await updateContactMessage(btn.dataset.contactClose, { status: 'closed' });
+        showToast('Contact message closed.', 'success');
+        await renderContactMessages({ force: true });
+      } catch (err) {
+        showToast(err?.data?.message || err.message || 'Failed to update.', 'error');
+      }
+    };
+  });
+}
+
+document.getElementById('contactMessageStatusFilter')?.addEventListener('change', () => renderContactMessages({ force: true }).catch(console.error));
+document.getElementById('contactMessageSearch')?.addEventListener('input', () => renderContactMessages({ reuseCache: true }).catch(console.error));
+document.getElementById('contactMessageRefreshBtn')?.addEventListener('click', () => renderContactMessages({ force: true }).catch(console.error));
+
 function openAdminSupportModal(issueId) {
   const issue = _adminSupportIssues.find(item => item._id === issueId);
   const body = document.getElementById('adminSupportBody');
@@ -3415,6 +3621,295 @@ function openAdminSupportModal(issueId) {
   `;
   _openProfileModal?.('adminSupportModal');
 }
+
+function openAdminContactModal(messageId) {
+  const message = _adminContactMessages.find(item => item._id === messageId);
+  const body = document.getElementById('adminContactBody');
+  if (!message || !body) return;
+
+  const canReply = message.status !== 'closed';
+  const statusColor = message.status === 'new' ? 'var(--color-warning)' : message.status === 'replied' ? 'var(--color-success)' : 'var(--color-text-muted)';
+  
+  body.innerHTML = `
+    <div class="admin-dispute-detail">
+      <div class="admin-dispute-detail__summary">
+        <span class="admin-support-priority" style="background:${statusColor}15; color:${statusColor}; font-weight:600; padding:4px 8px; border-radius:12px;">${escapeHtml(message.status || 'new').toUpperCase()}</span>
+        <h4 style="margin-top:10px;">Subject: ${escapeHtml(message.subject || '')}</h4>
+        <div style="background:var(--color-surface-soft); border-left:4px solid var(--color-border); padding:16px; border-radius:8px; margin:15px 0;">
+          <p style="white-space:pre-wrap; margin:0; line-height:1.6;">${escapeHtml(message.message || '')}</p>
+        </div>
+      </div>
+      
+      <div class="admin-dispute-detail__grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 20px;">
+        <div><span>Sender Name</span><strong>${escapeHtml(message.name || '-')}</strong></div>
+        <div><span>Sender Email</span><strong><a href="mailto:${escapeHtml(message.email)}" style="color:var(--color-accent); text-decoration:underline;">${escapeHtml(message.email || '-')}</a></strong></div>
+        <div><span>Received Date</span><strong>${escapeHtml(formatAdminDate(message.createdAt))}</strong></div>
+      </div>
+
+      ${message.adminReply ? `
+        <div style="margin-bottom: 20px;">
+          <h4 style="margin-bottom: 8px;">Previous Admin Reply</h4>
+          <div style="background:rgba(46, 125, 50, 0.08); border-left:4px solid #2e7d32; padding:16px; border-radius:8px;">
+            <p style="white-space:pre-wrap; margin:0; line-height:1.6; color:#1b5e20;">${escapeHtml(message.adminReply)}</p>
+          </div>
+        </div>
+      ` : ''}
+
+      ${canReply ? `
+        <div class="field field--full" style="margin-top:15px;">
+          <label class="label" for="contactReplyText" style="font-weight:600; margin-bottom:8px; display:block;">Send Email Reply to User</label>
+          <textarea class="input admin-textarea" id="contactReplyText" rows="6" placeholder="Type your reply to the user... (This will be emailed to ${escapeHtml(message.email)} directly)"></textarea>
+          <p class="error-text" id="contactReplyError" style="color:var(--color-danger); margin-top:5px;" hidden></p>
+        </div>
+        <div class="admin-modal__actions" style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
+          <button class="btn btn--ghost" type="button" data-modal-close="adminContactModal">Cancel</button>
+          <button class="btn btn--primary" type="button" id="contactReplySubmitBtn">Send Reply via Email</button>
+        </div>
+      ` : `
+        <div class="admin-modal__actions" style="margin-top:20px; display:flex; justify-content:flex-end;">
+          <button class="btn btn--ghost" type="button" data-modal-close="adminContactModal">Close</button>
+        </div>
+      `}
+    </div>
+  `;
+
+  if (canReply) {
+    const submitBtn = document.getElementById('contactReplySubmitBtn');
+    const textarea = document.getElementById('contactReplyText');
+    const errorEl = document.getElementById('contactReplyError');
+
+    if (submitBtn && textarea) {
+      submitBtn.onclick = async () => {
+        const replyText = textarea.value.trim();
+        if (!replyText || replyText.length < 10) {
+          if (errorEl) {
+            errorEl.textContent = 'Reply must be at least 10 characters long.';
+            errorEl.removeAttribute('hidden');
+          }
+          return;
+        }
+
+        if (errorEl) errorEl.setAttribute('hidden', '');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Sending...';
+
+        try {
+          await updateContactMessage(messageId, { adminReply: replyText });
+          showToast('Email reply sent successfully and marked as replied.', 'success');
+          
+          // Close modal
+          const modal = document.getElementById('adminContactModal');
+          if (modal) {
+            modal.setAttribute('hidden', '');
+            modal.style.display = 'none';
+          }
+          
+          await renderContactMessages({ force: true });
+        } catch (err) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Send Reply via Email';
+          if (errorEl) {
+            errorEl.textContent = err?.data?.message || err.message || 'Failed to send reply.';
+            errorEl.removeAttribute('hidden');
+          }
+        }
+      };
+    }
+  }
+
+  // Bind close actions in the rendered dynamic HTML
+  body.querySelectorAll('[data-modal-close]').forEach(btn => {
+    btn.onclick = () => {
+      const modal = document.getElementById(btn.dataset.modalClose);
+      if (modal) {
+        modal.setAttribute('hidden', '');
+        modal.style.display = 'none';
+      }
+    };
+  });
+
+  _openProfileModal?.('adminContactModal');
+}
+
+async function renderPendingApprovals(filter = {}) {
+  const container = document.getElementById('adminPendingApprovalsList');
+  if (!container) return;
+  container.innerHTML = skList(4);
+
+  try {
+    const { items } = await getPendingApprovals(filter);
+    if (!items.length) {
+      container.innerHTML = '<p class="empty-state">No pending approvals.</p>';
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="fp-table-wrap">
+      <table class="admin-table fp-table finance-table finance-table--queue">
+        <thead>
+          <tr>
+            <th>Customer</th><th>Worker</th><th>Service</th>
+            <th>Method</th><th>Amount</th><th>Worker Earns</th>
+            <th>Platform Fee</th><th>Decision Basis</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${items.map(item => `
+            <tr data-booking-id="${item.bookingId}" data-method="${item.paymentMethod}">
+              <td>${item.customer?.name || '—'}</td>
+              <td>${item.worker?.name || '—'}</td>
+              <td>${item.service || '—'}</td>
+              <td><span class="badge badge--${item.paymentMethod}">${item.paymentMethod}</span></td>
+              <td>${item.totalPaid || item.amount || '—'} EGP</td>
+              <td>${item.workerEarning != null ? item.workerEarning + ' EGP' : '—'}</td>
+              <td>${item.platformFee != null ? item.platformFee + ' EGP' : '—'}</td>
+              <td>${item.customerConfirmedAt ? new Date(item.customerConfirmedAt).toLocaleDateString() : '—'}</td>
+              <td class="admin-actions">
+                <button class="btn btn--sm btn--success js-approve-btn" data-id="${item.bookingId}">Approve</button>
+                ${item.paymentMethod === 'cash' ? `<button class="btn btn--sm btn--danger js-reject-cash-btn" data-id="${item.bookingId}">Reject</button>` : ''}
+                ${item.paymentId ? `<button class="btn btn--sm btn--warning js-refund-btn" data-id="${item.paymentId}">Refund</button>` : ''}
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+      </div>
+    `;
+
+    container.querySelectorAll('.js-approve-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm(window.t?.('admin_approve_confirm') || 'Approve this payment release? This cannot be undone.')) return;
+        try {
+          await adminApprovePayment(btn.dataset.id);
+          showToast('Approved.', 'success');
+          refreshPaymentsWorksurface();
+        } catch (err) {
+          showToast(err?.response?.data?.message || 'Approval failed.', 'error');
+        }
+      });
+    });
+
+    container.querySelectorAll('.js-reject-cash-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const reason = prompt('Reason for rejection (required):');
+        if (!reason) return;
+        try {
+          await adminRejectCash(btn.dataset.id, { reason });
+          showToast('Rejected.', 'info');
+          refreshPaymentsWorksurface();
+        } catch (err) {
+          showToast(err?.response?.data?.message || 'Rejection failed.', 'error');
+        }
+      });
+    });
+
+    container.querySelectorAll('.js-refund-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm(window.t?.('admin_refund_confirm') || 'Issue a refund? Booking will be cancelled.')) return;
+        const reason = prompt('Refund reason:');
+        if (!reason) return;
+        try {
+          await adminRefund(btn.dataset.id, { reason });
+          showToast('Refunded.', 'info');
+          refreshPaymentsWorksurface();
+        } catch (err) {
+          showToast(err?.response?.data?.message || 'Refund failed.', 'error');
+        }
+      });
+    });
+  } catch (err) {
+    container.innerHTML = `<p class="error-state">Failed to load: ${err?.message}</p>`;
+  }
+}
+
+async function renderCashDebts(filter = {}) {
+  const container = document.getElementById('adminCashDebtsList');
+  if (!container) return;
+  container.innerHTML = skList(4);
+
+  try {
+    const { items, summary } = await getCashDebts(filter);
+
+    const summaryEl = document.getElementById('adminCashDebtsSummary');
+    if (summaryEl) {
+      summaryEl.innerHTML = `
+        <span>Outstanding: <strong>${summary.totalOutstanding} EGP</strong></span>
+        <span>Partial: <strong>${summary.totalPartiallyPaid} EGP</strong></span>
+        <span>Collected: <strong>${summary.totalPaid} EGP</strong></span>
+      `;
+    }
+
+    if (!items.length) {
+      container.innerHTML = '<p class="empty-state">No cash debts found.</p>';
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="fp-table-wrap">
+      <table class="admin-table fp-table">
+        <thead>
+          <tr>
+            <th>Worker</th><th>Booking</th><th>Amount</th>
+            <th>Paid</th><th>Status</th><th>Created</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${items.map(d => `
+            <tr>
+              <td>${d.worker?.name || '—'}</td>
+              <td>${d.bookingId || '—'}</td>
+              <td>${d.amount} EGP</td>
+              <td>${d.paidAmount} EGP</td>
+              <td><span class="badge badge--${d.status}">${d.status.replace('_', ' ')}</span></td>
+              <td>${new Date(d.createdAt).toLocaleDateString()}</td>
+              <td>
+                ${d.status !== 'paid' ? `<button class="btn btn--sm btn--primary js-mark-paid-btn" data-id="${d.debtId}" data-remaining="${d.amount - d.paidAmount}">
+                  ${window.t?.('admin_mark_paid') || 'Mark Paid'}
+                </button>` : '—'}
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+      </div>
+    `;
+
+    container.querySelectorAll('.js-mark-paid-btn').forEach(btn => {
+      btn.addEventListener('click', () => openMarkPaidModal(btn.dataset.id, Number(btn.dataset.remaining)));
+    });
+  } catch (err) {
+    container.innerHTML = `<p class="error-state">Failed to load: ${err?.message}</p>`;
+  }
+}
+
+function openMarkPaidModal(debtId, remaining) {
+  const modal = document.getElementById('adminMarkPaidModal');
+  if (!modal) return;
+  document.getElementById('markPaidDebtId').value = debtId;
+  document.getElementById('markPaidRemaining').textContent = remaining + ' EGP';
+  document.getElementById('markPaidAmount').value = remaining;
+  document.getElementById('markPaidAmount').max = remaining;
+  modal.hidden = false;
+}
+
+document.getElementById('markPaidSubmit')?.addEventListener('click', async () => {
+  const debtId    = document.getElementById('markPaidDebtId').value;
+  const amount    = Number(document.getElementById('markPaidAmount').value);
+  const adminNote = document.getElementById('markPaidNote').value.trim() || undefined;
+  if (!amount || amount <= 0) { showToast('Enter a valid amount.', 'error'); return; }
+  try {
+    await markCashDebtPaid(debtId, { amount, adminNote });
+    document.getElementById('adminMarkPaidModal').hidden = true;
+    showToast('Payment recorded.', 'success');
+    renderCashDebts();
+  } catch (err) {
+    showToast(err?.response?.data?.message || 'Failed to record payment.', 'error');
+  }
+});
+
+document.getElementById('markPaidCancel')?.addEventListener('click', () => {
+  document.getElementById('adminMarkPaidModal').hidden = true;
+});
 
 initAdminDashboard();
 

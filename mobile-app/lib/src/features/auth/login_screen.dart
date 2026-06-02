@@ -3,15 +3,11 @@ import 'package:provider/provider.dart';
 
 import '../../core/models/user_account.dart';
 import '../../core/state/app_state.dart';
-import '../../design_system/servio_theme_extension.dart';
 import '../../design_system/servio_tokens.dart';
-import '../../design_system/widgets/servio_primary_button.dart';
 import '../customer/customer_shell.dart';
 import '../technician/technician_shell.dart';
 import 'forgot_password_screen.dart';
 import 'role_selection_screen.dart';
-import 'widgets/auth_background.dart';
-import 'widgets/auth_card.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -24,6 +20,8 @@ class _LoginScreenState extends State<LoginScreen>
     with SingleTickerProviderStateMixin {
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
+  final _passwordFocusNode = FocusNode();
+
   bool _obscurePassword = true;
   bool _rememberMe = false;
   bool _loading = false;
@@ -41,7 +39,7 @@ class _LoginScreenState extends State<LoginScreen>
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final saved = context.read<SessionProvider>().savedEmail;
-      if (saved.isNotEmpty) {
+      if (saved.isNotEmpty && mounted) {
         _emailCtrl.text = saved;
         setState(() => _rememberMe = true);
       }
@@ -52,15 +50,29 @@ class _LoginScreenState extends State<LoginScreen>
   void dispose() {
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
+    _passwordFocusNode.dispose();
     _entranceController.dispose();
     super.dispose();
+  }
+
+  bool _isValidEmail(String value) {
+    return RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(value.trim());
   }
 
   Future<void> _login() async {
     final email = _emailCtrl.text.trim();
     final password = _passwordCtrl.text;
+
     if (email.isEmpty || password.isEmpty) {
       setState(() => _errorMsg = 'Please enter your email and password.');
+      return;
+    }
+    if (!_isValidEmail(email)) {
+      setState(() => _errorMsg = 'Enter a valid email address.');
+      return;
+    }
+    if (password.length < 8) {
+      setState(() => _errorMsg = 'Password must be at least 8 characters.');
       return;
     }
 
@@ -69,7 +81,6 @@ class _LoginScreenState extends State<LoginScreen>
       _errorMsg = null;
     });
 
-    if (!mounted) return;
     final error = await context.read<SessionProvider>().login(
           email,
           password,
@@ -108,7 +119,7 @@ class _LoginScreenState extends State<LoginScreen>
         title: const Text('Account Under Review'),
         content: const Text(
           'Your technician account is pending verification. '
-          'Our team will review your documents and notify you within 24–48 hours.',
+          'Our team will review your documents and notify you within 24-48 hours.',
         ),
         actions: <Widget>[
           TextButton(
@@ -120,380 +131,70 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
+  void _openForgotPassword() {
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(builder: (_) => const ForgotPasswordScreen()),
+    );
+  }
+
+  void _openCreateAccount() {
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(builder: (_) => const RoleSelectionScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final servio = context.servio;
-    final isDark = theme.brightness == Brightness.dark;
-
     return Scaffold(
-      backgroundColor:
-          isDark ? const Color(0xFF1E2633) : ServioColors.backgroundLight,
-      body: Stack(
-        children: <Widget>[
-          const Positioned.fill(
-            child: AuthBackground(fullBleed: true),
-          ),
-          SafeArea(
-            child: LayoutBuilder(
+      backgroundColor: const Color(0xFFF3EDE7),
+      body: SafeArea(
+        child: Stack(
+          children: <Widget>[
+            LayoutBuilder(
               builder: (context, constraints) {
                 final horizontalPadding =
                     constraints.maxWidth >= 700 ? 32.0 : 20.0;
-                final minContentHeight = constraints.maxHeight > 116
-                    ? constraints.maxHeight - 116
-                    : 0.0;
+                final topPadding = constraints.maxHeight < 720 ? 64.0 : 72.0;
+                final minHeight = (constraints.maxHeight - topPadding - 24)
+                    .clamp(0.0, double.infinity)
+                    .toDouble();
 
                 return SingleChildScrollView(
                   keyboardDismissBehavior:
                       ScrollViewKeyboardDismissBehavior.onDrag,
                   padding: EdgeInsets.fromLTRB(
                     horizontalPadding,
-                    0,
+                    topPadding,
                     horizontalPadding,
                     24,
                   ),
                   child: ConstrainedBox(
-                    constraints: BoxConstraints(minHeight: minContentHeight),
+                    constraints: BoxConstraints(minHeight: minHeight),
                     child: Center(
                       child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 480),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: <Widget>[
-                            const SizedBox(height: 86),
-
-                            // ── Brand icon mark ────────────────────────────
-                            FadeTransition(
-                              opacity: CurvedAnimation(
-                                parent: _entranceController,
-                                curve: const Interval(0.0, 0.45),
-                              ),
-                              child: Center(
-                                child: Container(
-                                  width: 64,
-                                  height: 64,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.15),
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color:
-                                          Colors.white.withValues(alpha: 0.25),
-                                      width: 1.5,
-                                    ),
-                                  ),
-                                  child: const Icon(
-                                    Icons.person_outline_rounded,
-                                    size: 28,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
+                        constraints: const BoxConstraints(maxWidth: 460),
+                        child: _Reveal(
+                          controller: _entranceController,
+                          intervalStart: 0,
+                          child: _LoginCard(
+                            emailCtrl: _emailCtrl,
+                            passwordCtrl: _passwordCtrl,
+                            passwordFocusNode: _passwordFocusNode,
+                            obscurePassword: _obscurePassword,
+                            rememberMe: _rememberMe,
+                            loading: _loading,
+                            errorMsg: _errorMsg,
+                            onTogglePassword: () => setState(
+                              () => _obscurePassword = !_obscurePassword,
                             ),
-
-                            const SizedBox(height: 16),
-
-                            // ── Welcome heading ────────────────────────────
-                            SlideTransition(
-                              position: Tween<Offset>(
-                                begin: const Offset(0, 0.25),
-                                end: Offset.zero,
-                              ).animate(CurvedAnimation(
-                                parent: _entranceController,
-                                curve: const Interval(0.1, 0.6,
-                                    curve: ServioMotion.spring),
-                              )),
-                              child: FadeTransition(
-                                opacity: CurvedAnimation(
-                                  parent: _entranceController,
-                                  curve: const Interval(0.1, 0.55),
-                                ),
-                                child: Column(
-                                  children: <Widget>[
-                                    Text(
-                                      'Welcome back',
-                                      textAlign: TextAlign.center,
-                                      style: theme.textTheme.displayLarge
-                                          ?.copyWith(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w900,
-                                        height: 1.1,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      'Sign in to continue.',
-                                      textAlign: TextAlign.center,
-                                      style:
-                                          theme.textTheme.bodyMedium?.copyWith(
-                                        color: Colors.white
-                                            .withValues(alpha: 0.45),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-
-                            const SizedBox(height: 28),
-
-                            // ── Form card ──────────────────────────────────
-                            SlideTransition(
-                              position: Tween<Offset>(
-                                begin: const Offset(0, 0.15),
-                                end: Offset.zero,
-                              ).animate(CurvedAnimation(
-                                parent: _entranceController,
-                                curve: const Interval(0.25, 0.85,
-                                    curve: ServioMotion.spring),
-                              )),
-                              child: FadeTransition(
-                                opacity: CurvedAnimation(
-                                  parent: _entranceController,
-                                  curve: const Interval(0.25, 0.75),
-                                ),
-                                child: AuthCard(
-                                  frosted: true,
-                                  padding: const EdgeInsets.all(20),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: <Widget>[
-                                      // Section label
-                                      Row(
-                                        children: <Widget>[
-                                          Icon(
-                                            Icons.lock_outline_rounded,
-                                            size: 13,
-                                            color: servio.accent,
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            'YOUR CREDENTIALS',
-                                            style: theme.textTheme.labelSmall
-                                                ?.copyWith(
-                                              color: isDark
-                                                  ? ServioColors.accentLight
-                                                      .withValues(alpha: 0.65)
-                                                  : ServioColors.accent,
-                                              letterSpacing: 0.8,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 10),
-                                      Divider(
-                                        color: isDark
-                                            ? Colors.white
-                                                .withValues(alpha: 0.10)
-                                            : ServioColors.borderLight,
-                                      ),
-                                      const SizedBox(height: 18),
-
-                                      // Error banner
-                                      if (_errorMsg != null) ...<Widget>[
-                                        _ErrorBanner(message: _errorMsg!),
-                                        const SizedBox(height: 14),
-                                      ],
-
-                                      // Email field
-                                      TextField(
-                                        controller: _emailCtrl,
-                                        keyboardType:
-                                            TextInputType.emailAddress,
-                                        textInputAction: TextInputAction.next,
-                                        decoration: const InputDecoration(
-                                          labelText: 'Email address',
-                                          prefixIcon:
-                                              Icon(Icons.mail_outline_rounded),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 14),
-
-                                      // Password field
-                                      TextField(
-                                        controller: _passwordCtrl,
-                                        obscureText: _obscurePassword,
-                                        textInputAction: TextInputAction.done,
-                                        onSubmitted: (_) => _login(),
-                                        decoration: InputDecoration(
-                                          labelText: 'Password',
-                                          prefixIcon: const Icon(
-                                              Icons.lock_outline_rounded),
-                                          suffixIcon: IconButton(
-                                            onPressed: () => setState(() =>
-                                                _obscurePassword =
-                                                    !_obscurePassword),
-                                            icon: Icon(
-                                              _obscurePassword
-                                                  ? Icons.visibility_outlined
-                                                  : Icons
-                                                      .visibility_off_outlined,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-
-                                      const SizedBox(height: 6),
-
-                                      // Remember me / Forgot password row
-                                      Row(
-                                        children: <Widget>[
-                                          _AnimatedCheckbox(
-                                            value: _rememberMe,
-                                            accent: servio.accent,
-                                            border: servio.border,
-                                            onChanged: (v) =>
-                                                setState(() => _rememberMe = v),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            'Remember me',
-                                            style: theme.textTheme.bodySmall
-                                                ?.copyWith(
-                                              color: servio.textSecondary,
-                                            ),
-                                          ),
-                                          const Spacer(),
-                                          TextButton(
-                                            onPressed: () => Navigator.push(
-                                              context,
-                                              MaterialPageRoute<void>(
-                                                builder: (_) =>
-                                                    const ForgotPasswordScreen(),
-                                              ),
-                                            ),
-                                            child:
-                                                const Text('Forgot password?'),
-                                          ),
-                                        ],
-                                      ),
-
-                                      const SizedBox(height: 18),
-
-                                      // Primary CTA
-                                      ServioPrimaryButton(
-                                        label:
-                                            _loading ? 'Signing in…' : 'Log In',
-                                        isLoading: _loading,
-                                        onPressed: _loading ? null : _login,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-
-                            const SizedBox(height: 28),
-
-                            // ── Social auth ────────────────────────────────
-                            Row(
-                              children: <Widget>[
-                                Expanded(
-                                  child: Divider(
-                                    color: isDark
-                                        ? Colors.white.withValues(alpha: 0.10)
-                                        : ServioColors.borderLight,
-                                  ),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 16),
-                                  child: Text(
-                                    'or continue with',
-                                    style: theme.textTheme.bodySmall
-                                        ?.copyWith(color: servio.textSecondary),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: Divider(
-                                    color: isDark
-                                        ? Colors.white.withValues(alpha: 0.10)
-                                        : ServioColors.borderLight,
-                                  ),
-                                ),
-                              ],
-                            ),
-
-                            const SizedBox(height: 16),
-
-                            Row(
-                              children: <Widget>[
-                                Expanded(
-                                  child: OutlinedButton.icon(
-                                    onPressed: () {},
-                                    style: isDark
-                                        ? OutlinedButton.styleFrom(
-                                            side: const BorderSide(
-                                                color: Color(0x1CFFFFFF)),
-                                            backgroundColor:
-                                                const Color(0x0DFFFFFF),
-                                            foregroundColor: Colors.white
-                                                .withValues(alpha: 0.60),
-                                          )
-                                        : null,
-                                    icon: const Icon(Icons.g_mobiledata_rounded,
-                                        size: 22),
-                                    label: const Text('Google'),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: OutlinedButton.icon(
-                                    onPressed: () {},
-                                    style: isDark
-                                        ? OutlinedButton.styleFrom(
-                                            side: const BorderSide(
-                                                color: Color(0x1CFFFFFF)),
-                                            backgroundColor:
-                                                const Color(0x0DFFFFFF),
-                                            foregroundColor: Colors.white
-                                                .withValues(alpha: 0.60),
-                                          )
-                                        : null,
-                                    icon: const Icon(Icons.apple_rounded,
-                                        size: 22),
-                                    label: const Text('Apple'),
-                                  ),
-                                ),
-                              ],
-                            ),
-
-                            const SizedBox(height: 20),
-                            Divider(
-                              color: isDark
-                                  ? Colors.white.withValues(alpha: 0.10)
-                                  : ServioColors.borderLight,
-                            ),
-
-                            // ── Sign-up row ────────────────────────────────
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: <Widget>[
-                                Text(
-                                  'New to SERVIO?',
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: isDark
-                                        ? Colors.white.withValues(alpha: 0.35)
-                                        : ServioColors.textSecondaryLight,
-                                  ),
-                                ),
-                                TextButton(
-                                  onPressed: () {
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute<void>(
-                                        builder: (_) =>
-                                            const RoleSelectionScreen(),
-                                      ),
-                                    );
-                                  },
-                                  child: const Text('Create account'),
-                                ),
-                              ],
-                            ),
-
-                            const SizedBox(height: 12),
-                          ],
+                            onRememberChanged: (value) =>
+                                setState(() => _rememberMe = value),
+                            onForgotPassword: _openForgotPassword,
+                            onLogin: _loading ? null : _login,
+                            onCreateAccount: _openCreateAccount,
+                          ),
                         ),
                       ),
                     ),
@@ -501,61 +202,306 @@ class _LoginScreenState extends State<LoginScreen>
                 );
               },
             ),
-          ),
-          SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(
-                ServioSpacing.screenPadding,
-                18,
-                ServioSpacing.screenPadding,
-                0,
-              ),
-              child: Align(
-                alignment: AlignmentDirectional.topStart,
-                child: GestureDetector(
-                  onTap: () => Navigator.of(context).pop(),
-                  child: Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(ServioRadius.full),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.18),
-                      ),
-                    ),
-                    child: const Icon(
-                      Icons.arrow_back_rounded,
-                      color: Colors.white,
-                      size: 21,
-                    ),
-                  ),
-                ),
-              ),
+            PositionedDirectional(
+              top: 12,
+              start: 14,
+              child: _BackButton(onPressed: () => Navigator.of(context).pop()),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Animated custom checkbox — matches brand accent, exceeds 20px minimum
-// ─────────────────────────────────────────────────────────────────────────────
+class _LoginCard extends StatelessWidget {
+  const _LoginCard({
+    required this.emailCtrl,
+    required this.passwordCtrl,
+    required this.passwordFocusNode,
+    required this.obscurePassword,
+    required this.rememberMe,
+    required this.loading,
+    required this.onTogglePassword,
+    required this.onRememberChanged,
+    required this.onForgotPassword,
+    required this.onLogin,
+    required this.onCreateAccount,
+    this.errorMsg,
+  });
 
-class _AnimatedCheckbox extends StatelessWidget {
-  const _AnimatedCheckbox({
+  final TextEditingController emailCtrl;
+  final TextEditingController passwordCtrl;
+  final FocusNode passwordFocusNode;
+  final bool obscurePassword;
+  final bool rememberMe;
+  final bool loading;
+  final String? errorMsg;
+  final VoidCallback onTogglePassword;
+  final ValueChanged<bool> onRememberChanged;
+  final VoidCallback onForgotPassword;
+  final VoidCallback? onLogin;
+  final VoidCallback onCreateAccount;
+
+  @override
+  Widget build(BuildContext context) {
+    final isTight = MediaQuery.sizeOf(context).height < 720;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: const <BoxShadow>[
+          BoxShadow(
+            color: Color.fromRGBO(26, 29, 35, 0.08),
+            blurRadius: 28,
+            offset: Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(isTight ? 22 : 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            const _LoginHeader(),
+            SizedBox(height: isTight ? 24 : 32),
+            if (errorMsg != null) ...<Widget>[
+              _ErrorBanner(message: errorMsg!),
+              const SizedBox(height: 18),
+            ],
+            _InputField(
+              controller: emailCtrl,
+              label: 'Email Address',
+              hintText: 'name@example.com',
+              icon: Icons.mail_outline_rounded,
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.next,
+              onSubmitted: (_) => passwordFocusNode.requestFocus(),
+            ),
+            const SizedBox(height: 18),
+            _InputField(
+              controller: passwordCtrl,
+              focusNode: passwordFocusNode,
+              label: 'Password',
+              hintText: '••••••••',
+              icon: Icons.lock_outline_rounded,
+              obscureText: obscurePassword,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => onLogin?.call(),
+              trailing: IconButton(
+                tooltip:
+                    obscurePassword ? 'Show password' : 'Hide password',
+                onPressed: onTogglePassword,
+                icon: Icon(
+                  obscurePassword
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
+                  color: ServioColors.textSecondaryLight,
+                  size: 21,
+                ),
+              ),
+              labelTrailing: TextButton(
+                onPressed: onForgotPassword,
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(44, 32),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  foregroundColor: ServioColors.accent,
+                ),
+                child: const Text('Forgot password?'),
+              ),
+            ),
+            const SizedBox(height: 12),
+            _RememberRow(
+              value: rememberMe,
+              onChanged: onRememberChanged,
+            ),
+            const SizedBox(height: 18),
+            _LoginButton(
+              loading: loading,
+              onPressed: onLogin,
+            ),
+            const SizedBox(height: 24),
+            const _DividerLabel(),
+            const SizedBox(height: 20),
+            const _SocialButtons(),
+            const SizedBox(height: 28),
+            _FooterLink(onCreateAccount: onCreateAccount),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LoginHeader extends StatelessWidget {
+  const _LoginHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: <Widget>[
+        ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Image.asset(
+            'assets/images/servio_logo.png',
+            width: 72,
+            height: 72,
+            fit: BoxFit.cover,
+          ),
+        ),
+        const SizedBox(height: 14),
+        Text(
+          'SERVIO',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                color: ServioColors.navyDark,
+                fontFamily: 'Poppins',
+                fontSize: 32,
+                fontWeight: FontWeight.w800,
+                height: 1.2,
+                letterSpacing: 0,
+              ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Welcome back. Enter your details to access your sanctuary.',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: ServioColors.textSecondaryLight,
+                fontFamily: 'Inter',
+                height: 1.45,
+              ),
+        ),
+      ],
+    );
+  }
+}
+
+class _InputField extends StatelessWidget {
+  const _InputField({
+    required this.controller,
+    required this.label,
+    required this.hintText,
+    required this.icon,
+    this.focusNode,
+    this.keyboardType,
+    this.textInputAction,
+    this.obscureText = false,
+    this.trailing,
+    this.labelTrailing,
+    this.onSubmitted,
+  });
+
+  final TextEditingController controller;
+  final FocusNode? focusNode;
+  final String label;
+  final String hintText;
+  final IconData icon;
+  final TextInputType? keyboardType;
+  final TextInputAction? textInputAction;
+  final bool obscureText;
+  final Widget? trailing;
+  final Widget? labelTrailing;
+  final ValueChanged<String>? onSubmitted;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: Text(
+                label,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: ServioColors.navyDark,
+                      fontFamily: 'Inter',
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+            ),
+            if (labelTrailing != null) labelTrailing!,
+          ],
+        ),
+        const SizedBox(height: 6),
+        TextField(
+          controller: controller,
+          focusNode: focusNode,
+          keyboardType: keyboardType,
+          textInputAction: textInputAction,
+          obscureText: obscureText,
+          onSubmitted: onSubmitted,
+          decoration: InputDecoration(
+            hintText: hintText,
+            prefixIcon: Icon(icon, color: ServioColors.textSecondaryLight),
+            suffixIcon: trailing,
+            filled: true,
+            fillColor: const Color(0xFFF5F3F0),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                color: const Color(0xFFC6C6CB).withValues(alpha: 0.30),
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: ServioColors.accent),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _RememberRow extends StatelessWidget {
+  const _RememberRow({
     required this.value,
-    required this.accent,
-    required this.border,
     required this.onChanged,
   });
 
   final bool value;
-  final Color accent;
-  final Color border;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () => onChanged(!value),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            _AnimatedCheckbox(value: value, onChanged: onChanged),
+            const SizedBox(width: 8),
+            Text(
+              'Remember me',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: ServioColors.textSecondaryLight,
+                    fontFamily: 'Inter',
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AnimatedCheckbox extends StatelessWidget {
+  const _AnimatedCheckbox({
+    required this.value,
+    required this.onChanged,
+  });
+
+  final bool value;
   final ValueChanged<bool> onChanged;
 
   @override
@@ -565,27 +511,239 @@ class _AnimatedCheckbox extends StatelessWidget {
       child: AnimatedContainer(
         duration: ServioMotion.fast,
         curve: ServioMotion.spring,
-        width: 20,
-        height: 20,
+        width: 22,
+        height: 22,
         decoration: BoxDecoration(
-          color: value ? accent : Colors.transparent,
+          color: value ? ServioColors.accent : Colors.transparent,
           border: Border.all(
-            color: value ? accent : border,
+            color: value ? ServioColors.accent : ServioColors.borderLight,
             width: 1.5,
           ),
-          borderRadius: BorderRadius.circular(5),
+          borderRadius: BorderRadius.circular(6),
         ),
         child: value
-            ? const Icon(Icons.check_rounded, size: 13, color: Colors.white)
+            ? const Icon(Icons.check_rounded, size: 15, color: Colors.white)
             : null,
       ),
     );
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Error banner — consistent styling across auth screens
-// ─────────────────────────────────────────────────────────────────────────────
+class _LoginButton extends StatefulWidget {
+  const _LoginButton({
+    required this.loading,
+    required this.onPressed,
+  });
+
+  final bool loading;
+  final VoidCallback? onPressed;
+
+  @override
+  State<_LoginButton> createState() => _LoginButtonState();
+}
+
+class _LoginButtonState extends State<_LoginButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = widget.onPressed != null && !widget.loading;
+
+    return GestureDetector(
+      onTap: enabled ? widget.onPressed : null,
+      onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
+      onTapCancel: enabled ? () => setState(() => _pressed = false) : null,
+      onTapUp: enabled ? (_) => setState(() => _pressed = false) : null,
+      child: AnimatedScale(
+        scale: _pressed ? 0.98 : 1,
+        duration: ServioMotion.fast,
+        curve: ServioMotion.spring,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: ServioColors.navyDark,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: const <BoxShadow>[
+              BoxShadow(
+                color: Color.fromRGBO(26, 29, 35, 0.15),
+                blurRadius: 14,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: SizedBox(
+            height: ServioSpacing.tapTarget,
+            child: Center(
+              child: widget.loading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : Text(
+                      'Login',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: Colors.white,
+                            fontFamily: 'Poppins',
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DividerLabel extends StatelessWidget {
+  const _DividerLabel();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: <Widget>[
+        Expanded(child: _line()),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            'Or continue with',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: ServioColors.textSecondaryLight,
+                  fontFamily: 'Inter',
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8,
+                ),
+          ),
+        ),
+        Expanded(child: _line()),
+      ],
+    );
+  }
+
+  Widget _line() {
+    return Container(
+      height: 1,
+      color: const Color(0xFFC6C6CB).withValues(alpha: 0.30),
+    );
+  }
+}
+
+class _SocialButtons extends StatelessWidget {
+  const _SocialButtons();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        _SocialButton(
+          label: 'Google',
+          icon: Icons.g_mobiledata_rounded,
+          backgroundColor: Colors.white,
+          foregroundColor: ServioColors.navyDark,
+          borderColor: const Color(0xFFEAE8E5),
+          onPressed: () {},
+        ),
+        const SizedBox(height: 12),
+        _SocialButton(
+          label: 'Apple',
+          icon: Icons.apple_rounded,
+          backgroundColor: ServioColors.navyDark,
+          foregroundColor: Colors.white,
+          onPressed: () {},
+        ),
+      ],
+    );
+  }
+}
+
+class _SocialButton extends StatelessWidget {
+  const _SocialButton({
+    required this.label,
+    required this.icon,
+    required this.backgroundColor,
+    required this.foregroundColor,
+    required this.onPressed,
+    this.borderColor,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color backgroundColor;
+  final Color foregroundColor;
+  final Color? borderColor;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 22),
+      label: Text(label),
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size.fromHeight(ServioSpacing.tapTarget),
+        backgroundColor: backgroundColor,
+        foregroundColor: foregroundColor,
+        side: BorderSide(color: borderColor ?? backgroundColor, width: 2),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        textStyle: const TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class _FooterLink extends StatelessWidget {
+  const _FooterLink({required this.onCreateAccount});
+
+  final VoidCallback onCreateAccount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      alignment: WrapAlignment.center,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: <Widget>[
+        Text(
+          'New to SERVIO?',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: ServioColors.textSecondaryLight,
+                fontFamily: 'Inter',
+              ),
+        ),
+        TextButton(
+          onPressed: onCreateAccount,
+          child: const Text('Create account'),
+        ),
+      ],
+    );
+  }
+}
+
+class _BackButton extends StatelessWidget {
+  const _BackButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton.filledTonal(
+      onPressed: onPressed,
+      icon: const Icon(Icons.arrow_back_rounded),
+      style: IconButton.styleFrom(
+        backgroundColor: Colors.white.withValues(alpha: 0.72),
+        foregroundColor: ServioColors.navyDark,
+        minimumSize: const Size(44, 44),
+      ),
+    );
+  }
+}
 
 class _ErrorBanner extends StatelessWidget {
   const _ErrorBanner({required this.message});
@@ -594,13 +752,11 @@ class _ErrorBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final servio = context.servio;
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: ServioColors.tint(ServioColors.danger),
-        borderRadius: BorderRadius.circular(ServioRadius.md),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: ServioColors.danger.withValues(alpha: 0.28)),
       ),
       child: Row(
@@ -608,20 +764,60 @@ class _ErrorBanner extends StatelessWidget {
         children: <Widget>[
           const Padding(
             padding: EdgeInsets.only(top: 1),
-            child: Icon(Icons.error_outline_rounded,
-                size: 15, color: ServioColors.danger),
+            child: Icon(
+              Icons.error_outline_rounded,
+              size: 15,
+              color: ServioColors.danger,
+            ),
           ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               message,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: servio.danger,
-                    fontWeight: FontWeight.w500,
+                    color: ServioColors.danger,
+                    fontWeight: FontWeight.w600,
                   ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _Reveal extends StatelessWidget {
+  const _Reveal({
+    required this.controller,
+    required this.intervalStart,
+    required this.child,
+  });
+
+  final AnimationController controller;
+  final double intervalStart;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.disableAnimationsOf(context)) return child;
+
+    final animation = CurvedAnimation(
+      parent: controller,
+      curve: Interval(
+        intervalStart,
+        (intervalStart + 0.55).clamp(0.0, 1.0).toDouble(),
+        curve: ServioMotion.spring,
+      ),
+    );
+
+    return FadeTransition(
+      opacity: animation,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 0.10),
+          end: Offset.zero,
+        ).animate(animation),
+        child: child,
       ),
     );
   }

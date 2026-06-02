@@ -1,3 +1,19 @@
+# DEPRECATED — DO NOT MOUNT THIS ROUTER.
+#
+# This module is a stale duplicate of routes/room_analysis.py.
+# It uses Groq/Llama-4 (room_finishing/services/gemini_service.py) instead of
+# the canonical Gemini Vision pipeline. If ever mounted in main.py it would
+# shadow POST /ai/analyze-room with a completely different model and no SD render.
+#
+# Kept for reference only. Safe to delete once the project is stable.
+#
+# --- DO NOT add `app.include_router(room_finishing_router)` to main.py ---
+
+raise ImportError(
+    "room_finishing.routes.room_analysis is deprecated and must not be imported. "
+    "Use routes.room_analysis instead."
+)
+
 from fastapi import APIRouter, File, UploadFile, Form, HTTPException
 from fastapi.responses import JSONResponse
 from room_finishing.services.gemini_service import analyze_room

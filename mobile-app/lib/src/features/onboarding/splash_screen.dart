@@ -4,9 +4,9 @@ import 'package:provider/provider.dart';
 import '../../core/state/app_state.dart';
 import '../../core/models/user_account.dart';
 import '../../design_system/servio_tokens.dart';
-import '../auth/auth_landing_screen.dart';
 import '../customer/customer_shell.dart';
 import '../technician/technician_shell.dart';
+import 'onboarding_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -53,7 +53,7 @@ class _SplashScreenState extends State<SplashScreen>
     if (!mounted) return;
 
     final session = context.read<SessionProvider>();
-    Widget nextScreen = const AuthLandingScreen();
+    Widget nextScreen = const OnboardingScreen();
 
     if (session.isLoggedIn) {
       if (session.account!.role == UserRole.technician) {
@@ -104,6 +104,31 @@ class _SplashScreenState extends State<SplashScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
+              // ── Logo ─────────────────────────────────────
+              AnimatedBuilder(
+                animation: _logoController,
+                builder: (BuildContext context, Widget? child) {
+                  final Animation<double> anim = CurvedAnimation(
+                    parent: _logoController,
+                    curve: const Interval(0.0, 0.5, curve: Curves.easeOutBack),
+                  );
+                  return Transform.scale(
+                    scale: 0.5 + 0.5 * anim.value,
+                    child: Opacity(
+                      opacity: anim.value.clamp(0.0, 1.0),
+                      child: child,
+                    ),
+                  );
+                },
+                child: Image.asset(
+                  'assets/images/servio_logo.png',
+                  width: 110,
+                  height: 110,
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
               // ── Animated word "SERVIO" ────────────────────
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,

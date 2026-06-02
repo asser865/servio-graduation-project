@@ -34,6 +34,9 @@ yarn-error.log*
 # Local launcher
 Launcher/
 
+# Local mobile design drafts
+mobile_app_design_pages/
+
 # IDE / Tools
 .vscode/
 .idea/
@@ -61,3 +64,21 @@ docs/
 .gitattributes
 skills-lock.json
 Launcher/
+
+# Graphify and AI Audit custom local-only files
+.github/
+graphify_query2.py
+AI_SERVICE_AUDIT_REPORT.md
+.graphify_detect.json
+.graphify_python
+
+# Stitch folders
+stitch-*/
+
+# Antigravity CLI
+.antigravitycli/
+.antigravitycli
+
+# Local design and mcp configurations
+design.md
+mcp.json

@@ -85,10 +85,12 @@ const addressValidation = [
   body('zipCode').optional().trim().isLength({ max: 30 }).withMessage('Zip code cannot exceed 30 characters'),
   body('lat').optional({ nullable: true }).isFloat({ min: -90, max: 90 }).withMessage('Latitude must be between -90 and 90'),
   body('lng').optional({ nullable: true }).isFloat({ min: -180, max: 180 }).withMessage('Longitude must be between -180 and 180'),
+  body('apartment').optional().trim().isLength({ max: 50 }).withMessage('Apartment number cannot exceed 50 characters'),
 ];
 
 router.post('/me/addresses', protect, validate(addressValidation), userController.addAddress);
 router.patch('/me/addresses/:addrId', protect, validate(addressValidation), userController.updateAddress);
+router.patch('/me/addresses/:addrId/default', protect, userController.setDefaultAddress);
 router.delete('/me/addresses/:addrId', protect, userController.deleteAddress);
 
 router.patch('/me/available', protect, authorize('worker'), userController.toggleAvailableNow);
