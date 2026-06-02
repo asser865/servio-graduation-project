@@ -3499,10 +3499,14 @@ async function loadNotifications() {
 
     function normalizeUrl(raw) {
       if (!raw) return null;
+      let r = raw;
+      // Rewrite legacy URLs that role-guard would block for technicians
+      if (r.includes('booking-details.html')) r = './technician-dashboard.html#job-queue';
+      else if (r.includes('customer-dashboard.html')) r = r.replace(/customer-dashboard\.html/, 'technician-dashboard.html');
       try {
-        const u = new URL(raw, window.location.href);
+        const u = new URL(r, window.location.href);
         return u.pathname + u.search + u.hash;
-      } catch { return raw; }
+      } catch { return r; }
     }
 
     list.innerHTML = notifs.map(n => {
@@ -4574,7 +4578,20 @@ function initNotifPanel() {
         refreshBadgeAndEmpty();
       }
       const url = item.dataset.notifUrl;
-      if (url) { setTimeout(() => { window.location.href = url; }, 100); }
+      if (url) {
+        try {
+          const target = new URL(url, window.location.href);
+          if (target.pathname === window.location.pathname && target.hash) {
+            if (window.location.hash === target.hash) {
+              window.dispatchEvent(new HashChangeEvent('hashchange'));
+            } else {
+              window.location.hash = target.hash;
+            }
+          } else {
+            window.location.href = url;
+          }
+        } catch { window.location.href = url; }
+      }
       e.stopPropagation();
     }
   });
