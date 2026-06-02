@@ -46,6 +46,22 @@ const TYPE_ICON = {
     }
   }
 
+  function navigateToNotif(viewUrl) {
+    if (!viewUrl) return;
+    try {
+      const target = new URL(viewUrl, window.location.href);
+      if (target.pathname === window.location.pathname && target.hash) {
+        if (window.location.hash === target.hash) {
+          window.dispatchEvent(new HashChangeEvent('hashchange'));
+        } else {
+          window.location.hash = target.hash;
+        }
+        return;
+      }
+    } catch (_) {}
+    window.location.href = viewUrl;
+  }
+
 function renderItem(n) {
   const icon = TYPE_ICON[n.type] || TYPE_ICON.system;
   const unread = !n.isRead ? ' notif-item--unread' : '';
@@ -202,7 +218,7 @@ export function initNotifBell() {
 
     if (url) {
       closePanel();
-      window.location.href = normalizeNotifUrl(url) || url;
+      navigateToNotif(normalizeNotifUrl(url) || url);
     }
   }
 

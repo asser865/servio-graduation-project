@@ -25,7 +25,7 @@ async function createNotification(userId, type, title, body, referenceId = null,
  * booking = plain object or Mongoose doc with { _id, user, worker, service }
  */
 function notifyBookingCreated(booking) {
-  const url = `./booking-details.html?id=${booking._id}`;
+  const url = `./technician-dashboard.html#job-queue`;
   const svc = booking.serviceName || booking.service?.title || 'your service';
   return createNotification(
     booking.worker,
@@ -88,7 +88,8 @@ function notifyBookingArrived(booking) {
 }
 
 function notifyBookingCompleted(booking) {
-  const url = `./booking-details.html?id=${booking._id}`;
+  const customerUrl = `./booking-details.html?id=${booking._id}`;
+  const workerUrl = `./technician-dashboard.html#job-queue`;
   const svc = booking.serviceName || booking.service?.title || 'the service';
   // Notify both parties
   createNotification(
@@ -97,7 +98,7 @@ function notifyBookingCompleted(booking) {
     'Job Completed ✓',
     `${svc} has been completed. Don't forget to leave a review!`,
     String(booking._id),
-    url
+    customerUrl
   );
   createNotification(
     booking.worker,
@@ -105,12 +106,13 @@ function notifyBookingCompleted(booking) {
     'Job Marked Complete',
     `${svc} has been marked as completed. Great work!`,
     String(booking._id),
-    url
+    workerUrl
   );
 }
 
 function notifyBookingCancelled(booking, actorRole) {
-  const url = `./booking-details.html?id=${booking._id}`;
+  const customerUrl = `./booking-details.html?id=${booking._id}`;
+  const workerUrl = `./technician-dashboard.html#job-queue`;
   const svc = booking.serviceName || booking.service?.title || 'your booking';
   if (actorRole === 'user') {
     // Notify worker
@@ -120,7 +122,7 @@ function notifyBookingCancelled(booking, actorRole) {
       'Booking Cancelled',
       `A customer cancelled their booking for ${svc}.`,
       String(booking._id),
-      url
+      workerUrl
     );
   } else {
     // Notify customer
@@ -130,7 +132,7 @@ function notifyBookingCancelled(booking, actorRole) {
       'Booking Cancelled',
       `Your booking for ${svc} was cancelled. You can rebook at any time.`,
       String(booking._id),
-      url
+      customerUrl
     );
   }
 }
@@ -149,7 +151,8 @@ function notifyAwaitingCustomerConfirmation(booking) {
 }
 
 function notifyPendingAdminReview(booking) {
-  const url = `./booking-details.html?id=${booking._id}`;
+  const customerUrl = `./booking-details.html?id=${booking._id}`;
+  const workerUrl = `./technician-dashboard.html#job-queue`;
   const svc = booking.serviceName || booking.service?.title || 'the service';
   createNotification(
     booking.user,
@@ -157,7 +160,7 @@ function notifyPendingAdminReview(booking) {
     'Booking Under Review',
     `Your booking for ${svc} is being reviewed by our team. We'll update you shortly.`,
     String(booking._id),
-    url
+    customerUrl
   );
   createNotification(
     booking.worker,
@@ -165,12 +168,12 @@ function notifyPendingAdminReview(booking) {
     'Booking Under Review',
     `The booking for ${svc} is under admin review. Hold tight.`,
     String(booking._id),
-    url
+    workerUrl
   );
 }
 
 function notifyReviewReceived(workerId, reviewerName, rating, bookingId) {
-  const url = `./booking-details.html?id=${bookingId}`;
+  const url = `./technician-dashboard.html#reviews`;
   return createNotification(
     workerId,
     'review_received',
@@ -186,7 +189,8 @@ async function notifyDisputeOpened(dispute) {
   const bookingId = String(booking._id || dispute.booking || dispute.bookingId || '');
   const customerId = booking.user?._id || booking.user || dispute.raisedBy;
   const workerId = booking.worker?._id || booking.worker;
-  const url = `./booking-details.html?id=${bookingId}`;
+  const customerUrl = `./booking-details.html?id=${bookingId}`;
+  const workerUrl = `./technician-dashboard.html#disputes`;
 
   if (workerId) {
     createNotification(
@@ -195,7 +199,7 @@ async function notifyDisputeOpened(dispute) {
       'Dispute Opened',
       'A customer opened a support case on one of your bookings. Keep job notes and evidence ready.',
       bookingId,
-      url
+      workerUrl
     );
   }
 
@@ -223,7 +227,7 @@ async function notifyDisputeOpened(dispute) {
       'Support Case Opened',
       'Your dispute is now with SERVIO support. We will update you after review.',
       bookingId,
-      url
+      customerUrl
     );
   }
 }
@@ -326,7 +330,7 @@ async function notifySupportIssueOpened(issue) {
   const bookingId = String(booking._id || issue.booking || '');
   const customerId = issue.customer?._id || issue.customer;
   const workerId = issue.worker?._id || issue.worker || booking.worker;
-  const customerUrl = `./booking-details.html?id=${bookingId}`;
+  const workerUrl = `./technician-dashboard.html#disputes`;
 
   if (customerId) {
     createNotification(
@@ -346,7 +350,7 @@ async function notifySupportIssueOpened(issue) {
       issue.priority === 'urgent' ? 'Urgent Support Case' : 'Support Case Opened',
       'A customer reported an issue on one of your bookings. Keep job notes and evidence ready.',
       bookingId,
-      customerUrl
+      workerUrl
     );
   }
 
@@ -375,7 +379,7 @@ function notifySupportIssueUpdated(issue) {
   const workerId = issue.worker?._id || issue.worker || booking.worker;
   const body = `Support case status is now ${String(issue.status || 'updated').replace('_', ' ')}.`;
   if (customerId) createNotification(customerId, 'support_issue_updated', 'Support Case Updated', body, String(issue._id || bookingId), './customer-dashboard.html#support');
-  if (workerId) createNotification(workerId, 'support_issue_updated', 'Support Case Updated', body, String(issue._id || bookingId), `./booking-details.html?id=${bookingId}`);
+  if (workerId) createNotification(workerId, 'support_issue_updated', 'Support Case Updated', body, String(issue._id || bookingId), `./technician-dashboard.html#disputes`);
 }
 
 function notifySupportIssueResolved(issue) {
@@ -385,7 +389,7 @@ function notifySupportIssueResolved(issue) {
   const workerId = issue.worker?._id || issue.worker || booking.worker;
   const body = issue.resolution || 'The support case has been resolved.';
   if (customerId) createNotification(customerId, 'support_issue_resolved', 'Support Case Resolved', body, String(issue._id || bookingId), './customer-dashboard.html#support');
-  if (workerId) createNotification(workerId, 'support_issue_resolved', 'Support Case Resolved', body, String(issue._id || bookingId), `./booking-details.html?id=${bookingId}`);
+  if (workerId) createNotification(workerId, 'support_issue_resolved', 'Support Case Resolved', body, String(issue._id || bookingId), `./technician-dashboard.html#disputes`);
 }
 
 module.exports = {
