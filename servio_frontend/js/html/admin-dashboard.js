@@ -5,16 +5,11 @@
 import { showToast } from '../components/toast.js';
 import { skList, skTableRows } from '../components/skeleton.js';
 import { getAllUsers, deleteUser, updateUserStatus, updatePassword, reviewWorker, approveWorkerCategory } from '../api/users.js';
+import { createPoller, snapshotFocus, restoreFocus } from '../utils/live-poll.js';
 import { getServices, createService, updateService, deleteService as apiDeleteService } from '../api/services.js';
 import { getAllBookings } from '../api/bookings.js';
-import { getAuditLogs, deleteAuditLog, deleteAllAuditLogs, deleteSelectedAuditLogs, getAdminSettings, updateAdminSettings, getAnalytics } from '../api/admin.js';
+import { getAuditLogs, deleteAuditLog, deleteAllAuditLogs, deleteSelectedAuditLogs, getAdminSettings, updateAdminSettings, getAnalytics, getAdminOverview, getAdminRevenue } from '../api/admin.js';
 import {
-  getPendingApprovals,
-  adminApprovePayment,
-  adminRejectCash,
-  adminRefund,
-  getCashDebts,
-  markCashDebtPaid,
   getDisputes,
   resolveDispute,
   reviewDispute,
@@ -23,22 +18,8 @@ import {
   addDisputeNote,
   requestDisputeEvidence,
   resolveDisputeAppeal,
-  adminListPayments,
-  adminPaymentDetail,
-  adminPaymentsStats,
-  adminPartialRefund,
-  adminListCashDebtsGrouped,
-  adminWorkerDebts,
-  adminListSettlements,
-  adminListPayouts,
-  adminForceRelease,
-  adminForceLock,
-  adminForceUnlock,
 } from '../api/payments.js';
-import { openPaymentConfirmModal } from '../components/payment-confirm-modal.js';
-import { openSettlementVerifyModal } from '../components/settlement-verify-modal.js';
-import { openPayoutDecisionModal } from '../components/payout-decision-modal.js';
-import { openPartialRefundModal } from '../components/partial-refund-modal.js';
+import { initFinanceConsole } from './admin-finance-console.js';
 import {
   getAdminSupportIssues,
   updateSupportIssueStatus,
@@ -78,6 +59,48 @@ let _adminDisputes = [];
 let _disputesLoadedOnce = false;
 let _adminSupportIssues = [];
 let _supportLoadedOnce = false;
+let _overviewRequest = null;
+
+/* ── Sidebar nav indicators ────────────────────────────── */
+const ADMIN_NAV_SEEN_KEY = 'servio_admin_nav_seen_v1';
+
+function getAdminNavSeen() {
+  try { return JSON.parse(localStorage.getItem(ADMIN_NAV_SEEN_KEY) || '{}'); } catch { return {}; }
+}
+
+function setAdminNavSeen(map) {
+  try { localStorage.setItem(ADMIN_NAV_SEEN_KEY, JSON.stringify(map)); } catch {}
+}
+
+function setAdminNavBadge(tabId, count) {
+  document.querySelectorAll(`[data-nav-badge="${tabId}"]`).forEach((badge) => {
+    if (count > 0) {
+      badge.hidden = false;
+      badge.textContent = count > 99 ? '99+' : String(count);
+      badge.setAttribute('aria-label', `${count} new update${count === 1 ? '' : 's'}`);
+    } else {
+      badge.hidden = true;
+      badge.removeAttribute('aria-label');
+    }
+  });
+}
+
+function markAdminTabSeen(tabId) {
+  const seen = getAdminNavSeen();
+  seen[tabId] = Date.now();
+  setAdminNavSeen(seen);
+  setAdminNavBadge(tabId, 0);
+}
+
+function countAdminUpdatesSince(tabId, items, fields = ['updatedAt', 'createdAt']) {
+  const lastSeen = getAdminNavSeen()[tabId] || 0;
+  return (Array.isArray(items) ? items : []).filter((item) => {
+    const time = fields
+      .map((field) => new Date(item?.[field] || 0).getTime())
+      .find(Number.isFinite);
+    return Number.isFinite(time) && time > lastSeen;
+  }).length;
+}
 
 function getVerificationStatus(user) {
   return user?.verificationStatus || (user?.isVerified ? 'approved' : 'pending');
@@ -117,6 +140,474 @@ function escapeHtml(value) {
 function formatMoney(value) {
   const amount = Number(value);
   return Number.isFinite(amount) ? `${amount.toLocaleString()} EGP` : '-';
+}
+
+function setOverviewText(id, value) {
+  const element = document.getElementById(id);
+  if (element) element.textContent = String(value);
+}
+
+function formatOverviewPercent(value) {
+  const amount = Number(value);
+  return `${Number.isFinite(amount) ? Math.round(amount * 10) / 10 : 0}%`;
+}
+
+function formatRelativeTime(value) {
+  const time = new Date(value).getTime();
+  if (!Number.isFinite(time)) return '-';
+  const minutes = Math.max(0, Math.floor((Date.now() - time) / 60000));
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(value).toLocaleDateString();
+}
+
+function activityIcon(type) {
+  if (type === 'customer') {
+    return '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>';
+  }
+  if (type === 'dispute') {
+    return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+  }
+  if (type === 'technician') {
+    return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
+  }
+  if (type === 'admin') {
+    return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>';
+  }
+  return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+}
+
+function _smoothBezierPath(pts, yMin, yMax) {
+  const n = pts.length;
+  if (n < 2) return `M${pts[0].x},${pts[0].y}`;
+  if (n === 2) return `M${pts[0].x.toFixed(2)},${pts[0].y.toFixed(2)} L${pts[1].x.toFixed(2)},${pts[1].y.toFixed(2)}`;
+  const tension = 0.2;
+  const clamp = (v) => Math.max(yMin, Math.min(yMax, v));
+  let d = `M${pts[0].x.toFixed(2)},${pts[0].y.toFixed(2)}`;
+  for (let i = 0; i < n - 1; i++) {
+    const p0 = pts[i - 1] || pts[i];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[i + 2] || p2;
+    const cp1x = p1.x + (p2.x - p0.x) * tension;
+    const cp2x = p2.x - (p3.x - p1.x) * tension;
+    let cp1y = p1.y + (p2.y - p0.y) * tension;
+    let cp2y = p2.y - (p3.y - p1.y) * tension;
+    const segMinY = Math.min(p1.y, p2.y);
+    const segMaxY = Math.max(p1.y, p2.y);
+    const slack = Math.max(8, Math.abs(p2.y - p1.y) * 0.18);
+    cp1y = Math.max(segMinY - slack, Math.min(segMaxY + slack, cp1y));
+    cp2y = Math.max(segMinY - slack, Math.min(segMaxY + slack, cp2y));
+    cp1y = clamp(cp1y);
+    cp2y = clamp(cp2y);
+    d += ` C${cp1x.toFixed(2)},${cp1y.toFixed(2)} ${cp2x.toFixed(2)},${cp2y.toFixed(2)} ${p2.x.toFixed(2)},${p2.y.toFixed(2)}`;
+  }
+  return d;
+}
+
+function renderOverviewRevenue(revenue = {}, activeDays = 7) {
+  const chartEl = document.getElementById('overviewRevenueChart');
+  const daysEl = document.getElementById('overviewRevenueDays');
+  const total = Number(revenue.currentWeek) || 0;
+  const series = Array.isArray(revenue.daily) ? revenue.daily : [];
+  const max = Math.max(1, ...series.map((e) => Number(e.revenue) || 0));
+
+  setOverviewText('kpi-revenue-chart-total', formatMoney(total));
+
+  const statsHost = document.getElementById('overviewRevenueStats');
+  if (statsHost) {
+    const amounts = series.map((e) => Number(e.revenue) || 0);
+    const nonzero = amounts.filter((v) => v > 0);
+    const avg = nonzero.length ? Math.round(nonzero.reduce((s, v) => s + v, 0) / nonzero.length) : 0;
+    const peak = amounts.length ? Math.max(...amounts) : 0;
+    const todayAmt = amounts.length ? amounts[amounts.length - 1] : 0;
+    const yestAmt = amounts.length >= 2 ? amounts[amounts.length - 2] : 0;
+    const dayDelta = yestAmt > 0 ? ((todayAmt - yestAmt) / yestAmt) * 100 : (todayAmt > 0 ? 100 : 0);
+    const periodDelta = Number.isFinite(Number(revenue.comparisonPercent)) ? Number(revenue.comparisonPercent) : null;
+    const fmtPct = (v) => `${v > 0 ? '+' : ''}${v.toFixed(2)}%`;
+    const arrowSvg = (v) => v >= 0
+      ? '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="6 15 12 9 18 15"/></svg>'
+      : '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>';
+    const periodLabel = activeDays === 7 ? '7d' : activeDays === 30 ? '1M' : activeDays === 90 ? '3M' : '1Y';
+    const deltaHtml = periodDelta !== null
+      ? `<span class="rev-hero__stat-value rev-hero__stat-value--delta ${periodDelta >= 0 ? 'is-up' : 'is-down'}">${escapeHtml(fmtPct(periodDelta))}</span>`
+      : `<span class="rev-hero__stat-value" style="color:var(--color-text-muted)">—</span>`;
+    statsHost.innerHTML = `
+      <div class="rev-hero__left">
+        <div class="rev-hero__amount">${escapeHtml(formatMoney(total))}</div>
+        <div class="rev-hero__meta">
+          <span class="rev-hero__pill ${dayDelta >= 0 ? 'rev-hero__pill--up' : 'rev-hero__pill--down'}">${arrowSvg(dayDelta)} ${escapeHtml(fmtPct(dayDelta))}</span>
+          <span class="rev-hero__since">vs yesterday</span>
+        </div>
+      </div>
+      <div class="rev-hero__right">
+        <div class="rev-hero__stat">
+          <span class="rev-hero__stat-label">Today</span>
+          <span class="rev-hero__stat-value">${escapeHtml(formatMoney(todayAmt))}</span>
+        </div>
+        <div class="rev-hero__stat">
+          <span class="rev-hero__stat-label">${escapeHtml(periodLabel)} vs prev</span>
+          ${deltaHtml}
+        </div>
+        <div class="rev-hero__stat">
+          <span class="rev-hero__stat-label">Avg/day</span>
+          <span class="rev-hero__stat-value">${escapeHtml(formatMoney(avg))}</span>
+        </div>
+        <div class="rev-hero__stat">
+          <span class="rev-hero__stat-label">Peak</span>
+          <span class="rev-hero__stat-value">${escapeHtml(formatMoney(peak))}</span>
+        </div>
+      </div>`;
+  }
+
+  if (chartEl) {
+    if (!series.length) {
+      chartEl.innerHTML = '<div class="overview-inline-state">No revenue data is available yet.</div>';
+    } else {
+      const W = 800, H = 290, PAD_L = 58, PAD_R = 16, PAD_T = 20, PAD_B = 40;
+      const innerW = W - PAD_L - PAD_R;
+      const innerH = H - PAD_T - PAD_B;
+      const n = series.length;
+      const yMax = Math.max(1, Math.ceil(max * 1.25));
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const baseY = PAD_T + innerH;
+
+      // Bar geometry — clamp low so dense periods (90d/365d) stay readable
+      const barSlotW = innerW / n;
+      const barW = Math.max(2, Math.min(barSlotW * 0.85, 52));
+      const barR = Math.min(barW / 2, 7);
+
+      const bars = series.map((entry, i) => {
+        const amount = Number(entry.revenue) || 0;
+        const cx = PAD_L + barSlotW * (i + 0.5);
+        const barH = Math.max(amount > 0 ? 3 : 0, (amount / yMax) * innerH);
+        const topY = baseY - barH;
+        const isToday = entry.date === todayStr;
+        return { cx, topY, barH, amount, date: entry.date, isToday };
+      });
+
+      let peakIdx = -1, peakVal = 0;
+      bars.forEach((b, i) => { if (b.amount > peakVal) { peakVal = b.amount; peakIdx = i; } });
+
+      // Rounded-top-only bar path
+      const mkBarPath = (cx, topY, bW, bBaseY, r) => {
+        const h = bBaseY - topY;
+        const sr = Math.min(r, bW / 2, h / 2);
+        const L = (cx - bW / 2).toFixed(2), R2 = (cx + bW / 2).toFixed(2);
+        const tY = topY.toFixed(2), bY = bBaseY.toFixed(2);
+        const iL = (cx - bW / 2 + sr).toFixed(2), iR2 = (cx + bW / 2 - sr).toFixed(2);
+        const tR = (topY + sr).toFixed(2);
+        return `M${L},${bY} L${L},${tR} Q${L},${tY} ${iL},${tY} L${iR2},${tY} Q${R2},${tY} ${R2},${tR} L${R2},${bY} Z`;
+      };
+
+      // Y-axis ticks + gridlines (shadcn style)
+      const nTicks = 4;
+      const fmtY = (v) => {
+        if (v >= 1000000) return (v / 1000000).toFixed(1).replace('.0', '') + 'M';
+        if (v >= 1000)    return (v / 1000).toFixed(1).replace('.0', '') + 'K';
+        return Math.round(v).toString();
+      };
+      const yTicks = Array.from({ length: nTicks + 1 }, (_, i) => {
+        const frac = i / nTicks;
+        return { val: yMax * frac, y: baseY - frac * innerH };
+      });
+      const gridLines = yTicks.map(({ y }) =>
+        `<line class="rev-sg-grid" x1="${PAD_L}" y1="${y.toFixed(1)}" x2="${W - PAD_R}" y2="${y.toFixed(1)}"/>`
+      ).join('');
+      const yLabels = yTicks.map(({ val, y }) =>
+        `<text class="rev-svg-ylabel" x="${(PAD_L - 8).toFixed(1)}" y="${(y + 4).toFixed(1)}" text-anchor="end">${escapeHtml(fmtY(val))}</text>`
+      ).join('');
+
+      // X-axis labels
+      const labelInterval = Math.max(1, Math.ceil(n / 8));
+      const xLabels = bars.map((b, i) => {
+        if (i % labelInterval !== 0 && i !== n - 1) return '';
+        const d = new Date(`${series[i].date}T00:00:00`);
+        const label = n <= 7
+          ? d.toLocaleDateString(undefined, { weekday: 'short' })
+          : n <= 31
+          ? d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
+          : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        const cls = b.isToday ? 'rev-svg-label rev-svg-label--today' : 'rev-svg-label';
+        return `<text class="${cls}" x="${b.cx.toFixed(1)}" y="${H - 14}" text-anchor="middle">${escapeHtml(label)}</text>`;
+      }).join('');
+
+      // Bar elements
+      const barEls = bars.map((b, i) => {
+        const isPeak = i === peakIdx;
+        const isGhost = b.amount <= 0;
+        const topY = isGhost ? baseY - 4 : b.topY;
+        const fillId = isGhost ? 'fxBarGhost' : isPeak ? 'fxBarPeak' : b.isToday ? 'fxBarToday' : 'fxBarGrad';
+        const barCls = `rev-bar${isPeak ? ' rev-bar--peak' : b.isToday ? ' rev-bar--today' : isGhost ? ' rev-bar--ghost' : ''}`;
+        const capStroke = isPeak ? 'rgba(197,165,114,0.95)' : 'rgba(197,165,114,0.6)';
+        const capEl = !isGhost
+          ? `<line x1="${(b.cx - barW / 2 + 2).toFixed(2)}" y1="${topY.toFixed(2)}" x2="${(b.cx + barW / 2 - 2).toFixed(2)}" y2="${topY.toFixed(2)}" stroke="${capStroke}" stroke-width="2.5" stroke-linecap="round"/>`
+          : '';
+        return `<path class="${barCls}" fill="url(#${fillId})" d="${mkBarPath(b.cx, topY, barW, baseY, isGhost ? 2 : barR)}"/>${capEl}`;
+      }).join('');
+
+      // Peak floating label
+      const peakBar = peakIdx >= 0 ? bars[peakIdx] : null;
+      const peakLabel = peakBar && peakVal > 0 ? `
+        <g class="rev-peak-label" transform="translate(${peakBar.cx.toFixed(2)}, ${peakBar.topY.toFixed(2)})">
+          <text class="rev-peak-label__txt" x="0" y="-10" text-anchor="middle">${escapeHtml(formatMoney(peakVal))}</text>
+        </g>` : '';
+
+      const baseline = `<line class="rev-svg-baseline" x1="${PAD_L}" y1="${baseY.toFixed(1)}" x2="${W - PAD_R}" y2="${baseY.toFixed(1)}"/>`;
+
+      const hotspots = bars.map((b, i) => {
+        const d = new Date(`${series[i].date}T00:00:00`);
+        const full = d.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
+        const tipY = b.amount > 0 ? b.topY : baseY - 4;
+        return `<rect class="rev-hot" data-date="${escapeHtml(full)}" data-value="${escapeHtml(b.amount.toLocaleString())}" data-x="${b.cx.toFixed(2)}" data-y="${tipY.toFixed(2)}" x="${(b.cx - barSlotW / 2).toFixed(2)}" y="${PAD_T}" width="${barSlotW.toFixed(2)}" height="${innerH.toFixed(2)}" fill="transparent"/>`;
+      }).join('');
+
+      chartEl.innerHTML = `
+        <svg class="rev-svg rev-svg--bars" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" aria-label="Revenue bar chart">
+          <defs>
+            <linearGradient id="fxBarGrad" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0%" stop-color="#1e1810" stop-opacity="0.5"/>
+              <stop offset="50%" stop-color="#6b5e48" stop-opacity="0.88"/>
+              <stop offset="100%" stop-color="#9a8c73"/>
+            </linearGradient>
+            <linearGradient id="fxBarPeak" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0%" stop-color="#221a0e" stop-opacity="0.55"/>
+              <stop offset="50%" stop-color="#857462" stop-opacity="0.9"/>
+              <stop offset="100%" stop-color="#c5b69a"/>
+            </linearGradient>
+            <linearGradient id="fxBarToday" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0%" stop-color="#1e1810" stop-opacity="0.55"/>
+              <stop offset="50%" stop-color="#7a6d58" stop-opacity="0.88"/>
+              <stop offset="100%" stop-color="#a89880"/>
+            </linearGradient>
+            <linearGradient id="fxBarGhost" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0%" stop-color="#1e1c1a"/>
+              <stop offset="100%" stop-color="#2e2a26"/>
+            </linearGradient>
+            <clipPath id="fxRevClip">
+              <rect x="${PAD_L}" y="${PAD_T}" width="${innerW}" height="${innerH + 1}"/>
+            </clipPath>
+          </defs>
+          <g class="rev-svg-grid">${gridLines}</g>
+          ${yLabels}
+          ${baseline}
+          <g clip-path="url(#fxRevClip)">
+            <g class="rev-bar-layer">${barEls}</g>
+            ${peakLabel}
+          </g>
+          <line class="rev-svg-cursor" x1="0" y1="${PAD_T}" x2="0" y2="${baseY.toFixed(1)}" style="display:none"/>
+          <circle class="rev-svg-cursor-dot" r="5" cx="0" cy="0" style="display:none"/>
+          <g class="rev-svg-axis">${xLabels}</g>
+          <g class="rev-hots">${hotspots}</g>
+        </svg>
+        <div class="rev-tip" role="tooltip" style="display:none">
+          <div class="rev-tip__date"></div>
+          <div class="rev-tip__row"><span>Revenue</span><strong></strong></div>
+        </div>`;
+
+      const svg = chartEl.querySelector('svg');
+      const cursor = chartEl.querySelector('.rev-svg-cursor');
+      const dot = chartEl.querySelector('.rev-svg-cursor-dot');
+      const tip = chartEl.querySelector('.rev-tip');
+      const tipDate = chartEl.querySelector('.rev-tip__date');
+      const tipVal = chartEl.querySelector('.rev-tip__row strong');
+      chartEl.querySelectorAll('.rev-hot').forEach((rect) => {
+        rect.addEventListener('pointerenter', () => {
+          const x = parseFloat(rect.dataset.x);
+          const y = parseFloat(rect.dataset.y);
+          cursor.setAttribute('x1', x); cursor.setAttribute('x2', x); cursor.style.display = '';
+          dot.setAttribute('cx', x); dot.setAttribute('cy', y); dot.style.display = '';
+          tipDate.textContent = rect.dataset.date;
+          tipVal.textContent = rect.dataset.value;
+          tip.style.display = '';
+          const svgR = svg.getBoundingClientRect(), cR = chartEl.getBoundingClientRect();
+          tip.style.left = `${svgR.left - cR.left + (x / W) * svgR.width}px`;
+          tip.style.top = `${svgR.top - cR.top + (y / H) * svgR.height - 14}px`;
+        });
+        rect.addEventListener('pointerleave', () => {
+          cursor.style.display = 'none'; dot.style.display = 'none'; tip.style.display = 'none';
+        });
+      });
+    }
+  }
+  if (daysEl) daysEl.innerHTML = '';
+
+  const comparison = document.getElementById('overviewRevenueComparison');
+  if (comparison) {
+    const value = revenue.comparisonPercent;
+    const available = Number.isFinite(Number(value));
+    const amount = available ? Number(value) : 0;
+    comparison.classList.toggle('is-negative', amount < 0);
+    comparison.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" aria-hidden="true"><polyline points="18 15 12 9 6 15"/></svg>
+      <span>${available ? `${amount > 0 ? '+' : ''}${amount}% vs last week` : 'No prior-week revenue'}</span>`;
+  }
+}
+
+function renderOverviewBookings(bookings = {}) {
+  const total = Number(bookings.total) || 0;
+  const buckets = bookings.buckets || {};
+  const values = [
+    ['completed', 'Completed', '#10b981'],
+    ['inProgress', 'In Progress', '#3b82f6'],
+    ['scheduled', 'Scheduled', '#f59e0b'],
+    ['cancelled', 'Cancelled', '#ef4444'],
+    ['disputed', 'Disputed', '#e11d48'],
+  ];
+  const percentage = (count) => total > 0 ? (Number(count) || 0) / total * 100 : 0;
+  const bar = document.getElementById('overviewBookingVisualBar');
+  if (bar) {
+    bar.innerHTML = total > 0
+      ? values.map(([key, label, color]) => {
+          const width = percentage(buckets[key]);
+          return width > 0
+            ? `<div class="booking-visual-segment" style="width:${width}%;background:${color};" data-tooltip="${escapeHtml(`${label}: ${formatOverviewPercent(width)}`)}"></div>`
+            : '';
+        }).join('')
+      : '<div class="booking-visual-bar__empty">No bookings yet</div>';
+  }
+
+  const ids = {
+    completed: 'bk-pct-completed',
+    inProgress: 'bk-pct-inprogress',
+    scheduled: 'bk-pct-scheduled',
+    cancelled: 'bk-pct-cancelled',
+    disputed: 'bk-pct-disputed',
+  };
+  Object.entries(ids).forEach(([key, id]) => setOverviewText(id, formatOverviewPercent(percentage(buckets[key]))));
+  const totalElement = document.querySelector('.booking-status-total-val');
+  if (totalElement) totalElement.textContent = total.toLocaleString();
+  setOverviewText('bk-stat-new24h', (Number(bookings.newLast24Hours) || 0).toLocaleString());
+  setOverviewText('bk-stat-successrate', formatOverviewPercent(bookings.successRate));
+}
+
+function renderOverviewActivity(items = []) {
+  const root = document.getElementById('overviewActivityFeed');
+  if (!root) return;
+  if (!items.length) {
+    root.innerHTML = '<div class="overview-inline-state">No recent platform activity yet.</div>';
+    return;
+  }
+  const now = new Date();
+  const startOfDay = (d) => { const x = new Date(d); x.setHours(0,0,0,0); return x; };
+  const todayMs = startOfDay(now).getTime();
+  const yesterdayMs = todayMs - 86400000;
+  const groups = new Map();
+  items.forEach((item) => {
+    const when = item.at ? new Date(item.at) : null;
+    let key;
+    if (!when || isNaN(when)) key = 'Earlier';
+    else {
+      const dMs = startOfDay(when).getTime();
+      if (dMs === todayMs) key = 'Today';
+      else if (dMs === yesterdayMs) key = 'Yesterday';
+      else key = when.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+    }
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  });
+  const formatExactTime = (value) => {
+    if (!value) return '';
+    const d = new Date(value);
+    if (isNaN(d)) return '';
+    return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false });
+  };
+  const html = Array.from(groups.entries()).map(([label, list]) => {
+    const rows = list.map((item) => {
+      const iconColor = item.type === 'dispute' ? 'red'
+        : item.type === 'technician' ? 'amber'
+        : item.type === 'customer' ? 'green'
+        : item.type === 'admin' ? 'gold'
+        : 'blue';
+      return `<button class="activity-item activity-item--button" type="button" data-goto-tab="${escapeHtml(item.targetTab || 'audit')}">
+        <span class="activity-icon activity-icon--${iconColor}" aria-hidden="true">${activityIcon(item.type)}</span>
+        <span class="activity-text">${escapeHtml(item.text || 'Activity')} <strong>${escapeHtml(item.subject || '')}</strong></span>
+        <span class="activity-time"><span class="activity-time__rel">${escapeHtml(formatRelativeTime(item.at))}</span><span class="activity-time__abs">${escapeHtml(formatExactTime(item.at))}</span></span>
+      </button>`;
+    }).join('');
+    return `<div class="activity-group">
+      <div class="activity-group__header"><span class="activity-group__rule"></span><span class="activity-group__label">${escapeHtml(label)}</span><span class="activity-group__count">${list.length}</span></div>
+      <div class="activity-group__items">${rows}</div>
+    </div>`;
+  }).join('');
+  root.innerHTML = html;
+  root.querySelectorAll('[data-goto-tab]').forEach((button) => {
+    button.addEventListener('click', () => {
+      document.querySelector(`.admin-nav__btn[data-tab="${button.dataset.gotoTab}"]`)?.click();
+    });
+  });
+}
+
+function renderOverviewTechnicians(technicians = []) {
+  const root = document.getElementById('overviewTopTechnicians');
+  if (!root) return;
+  if (!technicians.length) {
+    root.innerHTML = '<div class="overview-inline-state">No completed technician jobs this month yet.</div>';
+    return;
+  }
+  root.innerHTML = technicians.map((technician, index) => `
+    <div class="leaderboard-row${index < 3 ? ` leaderboard-row--top${index + 1}` : ''}">
+      <div class="leaderboard-rank">${index + 1}</div>
+      <div class="leaderboard-avatar">${escapeHtml(technician.initials || '-')}</div>
+      <div class="leaderboard-info">
+        <div class="leaderboard-name">${escapeHtml(technician.name || '-')}</div>
+        <div class="leaderboard-specialty">${escapeHtml(technician.specialty || 'General')}</div>
+      </div>
+      <div class="leaderboard-rating">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="#f59e0b" aria-hidden="true"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        ${escapeHtml(Number(technician.rating || 0).toFixed(1))}
+      </div>
+      <div class="leaderboard-jobs">${escapeHtml(technician.jobs || 0)} jobs</div>
+    </div>
+  `).join('');
+}
+
+function renderOverviewError() {
+  const message = '<div class="overview-inline-state overview-inline-state--error">Overview data could not be loaded. Use Refresh to try again.</div>';
+  const chart = document.getElementById('overviewRevenueChart');
+  const activity = document.getElementById('overviewActivityFeed');
+  const technicians = document.getElementById('overviewTopTechnicians');
+  if (chart) chart.innerHTML = message;
+  if (activity) activity.innerHTML = message;
+  if (technicians) technicians.innerHTML = message;
+}
+
+async function loadOverviewData() {
+  if (_overviewRequest) return _overviewRequest;
+  const refresh = document.getElementById('overviewRefreshBtn');
+  if (refresh) {
+    refresh.disabled = true;
+    refresh.classList.add('is-loading');
+  }
+  _overviewRequest = getAdminOverview()
+    .then((overview) => {
+      const kpis = overview?.kpis || {};
+      setOverviewText('kpi-overview-users', (Number(kpis.totalUsers) || 0).toLocaleString());
+      setOverviewText('kpi-overview-techs', (Number(kpis.totalTechnicians) || 0).toLocaleString());
+      setOverviewText('kpi-overview-revenue', formatMoney(kpis.revenueThisMonth));
+      setOverviewText('kpi-overview-disputes', (Number(kpis.openDisputes) || 0).toLocaleString());
+      setOverviewText('qa-dispute-badge', Number(kpis.openDisputes) || 0);
+      renderOverviewRevenue(overview?.revenue);
+      renderOverviewBookings(overview?.bookings);
+      renderOverviewActivity(overview?.recentActivity);
+      renderOverviewTechnicians(overview?.topTechnicians);
+      _updateOverviewDate();
+    })
+    .catch((err) => {
+      console.error('Error loading overview:', err);
+      renderOverviewError();
+    })
+    .finally(() => {
+      _overviewRequest = null;
+      if (refresh) {
+        refresh.disabled = false;
+        refresh.classList.remove('is-loading');
+      }
+    });
+  return _overviewRequest;
 }
 
 async function downloadRemoteFile(url, filename) {
@@ -179,12 +670,20 @@ function buildTechProfileData(user) {
 
 function initAdminDashboard() {
   // ── Tab switching ──────────────────────────
-  const navBtns = document.querySelectorAll('.admin-nav__btn');
+  const navBtns = document.querySelectorAll('.admin-nav__btn[data-tab]');
   const panels  = document.querySelectorAll('.admin-panel');
 
   const headerTitle = document.getElementById('admin-header-title');
   function switchTab(tabName, save = true) {
-    navBtns.forEach(b => b.classList.toggle('is-active', b.dataset.tab === tabName));
+    navBtns.forEach(b => {
+      const isActive = b.dataset.tab === tabName;
+      b.classList.toggle('is-active', isActive);
+      if (isActive) {
+        b.setAttribute('aria-current', 'page');
+      } else {
+        b.removeAttribute('aria-current');
+      }
+    });
     panels.forEach(p => p.classList.toggle('is-active', p.dataset.panel === tabName));
     // Sync topbar title with active tab label
     const activeBtn = document.querySelector(`.admin-nav__btn[data-tab="${tabName}"]`);
@@ -202,12 +701,13 @@ function initAdminDashboard() {
     if (save) {
       sessionStorage.setItem('servio_admin_active_tab', tabName);
     }
+    markAdminTabSeen(tabName);
+    if (tabName === 'finance') initFinanceConsole();
   }
 
   // Restore active tab from sessionStorage or default to overview
   let savedTab = sessionStorage.getItem('servio_admin_active_tab');
   if (savedTab === 'payments' || savedTab === 'settlements') {
-    sessionStorage.setItem('servio_admin_fin_tab', savedTab);
     savedTab = 'finance';
     sessionStorage.setItem('servio_admin_active_tab', 'finance');
   }
@@ -220,7 +720,6 @@ function initAdminDashboard() {
   navBtns.forEach(btn => {
     btn.addEventListener('click', () => {
       switchTab(btn.dataset.tab);
-      if (btn.dataset.tab === 'disputes') renderDisputes().catch(err => console.error('Error loading disputes:', err));
       if (btn.dataset.tab === 'support') renderSupportIssues().catch(err => console.error('Error loading support issues:', err));
     });
   });
@@ -229,22 +728,9 @@ function initAdminDashboard() {
   document.querySelectorAll('[data-goto-tab]').forEach(btn => {
     btn.addEventListener('click', () => {
       switchTab(btn.dataset.gotoTab);
-      if (btn.dataset.gotoTab === 'disputes') renderDisputes().catch(err => console.error('Error loading disputes:', err));
       if (btn.dataset.gotoTab === 'support') renderSupportIssues().catch(err => console.error('Error loading support issues:', err));
-      if (btn.dataset.gotoFin && typeof switchFinanceTab === 'function') {
-        switchFinanceTab(btn.dataset.gotoFin);
-      }
     });
   });
-
-  // ── Finance inner tabs (Payments | Cash Settlements) ──
-  document.querySelectorAll('.fin-tab').forEach(t => {
-    t.addEventListener('click', () => window.switchFinanceTab && window.switchFinanceTab(t.dataset.finTab));
-  });
-  const savedFin = sessionStorage.getItem('servio_admin_fin_tab');
-  // Defer until window.switchFinanceTab is assigned later in this file
-  queueMicrotask(() => window.switchFinanceTab && window.switchFinanceTab(savedFin || 'payments'));
-
   // ── Users: combined search + status filter ─
   function _updateUserCount() {
     const countEl = document.getElementById('userCount');
@@ -759,76 +1245,6 @@ function initAdminDashboard() {
   document.querySelectorAll('[data-action="more-info"]').forEach(btn => {
     btn.addEventListener('click', () => showToast(typeof window.t === 'function' ? window.t('toast_info_request_sent') : 'Information request sent', 'info'));
   });
-
-  // ── Settlements: Redesigned Actions & Filters ───────
-  const settlementSearch = document.getElementById('settlementSearch');
-  const settlementStatusFilter = document.getElementById('settlementStatusFilter');
-  const settlementSort = document.getElementById('settlementSort');
-  const settlementsTableBody = document.querySelector('[data-panel="settlements"] tbody');
-
-  function _applySettlementFilters() {
-    if (!settlementsTableBody) return;
-    const q = (settlementSearch?.value || '').toLowerCase();
-    const status = settlementStatusFilter?.value || '';
-    
-    document.querySelectorAll('[data-panel="settlements"] .settlement-row').forEach(row => {
-      const name = row.querySelector('div > div:first-child')?.textContent.toLowerCase() || '';
-      const id = row.querySelector('div > div:last-child')?.textContent.toLowerCase() || '';
-      
-      const matchQ = q === '' || name.includes(q) || id.includes(q);
-      // For mock purposes, we check if the row's innerHTML contains the status value
-      // This is a simple way to handle the status filters in a static mock.
-      const matchStatus = status === '' || row.dataset.status === status;
-
-      row.style.display = (matchQ && matchStatus) ? '' : 'none';
-    });
-  }
-
-  settlementSearch?.addEventListener('input', _applySettlementFilters);
-  settlementStatusFilter?.addEventListener('change', _applySettlementFilters);
-  settlementSort?.addEventListener('change', () => {
-    showToast(typeof window.t === 'function' ? window.t('toast_feature_soon') : 'Sorting feature coming soon', 'info');
-  });
-
-  // Action: Record Payment
-  document.querySelectorAll('[data-action="record-payment"]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const row = btn.closest('tr');
-      const badge = row.querySelector('.bk-badge');
-      const amountCell = row.querySelectorAll('td')[2]?.querySelector('.settlement-amount');
-      
-      if (badge) {
-        badge.className = 'bk-badge bk-badge--settled';
-        badge.textContent = typeof window.t === 'function' ? window.t('status_settled') : 'Settled';
-        badge.setAttribute('data-i18n', 'status_settled');
-      }
-      if (amountCell) {
-        const t = (typeof window.t === 'function') ? window.t : (k) => k;
-        amountCell.innerHTML = `0 <span data-i18n="admin_currency">${t('admin_currency')}</span>`;
-        amountCell.style.color = 'var(--color-text-muted)';
-      }
-      
-      btn.style.opacity = '0.5';
-      btn.style.pointerEvents = 'none';
-      showToast(typeof window.t === 'function' ? window.t('toast_marked_paid') : 'Payment recorded successfully', 'success');
-    });
-  });
-
-  // Action: Send Reminder
-  document.querySelectorAll('[data-action="send-reminder"]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      showToast(typeof window.t === 'function' ? window.t('toast_reminder_sent') : 'Reminder sent to technician', 'info');
-    });
-  });
-
-  // Action: View Ledger
-  document.querySelectorAll('[data-action="view-ledger"]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      showToast(typeof window.t === 'function' ? window.t('toast_feature_soon') : 'Ledger view coming soon', 'info');
-    });
-  });
-
-  // ── Services Management ────────────────────
   async function renderServicesList() {
     const list = document.getElementById('servicesList');
     if (!list) return;
@@ -1554,22 +1970,54 @@ function initAdminDashboard() {
   });
 
   // ── Mobile sidebar toggle ──────────────────────────────
-  const sidebar        = document.querySelector('.admin-sidebar');
-  const overlay        = document.getElementById('sidebarOverlay');
-  const mobileToggle   = document.getElementById('sidebarToggle');
+  const sidebar      = document.querySelector('.admin-sidebar');
+  const overlay      = document.getElementById('sidebarOverlay');
+  const mobileToggle = document.getElementById('sidebarToggle');
 
-  function openSidebar()  { sidebar?.classList.add('is-open');    overlay?.classList.add('is-active'); }
-  function closeSidebar() { sidebar?.classList.remove('is-open'); overlay?.classList.remove('is-active'); }
+  function openSidebar()  {
+    sidebar?.classList.add('is-open');
+    overlay?.classList.add('is-active');
+    mobileToggle?.setAttribute('aria-expanded', 'true');
+    mobileToggle?.setAttribute('aria-label', 'Close menu');
+  }
+  function closeSidebar() {
+    sidebar?.classList.remove('is-open');
+    overlay?.classList.remove('is-active');
+    mobileToggle?.setAttribute('aria-expanded', 'false');
+    mobileToggle?.setAttribute('aria-label', 'Open menu');
+  }
 
   mobileToggle?.addEventListener('click', () => {
     sidebar?.classList.contains('is-open') ? closeSidebar() : openSidebar();
   });
   overlay?.addEventListener('click', closeSidebar);
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && sidebar?.classList.contains('is-open')) closeSidebar();
+  });
+  window.addEventListener('resize', () => {
+    if (window.innerWidth > 768) closeSidebar();
+  });
+  closeSidebar();
 
   // Close sidebar on nav click on mobile
   navBtns.forEach(btn => btn.addEventListener('click', () => {
     if (window.innerWidth <= 768) closeSidebar();
   }));
+
+  // ── Sidebar density toggle (compact/comfortable) ────────
+  const densityToggle = document.getElementById('adminDensityToggle');
+  const DENSITY_KEY = 'servio_admin_sidebar_density';
+  function applyDensity(mode) {
+    if (mode === 'compact') document.documentElement.setAttribute('data-density', 'compact');
+    else document.documentElement.removeAttribute('data-density');
+    densityToggle?.setAttribute('aria-pressed', String(mode === 'compact'));
+  }
+  applyDensity(localStorage.getItem(DENSITY_KEY) || 'comfortable');
+  densityToggle?.addEventListener('click', () => {
+    const next = document.documentElement.getAttribute('data-density') === 'compact' ? 'comfortable' : 'compact';
+    localStorage.setItem(DENSITY_KEY, next);
+    applyDensity(next);
+  });
 
   // ──────────────────────────────────────────────────────────
   //  AUDIT LOG — API-driven
@@ -1799,11 +2247,6 @@ function initAdminDashboard() {
     if (btn.dataset.tab === 'audit') {
       btn.addEventListener('click', () => { _auditPage = 1; _loadAuditPage(); });
     }
-    if (btn.dataset.tab === 'finance') {
-      btn.addEventListener('click', () => {
-        renderPendingApprovals();
-      });
-    }
   });
 
   document.getElementById('disputeStatusFilter')?.addEventListener('change', () => renderDisputes({ reuseCache: true }).catch(err => console.error('Error filtering disputes:', err)));
@@ -1814,6 +2257,7 @@ function initAdminDashboard() {
   });
   document.getElementById('supportSearch')?.addEventListener('input', () => renderSupportIssues({ reuseCache: true }).catch(err => console.error('Error searching support issues:', err)));
   document.getElementById('supportRefreshBtn')?.addEventListener('click', () => renderSupportIssues({ force: true }).catch(err => console.error('Error refreshing support issues:', err)));
+  document.getElementById('overviewRefreshBtn')?.addEventListener('click', () => loadOverviewData());
 
   // Initial load
   _loadAuditPage();
@@ -1823,18 +2267,24 @@ function initAdminDashboard() {
   _openTechProfileModal = openTechProfileModal;
 
   loadAdminData();
-  let _adminPollInterval = null;
-  const startAdminPolling = () => {
-    if (_adminPollInterval) clearInterval(_adminPollInterval);
-    _adminPollInterval = setInterval(() => loadAdminData(), 30000);
-  };
-  const stopAdminPolling = () => { if (_adminPollInterval) clearInterval(_adminPollInterval); _adminPollInterval = null; };
-  startAdminPolling();
-  document.addEventListener('visibilitychange', () => { document.hidden ? stopAdminPolling() : startAdminPolling(); });
+  // Polite poller: pauses while user is typing or has a modal open,
+  // halts when tab is hidden, preserves focused input value/caret across rerender.
+  const adminPoller = createPoller({
+    name: 'admin-dashboard',
+    intervalMs: 30_000,
+    tick: async () => {
+      const root = document.querySelector('main') || document.body;
+      const snap = snapshotFocus(root);
+      await loadAdminData();
+      restoreFocus(snap, root);
+    }
+  });
+  adminPoller.start();
 }
 
 async function loadAdminData() {
   const _set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = String(val); };
+  loadOverviewData();
 
   // ── Users (Customers) ──────────────────────────────────────────────────────
   try {
@@ -1900,11 +2350,11 @@ async function loadAdminData() {
       }
     }
 
-    _set('kpi-overview-users', total.toLocaleString());
     _set('kpi-users-total', total.toLocaleString());
     _set('kpi-users-active', active.toLocaleString());
     _set('kpi-users-suspended', suspended.toLocaleString());
     _set('kpi-users-new', newThisMonth.toLocaleString());
+    setAdminNavBadge('users', countAdminUpdatesSince('users', users, ['createdAt']));
 
     // Update pagination footer with actual count
     const userInfoEl = document.getElementById('userPaginationInfo');
@@ -2009,7 +2459,6 @@ async function loadAdminData() {
       }
     }
 
-    _set('kpi-overview-techs', techTotal.toLocaleString());
     _set('kpi-techs-total', techTotal.toLocaleString());
     _set('kpi-techs-pending', pendingTechs.length.toLocaleString());
     _set('kpi-techs-verified', verifiedTechs.length.toLocaleString());
@@ -2018,6 +2467,8 @@ async function loadAdminData() {
 
     // Pending category expansion requests
     const techsWithPendingCats = techs.filter(t => Array.isArray(t.pendingCategories) && t.pendingCategories.length > 0);
+    const pendingCategoryCount = techsWithPendingCats.reduce((sum, tech) => sum + tech.pendingCategories.length, 0);
+    setAdminNavBadge('technicians', pendingTechs.length + pendingCategoryCount);
     const pendingCatGrid = document.getElementById('pending-category-grid');
     if (pendingCatGrid) {
       if (!techsWithPendingCats.length) {
@@ -2069,7 +2520,6 @@ async function loadAdminData() {
     const bActive = bookings.filter(b => ['pending','accepted','en_route','arrived','in_progress'].includes(b.status)).length;
     const bCompleted = bookings.filter(b => b.status === 'completed').length;
     const bDisputed = bookings.filter(b => b.status === 'disputed').length;
-    const bCancelled = bookings.filter(b => b.status === 'cancelled').length;
 
     const bkRoot = document.querySelector('[data-panel="bookings"] tbody');
     if (bkRoot) {
@@ -2098,22 +2548,15 @@ async function loadAdminData() {
       }
     }
 
-    const bkTotalVal = document.querySelector('.booking-status-total-val');
-    if (bkTotalVal) bkTotalVal.textContent = bTotal.toLocaleString();
-
     _set('kpi-bookings-total', bTotal.toLocaleString());
     _set('kpi-bookings-active', bActive.toLocaleString());
     _set('kpi-bookings-completed', bCompleted.toLocaleString());
     _set('kpi-bookings-disputed', bDisputed.toLocaleString());
-
-    if (bTotal > 0) {
-      const pct = n => Math.round((n / bTotal) * 100) + '%';
-      _set('bk-pct-completed', pct(bCompleted));
-      _set('bk-pct-inprogress', pct(bActive));
-      _set('bk-pct-scheduled', pct(bookings.filter(b => b.status === 'pending').length));
-      _set('bk-pct-cancelled', pct(bCancelled));
-      _set('bk-stat-successrate', pct(bCompleted));
-    }
+    setAdminNavBadge('bookings', countAdminUpdatesSince('bookings', bookings));
+    setAdminNavBadge('finance', bookings.filter((booking) =>
+      booking.status === 'pending_admin_review'
+      || ['requires_action', 'pending_review'].includes(booking.paymentStatus)
+    ).length);
 
     if (!_disputesLoadedOnce) {
       renderDisputes().catch(err => console.error('Error loading disputes:', err));
@@ -2330,13 +2773,15 @@ function updateDisputeKpis(disputes) {
   const open = disputes.filter(d => d.status === 'open').length;
   const reviewing = disputes.filter(d => d.status === 'reviewing').length;
   const resolved = disputes.filter(d => String(d.status || '').startsWith('resolved_')).length;
+  const actionable = open + reviewing;
   setAdminText('kpi-overview-disputes', open + reviewing);
   setAdminText('kpi-disputes-total', total.toLocaleString());
   setAdminText('kpi-disputes-open', open.toLocaleString());
   setAdminText('kpi-disputes-review', reviewing.toLocaleString());
   setAdminText('kpi-disputes-resolved', resolved.toLocaleString());
-  setAdminText('disputeCount', open + reviewing);
-  setAdminText('qa-dispute-badge', open + reviewing);
+  setAdminText('disputeCount', actionable);
+  setAdminText('qa-dispute-badge', actionable);
+  setAdminNavBadge('disputes', actionable);
 }
 
 async function renderDisputes(options = {}) {
@@ -2859,11 +3304,7 @@ async function renderSupportIssues(options = {}) {
   }
 
   const openCount = _adminSupportIssues.filter(item => !['resolved', 'closed'].includes(item.status)).length;
-  const badge = document.getElementById('adminSupportBadge');
-  if (badge) {
-    badge.textContent = String(openCount);
-    badge.hidden = openCount === 0;
-  }
+  setAdminNavBadge('support', openCount);
 
   const query = String(document.getElementById('supportSearch')?.value || '').trim();
   const visible = _adminSupportIssues.filter(issue => supportIssueMatchesSearch(issue, query));
@@ -2975,212 +3416,9 @@ function openAdminSupportModal(issueId) {
   _openProfileModal?.('adminSupportModal');
 }
 
-async function renderPendingApprovals(filter = {}) {
-  const container = document.getElementById('adminPendingApprovalsList');
-  if (!container) return;
-  container.innerHTML = skList(4);
-
-  try {
-    const { items } = await getPendingApprovals(filter);
-    if (!items.length) {
-      container.innerHTML = '<p class="empty-state">No pending approvals.</p>';
-      return;
-    }
-
-    container.innerHTML = `
-      <div class="fp-table-wrap">
-      <table class="admin-table fp-table finance-table finance-table--queue">
-        <thead>
-          <tr>
-            <th>Customer</th><th>Worker</th><th>Service</th>
-            <th>Method</th><th>Amount</th><th>Worker Earns</th>
-            <th>Platform Fee</th><th>Decision Basis</th><th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${items.map(item => `
-            <tr data-booking-id="${item.bookingId}" data-method="${item.paymentMethod}">
-              <td>${item.customer?.name || '—'}</td>
-              <td>${item.worker?.name || '—'}</td>
-              <td>${item.service || '—'}</td>
-              <td><span class="badge badge--${item.paymentMethod}">${item.paymentMethod}</span></td>
-              <td>${item.totalPaid || item.amount || '—'} EGP</td>
-              <td>${item.workerEarning != null ? item.workerEarning + ' EGP' : '—'}</td>
-              <td>${item.platformFee != null ? item.platformFee + ' EGP' : '—'}</td>
-              <td>${item.customerConfirmedAt ? new Date(item.customerConfirmedAt).toLocaleDateString() : '—'}</td>
-              <td class="admin-actions">
-                <button class="btn btn--sm btn--success js-approve-btn" data-id="${item.bookingId}">Approve</button>
-                ${item.paymentMethod === 'cash' ? `<button class="btn btn--sm btn--danger js-reject-cash-btn" data-id="${item.bookingId}">Reject</button>` : ''}
-                ${item.paymentId ? `<button class="btn btn--sm btn--warning js-refund-btn" data-id="${item.paymentId}">Refund</button>` : ''}
-              </td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-      </div>
-    `;
-
-    container.querySelectorAll('.js-approve-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        if (!confirm(window.t?.('admin_approve_confirm') || 'Approve this payment release? This cannot be undone.')) return;
-        try {
-          await adminApprovePayment(btn.dataset.id);
-          showToast('Approved.', 'success');
-          refreshPaymentsWorksurface();
-        } catch (err) {
-          showToast(err?.response?.data?.message || 'Approval failed.', 'error');
-        }
-      });
-    });
-
-    container.querySelectorAll('.js-reject-cash-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const reason = prompt('Reason for rejection (required):');
-        if (!reason) return;
-        try {
-          await adminRejectCash(btn.dataset.id, { reason });
-          showToast('Rejected.', 'info');
-          refreshPaymentsWorksurface();
-        } catch (err) {
-          showToast(err?.response?.data?.message || 'Rejection failed.', 'error');
-        }
-      });
-    });
-
-    container.querySelectorAll('.js-refund-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        if (!confirm(window.t?.('admin_refund_confirm') || 'Issue a refund? Booking will be cancelled.')) return;
-        const reason = prompt('Refund reason:');
-        if (!reason) return;
-        try {
-          await adminRefund(btn.dataset.id, { reason });
-          showToast('Refunded.', 'info');
-          refreshPaymentsWorksurface();
-        } catch (err) {
-          showToast(err?.response?.data?.message || 'Refund failed.', 'error');
-        }
-      });
-    });
-  } catch (err) {
-    container.innerHTML = `<p class="error-state">Failed to load: ${err?.message}</p>`;
-  }
-}
-
-async function renderCashDebts(filter = {}) {
-  const container = document.getElementById('adminCashDebtsList');
-  if (!container) return;
-  container.innerHTML = skList(4);
-
-  try {
-    const { items, summary } = await getCashDebts(filter);
-
-    const summaryEl = document.getElementById('adminCashDebtsSummary');
-    if (summaryEl) {
-      summaryEl.innerHTML = `
-        <span>Outstanding: <strong>${summary.totalOutstanding} EGP</strong></span>
-        <span>Partial: <strong>${summary.totalPartiallyPaid} EGP</strong></span>
-        <span>Collected: <strong>${summary.totalPaid} EGP</strong></span>
-      `;
-    }
-
-    if (!items.length) {
-      container.innerHTML = '<p class="empty-state">No cash debts found.</p>';
-      return;
-    }
-
-    container.innerHTML = `
-      <div class="fp-table-wrap">
-      <table class="admin-table fp-table">
-        <thead>
-          <tr>
-            <th>Worker</th><th>Booking</th><th>Amount</th>
-            <th>Paid</th><th>Status</th><th>Created</th><th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${items.map(d => `
-            <tr>
-              <td>${d.worker?.name || '—'}</td>
-              <td>${d.bookingId || '—'}</td>
-              <td>${d.amount} EGP</td>
-              <td>${d.paidAmount} EGP</td>
-              <td><span class="badge badge--${d.status}">${d.status.replace('_', ' ')}</span></td>
-              <td>${new Date(d.createdAt).toLocaleDateString()}</td>
-              <td>
-                ${d.status !== 'paid' ? `<button class="btn btn--sm btn--primary js-mark-paid-btn" data-id="${d.debtId}" data-remaining="${d.amount - d.paidAmount}">
-                  ${window.t?.('admin_mark_paid') || 'Mark Paid'}
-                </button>` : '—'}
-              </td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-      </div>
-    `;
-
-    container.querySelectorAll('.js-mark-paid-btn').forEach(btn => {
-      btn.addEventListener('click', () => openMarkPaidModal(btn.dataset.id, Number(btn.dataset.remaining)));
-    });
-  } catch (err) {
-    container.innerHTML = `<p class="error-state">Failed to load: ${err?.message}</p>`;
-  }
-}
-
-function openMarkPaidModal(debtId, remaining) {
-  const modal = document.getElementById('adminMarkPaidModal');
-  if (!modal) return;
-  document.getElementById('markPaidDebtId').value = debtId;
-  document.getElementById('markPaidRemaining').textContent = remaining + ' EGP';
-  document.getElementById('markPaidAmount').value = remaining;
-  document.getElementById('markPaidAmount').max = remaining;
-  modal.hidden = false;
-}
-
-document.getElementById('markPaidSubmit')?.addEventListener('click', async () => {
-  const debtId    = document.getElementById('markPaidDebtId').value;
-  const amount    = Number(document.getElementById('markPaidAmount').value);
-  const adminNote = document.getElementById('markPaidNote').value.trim() || undefined;
-  if (!amount || amount <= 0) { showToast('Enter a valid amount.', 'error'); return; }
-  try {
-    await markCashDebtPaid(debtId, { amount, adminNote });
-    document.getElementById('adminMarkPaidModal').hidden = true;
-    showToast('Payment recorded.', 'success');
-    renderCashDebts();
-  } catch (err) {
-    showToast(err?.response?.data?.message || 'Failed to record payment.', 'error');
-  }
-});
-
-document.getElementById('markPaidCancel')?.addEventListener('click', () => {
-  document.getElementById('adminMarkPaidModal').hidden = true;
-});
-
 initAdminDashboard();
 
-// CSV export — anchor tags cannot send Authorization, so fetch as blob and trigger download manually.
-document.getElementById('btnExportSettlementsCsv')?.addEventListener('click', async () => {
-  try {
-    const apiBase = (window.SERVIO_CONFIG && window.SERVIO_CONFIG.API_BASE) || '';
-    const token   = localStorage.getItem('servio_token');
-    const res = await fetch(`${apiBase}/payments/admin/settlements/history.csv`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const blob = await res.blob();
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url;
-    a.download = `settlements-history-${new Date().toISOString().slice(0,10)}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  } catch (err) {
-    showToast(err.message || 'Failed to export CSV.', 'error');
-  }
-});
-
-// ── Preview Mode: View Site as Customer ───────
+// Preview Mode: View Site as Customer ───────
 document.getElementById('viewSiteAsCustomer')?.addEventListener('click', () => {
   localStorage.setItem('servio_preview_mode', 'true');
   window.open('./index.html', '_blank');
@@ -3231,809 +3469,99 @@ document.getElementById('viewSiteAsCustomer')?.addEventListener('click', () => {
   });
 })();
 
-// ─── Escrow Payments Tab (Plan 1 Task 18) ───────────────────────────────
-
-const _payState = { page: 1, limit: 20, filters: {} };
-
-function _payFmtMoney(n) {
-  return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'EGP' }).format(Number(n) || 0);
-}
-function _payFmtDate(d) { return d ? new Date(d).toLocaleDateString() : '—'; }
-function _payAge(d) {
-  if (!d) return '—';
-  const h = Math.floor((Date.now() - new Date(d).getTime()) / 3600000);
-  return h < 24 ? `${h}h` : `${Math.floor(h / 24)}d`;
-}
-
-async function legacyLoadPaymentsKpis() {
-  try {
-    const r = await adminPaymentsStats();
-    const data = r?.data || r || {};
-    for (const [k, v] of Object.entries(data)) {
-      const el = document.querySelector(`#paymentsKpis .kpi[data-key="${k}"] .kpi__value`);
-      if (!el) continue;
-      el.textContent = (typeof v === 'number' && /Total$/i.test(k)) ? _payFmtMoney(v) : String(v ?? '—');
-    }
-  } catch (e) { console.warn('kpi load failed', e); }
-}
-
-async function legacyLoadPaymentsTable() {
-  const tbody = document.getElementById('paymentsTbody');
-  if (!tbody) return;
-  try {
-    const r = await adminListPayments({ ..._payState.filters, page: _payState.page, limit: _payState.limit });
-    const items = r?.data || [];
-    tbody.innerHTML = items.length
-      ? items.map(_payRowHtml).join('')
-      : '<tr><td colspan="10" class="center-align" style="padding:1.5rem;">No payments found.</td></tr>';
-    tbody.querySelectorAll('[data-action="view"]').forEach((btn) => {
-      btn.onclick = () => openPaymentDetailDrawer(btn.dataset.bookingId);
-    });
-  } catch (e) { console.warn('payments table load failed', e); }
-}
-
-function legacyPayRowHtml(p) {
-  const b = p.booking || {};
-  const cust = b.user || b.customer || {};
-  const tech = b.worker || b.technician || {};
-  const svc = b.service || {};
-  return `<tr>
-    <td>#${(b._id || p._id || '').toString().slice(-4) || '—'}</td>
-    <td>${_payFmtDate(p.createdAt)}</td>
-    <td>${cust.name || '—'}</td>
-    <td>${tech.name || '—'}</td>
-    <td>${svc.title || '—'}</td>
-    <td>${_payFmtMoney(p.amount)}</td>
-    <td>${_payFmtMoney(b.platformFeeAmount || 0)}</td>
-    <td><span class="status-chip status-chip--${p.status}">${p.status}</span></td>
-    <td>${_payAge(p.createdAt)}</td>
-    <td><button class="btn btn--small" data-action="view" data-booking-id="${b._id || ''}">View</button></td>
-  </tr>`;
-}
-
-async function legacyOpenPaymentDetailDrawer(bookingId) {
-  const drawer = document.getElementById('paymentDrawer');
-  if (!drawer || !bookingId) return;
-  drawer.hidden = false;
-  drawer.innerHTML = '<p style="padding:1rem;">Loading…</p>';
-  try {
-    const r = await adminListPayments({ bookingId, limit: 1 });
-    const p = (r?.data || [])[0];
-    if (!p) { drawer.innerHTML = '<p style="padding:1rem;">Not found</p>'; return; }
-    drawer.innerHTML = _payDrawerHtml(p);
-    drawer.querySelector('[data-close]').onclick = () => { drawer.hidden = true; };
-    const approveBtn = drawer.querySelector('[data-action="approve"]');
-    if (approveBtn) approveBtn.onclick = () => {
-      const tech = p.booking?.worker?.name || p.booking?.technician?.name || 'tech';
-      const earn = (p.booking?.basePrice || p.booking?.totalPrice || p.amount) - (p.booking?.platformFeeAmount || 0);
-      openPaymentConfirmModal({
-        title: 'Approve & Release',
-        body: `Release ${_payFmtMoney(earn)} to ${tech}?`,
-        onConfirm: async () => {
-          await adminApprovePayment(p.booking._id);
-          drawer.hidden = true;
-          await renderPaymentsTab();
-        },
-      });
-    };
-    const refundBtn = drawer.querySelector('[data-action="partial-refund"]');
-    if (refundBtn) refundBtn.onclick = () => {
-      openPartialRefundModal({
-        payment: p,
-        onConfirm: async (payload) => {
-          await adminPartialRefund(p.booking._id, payload);
-          drawer.hidden = true;
-          await renderPaymentsTab();
-        },
-      });
-    };
-    const forceReleaseBtn = drawer.querySelector('[data-action="force-release"]');
-    if (forceReleaseBtn) forceReleaseBtn.onclick = () => {
-      const reason = window.prompt('Emergency force-release reason (required, min 10 chars):');
-      if (!reason || reason.trim().length < 10) { showToast('Reason required (min 10 chars)', 'error'); return; }
-      openPaymentConfirmModal({
-        title: 'Force-release (emergency)',
-        body: `Bypass workflow and release ${_payFmtMoney(p.amount)} now? Logged for audit.`,
-        onConfirm: async () => {
-          try {
-            await adminForceRelease(p._id, { reason: reason.trim() });
-            showToast('Payment force-released', 'success');
-            drawer.hidden = true;
-            await renderPaymentsTab();
-          } catch (err) { showToast(err.message || 'Force-release failed', 'error'); }
-        },
-      });
-    };
-    const forceLockBtn = drawer.querySelector('[data-action="force-lock"]');
-    if (forceLockBtn) forceLockBtn.onclick = () => {
-      const reason = window.prompt('Lock reason (required, min 10 chars):');
-      if (!reason || reason.trim().length < 10) { showToast('Reason required (min 10 chars)', 'error'); return; }
-      openPaymentConfirmModal({
-        title: 'Lock payment',
-        body: 'Lock prevents auto-release and worker actions until unlocked.',
-        onConfirm: async () => {
-          try {
-            await adminForceLock(p._id, { reason: reason.trim() });
-            showToast('Payment locked', 'success');
-            drawer.hidden = true;
-            await renderPaymentsTab();
-          } catch (err) { showToast(err.message || 'Lock failed', 'error'); }
-        },
-      });
-    };
-    const forceUnlockBtn = drawer.querySelector('[data-action="force-unlock"]');
-    if (forceUnlockBtn) forceUnlockBtn.onclick = () => {
-      const reason = window.prompt('Unlock reason (required, min 10 chars):');
-      if (!reason || reason.trim().length < 10) { showToast('Reason required (min 10 chars)', 'error'); return; }
-      openPaymentConfirmModal({
-        title: 'Unlock payment',
-        body: 'Resume normal escrow flow for this payment.',
-        onConfirm: async () => {
-          try {
-            await adminForceUnlock(p._id, { reason: reason.trim() });
-            showToast('Payment unlocked', 'success');
-            drawer.hidden = true;
-            await renderPaymentsTab();
-          } catch (err) { showToast(err.message || 'Unlock failed', 'error'); }
-        },
-      });
-    };
-  } catch (e) {
-    drawer.innerHTML = `<p style="padding:1rem;">Error: ${e.message || e}</p>`;
-  }
-}
-
-function legacyPayDrawerHtml(p) {
-  const b = p.booking || {};
-  const cust = b.user || b.customer || {};
-  const tech = b.worker || b.technician || {};
-  const total = b.basePrice || b.totalPrice || p.amount;
-  const fee = b.platformFeeAmount || 0;
-  return `<div class="drawer__head">
-      <h3>Payment ${_payFmtMoney(p.amount)}</h3>
-      <button data-close aria-label="Close">&times;</button>
-    </div>
-    <dl class="drawer__meta">
-      <dt>Status</dt><dd><span class="status-chip status-chip--${p.status}">${p.status}</span></dd>
-      <dt>Booking</dt><dd>#${b._id || ''}</dd>
-      <dt>Customer</dt><dd>${cust.name || '—'}</dd>
-      <dt>Tech</dt><dd>${tech.name || '—'}</dd>
-      <dt>Service</dt><dd>${(b.service && b.service.title) || '—'}</dd>
-      <dt>Tech earns</dt><dd>${_payFmtMoney(total - fee)}</dd>
-      <dt>Platform fee</dt><dd>${_payFmtMoney(fee)}</dd>
-    </dl>
-    <div class="drawer__actions">
-      ${p.status === 'held' || p.status === 'pending_review' ? '<button class="btn btn--primary" data-action="approve">Approve &amp; Release</button>' : ''}
-      ${p.status === 'held' || p.status === 'released' ? '<button class="btn btn--warn" data-action="partial-refund">Partial refund…</button>' : ''}
-      ${p.status === 'held' && !p.locked ? '<button class="btn btn--danger" data-action="force-release">Force-release (emergency)</button>' : ''}
-      ${p.status === 'held' && !p.locked ? '<button class="btn btn--ghost" data-action="force-lock">Lock</button>' : ''}
-      ${p.locked ? '<button class="btn btn--ghost" data-action="force-unlock">Unlock</button>' : ''}
-    </div>`;
-}
-
-let _paymentDrawerLastFocus = null;
-let _paymentDrawerEscHandler = null;
-
-const FINANCE_REASON_CODES = {
-  release: [
-    { value: 'customer_confirmed', label: 'Customer confirmed' },
-    { value: 'auto_release_window', label: 'Release window passed' },
-    { value: 'admin_policy', label: 'Admin policy' },
-  ],
-  emergency: [
-    { value: 'emergency_override', label: 'Emergency override' },
-    { value: 'support_resolution', label: 'Support resolution' },
-    { value: 'admin_policy', label: 'Admin policy' },
-  ],
-  lock: [
-    { value: 'missing_evidence', label: 'Missing evidence' },
-    { value: 'active_dispute', label: 'Active dispute' },
-    { value: 'high_risk_payment', label: 'High-risk payment' },
-    { value: 'manual_lock', label: 'Manual lock' },
-  ],
-  unlock: [
-    { value: 'evidence_received', label: 'Evidence received' },
-    { value: 'dispute_resolved', label: 'Dispute resolved' },
-    { value: 'manual_unlock', label: 'Manual unlock' },
-  ],
-  refund: [
-    { value: 'service_incomplete', label: 'Service incomplete' },
-    { value: 'quality_issue', label: 'Quality issue' },
-    { value: 'customer_goodwill', label: 'Customer goodwill' },
-    { value: 'admin_policy', label: 'Admin policy' },
-  ],
-};
-
-function _payFmtDateTime(d) { return d ? new Date(d).toLocaleString() : 'Not recorded'; }
-function _payTitle(v) {
-  return String(v || 'unknown').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-}
-function _payShortId(v) { return String(v || '').slice(-6) || '------'; }
-function _payActionLabel(action) {
-  return ({
-    release: 'Release',
-    request_evidence: 'Request evidence',
-    partial_refund: 'Partial refund',
-    full_refund: 'Full refund',
-    emergency_release: 'Emergency release',
-    lock: 'Lock',
-    unlock: 'Unlock',
-    escalate: 'Escalate',
-    manual_review: 'Manual review',
-  })[action] || _payTitle(action);
-}
-function _payAllowed(detail, action) {
-  return detail?.decisionPacket?.allowedActions?.includes(action);
-}
-
-async function refreshPaymentsWorksurface() {
-  await Promise.all([loadPaymentsKpis(), loadPaymentsTable(), renderPendingApprovals()]);
-}
-
-async function loadPaymentsKpis() {
-  try {
-    const r = await adminPaymentsStats();
-    const data = r?.data || r || {};
-    for (const [k, v] of Object.entries(data)) {
-      const el = document.querySelector(`#paymentsKpis .kpi[data-key="${k}"] .kpi__value`);
-      if (!el) continue;
-      el.textContent = (typeof v === 'number' && /Total$/i.test(k)) ? _payFmtMoney(v) : String(v ?? '-');
-    }
-    const syncEl = document.getElementById('financeLastSync');
-    if (syncEl) syncEl.textContent = `Last sync ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-  } catch (e) { console.warn('kpi load failed', e); }
-}
-
-async function loadPaymentsTable() {
-  const tbody = document.getElementById('paymentsTbody');
-  if (!tbody) return;
-  try {
-    const r = await adminListPayments({ ..._payState.filters, page: _payState.page, limit: _payState.limit });
-    const items = r?.data || [];
-    tbody.innerHTML = items.length
-      ? items.map(_payRowHtml).join('')
-      : '<tr><td colspan="10" class="center-align finance-empty-row">No ledger records match the current filters.</td></tr>';
-    tbody.querySelectorAll('[data-action="view"]').forEach((btn) => {
-      btn.onclick = () => openPaymentDetailDrawer(btn.dataset.paymentId);
-    });
-  } catch (e) { console.warn('payments table load failed', e); }
-}
-
-function _payRowHtml(p) {
-  const b = p.booking || {};
-  const cust = b.user || b.customer || {};
-  const worker = b.worker || b.technician || {};
-  const svc = b.service || {};
-  const fee = p.platformFee ?? b.platformFeeAmount ?? 0;
-  const rowRisk = p.lockedAt ? 'Locked' : (b.status === 'pending_admin_review' && p.status === 'held' ? 'Needs review' : 'Audit');
-  return `<tr>
-    <td><span class="finance-id">#${escapeHtml(_payShortId(b._id || p._id))}</span></td>
-    <td>${_payFmtDate(p.createdAt)}</td>
-    <td>${escapeHtml(cust.name || '-')}</td>
-    <td>${escapeHtml(worker.name || '-')}</td>
-    <td>${escapeHtml(svc.title || b.serviceName || b.serviceCategory || '-')}</td>
-    <td class="finance-money">${_payFmtMoney(p.amount)}</td>
-    <td class="finance-money">${_payFmtMoney(fee)}</td>
-    <td><span class="status-chip status-chip--${escapeHtml(p.status)}">${escapeHtml(p.status)}</span></td>
-    <td><span class="finance-queue-tag">${escapeHtml(rowRisk)} / ${_payAge(p.createdAt)}</span></td>
-    <td><button class="finance-detail-btn" data-action="view" data-payment-id="${escapeHtml(p._id || '')}">Details</button></td>
-  </tr>`;
-}
-
-function closePaymentDetailDrawer() {
-  const drawer = document.getElementById('paymentDrawer');
-  if (!drawer) return;
-  drawer.hidden = true;
-  drawer.innerHTML = '';
-  if (_paymentDrawerEscHandler) {
-    document.removeEventListener('keydown', _paymentDrawerEscHandler);
-    _paymentDrawerEscHandler = null;
-  }
-  if (_paymentDrawerLastFocus && typeof _paymentDrawerLastFocus.focus === 'function') {
-    _paymentDrawerLastFocus.focus();
-  }
-}
-
-async function openPaymentDetailDrawer(paymentId) {
-  const drawer = document.getElementById('paymentDrawer');
-  if (!drawer || !paymentId) return;
-  _paymentDrawerLastFocus = document.activeElement;
-  drawer.hidden = false;
-  drawer.innerHTML = '<p class="finance-drawer-loading">Loading decision packet...</p>';
-  _paymentDrawerEscHandler = (event) => {
-    if (event.key === 'Escape') closePaymentDetailDrawer();
-  };
-  document.addEventListener('keydown', _paymentDrawerEscHandler);
-  try {
-    const r = await adminPaymentDetail(paymentId);
-    const detail = r?.data || r;
-    if (!detail?.payment) {
-      drawer.innerHTML = '<p class="finance-drawer-loading">Payment not found.</p>';
-      return;
-    }
-    drawer.innerHTML = _payDrawerHtml(detail);
-    drawer.querySelector('[data-close]').onclick = closePaymentDetailDrawer;
-    drawer.querySelector('[data-action="request-evidence"]')?.addEventListener('click', () => handlePaymentEvidenceRequest(detail));
-    drawer.querySelector('[data-action="approve"]')?.addEventListener('click', () => handlePaymentRelease(detail));
-    drawer.querySelector('[data-action="partial-refund"]')?.addEventListener('click', () => handlePartialRefund(detail));
-    drawer.querySelector('[data-action="full-refund"]')?.addEventListener('click', () => handleFullRefund(detail));
-    drawer.querySelector('[data-action="force-release"]')?.addEventListener('click', () => handleForceRelease(detail));
-    drawer.querySelector('[data-action="force-lock"]')?.addEventListener('click', () => handleForceLock(detail));
-    drawer.querySelector('[data-action="force-unlock"]')?.addEventListener('click', () => handleForceUnlock(detail));
-  } catch (e) {
-    drawer.innerHTML = `<p class="finance-drawer-loading">Error: ${escapeHtml(e.message || String(e))}</p>`;
-  }
-}
-
-function handlePaymentRelease(detail) {
-  const worker = detail.parties?.worker?.name || 'worker';
-  openPaymentConfirmModal({
-    title: 'Approve release',
-    body: `Release ${_payFmtMoney(detail.paymentBreakdown?.workerEarning)} to ${escapeHtml(worker)}?`,
-    reasonCodeOptions: FINANCE_REASON_CODES.release,
-    confirmLabel: 'Release payment',
-    onConfirm: async ({ reasonCode }) => {
-      await adminApprovePayment(detail.booking.id, { reasonCode });
-      closePaymentDetailDrawer();
-      await refreshPaymentsWorksurface();
-    },
-  });
-}
-
-function handlePartialRefund(detail) {
-  openPartialRefundModal({
-    payment: { ...detail.payment, amount: detail.paymentBreakdown.amount },
-    decisionDetail: detail,
-    onConfirm: async (payload) => {
-      await adminPartialRefund(detail.booking.id, payload);
-      closePaymentDetailDrawer();
-      await refreshPaymentsWorksurface();
-    },
-  });
-}
-
-function handleFullRefund(detail) {
-  openPaymentConfirmModal({
-    title: 'Full refund',
-    body: `Refund the remaining ${_payFmtMoney(detail.paymentBreakdown.remainingRefundable)} to the customer?`,
-    requireReason: true,
-    reasonCodeOptions: FINANCE_REASON_CODES.refund,
-    confirmLabel: 'Refund customer',
-    onConfirm: async ({ reason, reasonCode }) => {
-      await adminRefund(detail.payment.id, { reason: `${reasonCode}: ${reason}` });
-      closePaymentDetailDrawer();
-      await refreshPaymentsWorksurface();
-    },
-  });
-}
-
-function handleForceRelease(detail) {
-  openPaymentConfirmModal({
-    title: 'Emergency release',
-    body: `Bypass policy checks and release ${_payFmtMoney(detail.paymentBreakdown.workerEarning)}. This is logged for audit.`,
-    requireReason: true,
-    reasonCodeOptions: FINANCE_REASON_CODES.emergency,
-    confirmLabel: 'Force release',
-    onConfirm: async ({ reason, reasonCode }) => {
-      await adminForceRelease(detail.payment.id, { reason, reasonCode });
-      showToast('Payment force-released', 'success');
-      closePaymentDetailDrawer();
-      await refreshPaymentsWorksurface();
-    },
-  });
-}
-
-function handleForceLock(detail) {
-  openPaymentConfirmModal({
-    title: 'Lock payment',
-    body: 'Lock prevents release until an admin unlocks this payment with a reason.',
-    requireReason: true,
-    reasonCodeOptions: FINANCE_REASON_CODES.lock,
-    confirmLabel: 'Lock payment',
-    onConfirm: async ({ reason, reasonCode }) => {
-      await adminForceLock(detail.payment.id, { reason, reasonCode });
-      showToast('Payment locked', 'success');
-      closePaymentDetailDrawer();
-      await refreshPaymentsWorksurface();
-    },
-  });
-}
-
-function handleForceUnlock(detail) {
-  openPaymentConfirmModal({
-    title: 'Unlock payment',
-    body: 'Resume the normal escrow review flow for this payment.',
-    requireReason: true,
-    reasonCodeOptions: FINANCE_REASON_CODES.unlock,
-    confirmLabel: 'Unlock payment',
-    onConfirm: async ({ reason, reasonCode }) => {
-      await adminForceUnlock(detail.payment.id, { reason, reasonCode });
-      showToast('Payment unlocked', 'success');
-      closePaymentDetailDrawer();
-      await refreshPaymentsWorksurface();
-    },
-  });
-}
-
-function handlePaymentEvidenceRequest(detail) {
-  const firstDispute = detail?.evidence?.disputes?.[0];
-  if (!firstDispute?.id) {
-    showToast('Open a dispute before requesting formal evidence from this drawer.', 'info');
-    return;
-  }
-  openPaymentConfirmModal({
-    title: 'Request evidence',
-    body: 'Ask both parties for more evidence on the active dispute.',
-    requireReason: true,
-    confirmLabel: 'Request evidence',
-    onConfirm: async ({ reason }) => {
-      await requestDisputeEvidence(firstDispute.id, 'both', reason);
-      showToast('Evidence requested.', 'success');
-      await openPaymentDetailDrawer(detail.payment.id);
-    },
-  });
-}
-
-function _payDrawerHtml(detail) {
-  const p = detail.payment || {};
-  const b = detail.booking || {};
-  const breakdown = detail.paymentBreakdown || {};
-  const decision = detail.decisionPacket || {};
-  const customer = detail.parties?.customer || {};
-  const worker = detail.parties?.worker || {};
-  const recommended = _payActionLabel(decision.recommendedAction);
-  const evidenceCount = (b.workerCompletionImages?.length || 0) + (detail.evidence?.bookingImages?.length || 0);
-  const flags = decision.policyFlags?.length ? decision.policyFlags : ['clear_for_standard_review'];
-  const timeline = detail.timeline || {};
-  const audit = detail.auditTrail || [];
-  return `<div class="drawer__head finance-drawer__head">
-      <div>
-        <span class="finance-drawer__eyebrow">Escrow decision packet</span>
-        <h3>Payment ${_payFmtMoney(breakdown.amount)}</h3>
-      </div>
-      <button data-close aria-label="Close">&times;</button>
-    </div>
-    <section class="finance-recommendation finance-recommendation--${escapeHtml(decision.riskLevel || 'low')}">
-      <span>Recommended</span>
-      <strong>${escapeHtml(recommended)}</strong>
-      <small>${escapeHtml(decision.riskLevel || 'low')} risk / ${decision.autoReleaseEligible ? 'Auto-release eligible' : `${decision.releaseWindowHours || 48}h review window`}</small>
-    </section>
-    <section class="finance-breakdown">
-      <div><span>Total charged</span><strong>${_payFmtMoney(breakdown.amount)}</strong></div>
-      <div><span>Worker earns</span><strong>${_payFmtMoney(breakdown.workerEarning)}</strong></div>
-      <div><span>Platform fee</span><strong>${_payFmtMoney(breakdown.platformFee)}</strong></div>
-      <div><span>Refund exposure</span><strong>${_payFmtMoney(breakdown.remainingRefundable)}</strong></div>
-    </section>
-    <dl class="drawer__meta finance-drawer__meta">
-      <dt>Status</dt><dd><span class="status-chip status-chip--${escapeHtml(p.status)}">${escapeHtml(p.status)}</span></dd>
-      <dt>Booking</dt><dd>#${escapeHtml(_payShortId(b.id))}</dd>
-      <dt>Customer</dt><dd>${escapeHtml(customer.name || '-')}</dd>
-      <dt>Worker</dt><dd>${escapeHtml(worker.name || '-')}</dd>
-      <dt>Service</dt><dd>${escapeHtml(b.service || '-')}</dd>
-      <dt>Evidence</dt><dd>${evidenceCount} completion file(s)</dd>
-    </dl>
-    <section class="finance-policy">
-      <h4>Policy checklist</h4>
-      <div class="finance-policy__grid">
-        ${flags.map(flag => `<span>${escapeHtml(_payTitle(flag))}</span>`).join('')}
-      </div>
-      ${decision.missingEvidence?.length ? `<p class="finance-policy__note">Missing: ${decision.missingEvidence.map(_payTitle).join(', ')}</p>` : ''}
-    </section>
-    <section class="finance-timeline">
-      <h4>Review timeline</h4>
-      <ol>
-        <li><span>Paid</span><strong>${escapeHtml(_payFmtDateTime(timeline.paidAt))}</strong></li>
-        <li><span>Worker completed</span><strong>${escapeHtml(_payFmtDateTime(timeline.completedAt))}</strong></li>
-        <li><span>Customer confirmed</span><strong>${escapeHtml(_payFmtDateTime(timeline.customerConfirmedAt))}</strong></li>
-        <li><span>Release eligible</span><strong>${escapeHtml(_payFmtDateTime(timeline.releaseEligibleAt))}</strong></li>
-      </ol>
-    </section>
-    <section class="finance-evidence">
-      <h4>Evidence and risk</h4>
-      <p>${escapeHtml(b.workerNotes || 'No worker completion note recorded.')}</p>
-      <div class="finance-evidence__chips">
-        <span>${detail.evidence?.disputes?.length || 0} active dispute(s)</span>
-        <span>${detail.evidence?.supportIssues?.length || 0} support issue(s)</span>
-        <span>${audit.length} audit event(s)</span>
-      </div>
-    </section>
-    <div class="drawer__actions finance-drawer__actions">
-      ${_payAllowed(detail, 'release') ? '<button class="btn btn--primary" data-action="approve">Approve release</button>' : ''}
-      ${_payAllowed(detail, 'request_evidence') ? '<button class="btn btn--ghost" data-action="request-evidence">Request evidence</button>' : ''}
-      ${_payAllowed(detail, 'partial_refund') ? '<button class="btn btn--warn" data-action="partial-refund">Partial refund</button>' : ''}
-      ${_payAllowed(detail, 'full_refund') ? '<button class="btn btn--warn" data-action="full-refund">Full refund</button>' : ''}
-      ${_payAllowed(detail, 'emergency_release') ? '<button class="btn btn--danger" data-action="force-release">Emergency release</button>' : ''}
-      ${_payAllowed(detail, 'lock') ? '<button class="btn btn--ghost" data-action="force-lock">Lock</button>' : ''}
-      ${_payAllowed(detail, 'unlock') ? '<button class="btn btn--ghost" data-action="force-unlock">Unlock</button>' : ''}
-    </div>`;
-}
-
-export async function renderPaymentsTab() {
-  await Promise.all([loadPaymentsKpis(), loadPaymentsTable(), renderPendingApprovals()]);
-  const statusEl = document.getElementById('payStatusFilter');
-  if (statusEl) statusEl.onchange = (e) => {
-    _payState.filters.status = e.target.value === 'all' ? '' : e.target.value;
-    _payState.page = 1;
-    loadPaymentsTable();
-  };
-  const custEl = document.getElementById('payCustomerFilter');
-  if (custEl) custEl.onchange = (e) => { _payState.filters.customer = e.target.value; loadPaymentsTable(); };
-  const wrkEl = document.getElementById('payWorkerFilter');
-  if (wrkEl) wrkEl.onchange = (e) => { _payState.filters.worker = e.target.value; loadPaymentsTable(); };
-  const fromEl = document.getElementById('payFromDate');
-  if (fromEl) fromEl.onchange = (e) => { _payState.filters.from = e.target.value; loadPaymentsTable(); };
-  const toEl = document.getElementById('payToDate');
-  if (toEl) toEl.onchange = (e) => { _payState.filters.to = e.target.value; loadPaymentsTable(); };
-  const resetEl = document.getElementById('payResetFilters');
-  if (resetEl) resetEl.onclick = () => {
-    _payState.filters = {};
-    _payState.page = 1;
-    document.querySelectorAll('.filters-bar input, .filters-bar select').forEach((el) => { el.value = ''; });
-    loadPaymentsTable();
-  };
-  const approvalMethodEl = document.getElementById('approvalMethodFilter');
-  if (approvalMethodEl) approvalMethodEl.onchange = (e) => renderPendingApprovals(e.target.value ? { paymentMethod: e.target.value } : {});
-}
-
-// Finance inner tab switching (global so other modules can call)
-window.switchFinanceTab = function switchFinanceTab(name) {
-  const target = name === 'settlements' ? 'settlements' : 'payments';
-  document.querySelectorAll('.fin-tab').forEach(t => {
-    const on = t.dataset.finTab === target;
-    t.classList.toggle('is-active', on);
-    t.setAttribute('aria-selected', on ? 'true' : 'false');
-  });
-  document.querySelectorAll('.fin-section').forEach(s => {
-    s.hidden = (s.dataset.finSection !== target);
-  });
-  sessionStorage.setItem('servio_admin_fin_tab', target);
-  if (target === 'payments' && typeof renderPaymentsTab === 'function') {
-    setTimeout(() => renderPaymentsTab(), 30);
-  }
-  if (target === 'settlements' && typeof renderSettlementsTab === 'function') {
-    setTimeout(() => renderSettlementsTab(), 30);
-  }
-};
-
-// Auto-render when finance tab opened
+// Overview interactions
 document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('.admin-nav__btn[data-tab="finance"]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const sub = sessionStorage.getItem('servio_admin_fin_tab') || 'payments';
-      setTimeout(() => window.switchFinanceTab(sub), 50);
+  // Futuristic overview: KPI + quick-action cards spotlight tracker
+  const fxPanel = document.querySelector('.admin-panel--futuristic');
+  if (fxPanel) {
+    const tracked = fxPanel.querySelectorAll('.admin-kpi-card, .quick-action-card');
+    tracked.forEach((card) => {
+      card.addEventListener('pointermove', (e) => {
+        const r = card.getBoundingClientRect();
+        card.style.setProperty('--mx', ((e.clientX - r.left) / r.width * 100) + '%');
+        card.style.setProperty('--my', ((e.clientY - r.top) / r.height * 100) + '%');
+      });
     });
-  });
-  if (document.querySelector('.admin-panel[data-panel="finance"].is-active')) {
-    const sub = sessionStorage.getItem('servio_admin_fin_tab') || 'payments';
-    window.switchFinanceTab(sub);
+  }
+
+  // Revenue period toggles
+  const periodToggles = document.getElementById('overviewRevenuePeriodToggles');
+  const periodLabel = document.getElementById('overviewRevenuePeriodLabel');
+  const periodLabels = { 7: 'Daily revenue for the past 7 days', 30: 'Daily revenue for the past 30 days', 90: 'Daily revenue for the past 90 days', 365: 'Daily revenue for the past year' };
+  let _revPeriodReq = null;
+  if (periodToggles) {
+    periodToggles.querySelectorAll('.rev-period-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        if (btn.classList.contains('is-active') || _revPeriodReq) return;
+        periodToggles.querySelectorAll('.rev-period-btn').forEach((b) => b.classList.remove('is-active'));
+        btn.classList.add('is-active');
+        const days = parseInt(btn.dataset.days, 10);
+        if (periodLabel) periodLabel.textContent = periodLabels[days] || `Daily revenue for the past ${days} days`;
+        const chart = document.getElementById('overviewRevenueChart');
+        const statsHost = document.getElementById('overviewRevenueStats');
+        if (chart) chart.innerHTML = '<div class="overview-inline-state">Loading revenue data...</div>';
+        if (statsHost) statsHost.innerHTML = '';
+        btn.disabled = true;
+        try {
+          _revPeriodReq = getAdminRevenue(days);
+          const data = await _revPeriodReq;
+          const revenuePayload = {
+            daily: data?.daily || [],
+            currentWeek: data?.currentTotal,
+            previousWeek: data?.previousTotal,
+            comparisonPercent: data?.comparisonPercent,
+          };
+          renderOverviewRevenue(revenuePayload, days);
+        } catch (err) {
+          console.error('Revenue period error:', err);
+          if (chart) chart.innerHTML = '<div class="overview-inline-state overview-inline-state--error">Could not load revenue data.</div>';
+        } finally {
+          btn.disabled = false;
+          _revPeriodReq = null;
+        }
+      });
+    });
+  }
+
+  // Revenue KPI Card cycler
+  const revKpiCard = document.getElementById('revenueKpiCard');
+  if (revKpiCard) {
+    const revPeriods = [
+      { days: 30, label: 'Revenue This Month' },
+      { days: 180, label: 'Revenue (6 Months)' },
+      { days: 365, label: 'Revenue (All Time)' },
+      { days: 7, label: 'Revenue (7 Days)' }
+    ];
+    let revKpiIndex = 0;
+    let _revKpiReq = null;
+    revKpiCard.addEventListener('click', async () => {
+      if (_revKpiReq) return;
+      revKpiIndex = (revKpiIndex + 1) % revPeriods.length;
+      const period = revPeriods[revKpiIndex];
+      const labelEl = document.getElementById('kpi-revenue-label');
+      const valEl = document.getElementById('kpi-overview-revenue');
+
+      if (labelEl) {
+        labelEl.textContent = period.label;
+        labelEl.removeAttribute('data-i18n'); // Overwrite i18n
+      }
+      if (valEl) valEl.innerHTML = '<span style="opacity:0.5; font-size:0.8em;">...</span> <small style="font-size:0.5em;">EGP</small>';
+
+      try {
+        revKpiCard.style.opacity = '0.7';
+        _revKpiReq = getAdminRevenue(period.days);
+        const data = await _revKpiReq;
+        // In the original code, the currentTotal is used to compute the total
+        const total = Number(data?.currentTotal) || 0;
+        const formattedTotal = typeof formatMoney === 'function' ? formatMoney(total) : total.toLocaleString();
+        if (valEl) valEl.innerHTML = `${formattedTotal} <small style="font-size:0.5em;">EGP</small>`;
+      } catch (err) {
+        console.error('Error fetching revenue kpi', err);
+        if (valEl) valEl.innerHTML = `— <small style="font-size:0.5em;">EGP</small>`;
+      } finally {
+        revKpiCard.style.opacity = '1';
+        _revKpiReq = null;
+      }
+    });
   }
 });
-/* ── Plan 2 Task 17: Cash Settlements 3 sub-tabs ──────────────────── */
-
-function _fmtMoney(n) {
-  try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'EGP', maximumFractionDigits: 2 }).format(Number(n) || 0); }
-  catch (_) { return (Number(n || 0)).toFixed(2) + ' EGP'; }
-}
-
-function _ageOf(d) {
-  if (!d) return '—';
-  const h = Math.floor((Date.now() - new Date(d).getTime()) / 3600000);
-  if (h < 1) return 'now';
-  if (h < 24) return h + 'h';
-  return Math.floor(h / 24) + 'd';
-}
-
-function _setKpi(key, val) {
-  const el = document.querySelector('#settlementsKpis .kpi[data-key="' + key + '"] .kpi__value');
-  if (el) el.textContent = val;
-}
-
-function switchSettlementSubtab(name) {
-  document.querySelectorAll('.subtab').forEach(t => {
-    const on = t.dataset.subtab === name;
-    t.classList.toggle('is-active', on);
-    t.setAttribute('aria-selected', on ? 'true' : 'false');
-  });
-  const map = { 'worker-debts': 'subWorkerDebts', 'payout-requests': 'subPayoutRequests', 'history': 'subHistory' };
-  Object.entries(map).forEach(([k, id]) => {
-    const el = document.getElementById(id);
-    if (el) el.hidden = (k !== name);
-  });
-}
-
-async function renderWorkerDebts() {
-  const tbody = document.getElementById('workerDebtsTbody');
-  if (!tbody) return;
-  try {
-    const r = await adminListCashDebtsGrouped();
-    const rows = r?.data || [];
-    if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="7" class="center-align" style="padding:3rem;color:var(--color-text-muted);">No outstanding debts.</td></tr>';
-      return;
-    }
-    tbody.innerHTML = rows.map(row => {
-      const name = row.worker?.name || '—';
-      const email = row.worker?.email || '';
-      const blocked = (row.totalOwed || 0) >= 300 ? '<span style="color:#dc2626;">BLOCKED</span>' : '';
-      return '<tr>'
-        + '<td>' + name + '<br><small style="color:#6b7280;">' + email + '</small></td>'
-        + '<td class="right-align">' + _fmtMoney(row.totalOwed) + '</td>'
-        + '<td>' + (row.oldest ? _ageOf(row.oldest) : '—') + '</td>'
-        + '<td class="right-align">' + row.debtCount + '</td>'
-        + '<td>' + (row.statusMix || []).join(', ') + '</td>'
-        + '<td>' + blocked + '</td>'
-        + '<td><button class="btn-premium btn-premium--sm" data-action="view" data-worker-id="' + row.workerId + '">View</button></td>'
-        + '</tr>';
-    }).join('');
-    tbody.querySelectorAll('[data-action="view"]').forEach(b => {
-      b.onclick = () => openWorkerDebtDrawer(b.dataset.workerId);
-    });
-  } catch (e) {
-    console.error('[workerDebts]', e);
-    tbody.innerHTML = '<tr><td colspan="7" class="center-align" style="color:#dc2626;">Load failed: ' + (e.message || e) + '</td></tr>';
-  }
-}
-
-async function renderPayoutRequests() {
-  const tbody = document.getElementById('payoutRequestsTbody');
-  if (!tbody) return;
-  try {
-    const r = await adminListPayouts();
-    const items = r?.data || [];
-    if (!items.length) {
-      tbody.innerHTML = '<tr><td colspan="6" class="center-align" style="padding:3rem;color:var(--color-text-muted);">No payout requests.</td></tr>';
-      return;
-    }
-    tbody.innerHTML = items.map(p => {
-      const name = p.worker?.name || '—';
-      const email = p.worker?.email || '';
-      return '<tr>'
-        + '<td>' + name + '<br><small style="color:#6b7280;">' + email + '</small></td>'
-        + '<td>' + _ageOf(p.requestedAt || p.createdAt) + '</td>'
-        + '<td class="right-align">' + _fmtMoney(p.amount) + '</td>'
-        + '<td>' + p.payoutMethod + '</td>'
-        + '<td><span class="status-chip status-chip--' + p.status + '">' + p.status + '</span></td>'
-        + '<td><button class="btn-premium btn-premium--sm" data-payout-id="' + p._id + '" data-status="' + p.status + '">View</button></td>'
-        + '</tr>';
-    }).join('');
-    tbody.querySelectorAll('button[data-payout-id]').forEach(b => {
-      b.onclick = () => openPayoutDecisionModal({
-        payoutId: b.dataset.payoutId,
-        currentStatus: b.dataset.status,
-        onSuccess: () => { renderPayoutRequests(); renderSettlementsKpis(); },
-      });
-    });
-  } catch (e) {
-    console.error('[payouts]', e);
-    tbody.innerHTML = '<tr><td colspan="6" class="center-align" style="color:#dc2626;">Load failed: ' + (e.message || e) + '</td></tr>';
-  }
-}
-
-async function renderSettlementHistory() {
-  const tbody = document.getElementById('historyTbody');
-  if (!tbody) return;
-  try {
-    const r = await adminListSettlements({ status: 'verified' });
-    const items = r?.data || [];
-    if (!items.length) {
-      tbody.innerHTML = '<tr><td colspan="6" class="center-align" style="padding:3rem;color:var(--color-text-muted);">No verified settlements.</td></tr>';
-      return;
-    }
-    tbody.innerHTML = items.map(s => '<tr>'
-      + '<td>' + new Date(s.createdAt).toLocaleString() + '</td>'
-      + '<td>' + (s.worker?.name || '—') + '</td>'
-      + '<td>' + s.method + '</td>'
-      + '<td class="right-align">' + _fmtMoney(s.totalAmount) + '</td>'
-      + '<td>' + s.status + '</td>'
-      + '<td>' + (s.verifiedBy?.name || '—') + '</td>'
-      + '</tr>').join('');
-  } catch (e) {
-    console.error('[history]', e);
-    tbody.innerHTML = '<tr><td colspan="6" class="center-align" style="color:#dc2626;">Load failed: ' + (e.message || e) + '</td></tr>';
-  }
-}
-
-async function renderSettlementsKpis() {
-  try {
-    const [debts, payouts, verified] = await Promise.all([
-      adminListCashDebtsGrouped().catch(() => ({ data: [] })),
-      adminListPayouts().catch(() => ({ data: [] })),
-      adminListSettlements({ status: 'verified' }).catch(() => ({ data: [] })),
-    ]);
-    const drows = debts?.data || [];
-    const outstanding = drows.reduce((a, r) => a + (Number(r.totalOwed) || 0), 0);
-    const blocked = drows.filter(r => (r.totalOwed || 0) >= 300).length;
-    const queue = (payouts?.data || []).filter(p => ['pending', 'approved'].includes(p.status)).reduce((a, p) => a + (Number(p.amount) || 0), 0);
-    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-    const settledTodayCount = (verified?.data || []).filter(s => new Date(s.verifiedAt || s.createdAt) >= todayStart).length;
-    _setKpi('outstandingDebt', _fmtMoney(outstanding));
-    _setKpi('blockedWorkers', String(blocked));
-    _setKpi('payoutQueue', _fmtMoney(queue));
-    _setKpi('settledToday', String(settledTodayCount));
-  } catch (e) {
-    console.error('[kpis]', e);
-  }
-}
-
-async function openWorkerDebtDrawer(workerId) {
-  const drawer = document.getElementById('settlementDrawer');
-  if (!drawer) return;
-  drawer.hidden = false;
-  drawer.innerHTML = '<p>Loading…</p>';
-  try {
-    const r = await adminWorkerDebts(workerId);
-    drawer.innerHTML = workerDrawerHtml(r?.data || {});
-    drawer.querySelector('[data-close]').onclick = () => { drawer.hidden = true; };
-    drawer.querySelectorAll('[data-action="verify-settlement"]').forEach(b => {
-      b.onclick = () => openSettlementVerifyModal({
-        settlementId: b.dataset.id,
-        onSuccess: () => { drawer.hidden = true; renderWorkerDebts(); renderSettlementHistory(); renderSettlementsKpis(); },
-      });
-    });
-    drawer.querySelectorAll('[data-action="mark-debt-paid"]').forEach(b => {
-      b.onclick = async () => {
-        if (!confirm('Mark this debt paid by admin override?')) return;
-        try {
-          await markCashDebtPaid(b.dataset.id, { amount: parseFloat(b.dataset.amount), adminNote: 'admin_override' });
-          openWorkerDebtDrawer(workerId);
-          renderWorkerDebts();
-          renderSettlementsKpis();
-        } catch (e) { alert(e.message || e); }
-      };
-    });
-  } catch (e) {
-    drawer.innerHTML = '<p style="color:#dc2626;">Load failed: ' + (e.message || e) + '</p><button data-close type="button">Close</button>';
-    drawer.querySelector('[data-close]').onclick = () => { drawer.hidden = true; };
-  }
-}
-
-function workerDrawerHtml(data) {
-  const debts = data?.debts || [];
-  const settlements = data?.settlements || [];
-  const pending = settlements.length
-    ? settlements.map(s => '<div class="drawer__settlement" style="padding:12px;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:8px;">'
-        + '<div><strong>' + _fmtMoney(s.totalAmount) + '</strong> via ' + s.method + ' · ref ' + (s.reference || '—') + '</div>'
-        + (s.proofUrl ? '<div><a href="' + s.proofUrl + '" target="_blank" rel="noopener">View proof</a></div>' : '')
-        + '<button class="btn-premium btn-premium--sm" data-action="verify-settlement" data-id="' + s._id + '" style="margin-top:8px;">Verify…</button>'
-        + '</div>').join('')
-    : '<p class="empty" style="color:#6b7280;">No pending settlements.</p>';
-  const debtRows = debts.length
-    ? debts.map(d => {
-        const remaining = d.remaining ?? d.amount;
-        const actionBtn = d.status !== 'paid'
-          ? '<button class="btn-premium btn-premium--sm" data-action="mark-debt-paid" data-id="' + d._id + '" data-amount="' + remaining + '">Mark paid</button>'
-          : '';
-        return '<tr>'
-          + '<td>#' + String(d.booking || '').toString().slice(-4) + '</td>'
-          + '<td>' + _fmtMoney(remaining) + ' / ' + _fmtMoney(d.amount) + '</td>'
-          + '<td>' + _ageOf(d.createdAt) + '</td>'
-          + '<td><span class="status-chip status-chip--' + d.status + '">' + d.status + '</span></td>'
-          + '<td>' + actionBtn + '</td>'
-          + '</tr>';
-      }).join('')
-    : '<tr><td colspan="5" style="color:#6b7280;">No debts.</td></tr>';
-  return '<div class="drawer__head" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">'
-    + '<h3 style="margin:0;">Worker debts</h3>'
-    + '<button data-close type="button" style="background:none;border:none;font-size:24px;cursor:pointer;">×</button>'
-    + '</div>'
-    + '<section style="margin-bottom:24px;"><h4>Pending settlements</h4>' + pending + '</section>'
-    + '<section><h4>Debt rows</h4>'
-    + '<table class="bk-table"><thead><tr><th>Booking</th><th>Owed</th><th>Age</th><th>Status</th><th></th></tr></thead>'
-    + '<tbody>' + debtRows + '</tbody></table></section>';
-}
-
-async function renderSettlementsTab() {
-  await renderSettlementsKpis();
-  await Promise.all([renderWorkerDebts(), renderPayoutRequests(), renderSettlementHistory()]);
-  document.querySelectorAll('.subtab').forEach(t => {
-    t.onclick = () => switchSettlementSubtab(t.dataset.subtab);
-  });
-  const initial = (location.hash || '').replace('#', '');
-  if (['worker-debts', 'payout-requests', 'history'].includes(initial)) {
-    switchSettlementSubtab(initial);
-  } else {
-    switchSettlementSubtab('worker-debts');
-  }
-}
-
-// Settlements render is now driven by switchFinanceTab

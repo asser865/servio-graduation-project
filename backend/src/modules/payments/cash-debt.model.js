@@ -17,6 +17,19 @@ const cashDebtSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    debtType: {
+      type: String,
+      enum: ['platform_fee', 'refund_recovery', 'penalty'],
+      default: 'platform_fee',
+    },
+    refundRecipientAmount: {
+      type: Number,
+      default: 0,
+    },
+    relatedDispute: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Dispute',
+    },
     paidAmount: {
       type: Number,
       default: 0,

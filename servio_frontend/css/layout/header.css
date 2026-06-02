@@ -82,12 +82,25 @@ html.no-intro .site-header * {
 }
 
 .brand__mark {
-  width: 34px;
-  height: 34px;
+  width: 38px;
+  height: 38px;
   border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: #E8D5B7;
+  box-shadow: 0 2px 8px rgba(34, 40, 49, 0.14);
+}
+
+.brand__mark img {
+  width: 100%;
+  height: 100%;
   display: block;
   object-fit: contain;
-  box-shadow: 0 2px 8px rgba(34, 40, 49, 0.14);
+  transform: scale(1.2);
+  transform-origin: center center;
 }
 
 .brand__name {
@@ -706,6 +719,32 @@ html.is-booting [data-theme-button] .theme-button__icon {
 .notif-bell .notif-icon--warn     { background: rgba(231,76,60,0.12);   color: #e74c3c; }
 .notif-bell .notif-icon--star     { background: rgba(245,158,11,0.12);  color: #f59e0b; }
 .notif-bell .notif-icon--system   { background: rgba(100,116,139,0.12); color: #94a3b8; }
+
+/* ── Light Mode Notification Panel Overrides ── */
+[data-theme="light"] .notif-bell .notif-panel {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(34, 40, 49, 0.12);
+  box-shadow: 
+    0 10px 20px -5px rgba(34, 40, 49, 0.1),
+    0 24px 50px -10px rgba(34, 40, 49, 0.15);
+}
+[data-theme="light"] .notif-bell .notif-panel__header {
+  border-bottom-color: rgba(34, 40, 49, 0.08);
+}
+[data-theme="light"] .notif-bell .notif-item {
+  border-bottom-color: rgba(34, 40, 49, 0.05);
+}
+[data-theme="light"] .notif-bell .notif-item:hover,
+[data-theme="light"] .notif-bell .notif-item:focus-visible {
+  background: rgba(34, 40, 49, 0.04);
+}
+[data-theme="light"] .notif-bell .notif-item--unread {
+  background: rgba(154, 140, 115, 0.08);
+}
+[data-theme="light"] .notif-bell .notif-panel__action-btn:hover {
+  background: rgba(154, 140, 115, 0.15);
+}
+
 @media (max-width: 480px) {
   .notif-bell .notif-panel { width: calc(100vw - 24px); right: -12px; }
 }

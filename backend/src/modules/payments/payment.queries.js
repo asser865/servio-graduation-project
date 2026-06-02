@@ -70,12 +70,20 @@ async function listAdminPayments({
 async function statsAdmin() {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const Booking = require('../bookings/booking.model');
-  const [heldAgg, releasedTodayAgg, pendingReview, disputed, refundsToday, avgRelease] = await Promise.all([
+  const [heldAgg, releasedTodayAgg, pendingReview, disputed, disputedAgg, refundsTodayAgg, avgRelease] = await Promise.all([
     Payment.aggregate([{ $match: { status: 'held' } }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
     Payment.aggregate([{ $match: { status: 'released', releasedAt: { $gte: today } } }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
     Booking.countDocuments({ status: 'pending_admin_review' }),
     Payment.countDocuments({ status: 'disputed' }),
-    Payment.countDocuments({ status: { $in: ['refunded', 'partially_refunded'] }, refundedAt: { $gte: today } }),
+    Payment.aggregate([
+      { $match: { status: 'disputed' } },
+      { $group: { _id: null, total: { $sum: '$amount' } } },
+    ]),
+    Payment.aggregate([
+      { $match: { status: { $in: ['refunded', 'partially_refunded'] }, refundedAt: { $gte: today } } },
+      { $project: { refunded: { $cond: [{ $gt: ['$refundedAmount', 0] }, '$refundedAmount', '$amount'] } } },
+      { $group: { _id: null, total: { $sum: '$refunded' }, count: { $sum: 1 } } },
+    ]),
     Payment.aggregate([
       { $match: { status: 'released', releasedAt: { $exists: true }, heldAt: { $exists: true } } },
       { $project: { hours: { $divide: [{ $subtract: ['$releasedAt', '$heldAt'] }, 3600 * 1000] } } },
@@ -87,7 +95,9 @@ async function statsAdmin() {
     releasedTodayTotal: releasedTodayAgg[0]?.total || 0,
     pendingReviewCount: pendingReview,
     disputedCount:      disputed,
-    refundsTodayCount:  refundsToday,
+    disputeExposureTotal: disputedAgg[0]?.total || 0,
+    refundsTodayCount:  refundsTodayAgg[0]?.count || 0,
+    refundedTodayTotal: refundsTodayAgg[0]?.total || 0,
     avgReleaseHours:    Math.round((avgRelease[0]?.avg || 0) * 10) / 10,
   };
 }

@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SERVIO | AI Finisher</title>
+  <meta name="description" content="Upload a photo of your room and get a complete AI-powered finishing plan with materials, labor, and cost breakdown." />
+  <script src="../js/config.js"></script>
+  <script src="../js/theme-init.js"></script>
+  <script src="../js/lang-init.js"></script>
+  <script src="../js/boot-init.js"></script>
+  <link rel="stylesheet" href="../css/main.css" />
+</head>
+<body class="has-dark-hero" data-page="ai-finisher">
+  <div class="scroll-progress" data-scroll-progress aria-hidden="true"></div>
+  <a class="skip-link" href="#main" data-i18n="skip_to_content">Skip to content</a>
+
+  <!-- Page-scoped dark gradient background -->
+  <div class="af-page-bg" aria-hidden="true"></div>
+
+  <!-- HEADER -->
+  <header class="site-header" data-site-header>
+    <div class="container header__inner">
+      <a class="brand" href="./index.html" aria-label="SERVIO Home">
+        <span class="brand__mark"><span class="brand__mark-inner"><img src="../assets/images/logo.png" alt="SERVIO" /></span></span>
+        <span class="brand__name">SERVIO</span>
+      </a>
+
+      <div class="header__center">
+        <nav class="primary-nav" aria-label="Primary">
+          <div class="nav-shell" id="primary-nav">
+            <ul class="primary-nav__list" role="list">
+              <li><a class="nav-link" href="./index.html" data-i18n="nav_home">Home</a></li>
+              <li><a class="nav-link" href="./services-marketplace.html" data-i18n="nav_services">Services</a></li>
+              <li><a class="nav-link" href="./smart-match.html" data-i18n="nav_smart_match">Smart Match</a></li>
+              <li><a class="nav-link nav-link--active" href="./ai-finisher.html" data-i18n="nav_ai_finisher" aria-current="page">AI Finisher</a></li>
+              <li><a class="nav-link" href="./about.html" data-i18n="nav_about">About</a></li>
+              <li><a class="nav-link" href="./contact.html" data-i18n="nav_contact">Contact</a></li>
+            </ul>
+          </div>
+        </nav>
+      </div>
+
+      <div class="header__right">
+        <div class="lang" data-lang>
+          <button class="lang-switch" type="button" aria-haspopup="listbox" aria-expanded="false">
+            <svg class="lang-switch__globe" viewBox="0 0 24 24" aria-hidden="true" width="16" height="16">
+              <path fill="currentColor"
+                d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm7.93 9h-3.11a15.6 15.6 0 0 0-1.3-5.06A8.03 8.03 0 0 1 19.93 11ZM12 4c.78.95 1.9 3.1 2.56 7H9.44C10.1 7.1 11.22 4.95 12 4ZM4.07 13h3.11a15.6 15.6 0 0 0 1.3 5.06A8.03 8.03 0 0 1 4.07 13ZM7.18 11H4.07a8.03 8.03 0 0 1 4.41-5.06A15.6 15.6 0 0 0 7.18 11Zm2.26 2h5.12c-.66 3.9-1.78 6.05-2.56 7-.78-.95-1.9-3.1-2.56-7Zm6.08 5.06A15.6 15.6 0 0 0 16.82 13h3.11a8.03 8.03 0 0 1-4.41 5.06Z" />
+            </svg>
+            <span class="lang__current">EN</span>
+            <span class="lang__caret" aria-hidden="true">▾</span>
+          </button>
+          <ul class="lang__menu" role="listbox" aria-label="Select language">
+            <li role="option" aria-selected="true">EN</li>
+            <li role="option" aria-selected="false">AR</li>
+          </ul>
+        </div>
+        <button class="btn btn--sm btn--header-theme" type="button" data-theme-button aria-label="Toggle dark mode">
+        <span class="theme-button__icon theme-button__icon--moon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            </svg>
+          </span>
+          <span class="theme-button__icon theme-button__icon--sun" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="4.25"></circle>
+              <path d="M12 2.5v2.5M12 19v2.5M4.93 4.93l1.77 1.77M17.3 17.3l1.77 1.77M2.5 12H5M19 12h2.5M4.93 19.07l1.77-1.77M17.3 6.7l1.77-1.77"></path>
+            </svg>
+          </span>
+        </button>
+        <a class="btn btn--sm btn--header-login" href="./login.html" data-i18n="nav_login">Login</a>
+        <a class="btn btn--sm btn--header-signup" href="./signup.html" data-i18n="nav_signup">Sign Up</a>
+
+        <button class="hamburger" type="button" aria-label="Toggle menu" aria-expanded="false"
+          aria-controls="primary-nav" data-nav-toggle>
+          <span class="hamburger__lines" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+          </span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+
+    <!-- HERO — editorial split layout -->
+    <section class="hero-ai">
+      <canvas id="hero-ai-canvas" class="hero-ai__canvas"></canvas>
+
+      <!-- Room silhouette removed per user request -->
+
+      <div class="container">
+        <div class="hero-ai__content">
+
+          <!-- Badge -->
+          <div class="hero-ai__badge" data-reveal>
+            <img src="../assets/icons/ai_icon.png" alt="" width="18" height="18" aria-hidden="true" />
+            <span>Powered by Gemini Vision</span>
+          </div>
+
+          <!-- Headline -->
+          <h1 class="hero-ai__title" data-reveal data-reveal-delay="1" data-i18n-html="finisher_hero_title_html">
+            Turn any empty room<br>into a <em>finished space</em>
+          </h1>
+
+          <!-- Sub -->
+          <p class="hero-ai__lead" data-reveal data-reveal-delay="2" data-i18n="finisher_hero_sub">
+            Upload a photo · set your budget · get a full finishing plan with materials, labor, and 3 cost tiers — in under a minute.
+          </p>
+
+          <!-- 3-step strip -->
+          <div class="hero-ai__steps" data-reveal data-reveal-delay="3">
+            <div class="hero-ai__step">
+              <span class="hero-ai__step-num">01</span>
+              <span class="hero-ai__step-label">Upload room photo</span>
+            </div>
+            <span class="hero-ai__step-sep" aria-hidden="true">→</span>
+            <div class="hero-ai__step">
+              <span class="hero-ai__step-num">02</span>
+              <span class="hero-ai__step-label">Set dimensions &amp; budget</span>
+            </div>
+            <span class="hero-ai__step-sep" aria-hidden="true">→</span>
+            <div class="hero-ai__step">
+              <span class="hero-ai__step-num">03</span>
+              <span class="hero-ai__step-label">Get your plan instantly</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- WIZARD -->
+    <section class="rf-wizard" aria-label="AI Finisher Wizard">
+      <div class="rf-wizard__layout">
+
+        <div class="rf-form-col">
+          <div class="rf-wizard__card" id="wizard-card">
+
+            <!-- Stepper: progress indicator (NOT tabs) -->
+            <ol class="rf-steps" aria-label="Wizard progress">
+              <li class="rf-step" data-step="1" aria-current="step">
+                <span class="rf-step__dot">1</span>
+                <span class="rf-step__label" data-i18n="finisher_step_photo">Photo</span>
+              </li>
+              <li class="rf-step__connector" data-connector="1" role="none" aria-hidden="true"></li>
+              <li class="rf-step" data-step="2">
+                <span class="rf-step__dot">2</span>
+                <span class="rf-step__label" data-i18n="finisher_step_details">Details</span>
+              </li>
+              <li class="rf-step__connector" data-connector="2" role="none" aria-hidden="true"></li>
+              <li class="rf-step" data-step="3">
+                <span class="rf-step__dot">3</span>
+                <span class="rf-step__label" data-i18n="finisher_step_analyzing">Analyzing</span>
+              </li>
+              <li class="rf-step__connector" data-connector="3" role="none" aria-hidden="true"></li>
+              <li class="rf-step" data-step="4">
+                <span class="rf-step__dot">4</span>
+                <span class="rf-step__label" data-i18n="finisher_step_results">Results</span>
+              </li>
+            </ol>
+
+            <!-- Live region for phase announcements -->
+            <p id="rf-live" role="status" aria-live="polite" class="visually-hidden"></p>
+
+            <!-- Panel 1: Upload + Style -->
+            <div class="rf-panel rf-panel--active" id="panel-1">
+              <p class="rf-panel__title" data-i18n="finisher_upload_title">Upload your room photo</p>
+
+              <!-- Upload wrapper: position:relative so JS-injected change-btn can be
+                   positioned absolutely. The button is a SIBLING of the label (not inside
+                   it) to satisfy the HTML spec: no interactive content inside <label>. -->
+              <div class="rf-upload-wrap">
+                <label class="rf-upload" id="upload-zone" for="image-input">
+                  <input
+                    class="rf-upload__input"
+                    type="file"
+                    id="image-input"
+                    accept="image/jpeg,image/png,image/webp"
+                    aria-label="Select room image file" />
+                  <span class="rf-upload__icon" aria-hidden="true">
+                    <!-- inline SVG: camera icon -->
+                    <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                      <circle cx="12" cy="13" r="4"/>
+                    </svg>
+                  </span>
+                  <span class="rf-upload__label" data-i18n="finisher_upload_label">Click or drag to upload</span>
+                  <span class="rf-upload__hint"  data-i18n="finisher_upload_hint">JPEG, PNG or WebP · Max 10 MB</span>
+                </label>
+                <!-- JS appends the change-photo <button> here (sibling of label) -->
+              </div>
+              <p id="upload-error" class="rf-field-error" hidden></p>
+
+              <p class="rf-section-title" data-i18n="finisher_style_title">Preferred finishing style</p>
+              <div class="rf-styles" id="style-selector">
+                <button class="rf-style-card rf-style-card--active" data-style="modern" type="button">
+                  <span class="rf-style-card__icon" aria-hidden="true">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M12 6h.01"/><path d="M12 10h.01"/><path d="M12 14h.01"/><path d="M16 10h.01"/><path d="M16 14h.01"/><path d="M8 10h.01"/><path d="M8 14h.01"/></svg>
+                  </span>
+                  <span class="rf-style-card__label" data-i18n="finisher_style_modern">Modern</span>
+                </button>
+                <button class="rf-style-card" data-style="classic" type="button">
+                  <span class="rf-style-card__icon" aria-hidden="true">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21v-4"/><path d="M19 21v-4"/><path d="M3 7v4"/><path d="M21 7v4"/><path d="M8 11v6"/><path d="M16 11v6"/><path d="M4 3h16a1 1 0 0 1 1 1v3H3V4a1 1 0 0 1 1-1z"/></svg>
+                  </span>
+                  <span class="rf-style-card__label" data-i18n="finisher_style_classic">Classic</span>
+                </button>
+                <button class="rf-style-card" data-style="minimal" type="button">
+                  <span class="rf-style-card__icon" aria-hidden="true">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+                  </span>
+                  <span class="rf-style-card__label" data-i18n="finisher_style_minimal">Minimal</span>
+                </button>
+                <button class="rf-style-card" data-style="luxe" type="button">
+                  <span class="rf-style-card__icon" aria-hidden="true">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 13L2 9Z"/><path d="M11 3 8 9l4 13"/><path d="M13 3l3 6-4 13"/><path d="M2 9h20"/></svg>
+                  </span>
+                  <span class="rf-style-card__label" data-i18n="finisher_style_luxe">Luxe</span>
+                </button>
+              </div>
+
+              <div class="rf-panel__footer rf-panel__footer--end">
+                <button class="btn btn--primary btn--lg" id="step1-next" disabled data-i18n="finisher_btn_next">Next →</button>
+              </div>
+            </div>
+
+            <!-- Panel 2: Dimensions + Budget -->
+            <div class="rf-panel" id="panel-2">
+              <p class="rf-panel__title" data-i18n="finisher_dims_title">Room dimensions &amp; budget</p>
+
+              <div class="rf-dims">
+                <div class="rf-dims__field">
+                  <label class="rf-dims__label" for="dim-length" data-i18n="finisher_dims_length">Length (m)</label>
+                  <input class="rf-dims__input" type="number" id="dim-length" min="1" max="50" step="0.1" placeholder="5.0" />
+                </div>
+                <div class="rf-dims__field">
+                  <label class="rf-dims__label" for="dim-width" data-i18n="finisher_dims_width">Width (m)</label>
+                  <input class="rf-dims__input" type="number" id="dim-width" min="1" max="50" step="0.1" placeholder="4.0" />
+                </div>
+                <div class="rf-dims__field">
+                  <label class="rf-dims__label" for="dim-height" data-i18n="finisher_dims_height">Height (m)</label>
+                  <input class="rf-dims__input" type="number" id="dim-height" min="2" max="6" step="0.1" placeholder="2.8" />
+                </div>
+              </div>
+              <p id="dims-error" class="rf-field-error" hidden></p>
+
+              <div class="rf-budget">
+                <label class="rf-budget__label" for="budget-input" data-i18n="finisher_budget_label">Total budget</label>
+                <div class="rf-budget__row">
+                  <span class="rf-budget__prefix">EGP</span>
+                  <input class="rf-budget__input" type="number" id="budget-input" min="1000" step="1000" placeholder="50000" />
+                </div>
+              </div>
+              <p id="budget-error" class="rf-field-error" hidden></p>
+
+              <label class="rf-render-toggle">
+                <input type="checkbox" id="render-toggle" checked />
+                <span data-i18n="finisher_render_toggle">Generate AI visual render</span>
+                <span class="rf-render-toggle__hint" data-i18n="finisher_render_hint">(adds ~45 s)</span>
+              </label>
+
+              <div class="rf-panel__footer">
+                <button class="btn btn--ghost"  id="step2-back" data-i18n="finisher_btn_back">← Back</button>
+                <button class="btn btn--primary" id="step2-next" data-i18n="finisher_btn_analyze">Analyze Room</button>
+              </div>
+            </div>
+
+            <!-- Panel 3: Analyzing -->
+            <div class="rf-panel" id="panel-3">
+              <div class="rf-analyzing">
+                <div class="rf-analyzing__spinner" aria-hidden="true"></div>
+                <p class="rf-analyzing__title"  data-i18n="finisher_analyzing_title">Analyzing your room…</p>
+                <p class="rf-analyzing__status" id="analyze-status" data-i18n="finisher_analyzing_status_default">Uploading image</p>
+                <p class="rf-analyzing__elapsed" id="elapsed">00:00</p>
+                <div class="rf-analyzing__log" id="analyze-log"></div>
+                <button class="btn btn--ghost rf-analyzing__cancel" id="cancel-btn" type="button" data-i18n="finisher_btn_cancel">Cancel</button>
+              </div>
+            </div>
+
+            <!-- Error panel -->
+            <div class="rf-panel" id="panel-error" role="alert">
+              <div class="rf-error">
+                <div class="rf-error__icon" aria-hidden="true">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    <line x1="12" y1="9"  x2="12" y2="13"/>
+                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                  </svg>
+                </div>
+                <p class="rf-error__title" data-i18n="finisher_error_title">Analysis Failed</p>
+                <p class="rf-error__msg" id="error-msg">Something went wrong. Please try again.</p>
+                <div class="rf-actions">
+                  <button class="btn btn--primary" id="retry-btn"         data-i18n="finisher_btn_retry">Try Again</button>
+                  <button class="btn btn--ghost"   id="error-restart-btn" data-i18n="finisher_btn_start_over">Start Over</button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Preview / results column (visible on desktop only via CSS sticky) -->
+        <div class="rf-preview-col">
+          <div class="rf-wizard__card">
+
+            <!-- Panel 4: Results -->
+            <div class="rf-panel rf-panel--active" id="panel-4" hidden>
+
+              <div class="rf-results__header">
+                <span class="rf-results__ai-badge" data-i18n="finisher_recommended">AI Pick</span>
+                <p class="rf-results__room-type" id="results-room-type"></p>
+                <p class="rf-results__reason"    id="results-reason"></p>
+              <!-- Detected room features as pill chips (from room_analysis.detected_features) -->
+              <div id="detected-features" class="rf-features" hidden></div>
+              <!-- Consistency warnings from consistency_envelope.consistency_warnings -->
+              <div id="warnings-section" class="rf-warnings" hidden>
+                <p class="rf-warnings__title">⚠ Plan Notes</p>
+                <ul class="rf-warnings__list" id="warnings-list"></ul>
+              </div>
+              </div>
+
+              <!-- Plan tabs: this IS a real tablist -->
+              <div class="rf-tabs" id="plan-tabs" role="tablist" aria-label="Finishing plans"></div>
+
+              <!-- Plan panel (single panel — JS swaps content on tab click) -->
+              <div id="plan-content" role="tabpanel" aria-labelledby="plan-tab-0"></div>
+
+              <!-- Cross-plan cost comparison (collapsible, mirrors mobile _PlanComparisonTable) -->
+              <details class="rf-compare" id="compare-section" hidden>
+                <summary>Compare All Plans</summary>
+                <div class="rf-table-wrap">
+                  <table class="rf-compare__table" id="compare-table" aria-label="Plan cost comparison"></table>
+                </div>
+              </details>
+
+              <!-- Palette -->
+              <div class="rf-palette" id="palette-content" hidden></div>
+
+              <!-- SD Render -->
+              <div class="rf-render" id="render-section" hidden>
+                <p class="rf-table-title" data-i18n="finisher_section_render">AI Visual Render</p>
+                <img class="rf-render__img" id="render-img" alt="AI generated room render" />
+                <p class="rf-render__caption">AI-generated preview — actual results may vary</p>
+              </div>
+
+              <!-- Knowledge graph (collapsible; Phase-2 placeholder, populated by JS) -->
+              <details class="rf-graph" id="graph-section" hidden>
+                <summary data-i18n="finisher_section_graph">Plan Knowledge Graph</summary>
+                <p class="rf-graph__stats" id="graph-stats"></p>
+                <div class="rf-graph__chips" id="graph-chips"></div>
+              </details>
+
+              <div class="rf-actions">
+                <button class="btn btn--ghost" id="restart-btn" data-i18n="finisher_btn_start_over">Start Over</button>
+                <a class="btn btn--primary" href="./services-marketplace.html" data-i18n="finisher_btn_book">Book a Technician →</a>
+              </div>
+            </div>
+
+            <!-- Idle placeholder: skeleton preview of what results look like -->
+            <div id="preview-placeholder" class="rf-preview-placeholder">
+              <div class="rf-preview-placeholder__header">
+                <div class="rf-preview-placeholder__icon" aria-hidden="true">✨</div>
+                <div>
+                  <div class="rf-preview-placeholder__title">Your Plan Preview</div>
+                  <div class="rf-preview-placeholder__sub">Results will appear here after analysis</div>
+                </div>
+              </div>
+              <!-- Skeleton stat row -->
+              <div class="rf-preview-placeholder__stats">
+                <div class="rf-preview-placeholder__stat">
+                  <div class="rf-skel rf-skel--line"></div>
+                  <div class="rf-skel rf-skel--line-sm"></div>
+                </div>
+                <div class="rf-preview-placeholder__stat">
+                  <div class="rf-skel rf-skel--line"></div>
+                  <div class="rf-skel rf-skel--line-sm"></div>
+                </div>
+                <div class="rf-preview-placeholder__stat">
+                  <div class="rf-skel rf-skel--line"></div>
+                  <div class="rf-skel rf-skel--line-sm"></div>
+                </div>
+              </div>
+              <!-- Skeleton lines -->
+              <div class="rf-skel rf-skel--line"></div>
+              <div class="rf-skel rf-skel--line-sm"></div>
+              <div class="rf-skel rf-skel--block"></div>
+              <div class="rf-skel rf-skel--line"></div>
+              <div class="rf-skel rf-skel--line-sm"></div>
+              <p class="rf-preview-placeholder__hint">Upload a photo to get started</p>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+      <!-- FOOTER -->
+  <footer class="site-footer">
+    <div class="container footer__grid">
+      <div class="footer__brand-col">
+        <h2 class="footer__brand-text" data-i18n="footer_stay_connected">Stay Connected</h2>
+        <p class="footer__desc" data-i18n="footer_newsletter_desc">Join our newsletter for the latest updates and exclusive offers.</p>
+        <form class="footer__newsletter">
+          <input type="email" placeholder="Enter your email" class="footer__input" required data-i18n-placeholder="footer_email_ph">
+          <button type="submit" class="footer__submit-btn" aria-label="Subscribe">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+          </button>
+        </form>
+      </div>
+      <div class="footer__nav-col">
+        <h3 class="footer__title" data-i18n="footer_quick_links">Quick Links</h3>
+        <ul class="footer__links" role="list">
+          <li><a class="footer__link" href="./index.html" data-i18n="nav_home">Home</a></li>
+          <li><a class="footer__link" href="./about.html" data-i18n="footer_about">About Us</a></li>
+          <li><a class="footer__link" href="./services-marketplace.html" data-i18n="nav_services">Services</a></li>
+          <li><a class="footer__link" href="./contact.html" data-i18n="nav_contact">Contact</a></li>
+        </ul>
+      </div>
+      <div class="footer__nav-col">
+        <h3 class="footer__title" data-i18n="footer_contact_us">Contact Us</h3>
+        <address class="footer__address">
+          <p data-i18n="footer_city">Cairo, Egypt</p>
+
+          <p><span data-i18n="footer_phone_label">Phone:</span> +20 100 000 0000</p>
+          <p data-i18n-html="footer_email">Email: hello@servio.eg</p>
+        </address>
+      </div>
+      <div class="footer__nav-col">
+        <h3 class="footer__title" data-i18n="footer_follow_us">Follow Us</h3>
+        <div class="footer__socials">
+          <a href="#" class="social-link" aria-label="Facebook">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg>
+          </a>
+          <a href="#" class="social-link" aria-label="Twitter">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"></path></svg>
+          </a>
+          <a href="#" class="social-link" aria-label="Instagram">
+             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+          </a>
+          <a href="#" class="social-link" aria-label="LinkedIn">
+             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path><rect x="2" y="9" width="4" height="12"></rect><circle cx="4" cy="4" r="2"></circle></svg>
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="container footer__bottom-wrapper">
+      <div class="footer__bottom">
+        <p class="footer__fineprint">© <span id="year">2026</span> <span data-i18n="footer_rights">SERVIO. All rights reserved.</span></p>
+        <div class="footer__bottom-links">
+          <a href="#" class="footer__small-link" data-i18n="footer_privacy">Privacy Policy</a>
+          <a href="#" class="footer__small-link" data-i18n="footer_terms">Terms of Service</a>
+          <a href="#" class="footer__small-link" data-i18n="footer_cookies">Cookie Settings</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script type="module" src="../js/main.js"></script>
+  <script type="module" src="../js/html/ai-finisher.js"></script>
+    <!-- Render fullscreen lightbox — native <dialog>, Escape closes without triggering analysis cancel -->
+    <dialog class="rf-lightbox" id="render-lightbox" aria-label="Fullscreen room render">
+      <img id="render-lightbox-img" alt="AI room render fullscreen" />
+    </dialog>
+</body>
+</html>

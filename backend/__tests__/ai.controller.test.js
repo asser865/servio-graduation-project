@@ -66,7 +66,7 @@ describe('extractAreaKeywords', () => {
 
 const axios = require('axios');
 const User  = require('../src/modules/users/user.model');
-const { getServiceRecommendation } = require('../src/modules/ai/ai.controller');
+const { getServiceRecommendation, analyzeRoom } = require('../src/modules/ai/ai.controller');
 
 const buildQuery = (users) => ({
   select: jest.fn().mockReturnThis(),
@@ -83,7 +83,51 @@ const mockRes = () => {
 
 beforeEach(() => {
   process.env.AI_SERVICE_URL = 'http://localhost:5001';
+  delete process.env.AI_FINISHER_SERVICE_URL;
   jest.clearAllMocks();
+});
+
+describe('analyzeRoom - website AI Finisher routing', () => {
+  const roomRequest = () => ({
+    file: {
+      buffer: Buffer.from('room-image'),
+      originalname: 'room.jpg',
+      mimetype: 'image/jpeg',
+    },
+    body: {
+      length_m: '4',
+      width_m: '5',
+      height_m: '2.8',
+      budget_egp: '50000',
+      style: 'modern',
+      include_render: 'false',
+    },
+  });
+
+  test('prefers the isolated website AI Finisher service URL', async () => {
+    process.env.AI_FINISHER_SERVICE_URL = 'http://localhost:8003';
+    axios.post = jest.fn().mockResolvedValue({ data: { status: 'success' } });
+
+    await analyzeRoom(roomRequest(), mockRes());
+
+    expect(axios.post).toHaveBeenCalledWith(
+      'http://localhost:8003/ai/analyze-room',
+      expect.anything(),
+      expect.any(Object)
+    );
+  });
+
+  test('falls back to AI_SERVICE_URL for existing deployments', async () => {
+    axios.post = jest.fn().mockResolvedValue({ data: { status: 'success' } });
+
+    await analyzeRoom(roomRequest(), mockRes());
+
+    expect(axios.post).toHaveBeenCalledWith(
+      'http://localhost:5001/ai/analyze-room',
+      expect.anything(),
+      expect.any(Object)
+    );
+  });
 });
 
 describe('getServiceRecommendation — effectiveLocation', () => {

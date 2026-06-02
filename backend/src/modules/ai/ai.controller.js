@@ -1,8 +1,8 @@
 // ─── Purpose ──────────────────────────────────────────────────────────────────
 // AI controller acts as a gateway — it forwards requests to the Python AI
-// microservice and returns its response. Isolating AI calls here means the
-// AI_SERVICE_URL and retry/timeout logic is centralised, not scattered across
-// multiple controllers.
+// microservice and returns its response. Smart Match uses AI_SERVICE_URL.
+// Website room finishing uses AI_FINISHER_SERVICE_URL so its runtime can
+// evolve independently from both Smart Match and the mobile application.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const axios           = require('axios');
@@ -233,13 +233,14 @@ const analyzeRoom = async (req, res) => {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Room image is required.');
   }
 
-  const { length_m, width_m, height_m, budget_egp, style } = req.body;
+  const { length_m, width_m, height_m, budget_egp, style, include_render } = req.body;
 
   if (!length_m || !width_m || !height_m || !budget_egp) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'length_m, width_m, height_m, and budget_egp are required.');
   }
 
   try {
+    const aiFinisherServiceUrl = process.env.AI_FINISHER_SERVICE_URL || process.env.AI_SERVICE_URL;
     const form = new FormData();
     form.append('image', req.file.buffer, {
       filename: req.file.originalname,
@@ -250,9 +251,10 @@ const analyzeRoom = async (req, res) => {
     form.append('height_m',   height_m);
     form.append('budget_egp', budget_egp);
     form.append('style',      style || 'modern');
+    form.append('include_render', String(include_render === true || include_render === 'true'));
 
     const aiResponse = await axios.post(
-      `${process.env.AI_SERVICE_URL}/ai/analyze-room`,
+      `${aiFinisherServiceUrl}/ai/analyze-room`,
       form,
       {
         headers: form.getHeaders(),

@@ -27,6 +27,11 @@ test('accepts new status pending_admin_review', async () => {
   expect(b.status).toBe('pending_admin_review');
 });
 
+test('accepts refusal investigation status', async () => {
+  const b = await Booking.create({ ...baseFixture(), status: 'refusal_under_investigation' });
+  expect(b.status).toBe('refusal_under_investigation');
+});
+
 test('accepts new no-show / re-pool statuses', async () => {
   for (const s of ['cancelled_no_show', 'customer_no_show', 'worker_no_show', 're_pooling']) {
     const b = await Booking.create({ ...baseFixture(), status: s });

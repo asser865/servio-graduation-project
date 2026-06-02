@@ -42,6 +42,29 @@ describe('getWorkerDebtSummary', () => {
   });
 });
 
+describe('getAdminDebts', () => {
+  test('includes how paid debt was settled', async () => {
+    const worker = new mongoose.Types.ObjectId();
+    await CashDebt.create({
+      worker,
+      booking: new mongoose.Types.ObjectId(),
+      amount: 80,
+      paidAmount: 80,
+      remaining: 0,
+      status: 'paid',
+      paidAt: new Date(),
+      paidBy: 'manual_admin',
+      settlementMethod: 'instapay',
+    });
+
+    const result = await svc.getAdminDebts({ status: 'paid' });
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].settlementMethod).toBe('instapay');
+    expect(result.items[0].paidBy).toBe('manual_admin');
+  });
+});
+
 describe('settleByWallet', () => {
   test('debits wallet + pays oldest debts first', async () => {
     const worker = new mongoose.Types.ObjectId();

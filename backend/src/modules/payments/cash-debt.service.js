@@ -295,6 +295,8 @@ class CashDebtService {
         status: d.status,
         createdAt: d.createdAt,
         paidAt: d.paidAt,
+        paidBy: d.paidBy,
+        settlementMethod: d.settlementMethod,
       })),
       summary,
       pagination: {

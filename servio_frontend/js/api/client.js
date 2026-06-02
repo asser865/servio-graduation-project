@@ -53,10 +53,14 @@ async function request(method, path, body, opts = {}) {
     throw err;
   }
   
-  if (data && typeof data === 'object' && data.success !== undefined && data.data !== undefined) {
-    return data.data;
+  if (data && typeof data === 'object' && !Array.isArray(data) && 'data' in data) {
+    const hasEnvelopeMarker = 'success' in data || 'message' in data || 'meta' in data;
+    const onlyDataKey = Object.keys(data).length === 1;
+    if (hasEnvelopeMarker || onlyDataKey) {
+      return data.data;
+    }
   }
-  
+
   return data;
 }
 

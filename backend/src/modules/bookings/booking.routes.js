@@ -55,6 +55,9 @@ router.get('/worker', protect, authorize('worker'), bookingController.getWorkerB
 // GET /api/v1/bookings — admin views all bookings
 router.get('/', protect, authorize('admin'), bookingController.getAllBookings);
 
+// Admin exception queue for pending customer refusal responses.
+router.get('/admin/refusal-verifications', protect, authorize('admin'), bookingController.getRefusalsAwaitingResponse);
+
 // GET /api/v1/bookings/worker/:workerId/slots — get booked time slots for a worker on a date
 router.get('/worker/:workerId/slots', protect, bookingController.getWorkerBookedSlots);
 
@@ -102,6 +105,26 @@ router.post('/:id/complete',
   authorize('worker'),
   validate(completeValidation),
   bookingController.completeBooking
+);
+
+// POST /api/v1/bookings/:id/completion-outcome — worker submits completion outcome
+router.post('/:id/completion-outcome',
+  protect,
+  authorize('worker'),
+  bookingController.submitCompletionOutcome
+);
+
+// POST /api/v1/bookings/:id/customer-feedback — customer confirms or reports issue
+router.post('/:id/customer-feedback',
+  protect,
+  authorize('user'),
+  bookingController.submitCustomerFeedback
+);
+
+router.post('/:id/refusal-verification',
+  protect,
+  authorize('user'),
+  bookingController.respondToRefusalVerification
 );
 
 // POST /api/v1/bookings/:id/cancel — customer or worker cancels (Plan 3 Task 6)

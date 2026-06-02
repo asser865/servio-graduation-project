@@ -10,6 +10,13 @@
   <script src="../js/boot-init.js"></script>
   <link rel="stylesheet" href="../css/main.css" />
   <link rel="stylesheet" href="../css/pages/admin-dashboard.css" />
+  <link rel="stylesheet" href="../css/pages/admin-overview-futuristic.css" />
+  <link rel="stylesheet" href="../css/pages/admin-finance-console.css" />
+  <link rel="stylesheet" href="../css/components/photo-gallery.css" />
+  <link rel="stylesheet" href="../css/components/finance-drawer.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" />
 </head>
 <body>
 
@@ -17,7 +24,7 @@
 
   <header class="admin-header">
     <div class="admin-header__left">
-      <button class="admin-mobile-toggle" id="sidebarToggle" aria-label="Open menu" type="button">
+      <button class="admin-mobile-toggle" id="sidebarToggle" aria-label="Open menu" aria-expanded="false" type="button">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
           <line x1="3" y1="6"  x2="21" y2="6"/>
           <line x1="3" y1="12" x2="21" y2="12"/>
@@ -25,7 +32,7 @@
         </svg>
       </button>
       <a class="admin-header__brand" href="./index.html" aria-label="SERVIO Home" data-i18n-aria-label="topbar_brand_aria">
-        <img src="../assets/images/logo.svg" alt="SERVIO" width="32" height="32" />
+        <span class="brand__mark"><img src="../assets/images/logo.png" alt="SERVIO" /></span>
         <span>SERVIO</span>
       </a>
     </div>
@@ -52,6 +59,7 @@
           <li role="option" aria-selected="false">AR</li>
         </ul>
       </div>
+
       <button class="admin-header__theme-btn" type="button" data-theme-button aria-label="Toggle dark mode">
         <span class="theme-button__icon theme-button__icon--moon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
@@ -70,8 +78,7 @@
   </header>
 
   <div class="admin-layout" id="main">
-    <!-- Always-expanded 260px sidebar -->
-    <aside class="admin-sidebar">
+    <aside class="admin-sidebar" aria-label="Admin dashboard sidebar">
       <div class="admin-sidebar__profile">
         <div class="admin-sidebar__avatar">AD</div>
         <div class="admin-sidebar__profile-text">
@@ -79,79 +86,95 @@
           <div class="admin-sidebar__role" data-i18n="admin_role">Platform Administrator</div>
         </div>
       </div>
-      <nav class="admin-nav">
-        <button class="admin-nav__btn" data-tab="overview">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
-          <span data-i18n="admin_nav_overview">Overview</span>
-        </button>
-        <button class="admin-nav__btn" data-tab="users">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
-          <span data-i18n="admin_nav_users">Users</span>
-        </button>
-        <button class="admin-nav__btn" data-tab="technicians">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5z"/></svg>
-          <span data-i18n="admin_nav_technicians">Technicians</span>
-        </button>
-        <button class="admin-nav__btn" data-tab="bookings">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-1V1h-2zm3 18H5V8h14v11z"/></svg>
-          <span data-i18n="admin_nav_bookings">Bookings</span>
-        </button>
-        <button class="admin-nav__btn" data-tab="services">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l-5.5 9h11L12 2zm0 3.84L13.93 9H10.07L12 5.84zM5.5 12c-1.93 0-3.5 1.57-3.5 3.5S3.57 19 5.5 19s3.5-1.57 3.5-3.5S7.43 12 5.5 12zm0 5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM12 12c-1.93 0-3.5 1.57-3.5 3.5S10.07 19 12 19s3.5-1.57 3.5-3.5S13.93 12 12 12zm0 5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM18.5 12c-1.93 0-3.5 1.57-3.5 3.5s1.57 3.5 3.5 3.5 3.5-1.57 3.5-3.5-1.57-3.5-3.5-3.5zm0 5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
-          <span data-i18n="admin_nav_services">Services</span>
-        </button>
-        <button class="admin-nav__btn" data-tab="disputes">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
-          <span data-i18n="admin_nav_disputes">Disputes</span>
-        </button>
-        <button class="admin-nav__btn" data-tab="support">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
-          <span>Support <span id="adminSupportBadge" class="tab-badge" hidden>0</span></span>
-        </button>
-        <button class="admin-nav__btn" data-tab="finance">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7z"/><path d="M3 7l3-3h12l3 3"/><path d="M8 12h.01M12 12h4"/></svg>
-          <span><span data-i18n="admin_nav_finance">Finance</span> <span id="adminPaymentsBadge" class="tab-badge" hidden>0</span></span>
-        </button>
-        <button class="admin-nav__btn" data-tab="analytics">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
-          <span data-i18n="admin_nav_analytics">Analytics</span>
-        </button>
-        <button class="admin-nav__btn" data-tab="reports">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-          <span data-i18n="admin_nav_reports">Reports</span>
-        </button>
-        <button class="admin-nav__btn" data-tab="audit">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><circle cx="8" cy="17" r="1"/><line x1="10" y1="17" x2="16" y2="17"/></svg>
-          <span data-i18n="admin_nav_audit">Audit Log</span>
-        </button>
-        <button class="admin-nav__btn" data-tab="settings">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>
-          <span data-i18n="admin_nav_settings">Settings</span>
-        </button>
-
-        <div class="admin-nav__footer">
-          <div class="admin-nav__divider"></div>
-          <button class="admin-nav__btn admin-nav__btn--logout" id="adminLogout">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
-            </svg>
-            <span data-i18n="admin_logout">Logout</span>
+      <nav class="admin-nav" aria-label="Admin dashboard navigation">
+        <div class="admin-nav__group">
+          <span class="admin-nav__group-label" data-i18n="admin_nav_group_workspace">Workspace</span>
+          <button class="admin-nav__btn" type="button" data-tab="overview" aria-label="Overview" data-nav-label="Overview">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+            <span data-i18n="admin_nav_overview">Overview</span>
           </button>
         </div>
-
+        <div class="admin-nav__group">
+          <span class="admin-nav__group-label" data-i18n="admin_nav_group_management">Management</span>
+          <button class="admin-nav__btn" type="button" data-tab="users" aria-label="Users" data-nav-label="Users">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+            <span><span data-i18n="admin_nav_users">Users</span><span class="tab-badge" data-nav-badge="users" hidden>0</span></span>
+          </button>
+          <button class="admin-nav__btn" type="button" data-tab="technicians" aria-label="Technicians" data-nav-label="Technicians">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5z"/></svg>
+            <span><span data-i18n="admin_nav_technicians">Technicians</span><span class="tab-badge" data-nav-badge="technicians" hidden>0</span></span>
+          </button>
+          <button class="admin-nav__btn" type="button" data-tab="bookings" aria-label="Bookings" data-nav-label="Bookings">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-1V1h-2zm3 18H5V8h14v11z"/></svg>
+            <span><span data-i18n="admin_nav_bookings">Bookings</span><span class="tab-badge" data-nav-badge="bookings" hidden>0</span></span>
+          </button>
+          <button class="admin-nav__btn" type="button" data-tab="services" aria-label="Services" data-nav-label="Services">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l-5.5 9h11L12 2zm0 3.84L13.93 9H10.07L12 5.84zM5.5 12c-1.93 0-3.5 1.57-3.5 3.5S3.57 19 5.5 19s3.5-1.57 3.5-3.5S7.43 12 5.5 12zm0 5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM12 12c-1.93 0-3.5 1.57-3.5 3.5S10.07 19 12 19s3.5-1.57 3.5-3.5S13.93 12 12 12zm0 5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM18.5 12c-1.93 0-3.5 1.57-3.5 3.5s1.57 3.5 3.5 3.5 3.5-1.57 3.5-3.5-1.57-3.5-3.5-3.5zm0 5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
+            <span data-i18n="admin_nav_services">Services</span>
+          </button>
+        </div>
+        <div class="admin-nav__group">
+          <span class="admin-nav__group-label" data-i18n="admin_nav_group_operations">Operations</span>
+          <button class="admin-nav__btn" type="button" data-tab="disputes" aria-label="Disputes" data-nav-label="Disputes">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+            <span><span data-i18n="admin_nav_disputes">Disputes</span><span id="adminDisputesBadge" class="tab-badge" data-nav-badge="disputes" hidden>0</span></span>
+          </button>
+          <button class="admin-nav__btn" type="button" data-tab="support" aria-label="Support" data-nav-label="Support">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+            <span><span data-i18n="admin_nav_support">Support</span><span id="adminSupportBadge" class="tab-badge" data-nav-badge="support" hidden>0</span></span>
+          </button>
+        </div>
+        <div class="admin-nav__group">
+          <span class="admin-nav__group-label" data-i18n="admin_nav_group_insights">Insights</span>
+          <button class="admin-nav__btn" type="button" data-tab="finance" aria-label="Finance" data-nav-label="Finance">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h18v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7z"/><path d="M3 7l3-3h12l3 3"/><path d="M8 12h.01M12 12h4"/></svg>
+            <span><span data-i18n="admin_nav_finance">Finance</span><span id="adminPaymentsBadge" class="tab-badge" data-nav-badge="finance" hidden>0</span></span>
+          </button>
+          <button class="admin-nav__btn" type="button" data-tab="analytics" aria-label="Analytics" data-nav-label="Analytics">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
+            <span data-i18n="admin_nav_analytics">Analytics</span>
+          </button>
+          <button class="admin-nav__btn" type="button" data-tab="reports" aria-label="Reports" data-nav-label="Reports">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            <span data-i18n="admin_nav_reports">Reports</span>
+          </button>
+        </div>
+        <div class="admin-nav__group">
+          <span class="admin-nav__group-label" data-i18n="admin_nav_group_system">System</span>
+          <button class="admin-nav__btn" type="button" data-tab="audit" aria-label="Audit Log" data-nav-label="Audit Log">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><circle cx="8" cy="17" r="1"/><line x1="10" y1="17" x2="16" y2="17"/></svg>
+            <span data-i18n="admin_nav_audit">Audit Log</span>
+          </button>
+          <button class="admin-nav__btn" type="button" data-tab="settings" aria-label="Settings" data-nav-label="Settings">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>
+            <span data-i18n="admin_nav_settings">Settings</span>
+          </button>
+        </div>
       </nav>
+      <div class="admin-nav__footer">
+        <div class="admin-nav__divider"></div>
+        <button class="admin-nav__btn admin-nav__btn--logout" type="button" id="adminLogout" aria-label="Logout" data-nav-label="Logout">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+          <span data-i18n="admin_logout">Logout</span>
+        </button>
+      </div>
     </aside>
 
     <main class="admin-content">
 
 
       <!-- ── Panel: Overview ───────────────────── -->
-      <section class="admin-panel" data-panel="overview">
+      <section class="admin-panel admin-panel--futuristic" data-panel="overview">
 
         <!-- Row 1: heading + date + export -->
         <div class="admin-panel__header">
           <h2 data-i18n="admin_overview_title">Platform Overview</h2>
-          <span class="admin-panel__date" id="overviewDate">23 Mar 2026</span>
+          <div class="admin-panel__overview-meta">
+            <span class="admin-panel__date" id="overviewDate">—</span>
+            <button class="overview-refresh-btn" id="overviewRefreshBtn" type="button">Refresh</button>
+          </div>
         </div>
 
         <!-- Row 2: 4-card modern KPI stats -->
@@ -179,9 +202,12 @@
           </div>
 
           <!-- Revenue -->
-          <div class="admin-kpi-card">
+          <div class="admin-kpi-card" id="revenueKpiCard" style="cursor: pointer; position: relative; transition: transform 0.2s, box-shadow 0.2s;" title="Click to change period" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.05)';" onmouseout="this.style.transform=''; this.style.boxShadow='';">
             <div class="admin-kpi-card__main">
-              <span class="admin-kpi-card__label" data-i18n="admin_stat_revenue">Revenue This Month</span>
+              <span class="admin-kpi-card__label" style="display:flex; align-items:center; gap:4px;">
+                <span id="kpi-revenue-label" data-i18n="admin_stat_revenue">Revenue This Month</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.5;"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </span>
               <div class="admin-kpi-card__value" id="kpi-overview-revenue">— <small style="font-size:0.5em;">EGP</small></div>
             </div>
             <div class="admin-kpi-card__icon" style="background: var(--color-success-bg); color: var(--color-success);">
@@ -209,50 +235,21 @@
             <div class="overview-section__head">
               <div>
                 <h3 class="admin-section__title overview-section__title--no-mb" data-i18n="admin_revenue_trend">Revenue Trend</h3>
-                <p class="overview-section__subtitle" data-i18n="admin_revenue_subtitle">Daily revenue for the past 7 days</p>
+                <p class="overview-section__subtitle" id="overviewRevenuePeriodLabel">Daily revenue for the past 7 days</p>
               </div>
-              <div class="overview-chart-summary">
-                <div class="overview-chart-total" id="kpi-revenue-chart-total">— EGP</div>
-                <div class="overview-chart-vs" data-i18n="admin_revenue_vs_last_week">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" aria-hidden="true"><polyline points="18 15 12 9 6 15"/></svg>
-                  <span data-i18n="admin_revenue_pct_badge">+18.5% vs last week</span>
-                </div>
+              <div class="rev-period-toggles" id="overviewRevenuePeriodToggles" role="group" aria-label="Revenue period">
+                <button class="rev-period-btn is-active" type="button" data-days="7">1W</button>
+                <button class="rev-period-btn" type="button" data-days="30">1M</button>
+                <button class="rev-period-btn" type="button" data-days="90">3M</button>
+                <button class="rev-period-btn" type="button" data-days="365">Max</button>
               </div>
             </div>
+            <div class="rev-stats" id="overviewRevenueStats" aria-label="Revenue summary"></div>
             <div class="rev-chart-wrap">
-              <div class="rev-chart">
-                <div class="rev-chart__col">
-                  <span class="rev-chart__val-label">8,200</span>
-                  <div class="rev-chart__bar" style="--rh: 46.7%" data-i18n-tooltip="chart_tooltip_monday" data-i18n-v="8,200" data-tooltip="Monday · 8,200 EGP"></div>
-                </div>
-                <div class="rev-chart__col">
-                  <span class="rev-chart__val-label">11,400</span>
-                  <div class="rev-chart__bar" style="--rh: 65%" data-i18n-tooltip="chart_tooltip_tuesday" data-i18n-v="11,400" data-tooltip="Tuesday · 11,400 EGP"></div>
-                </div>
-                <div class="rev-chart__col">
-                  <span class="rev-chart__val-label">9,800</span>
-                  <div class="rev-chart__bar" style="--rh: 55.8%" data-i18n-tooltip="chart_tooltip_wednesday" data-i18n-v="9,800" data-tooltip="Wednesday · 9,800 EGP"></div>
-                </div>
-                <div class="rev-chart__col">
-                  <span class="rev-chart__val-label">14,200</span>
-                  <div class="rev-chart__bar" style="--rh: 80.9%" data-i18n-tooltip="chart_tooltip_thursday" data-i18n-v="14,200" data-tooltip="Thursday · 14,200 EGP"></div>
-                </div>
-                <div class="rev-chart__col">
-                  <span class="rev-chart__val-label">12,600</span>
-                  <div class="rev-chart__bar" style="--rh: 71.8%" data-i18n-tooltip="chart_tooltip_friday" data-i18n-v="12,600" data-tooltip="Friday · 12,600 EGP"></div>
-                </div>
-                <div class="rev-chart__col">
-                  <span class="rev-chart__val-label">15,800</span>
-                  <div class="rev-chart__bar" style="--rh: 90%" data-i18n-tooltip="chart_tooltip_saturday" data-i18n-v="15,800" data-tooltip="Saturday · 15,800 EGP"></div>
-                </div>
-                <div class="rev-chart__col">
-                  <span class="rev-chart__val-label">13,700</span>
-                  <div class="rev-chart__bar" style="--rh: 78%" data-i18n-tooltip="chart_tooltip_sunday" data-i18n-v="13,700" data-tooltip="Sunday · 13,700 EGP"></div>
-                </div>
+              <div class="rev-chart" id="overviewRevenueChart" aria-label="Revenue chart">
+                <div class="overview-inline-state">Loading revenue data...</div>
               </div>
-              <div class="rev-chart__days">
-                <span data-i18n="chart_mon">Mon</span><span data-i18n="chart_tue">Tue</span><span data-i18n="chart_wed">Wed</span><span data-i18n="chart_thu">Thu</span><span data-i18n="chart_fri">Fri</span><span data-i18n="chart_sat">Sat</span><span data-i18n="chart_sun">Sun</span>
-              </div>
+              <div class="rev-chart__days" id="overviewRevenueDays"></div>
             </div>
           </div>
 
@@ -266,12 +263,7 @@
             </div>
 
             <!-- Visual Segmented Bar -->
-            <div class="booking-visual-bar">
-              <div class="booking-visual-segment" style="width: 65%; background: #10b981;" data-tooltip="Completed: 65%"></div>
-              <div class="booking-visual-segment" style="width: 28%; background: #3b82f6;" data-tooltip="In Progress: 28%"></div>
-              <div class="booking-visual-segment" style="width: 10%; background: #f59e0b;" data-tooltip="Scheduled: 10%"></div>
-              <div class="booking-visual-segment" style="width: 2%;  background: #ef4444;" data-tooltip="Cancelled: 2%"></div>
-            </div>
+            <div class="booking-visual-bar" id="overviewBookingVisualBar"></div>
 
             <div class="booking-status-grid">
               <div class="booking-status-item">
@@ -302,6 +294,13 @@
                   <span class="booking-status-pct" id="bk-pct-cancelled">—</span>
                 </div>
               </div>
+              <div class="booking-status-item">
+                <div class="booking-status-item__header">
+                  <span class="booking-status-dot booking-status-dot--rose"></span>
+                  <span class="booking-status-label">Disputed</span>
+                  <span class="booking-status-pct" id="bk-pct-disputed">—</span>
+                </div>
+              </div>
             </div>
 
             <div class="booking-status-footer">
@@ -327,42 +326,8 @@
               <h3 class="admin-section__title overview-section__title--no-mb" data-i18n="admin_recent_activity">Recent Activity</h3>
               <button class="overview-viewall" type="button" data-goto-tab="bookings" data-i18n="admin_view_all">View All</button>
             </div>
-            <div class="activity-feed activity-feed--icons">
-              <div class="activity-item">
-                <div class="activity-icon activity-icon--green" aria-hidden="true">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>
-                </div>
-                <span class="activity-text"><span data-i18n="admin_activity_new_customer">New customer signup:</span> <strong>Hana Mostafa</strong></span>
-                <span class="activity-time" data-i18n="time_2min_ago">2 min ago</span>
-              </div>
-              <div class="activity-item">
-                <div class="activity-icon activity-icon--blue" aria-hidden="true">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                </div>
-                <span class="activity-text"><span data-i18n="admin_activity_booking">Booking</span> <strong>#S-2780</strong> <span data-i18n="admin_activity_completed_by">completed by</span> Hassan Ali</span>
-                <span class="activity-time" data-i18n="time_15min_ago">15 min ago</span>
-              </div>
-              <div class="activity-item">
-                <div class="activity-icon activity-icon--red" aria-hidden="true">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                </div>
-                <span class="activity-text"><span data-i18n="admin_activity_new_dispute">New dispute opened:</span> <strong>#S-2788</strong></span>
-                <span class="activity-time" data-i18n="time_1hr_ago">1 hr ago</span>
-              </div>
-              <div class="activity-item">
-                <div class="activity-icon activity-icon--amber" aria-hidden="true">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                </div>
-                <span class="activity-text"><span data-i18n="admin_activity_tech_pending">Technician pending review:</span> <strong>Layla Mansour</strong></span>
-                <span class="activity-time" data-i18n="time_3hr_ago">3 hr ago</span>
-              </div>
-              <div class="activity-item">
-                <div class="activity-icon activity-icon--blue" aria-hidden="true">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                </div>
-                <span class="activity-text"><span data-i18n="admin_activity_booking">Booking</span> <strong>#S-2847</strong> <span data-i18n="admin_activity_completed_by">completed by</span> Khaled Mohamed</span>
-                <span class="activity-time" data-i18n="time_5hr_ago">5 hr ago</span>
-              </div>
+            <div class="activity-feed activity-feed--icons" id="overviewActivityFeed">
+              <div class="overview-inline-state">Loading recent activity...</div>
             </div>
           </div>
 
@@ -370,72 +335,8 @@
           <div class="overview-section">
             <h3 class="admin-section__title overview-section__title--no-mb" data-i18n="admin_top_techs">Top Technicians</h3>
             <p class="overview-section__subtitle" data-i18n="admin_top_techs_subtitle">Best performers this month</p>
-            <div class="leaderboard">
-              <div class="leaderboard-row leaderboard-row--top1">
-                <div class="leaderboard-rank">1</div>
-                <div class="leaderboard-avatar">KM</div>
-                <div class="leaderboard-info">
-                  <div class="leaderboard-name">Khaled Mohamed</div>
-                  <div class="leaderboard-specialty" data-i18n="home_cat_plumbing">Plumbing</div>
-                </div>
-                <div class="leaderboard-rating">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="#f59e0b" aria-hidden="true"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                  4.9
-                </div>
-                <div class="leaderboard-jobs" data-i18n="admin_jobs_count" data-i18n-n="124">124 jobs</div>
-              </div>
-              <div class="leaderboard-row leaderboard-row--top2">
-                <div class="leaderboard-rank">2</div>
-                <div class="leaderboard-avatar">HA</div>
-                <div class="leaderboard-info">
-                  <div class="leaderboard-name">Hassan Ali</div>
-                  <div class="leaderboard-specialty" data-i18n="admin_skill_hvac_cleaning">HVAC and Cleaning</div>
-                </div>
-                <div class="leaderboard-rating">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="#f59e0b" aria-hidden="true"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                  4.8
-                </div>
-                <div class="leaderboard-jobs" data-i18n="admin_jobs_count" data-i18n-n="156">156 jobs</div>
-              </div>
-              <div class="leaderboard-row leaderboard-row--top3">
-                <div class="leaderboard-rank">3</div>
-                <div class="leaderboard-avatar">MI</div>
-                <div class="leaderboard-info">
-                  <div class="leaderboard-name">Mahmoud Ibrahim</div>
-                  <div class="leaderboard-specialty" data-i18n="home_cat_electrical">Electrical</div>
-                </div>
-                <div class="leaderboard-rating">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="#f59e0b" aria-hidden="true"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                  4.7
-                </div>
-                <div class="leaderboard-jobs" data-i18n="admin_jobs_count" data-i18n-n="89">89 jobs</div>
-              </div>
-              <div class="leaderboard-row">
-                <div class="leaderboard-rank">4</div>
-                <div class="leaderboard-avatar">YS</div>
-                <div class="leaderboard-info">
-                  <div class="leaderboard-name">Youssef Samir</div>
-                  <div class="leaderboard-specialty" data-i18n="home_cat_painting">Painting</div>
-                </div>
-                <div class="leaderboard-rating">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="#f59e0b" aria-hidden="true"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                  4.6
-                </div>
-                <div class="leaderboard-jobs" data-i18n="admin_jobs_count" data-i18n-n="67">67 jobs</div>
-              </div>
-              <div class="leaderboard-row">
-                <div class="leaderboard-rank">5</div>
-                <div class="leaderboard-avatar">AG</div>
-                <div class="leaderboard-info">
-                  <div class="leaderboard-name">Amr Gamal</div>
-                  <div class="leaderboard-specialty" data-i18n="home_cat_carpentry">Carpentry</div>
-                </div>
-                <div class="leaderboard-rating">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="#f59e0b" aria-hidden="true"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                  4.5
-                </div>
-                <div class="leaderboard-jobs" data-i18n="admin_jobs_count" data-i18n-n="43">43 jobs</div>
-              </div>
+            <div class="leaderboard" id="overviewTopTechnicians">
+              <div class="overview-inline-state">Loading technician rankings...</div>
             </div>
           </div>
 
@@ -1149,228 +1050,143 @@
 
       <!-- ── Panel: Finance (Payments + Cash Settlements unified) ── -->
       <section class="admin-panel fin-panel" data-panel="finance">
-        <div class="admin-panel__header fin-header">
-          <div class="fin-header__title">
-            <span class="fin-header__eyebrow" data-i18n="admin_finance_eyebrow">Financial operations</span>
-            <h2 data-i18n="admin_finance_title">Finance</h2>
-            <p class="fin-header__lede" data-i18n="admin_finance_lede">Online card escrow and offline cash settlements — one ledger.</p>
-          </div>
-          <div class="fin-header__meta">
-            <span class="fin-header__pulse" aria-hidden="true">
-              <span class="fin-header__dot"></span>
-              <span data-i18n="admin_finance_live">Live</span>
-            </span>
+        <div class="admin-panel__header">
+          <h2 data-i18n="admin_nav_finance">Finance Console</h2>
+          <div class="finance-console__live">
+            <span class="finance-console__pulse"></span>
+            <span>Live <small id="financeUpdatedAt" class="finance-console__updated"></small></span>
           </div>
         </div>
+        <p class="admin-panel__subtitle" style="margin: -1.5rem 0 1.5rem;">Track all money, approvals, and payouts in one place.</p>
 
-        <nav class="fin-tabs" role="tablist" aria-label="Finance sections">
-          <button class="fin-tab is-active" data-fin-tab="payments" role="tab" aria-selected="true">
-            <span class="fin-tab__icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 11h20M6 15h4"/></svg>
-            </span>
-            <span class="fin-tab__label" data-i18n="admin_finance_tab_payments">Payments</span>
-            <span class="fin-tab__hint" data-i18n="admin_finance_tab_payments_hint">Card escrow</span>
+        <div class="finance-console__kpis finance-console__kpis--hero" id="financeKpiStrip">
+          <!-- 3 hero KPI cards injected by JS -->
+        </div>
+
+        <nav class="finance-console__tabs" role="tablist" aria-label="Finance sections">
+          <button type="button" role="tab" class="finance-console__tab is-active" data-finance-tab="queue" aria-selected="true" id="financeTab-queue">
+            <span>Payment Queue</span><strong class="finance-console__tab-badge" id="financeTabBadge-queue">0</strong>
           </button>
-          <button class="fin-tab" data-fin-tab="settlements" role="tab" aria-selected="false">
-            <span class="fin-tab__icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-            </span>
-            <span class="fin-tab__label" data-i18n="admin_finance_tab_settlements">Cash Settlements</span>
-            <span class="fin-tab__hint" data-i18n="admin_finance_tab_settlements_hint">Worker debts</span>
+          <button type="button" role="tab" class="finance-console__tab" data-finance-tab="cash-debts" aria-selected="false" id="financeTab-cash-debts">
+            <span>Worker Debt</span><strong class="finance-console__tab-badge" id="financeTabBadge-cash-debts">0</strong>
+          </button>
+          <button type="button" role="tab" class="finance-console__tab" data-finance-tab="investigations" aria-selected="false" id="financeTab-investigations">
+            <span>Checks</span><strong class="finance-console__tab-badge" id="financeTabBadge-investigations">0</strong>
+          </button>
+          <button type="button" role="tab" class="finance-console__tab" data-finance-tab="recent-activity" aria-selected="false" id="financeTab-recent-activity">
+            <span>Activity</span>
           </button>
         </nav>
 
-        <!-- ── Inner: Cash Settlements ── -->
-        <div class="fin-section cs-panel" data-fin-section="settlements" hidden>
-        <div class="cs-header" style="margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--color-border);">
-          <div class="cs-header__title">
-            <h2 data-i18n="admin_settlements_title">Cash Settlements</h2>
-            <p class="cs-header__lede" data-i18n="admin_settlements_lede">Track outstanding worker debts, queue payouts, and audit settled cash flow.</p>
-          </div>
-          <span class="cs-header__pulse" aria-hidden="true">
-            <span class="cs-header__dot"></span>
-            <span data-i18n="admin_settlements_live">Live ledger</span>
-          </span>
-        </div>
-
-        <!-- KPI bento — asymmetric, distinct per metric -->
-        <div class="kpi-strip cs-kpis" id="settlementsKpis">
-          <div class="kpi cs-kpi cs-kpi--debt" data-key="outstandingDebt">
-            <span class="cs-kpi__glyph" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-            </span>
-            <span class="kpi__label cs-kpi__label" data-i18n="admin_settlements_outstanding">Outstanding</span>
-            <span class="kpi__value cs-kpi__value">—</span>
-            <span class="cs-kpi__foot" data-i18n="admin_settlements_outstanding_foot">Cash owed by workers</span>
-          </div>
-          <div class="kpi cs-kpi cs-kpi--blocked" data-key="blockedWorkers">
-            <span class="cs-kpi__glyph" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg>
-            </span>
-            <span class="kpi__label cs-kpi__label" data-i18n="admin_settlements_blocked">Blocked workers</span>
-            <span class="kpi__value cs-kpi__value">—</span>
-            <span class="cs-kpi__foot" data-i18n="admin_settlements_blocked_foot">Locked until paid</span>
-          </div>
-          <div class="kpi cs-kpi cs-kpi--queue" data-key="payoutQueue">
-            <span class="cs-kpi__glyph" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h13l-3-3M21 17H8l3 3"/></svg>
-            </span>
-            <span class="kpi__label cs-kpi__label" data-i18n="admin_settlements_queue">Payout queue</span>
-            <span class="kpi__value cs-kpi__value">—</span>
-            <span class="cs-kpi__foot" data-i18n="admin_settlements_queue_foot">Awaiting verification</span>
-          </div>
-          <div class="kpi cs-kpi cs-kpi--settled" data-key="settledToday">
-            <span class="cs-kpi__glyph" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6"/></svg>
-            </span>
-            <span class="kpi__label cs-kpi__label" data-i18n="admin_settlements_settled">Settled today</span>
-            <span class="kpi__value cs-kpi__value">—</span>
-            <span class="cs-kpi__foot" data-i18n="admin_settlements_settled_foot">Closed since 00:00</span>
-          </div>
-        </div>
-
-        <nav class="subtabs cs-subtabs" role="tablist">
-          <button class="subtab cs-subtab is-active" data-subtab="worker-debts" role="tab" aria-selected="true">
-            <span class="cs-subtab__label" data-i18n="admin_settlements_tab_debts">Worker Debts</span>
-          </button>
-          <button class="subtab cs-subtab" data-subtab="payout-requests" role="tab" aria-selected="false">
-            <span class="cs-subtab__label" data-i18n="admin_settlements_tab_payouts">Payout Requests</span>
-          </button>
-          <button class="subtab cs-subtab" data-subtab="history" role="tab" aria-selected="false">
-            <span class="cs-subtab__label" data-i18n="admin_settlements_tab_history">History</span>
-          </button>
-        </nav>
-
-        <div id="subWorkerDebts" class="subpanel cs-subpanel is-active">
-          <div class="cs-table-wrap">
-            <table class="bk-table cs-table" id="workerDebtsTable">
-              <thead><tr><th data-i18n="admin_settlements_col_worker">Worker</th><th class="right-align" data-i18n="admin_settlements_col_owed">Total owed</th><th data-i18n="admin_settlements_col_oldest">Oldest</th><th class="right-align" data-i18n="admin_settlements_col_count"># Debts</th><th data-i18n="admin_settlements_col_status">Status</th><th data-i18n="admin_settlements_col_blocked">Blocked</th><th></th></tr></thead>
-              <tbody id="workerDebtsTbody"><tr><td colspan="7" class="center-align cs-empty">Loading…</td></tr></tbody>
-            </table>
-          </div>
-        </div>
-        <div id="subPayoutRequests" class="subpanel cs-subpanel" hidden>
-          <div class="cs-table-wrap">
-            <table class="bk-table cs-table" id="payoutRequestsTable">
-              <thead><tr><th data-i18n="admin_settlements_col_worker">Worker</th><th data-i18n="admin_settlements_col_requested">Requested</th><th class="right-align" data-i18n="admin_settlements_col_amount">Amount</th><th data-i18n="admin_settlements_col_method">Method</th><th data-i18n="admin_settlements_col_status">Status</th><th></th></tr></thead>
-              <tbody id="payoutRequestsTbody"><tr><td colspan="6" class="center-align cs-empty">Loading…</td></tr></tbody>
-            </table>
-          </div>
-        </div>
-        <div id="subHistory" class="subpanel cs-subpanel" hidden>
-          <div class="cs-history-toolbar">
-            <button type="button" id="btnExportSettlementsCsv" class="btn-premium btn-premium--ghost cs-export-btn">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
-              <span data-i18n="admin_settlements_export_csv">Export CSV</span>
-            </button>
-          </div>
-          <div class="cs-table-wrap">
-            <table class="bk-table cs-table" id="historyTable">
-              <thead><tr><th data-i18n="admin_settlements_col_date">Date</th><th data-i18n="admin_settlements_col_worker">Worker</th><th data-i18n="admin_settlements_col_method">Method</th><th class="right-align" data-i18n="admin_settlements_col_amount">Amount</th><th data-i18n="admin_settlements_col_status">Status</th><th data-i18n="admin_settlements_col_verifier">Verifier</th></tr></thead>
-              <tbody id="historyTbody"><tr><td colspan="6" class="center-align cs-empty">Loading…</td></tr></tbody>
-            </table>
-          </div>
-        </div>
-
-        <aside class="drawer cs-drawer" id="settlementDrawer" hidden></aside>
-        </div><!-- /.fin-section[settlements] -->
-
-        <!-- ── Inner: Payments (card escrow) ── -->
-        <div class="fin-section fp-panel" data-fin-section="payments">
-          <div class="fp-header">
-            <div class="fp-header__title">
-              <span class="finance-command__label">Escrow operations</span>
-              <h2 data-i18n="admin.payments.title">Payment command center</h2>
-              <div class="finance-command__meta">
-                <span id="financeLastSync">Last sync --:--</span>
-                <span>48h release window</span>
-              </div>
-              <p class="fp-header__lede" data-i18n="admin_payments_lede">Card-paid bookings held in escrow — approve releases, refunds and disputes.</p>
+        <div class="finance-console__queue" data-finance-panel="queue" role="tabpanel" aria-labelledby="financeTab-queue">
+          <div class="finance-console__queue-head">
+            <div>
+              <h2>Payment Queue</h2>
+              <p class="finance-console__queue-sub">Card escrow releases and flagged payout approvals</p>
             </div>
+            <span class="finance-console__queue-count" id="financeQueueCount">0</span>
           </div>
 
-          <div class="kpi-strip fp-kpis" id="paymentsKpis">
-            <div class="kpi fp-kpi fp-kpi--held" data-key="heldTotal">
-              <span class="fp-kpi__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/></svg></span>
-              <span class="kpi__label fp-kpi__label" data-i18n="admin_payments_held">Held</span>
-              <span class="kpi__value fp-kpi__value">—</span>
+          <div class="finance-console__filters">
+            <div class="finance-console__filters-primary">
+              <input type="search" class="finance-console__search" id="financeSearch" placeholder="Search by booking ID, customer, or worker" aria-label="Search payment queue" />
+              <button type="button" class="finance-console__advanced-toggle" id="financeAdvancedFiltersToggle" aria-expanded="false">
+                Filters <span id="financeActiveFilterCount">0</span>
+              </button>
             </div>
-            <div class="kpi fp-kpi fp-kpi--review" data-key="pendingReviewCount">
-              <span class="fp-kpi__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
-              <span class="kpi__label fp-kpi__label" data-i18n="admin_payments_review">Pending review</span>
-              <span class="kpi__value fp-kpi__value">—</span>
-            </div>
-            <div class="kpi fp-kpi fp-kpi--released" data-key="releasedTodayTotal">
-              <span class="fp-kpi__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6"/></svg></span>
-              <span class="kpi__label fp-kpi__label" data-i18n="admin_payments_released">Released today</span>
-              <span class="kpi__value fp-kpi__value">—</span>
-            </div>
-            <div class="kpi fp-kpi fp-kpi--disputed" data-key="disputedCount">
-              <span class="fp-kpi__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.7 3.86a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span>
-              <span class="kpi__label fp-kpi__label" data-i18n="admin_payments_disputed">Disputed</span>
-              <span class="kpi__value fp-kpi__value">—</span>
-            </div>
-            <div class="kpi fp-kpi fp-kpi--refunds" data-key="refundsTodayCount">
-              <span class="fp-kpi__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></span>
-              <span class="kpi__label fp-kpi__label" data-i18n="admin_payments_refunds">Refunds today</span>
-              <span class="kpi__value fp-kpi__value">—</span>
-            </div>
-            <div class="kpi fp-kpi fp-kpi--avg" data-key="avgReleaseHours">
-              <span class="fp-kpi__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M2 12h4M12 22v-4M22 12h-4"/><circle cx="12" cy="12" r="5"/></svg></span>
-              <span class="kpi__label fp-kpi__label" data-i18n="admin_payments_avg">Avg release</span>
-              <span class="kpi__value fp-kpi__value">—</span>
-            </div>
-          </div>
-
-          <div class="fp-section">
-            <div class="fp-section__head">
-              <h3 class="fp-section__title" data-i18n="admin_payments_ledger">Transaction ledger</h3>
-              <div class="filters-bar fp-filters">
-                <select id="payStatusFilter">
-                  <option value="all">All</option>
-                  <option value="held">Held</option>
-                  <option value="released">Released</option>
-                  <option value="refunded">Refunded</option>
-                  <option value="partially_refunded">Partial refund</option>
-                  <option value="disputed">Disputed</option>
-                </select>
-                <input id="payCustomerFilter" placeholder="Customer search">
-                <input id="payWorkerFilter" placeholder="Worker search">
-                <input id="payFromDate" type="date">
-                <input id="payToDate" type="date">
-                <button id="payResetFilters" class="btn btn--ghost">Reset</button>
+            <div class="finance-console__filters-quick">
+              <div class="finance-console__filter-block">
+                <span class="finance-console__filter-label">Type</span>
+                <div class="finance-console__chip-group finance-console__chip-group--type" id="financeTypeChips">
+                  <button class="finance-console__chip is-active" data-type="all">All</button>
+                  <button class="finance-console__chip" data-type="card_release">Card Release</button>
+                  <button class="finance-console__chip" data-type="payout_verify">Payout Exception</button>
+                  <button class="finance-console__chip" data-type="refusal_verify">Cash Refusal</button>
+                </div>
               </div>
             </div>
-
-            <div class="fp-table-wrap">
-              <table class="admin-table fp-table finance-table finance-table--ledger" id="paymentsTable">
-                <thead>
-                  <tr><th>#</th><th>Date</th><th>Customer</th><th>Worker</th><th>Service</th><th>Amount</th><th>Fee</th><th>Status</th><th>Review state</th><th></th></tr>
-                </thead>
-                <tbody id="paymentsTbody"></tbody>
-              </table>
-            </div>
-            <div class="pagination" id="paymentsPagination"></div>
-          </div>
-
-          <aside class="drawer cs-drawer" id="paymentDrawer" hidden></aside>
-
-          <div class="fp-section">
-            <div class="fp-section__head">
-              <h3 class="fp-section__title" data-i18n="admin_payments_pending_approvals">Decision queue</h3>
-              <div class="admin-filter-row">
-                <select id="approvalMethodFilter">
-                  <option value="">All Methods</option>
-                  <option value="online">Online</option>
-                  <option value="cash">Cash</option>
-                </select>
+            <div class="finance-console__filters-advanced" id="financeAdvancedFilters" hidden>
+              <div class="finance-console__filter-block">
+                <span class="finance-console__filter-label">Payment method</span>
+                <div class="finance-console__chip-group" id="financeMethodChips">
+                  <button class="finance-console__chip is-active" data-method="all">All</button>
+                  <button class="finance-console__chip" data-method="cash">Cash</button>
+                  <button class="finance-console__chip" data-method="online">Card</button>
+                </div>
+              </div>
+              <div class="finance-console__filter-block">
+                <span class="finance-console__filter-label">Priority</span>
+                <div class="finance-console__chip-group" id="financePriorityChips">
+                  <button class="finance-console__chip is-active" data-priority="all">All</button>
+                  <button class="finance-console__chip finance-console__chip--critical" data-priority="critical">Critical</button>
+                  <button class="finance-console__chip finance-console__chip--high" data-priority="high">High</button>
+                  <button class="finance-console__chip finance-console__chip--medium" data-priority="medium">Medium</button>
+                  <button class="finance-console__chip finance-console__chip--low" data-priority="low">Low</button>
+                </div>
+              </div>
+              <div class="finance-console__filter-block">
+                <span class="finance-console__filter-label">Date range</span>
+                <div class="finance-console__date-range">
+                  <label><span>From</span><input type="date" id="financeDateFrom" /></label>
+                  <span aria-hidden="true">→</span>
+                  <label><span>To</span><input type="date" id="financeDateTo" /></label>
+                </div>
+              </div>
+              <div class="finance-console__filter-block">
+                <span class="finance-console__filter-label">Flag reason</span>
+                <div class="finance-console__chip-group" id="financeReasonChips">
+                  <button class="finance-console__chip is-active" data-reason="all">All reasons</button>
+                </div>
               </div>
             </div>
-            <div id="adminPendingApprovalsList" class="fp-list"><!-- populated by JS --></div>
           </div>
 
-        </div><!-- /.fin-section[payments] -->
+          <div class="finance-console__queue-table-wrap">
+            <table class="finance-console__table">
+              <thead>
+                <tr>
+                  <th class="finance-console__col-check" aria-label="Select"></th>
+                  <th class="finance-console__col-flag" data-finance-sort="priority" aria-sort="ascending"><button type="button">Flag<span class="finance-console__sort-arrow"></span></button></th>
+                  <th class="finance-console__cell-when" data-finance-sort="when"><button type="button">Date<span class="finance-console__sort-arrow"></span></button></th>
+                  <th class="finance-console__col-case">Case</th>
+                  <th>Parties</th>
+                  <th>Method</th>
+                  <th class="finance-console__col-num" data-finance-sort="amount"><button type="button">Amount<span class="finance-console__sort-arrow"></span></button></th>
+                  <th data-finance-sort="sla"><button type="button">Deadline<span class="finance-console__sort-arrow"></span></button></th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="financeQueueRows"></tbody>
+            </table>
+            <span class="finance-console__table-cue" aria-hidden="true">Scroll <b>→</b></span>
+          </div>
+        </div>
 
+        <section class="finance-console__panel" data-finance-panel="cash-debts" data-section="cash-debts" role="tabpanel" aria-labelledby="financeTab-cash-debts" hidden>
+          <header class="finance-console__panel-head">
+            <div>
+              <h2>Worker Debt by Person</h2>
+              <p>Track outstanding jobs, repayment route, recovery progress, and submitted payment proof.</p>
+            </div>
+            <span class="finance-console__section-count" id="cashDebtsSectionCount">0</span>
+          </header>
+          <div id="financeCashDebtsList"></div>
+        </section>
+
+        <section class="finance-console__panel" data-finance-panel="investigations" data-section="investigations" role="tabpanel" aria-labelledby="financeTab-investigations" hidden>
+          <header class="finance-console__panel-head">
+            <h2>Cancellation Checks</h2>
+            <span class="finance-console__section-count" id="investigationsSectionCount">0</span>
+          </header>
+          <div id="financeInvestigationsList"></div>
+        </section>
+
+        <section class="finance-console__panel" data-finance-panel="recent-activity" data-section="recent-activity" role="tabpanel" aria-labelledby="financeTab-recent-activity" hidden>
+          <header class="finance-console__panel-head">
+            <h2>Recent Activity</h2>
+          </header>
+          <div id="financeActivityFeed"></div>
+        </section>
       </section><!-- /.fin-panel -->
 
 

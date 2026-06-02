@@ -18,9 +18,10 @@ describe('paymentService earnings breakdown', () => {
     const user = id();
     const worker = id();
     const now = new Date();
-    const cashDate = new Date(now.getTime() - 2 * 86400000);
-    const cardDate = new Date(now.getTime() - 4 * 86400000);
-    const releaseDate = new Date(now.getTime() - 3 * 86400000);
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const cashDate = new Date(monthStart.getTime() + 3600000);
+    const cardDate = new Date(monthStart.getTime() + 2 * 3600000);
+    const releaseDate = new Date(monthStart.getTime() + 3 * 3600000);
 
     const cashBooking = await Booking.create({
       user,

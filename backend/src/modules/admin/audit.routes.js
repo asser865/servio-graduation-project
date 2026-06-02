@@ -1,10 +1,14 @@
 const { Router }          = require('express');
 const auditController     = require('./audit.controller');
 const settingsController  = require('./settings.controller');
+const overviewController  = require('./overview.controller');
 const { protect }         = require('../../middleware/auth.middleware');
 const { authorize }       = require('../../middleware/role.middleware');
 
 const router = Router();
+
+router.get('/overview', protect, authorize('admin'), overviewController.getOverview);
+router.get('/revenue', protect, authorize('admin'), overviewController.getRevenueHistory);
 
 // GET /api/v1/admin/audit — admin only: paginated, filterable audit log
 router.get('/audit', protect, authorize('admin'), auditController.getLogs);

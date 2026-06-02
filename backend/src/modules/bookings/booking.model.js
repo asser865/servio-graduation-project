@@ -11,8 +11,50 @@ const BOOKING_STATUSES = [
   'awaiting_customer_confirmation', 'pending_admin_review',
   'completed', 'cancelled', 'disputed',
   'cancelled_no_show', 'customer_no_show', 'worker_no_show', 're_pooling',
+  'payment_refused', 'refusal_under_investigation', 'incomplete_review', 'customer_disputed',
 ];
 const PAYMENT_METHODS = ['cash', 'card', 'online'];
+
+const COMPLETION_OUTCOME_VALUES = ['customer_paid', 'customer_refused_payment', 'could_not_complete'];
+const CUSTOMER_FEEDBACK_ACTIONS = ['confirmed', 'reported_issue', 'system_auto_confirmed'];
+const CUSTOMER_ISSUE_REASONS = [
+  'work_not_done',
+  'work_damaged_property',
+  'overcharged',
+  'tech_unprofessional',
+  'incomplete',
+  'tech_did_not_arrive',
+  'other',
+];
+
+const completionOutcomeSchema = new mongoose.Schema({
+  outcome: { type: String, enum: COMPLETION_OUTCOME_VALUES },
+  submittedAt: { type: Date },
+  beforePhotos: { type: [String], default: [] },
+  afterPhotos: { type: [String], default: [] },
+  workerNotes: { type: String, trim: true },
+  materialsUsed: { type: String, trim: true },
+  refusalReason: { type: String, trim: true },
+  couldNotCompleteReason: { type: String, trim: true },
+}, { _id: false });
+
+const customerFeedbackSchema = new mongoose.Schema({
+  action: { type: String, enum: CUSTOMER_FEEDBACK_ACTIONS },
+  issueReason: { type: String, enum: CUSTOMER_ISSUE_REASONS },
+  rating: { type: Number, min: 1, max: 5 },
+  notes: { type: String, trim: true },
+  evidenceImages: { type: [String], default: [] },
+  submittedAt: { type: Date },
+  confirmedVia: { type: String, enum: ['customer', 'system_auto'] },
+}, { _id: false });
+
+const riskFlagSchema = new mongoose.Schema({
+  code: { type: String, required: true, trim: true },
+  reason: { type: String, trim: true },
+  status: { type: String, enum: ['unresolved', 'resolved'], default: 'unresolved' },
+  createdAt: { type: Date, default: Date.now },
+  resolvedAt: { type: Date },
+}, { _id: false });
 
 const bookingSchema = new mongoose.Schema(
   {
@@ -278,6 +320,11 @@ const bookingSchema = new mongoose.Schema(
       type:  String,
       trim:  true,
     },
+    enhancedReviewReason: {
+      type: String,
+      enum: ['HIGH_VALUE', 'SAFEGUARD_BLOCK'],
+    },
+    riskFlags: { type: [riskFlagSchema], default: [] },
 
     completedAt: { type: Date },
     releasedAt: { type: Date },
@@ -290,6 +337,24 @@ const bookingSchema = new mongoose.Schema(
     completionNotes:  { type: String },
     completionPhotos: { type: [String], default: [] },
     confirmRemindersSent: { type: [Number], default: [] },
+
+    // ── Completion outcome (worker submits) ────────────────────────────────
+    completionOutcome: { type: completionOutcomeSchema, default: () => ({}) },
+
+    // ── Customer feedback (confirm or report issue) ────────────────────────
+    customerFeedback: { type: customerFeedbackSchema, default: () => ({}) },
+
+    // ── Refusal-of-payment verification flow ───────────────────────────────
+    refusalVerification: {
+      status: {
+        type: String,
+        enum: ['pending', 'customer_confirmed_refusal', 'customer_disputes_refusal'],
+        default: undefined,
+      },
+      notifiedAt: { type: Date },
+      respondedAt: { type: Date },
+      customerResponse: { type: String, trim: true },
+    },
   },
   { timestamps: true }
 );
@@ -318,3 +383,6 @@ bookingSchema.index({ status: 1, paymentMethod: 1, customerConfirmedAt: -1 });
 const Booking = mongoose.model('Booking', bookingSchema);
 
 module.exports = Booking;
+module.exports.COMPLETION_OUTCOME_VALUES = COMPLETION_OUTCOME_VALUES;
+module.exports.CUSTOMER_FEEDBACK_ACTIONS = CUSTOMER_FEEDBACK_ACTIONS;
+module.exports.CUSTOMER_ISSUE_REASONS = CUSTOMER_ISSUE_REASONS;

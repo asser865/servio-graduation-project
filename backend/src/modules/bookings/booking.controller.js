@@ -175,9 +175,52 @@ const completeBooking = async (req, res) => {
   return ApiResponse.success(res, StatusCodes.OK, 'Booking completed.', booking);
 };
 
+const completionOutcomeSvc = require('./completion-outcome.service');
+
+const submitCompletionOutcome = async (req, res) => {
+  const { id: bookingId } = req.params;
+  const workerId = req.user.id;
+  const booking = await completionOutcomeSvc.submit(bookingId, workerId, req.body);
+  logEvent({ req, type: 'booking', action: 'Completion outcome submitted', target: booking._id?.toString() });
+  return ApiResponse.success(res, StatusCodes.OK, 'Completion outcome submitted.', booking);
+};
+
+const customerFeedbackSvc = require('./customer-feedback.service');
+const refusalVerificationSvc = require('./refusal-verification.service');
+
+const submitCustomerFeedback = async (req, res) => {
+  const { id: bookingId } = req.params;
+  const userId = req.user.id;
+  const booking = await customerFeedbackSvc.submit(bookingId, userId, req.body);
+  logEvent({ req, type: 'booking', action: `Customer feedback ${req.body?.action}`, target: booking._id?.toString() });
+  return ApiResponse.success(res, StatusCodes.OK, 'Customer feedback submitted.', booking);
+};
+
+const respondToRefusalVerification = async (req, res) => {
+  const booking = await refusalVerificationSvc.respond(req.params.id, req.user.id, req.body);
+  logEvent({ req, type: 'booking', action: 'Customer responded to refusal verification', target: booking._id?.toString() });
+  return ApiResponse.success(res, StatusCodes.OK, 'Refusal verification response recorded.', booking);
+};
+
+const getRefusalsAwaitingResponse = async (_req, res) => {
+  const items = await Booking.find({
+    status: 'payment_refused',
+    'refusalVerification.status': 'pending',
+  })
+    .select('user worker service serviceCategory totalPrice completionOutcome refusalVerification status updatedAt')
+    .populate('user', 'name email')
+    .populate('worker', 'name email')
+    .populate('service', 'title');
+  return ApiResponse.success(res, StatusCodes.OK, 'Pending refusal verifications retrieved.', items);
+};
+
 module.exports = {
   create, getMyBookings, getWorkerBookings, updateStatus, reschedule,
   getAllBookings, getBookingById, getWorkerBookedSlots,
   cancelBooking, markCustomerNoShow, markWorkerNoShow,
   acceptBooking, startBooking, completeBooking,
+  submitCompletionOutcome,
+  submitCustomerFeedback,
+  respondToRefusalVerification,
+  getRefusalsAwaitingResponse,
 };

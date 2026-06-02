@@ -15,7 +15,7 @@ router.post('/hold/:bookingId', protect, authorize('user'), controller.holdPayme
 // Customer: confirm service complete → pending_admin_review
 router.post('/confirm/:bookingId', protect, authorize('user'), controller.confirmCompletion);
 
-// Admin: approve completion (release escrow or create cash debt)
+// Admin: approve completion for held card/online escrow only.
 router.post('/admin/approve/:bookingId', protect, authorize(...ADMINS), permission(PERMS.PAYMENTS_RELEASE), controller.adminApproveCompletion);
 
 router.patch(
@@ -37,6 +37,9 @@ router.get('/admin/cash-debts', protect, authorize('admin'), controller.getCashD
 // Admin: grouped cash debts (Plan 2 Task 11)
 router.get('/admin/cash-debts/grouped', protect, authorize('admin'), controller.adminListCashDebtsGrouped);
 router.get('/admin/cash-debts/by-worker/:workerId', protect, authorize('admin'), controller.adminListWorkerDebts);
+
+// Admin: send debt reminder notification to worker
+router.post('/admin/cash-debts/remind/:workerId', protect, authorize(...ADMINS), permission(PERMS.CASH_DEBTS_WRITE), controller.adminSendDebtReminder);
 
 // Admin: mark cash debt paid (full or partial)
 router.patch('/admin/cash-debts/:id/mark-paid', protect, authorize(...ADMINS), permission(PERMS.CASH_DEBTS_WRITE), controller.markCashDebtPaid);
@@ -81,6 +84,7 @@ router.get('/:id/receipt', protect, authorize('user', 'worker', 'admin'), contro
 
 // Read / existing
 router.get('/booking/:bookingId', protect, authorize('user', 'worker', 'admin'), controller.getMyPayment);
+router.get('/earnings/history', protect, authorize('worker'), controller.getWorkerEarningsHistory);
 router.get('/earnings', protect, authorize('worker'), controller.getWorkerEarnings);
 router.post('/refund/:paymentId', protect, authorize(...ADMINS), permission(PERMS.PAYMENTS_REFUND), controller.adminRefund);
 

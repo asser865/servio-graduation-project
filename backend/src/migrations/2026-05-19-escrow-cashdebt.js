@@ -49,7 +49,7 @@ async function up(db) {
           workerSuspensionDays: 7,
         },
         noShow: { customerNoShowFeePercent: 50 },
-        escrow: { autoConfirmHours: 72, reminderHours: [24, 48] },
+        escrow: { autoConfirmHours: 48, reminderHours: [24, 44] },
         vat: { rate: 0.14 },
       },
     },
