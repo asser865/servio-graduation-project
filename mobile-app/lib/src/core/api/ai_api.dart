@@ -177,6 +177,11 @@ class RecommendedWorker {
     this.totalReviews,
     this.locationLabel,
     this.categories = const <String>[],
+    this.matchScore,
+    this.hourlyRate,
+    this.yearsExperience,
+    this.completedJobs,
+    this.skills = const <String>[],
   });
 
   final String id;
@@ -189,6 +194,13 @@ class RecommendedWorker {
   final String? locationLabel;
   final List<String> categories;
 
+  /// Normalised 0–100 match score (when the AI service returns one).
+  final double? matchScore;
+  final double? hourlyRate;
+  final int? yearsExperience;
+  final int? completedJobs;
+  final List<String> skills;
+
   factory RecommendedWorker.fromJson(Map<String, dynamic> json) {
     final worker = json['worker'];
     final workerJson = worker is Map<String, dynamic> ? worker : json;
@@ -200,6 +212,13 @@ class RecommendedWorker {
     final rating = _firstNum(<dynamic>[
       workerJson['averageRating'],
       workerJson['rating'],
+    ]);
+    final normalizedScore = score > 0
+        ? (score <= 1 ? score * 100 : score).toDouble()
+        : null;
+    final rate = _firstNum(<dynamic>[
+      workerJson['hourlyRate'],
+      workerJson['rate'],
     ]);
     String scoreLabel;
     if (score > 0) {
@@ -231,6 +250,14 @@ class RecommendedWorker {
       categories: (workerJson['categories'] is List)
           ? List<String>.from(
               (workerJson['categories'] as List).map((e) => e.toString()))
+          : <String>[],
+      matchScore: normalizedScore,
+      hourlyRate: rate > 0 ? rate.toDouble() : null,
+      yearsExperience: (workerJson['yearsExperience'] as num?)?.toInt(),
+      completedJobs: (workerJson['completedJobs'] as num?)?.toInt(),
+      skills: (workerJson['skills'] is List)
+          ? List<String>.from(
+              (workerJson['skills'] as List).map((e) => e.toString()))
           : <String>[],
     );
   }

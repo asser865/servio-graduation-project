@@ -20,6 +20,14 @@ IconData _iconForKey(String key) => switch (key) {
       'temp' => Icons.ac_unit_rounded,
       'wrench' => Icons.handyman_rounded,
       'paint' => Icons.format_paint_rounded,
+      'appliance' => Icons.kitchen_rounded,
+      'install' => Icons.build_rounded,
+      'floor' => Icons.grid_view_rounded,
+      'clean' => Icons.cleaning_services_rounded,
+      'pest' => Icons.pest_control_rounded,
+      'roof' => Icons.roofing_rounded,
+      'reno' => Icons.home_repair_service_rounded,
+      'garden' => Icons.grass_rounded,
       _ => Icons.water_drop_rounded,
     };
 
@@ -47,9 +55,13 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
   }
 
   ServiceModel get _service {
-    if (widget.serviceId == null) return kDemoServices.first;
+    // Match by normalized category so Mongo-ID service IDs and aliases
+    // (e.g. backend 'hvac' ↔ demo 'ac-maintenance') resolve correctly.
+    final category =
+        normalizeServiceCategory(_backendService?.category ?? widget.serviceId);
+    if (category.isEmpty) return kDemoServices.first;
     return kDemoServices.firstWhere(
-      (ServiceModel s) => s.id == widget.serviceId,
+      (ServiceModel s) => normalizeServiceCategory(s.id) == category,
       orElse: () => kDemoServices.first,
     );
   }
