@@ -64,7 +64,7 @@ async function seed() {
       verificationStatus: 'approved',
       verificationSubmittedAt: new Date(),
       verificationReviewedAt:  new Date(),
-      services:           services.map(s => s._id),
+      services:           services.map(s => ({ serviceId: s._id, startsFrom: s.basePrice })),
       categories:         tech.categories,
       bio:                tech.bio,
       hourlyRate:         tech.hourlyRate,

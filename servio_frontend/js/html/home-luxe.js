@@ -157,21 +157,17 @@
         const ry = (px - 0.5) * MAX_DEG * 2;            // tilt around Y by X
         const rx = -(py - 0.5) * MAX_DEG * 2;           // tilt around X by Y
 
+        // Tilt disabled — keep only cursor sheen (no 3D bend).
+        void rx; void ry;
         if (rafId) cancelAnimationFrame(rafId);
         rafId = requestAnimationFrame(() => {
-          card.style.setProperty('--luxe-rx', rx.toFixed(2) + 'deg');
-          card.style.setProperty('--luxe-ry', ry.toFixed(2) + 'deg');
           card.style.setProperty('--luxe-mx', (px * 100).toFixed(1) + '%');
           card.style.setProperty('--luxe-my', (py * 100).toFixed(1) + '%');
-          card.classList.add('is-luxe-tilted');
         });
       };
 
       const onLeave = () => {
         if (rafId) cancelAnimationFrame(rafId);
-        card.style.setProperty('--luxe-rx', '0deg');
-        card.style.setProperty('--luxe-ry', '0deg');
-        card.classList.remove('is-luxe-tilted');
       };
 
       card.addEventListener('mousemove', onMove);

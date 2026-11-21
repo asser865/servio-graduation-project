@@ -3,6 +3,7 @@
    ═══════════════════════════════════════════════════════════ */
 import { revealAll } from '../components/scroll-reveal.js';
 import { showToast } from '../components/toast.js';
+import { confirmDialog, promptDialog, alertDialog } from '../components/confirm-dialog.js';
 import { skCardGrid, skList, skStatGrid, skTableRows } from '../components/skeleton.js';
 import { getInitials } from '../utils/string.js';
 import { getMe, updateMe, updatePassword, updateEmail, deleteMe, updateAvailability, toggleAvailableNow, toggleBlockedDate } from '../api/users.js';
@@ -2434,12 +2435,24 @@ function wireArrivalFlows(container) {
       }
 
       if (action === 'customer-no-show') {
-        const note = window.prompt('Describe what happened (min 5 chars):', '');
+        const note = await promptDialog({
+          title: 'Customer no-show',
+          body: 'Describe what happened (minimum 5 characters).',
+          label: 'What happened',
+          placeholder: 'e.g. Customer was not at the address and did not answer calls…',
+          confirmLabel: 'Continue',
+        });
         if (!note || note.trim().length < 5) {
-          showToast('Please describe what happened (5+ chars).', 'error');
+          if (note !== null) showToast('Please describe what happened (5+ chars).', 'error');
           return;
         }
-        if (!window.confirm('Mark customer as no-show? You will receive a partial fee; the customer is refunded the remainder.')) return;
+        const okNoShow = await confirmDialog({
+          title: 'Mark customer as no-show?',
+          body: 'You will receive a partial fee; the customer is refunded the remainder.',
+          confirmLabel: 'Mark no-show',
+          tone: 'danger',
+        });
+        if (!okNoShow) return;
         btn.disabled = true;
         try {
           const { markCustomerNoShow } = await import('../api/bookings.js');
@@ -2562,7 +2575,7 @@ function populateOverviewIncoming(pendingBookings) {
   }
 
   container.innerHTML = preview.map(b => {
-    const service = b.service?.title || b.service?.category || 'Service';
+    const service = b.serviceName || b.service?.title || b.service?.category || 'Service';
     const customer = b.user?.name || '—';
     const address = b.address || '—';
     const price = b.totalPrice != null ? `~EGP ${Number(b.totalPrice).toLocaleString('en-US')}` : '—';
@@ -2609,7 +2622,7 @@ function populateOverviewSchedule(bookings) {
     const d = new Date(b.scheduledDate);
     const day = String(d.getDate()).padStart(2, '0');
     const month = MONTHS[d.getMonth()];
-    const service = b.service?.title || b.service?.category || 'Service';
+    const service = b.serviceName || b.service?.title || b.service?.category || 'Service';
     const time = b.scheduledTime || '—';
     const loc = b.address ? b.address.split(',')[0] : '—';
     return `
@@ -2723,7 +2736,7 @@ function renderCanonicalEarningsPanel({
         shortBookingId: String(booking._id || '').slice(-6).toUpperCase(),
         paymentMethod: booking.paymentMethod || (isCash ? 'cash' : 'online'),
         customerName: booking.user?.name || '',
-        serviceName: booking.service?.title || booking.service?.category || booking.serviceName || 'Service',
+        serviceName: booking.serviceName || booking.service?.title || booking.service?.category || 'Service',
         gross: snapshot.gross,
         fee: snapshot.fee,
         displayAmount: snapshot.net,
@@ -3407,7 +3420,7 @@ function populateEarningsLegacy(allBookings, completed, monthEarnings, lastMonth
         </div>`;
     } else {
       recentList.innerHTML = recentCompleted.map(b => {
-        const service = b.service?.title || b.service?.category || 'Service';
+        const service = b.serviceName || b.service?.title || b.service?.category || 'Service';
         const dateStr = b.scheduledDate
           ? new Date(b.scheduledDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
           : '—';
@@ -4157,9 +4170,15 @@ function initAccountTab() {
   document.getElementById('btn-export-data')?.addEventListener('click', () => {
     showToast(_t('toast_export_requested') || 'Data export requested. You will receive an email shortly.', 'success');
   });
-  document.getElementById('btn-deactivate-account')?.addEventListener('click', () => {
+  document.getElementById('btn-deactivate-account')?.addEventListener('click', async () => {
     const msg = _t('confirm_deactivate') || 'Deactivate your account? You can log back in to reactivate.';
-    if (confirm(msg)) showToast(_t('toast_account_deactivated') || 'Account deactivated.', 'info');
+    const okDeactivate = await confirmDialog({
+      title: 'Deactivate account?',
+      body: msg,
+      confirmLabel: 'Deactivate',
+      tone: 'danger',
+    });
+    if (okDeactivate) showToast(_t('toast_account_deactivated') || 'Account deactivated.', 'info');
   });
 }
 
@@ -4873,9 +4892,15 @@ function initPhase2() {
 
   // My Proposals: Withdraw
   document.querySelectorAll('[data-withdraw-proposal]').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const msg = typeof window.t === 'function' ? window.t('confirm_withdraw') : 'Withdraw this proposal?';
-      if (confirm(msg)) {
+      const okWithdraw = await confirmDialog({
+        title: 'Withdraw proposal?',
+        body: msg,
+        confirmLabel: 'Withdraw',
+        tone: 'danger',
+      });
+      if (okWithdraw) {
         btn.closest('.my-proposal-card').remove();
         showToast(typeof window.t === 'function' ? window.t('toast_request_withdrawn') : 'Proposal withdrawn', 'info');
       }
@@ -4963,7 +4988,7 @@ function initPhase2() {
         renderMyDebtsV2();
       },
       onError: (msg) => {
-        try { showToast(msg, 'error'); } catch (_) { alert(msg); }
+        try { showToast(msg, 'error'); } catch (_) { alertDialog({ title: 'Error', body: String(msg), tone: 'danger' }); }
       },
     });
   };
@@ -5075,16 +5100,29 @@ const CATEGORY_ICONS = {
   other: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
 };
 
+// worker.services entries are [{serviceId, startsFrom}] subdocs where serviceId may
+// arrive either as a populated object ({_id,...}) or as a raw id string — unwrap
+// ._id first (see js/html/booking.js resolveSubServiceId for the same fix).
+function resolveWorkerSubServiceId(sub) {
+  const raw = sub?.serviceId?._id || sub?.serviceId || sub?._id || sub;
+  return (raw || '').toString();
+}
+
 async function initServicesCatalog() {
   const catalog = document.getElementById('services-catalog');
   const saveBtn = document.getElementById('btn-save-skills');
   const saveMsg = document.getElementById('skills-save-msg');
   if (!catalog) return;
 
+  const _t = k => (typeof window.t === 'function' ? window.t(k) : k);
+
   let allServices = [];
   let selectedIds = new Set();
   let verifiedCats = [];
   let pendingCats = [];
+  let workerServices = [];
+  // serviceId -> current startsFrom value (persisted or user-edited)
+  const startsFromById = new Map();
 
   try {
     const [svcRes, meRes] = await Promise.all([
@@ -5096,8 +5134,13 @@ async function initServicesCatalog() {
     verifiedCats = me.categories || [];
     pendingCats = me.pendingCategories || [];
 
-    const workerServices = me.services || [];
-    workerServices.forEach(s => selectedIds.add((s._id || s).toString()));
+    workerServices = me.services || [];
+    workerServices.forEach(s => {
+      const id = resolveWorkerSubServiceId(s);
+      if (!id) return;
+      selectedIds.add(id);
+      if (s.startsFrom != null && s.startsFrom !== '') startsFromById.set(id, Number(s.startsFrom));
+    });
 
     const skills = me.skills || [];
     const certEl = document.getElementById('s-certifications');
@@ -5158,7 +5201,67 @@ async function initServicesCatalog() {
     }).join('')}</div>
       </div>
     </div>`;
-  }).join('')}</div>`;
+  }).join('')}</div>
+  <div class="svc-price-section" id="svc-price-section">
+    <h3 class="settings-section__subheading" data-i18n="tech_svc_price_title">${_t('tech_svc_price_title') || 'Starts-From Pricing'}</h3>
+    <p class="settings-section__desc" data-i18n="tech_svc_price_desc">${_t('tech_svc_price_desc') || 'Set the starting price you charge for each service you offer.'}</p>
+    <div class="svc-price-rows" id="svc-price-rows"></div>
+  </div>`;
+
+  // ── Per-service "Starts From" pricing rows (Task 21) ──────────────────
+  // Renders one row per currently-checked service, prefilled with the
+  // worker's persisted startsFrom (startsFromById) when available, falling
+  // back to the service's basePrice. Shows a non-blocking warning when the
+  // value is below the service's seedRange.min — saving is never blocked.
+  function renderPriceRows() {
+    const wrap = document.getElementById('svc-price-rows');
+    if (!wrap) return;
+    const checkedIds = [...catalog.querySelectorAll('.svc-checkbox:checked')].map(cb => cb.value);
+    if (!checkedIds.length) {
+      wrap.innerHTML = `<p class="svc-price-empty" data-i18n="tech_svc_price_empty">${_t('tech_svc_price_empty') || 'Select services above to set your starting prices.'}</p>`;
+      return;
+    }
+    wrap.innerHTML = checkedIds.map(id => {
+      const svc = allServices.find(s => (s._id || s.id || '').toString() === id);
+      if (!svc) return '';
+      const seedMin = Number(svc.seedRange?.min) || 0;
+      const current = startsFromById.has(id) ? startsFromById.get(id) : (seedMin || svc.basePrice || '');
+      const belowBand = seedMin > 0 && Number(current) > 0 && Number(current) < seedMin;
+      return `<div class="svc-price-row" data-service-id="${id}">
+        <span class="svc-price-row__name">${svc.title}</span>
+        <span class="svc-price-row__field">
+          <input type="number" class="svc-price-row__input" data-starts-from-input value="${current !== '' ? current : ''}" min="0" step="1" placeholder="e.g. ${seedMin || svc.basePrice || 200}" />
+          <span class="svc-price-row__unit" data-i18n="tech_svc_price_unit">${_t('tech_svc_price_unit') || 'EGP'}</span>
+        </span>
+        ${belowBand ? `<span class="svc-price-row__warning" data-band-warning>${_t('tech_svc_price_below_band') || '⚠ below typical market range'}</span>` : ''}
+      </div>`;
+    }).join('');
+
+    wrap.querySelectorAll('.svc-price-row').forEach(row => {
+      const id = row.dataset.serviceId;
+      const input = row.querySelector('[data-starts-from-input]');
+      const svc = allServices.find(s => (s._id || s.id || '').toString() === id);
+      const seedMin = Number(svc?.seedRange?.min) || 0;
+      input?.addEventListener('input', () => {
+        const val = Number(input.value);
+        if (input.value !== '') startsFromById.set(id, val);
+        else startsFromById.delete(id);
+        let warnEl = row.querySelector('[data-band-warning]');
+        const shouldWarn = seedMin > 0 && val > 0 && val < seedMin;
+        if (shouldWarn && !warnEl) {
+          warnEl = document.createElement('span');
+          warnEl.className = 'svc-price-row__warning';
+          warnEl.setAttribute('data-band-warning', '');
+          warnEl.textContent = _t('tech_svc_price_below_band') || '⚠ below typical market range';
+          row.appendChild(warnEl);
+        } else if (!shouldWarn && warnEl) {
+          warnEl.remove();
+        }
+      });
+    });
+  }
+
+  renderPriceRows();
 
   catalog.querySelectorAll('.svc-acc-toggle').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -5178,6 +5281,7 @@ async function initServicesCatalog() {
       const countEl = item.querySelector('.svc-sel-count');
       const n = item.querySelectorAll('.svc-checkbox:checked').length;
       if (countEl) { countEl.textContent = n + ' selected'; countEl.hidden = n === 0; }
+      renderPriceRows();
     });
   });
 
@@ -5187,8 +5291,19 @@ async function initServicesCatalog() {
     const certEl = document.getElementById('s-certifications');
     const skills = certEl ? certEl.value.trim().split('\n').map(s => s.trim()).filter(Boolean) : [];
 
+    // Per-service startsFrom payload (Task 21) — same [{serviceId, startsFrom}]
+    // shape the worker-update endpoint already accepts (Task 16). Reads live
+    // input values first (covers rows the user just edited but didn't blur),
+    // falling back to the tracked map for any other checked service.
+    const servicesPayload = checkedIds.map(id => {
+      const row = catalog.querySelector(`.svc-price-row[data-service-id="${id}"] [data-starts-from-input]`);
+      const liveVal = row && row.value !== '' ? Number(row.value) : null;
+      const startsFrom = liveVal != null ? liveVal : startsFromById.get(id);
+      return (startsFrom != null && startsFrom > 0) ? { serviceId: id, startsFrom } : { serviceId: id };
+    });
+
     try {
-      await updateMe({ services: checkedIds, skills });
+      await updateMe({ services: servicesPayload, skills });
       const newCats = checkedCats.filter(c => !verifiedCats.includes(c));
       if (newCats.length) {
         const labels = newCats.map(c => CATEGORY_LABELS[c] || c).join(', ');
@@ -5611,7 +5726,7 @@ function getCustomerName(d) {
 }
 
 function getServiceName(d) {
-  return d?.booking?.service?.title || d?.booking?.serviceCategory || 'Service';
+  return d?.booking?.serviceName || d?.booking?.service?.title || d?.booking?.serviceCategory || 'Service';
 }
 
 function renderTechDisputeCard(d) {
@@ -6337,7 +6452,7 @@ const WALLET_HISTORY_CONFIG = {
 };
 
 function _walletHistoryDate(value) {
-  if (!value) return 'â€”';
+  if (!value) return '—';
   return new Date(value).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
@@ -6352,7 +6467,7 @@ function _walletHistoryStatusLabel(status) {
     released: 'Released',
     reversed: 'Reversed',
   };
-  return labels[status] || String(status || 'â€”').replace(/_/g, ' ');
+  return labels[status] || String(status || '—').replace(/_/g, ' ');
 }
 
 function _walletHistoryStatus(status) {
@@ -6385,7 +6500,7 @@ function _walletHistoryMethod(method) {
 
 function _walletHistoryJob(item) {
   const id = escapeHtml(String(item.bookingId || '').slice(-6).toUpperCase());
-  return `<div class="wallet-history__job"><strong>${escapeHtml(item.job || 'Service job')}</strong><span>#${id || 'â€”'}</span></div>`;
+  return `<div class="wallet-history__job"><strong>${escapeHtml(item.job || 'Service job')}</strong><span>#${id || '—'}</span></div>`;
 }
 
 function _renderWalletHistoryHead() {
@@ -6663,17 +6778,27 @@ function _wireWalletHistory() {
 }
 
 function _wirePendingReleaseHelp() {
-  const button = document.querySelector('.money-card__info[data-tooltip]');
-  if (!button) return;
-  button.addEventListener('click', event => {
-    event.stopPropagation();
-    const open = !button.classList.contains('is-open');
-    button.classList.toggle('is-open', open);
-    button.setAttribute('aria-expanded', String(open));
+  const buttons = document.querySelectorAll('.money-card__info[data-tooltip]');
+  if (!buttons.length) return;
+  buttons.forEach(button => {
+    button.addEventListener('click', event => {
+      event.stopPropagation();
+      const open = !button.classList.contains('is-open');
+      buttons.forEach(other => {
+        if (other !== button) {
+          other.classList.remove('is-open');
+          other.setAttribute('aria-expanded', 'false');
+        }
+      });
+      button.classList.toggle('is-open', open);
+      button.setAttribute('aria-expanded', String(open));
+    });
   });
   document.addEventListener('click', () => {
-    button.classList.remove('is-open');
-    button.setAttribute('aria-expanded', 'false');
+    buttons.forEach(button => {
+      button.classList.remove('is-open');
+      button.setAttribute('aria-expanded', 'false');
+    });
   });
 }
 
@@ -6808,7 +6933,10 @@ function _wireTileDeepLinks() {
     const goDisputes = () => {
       document.querySelector('[data-tab="disputes"]')?.click();
     };
-    heldTile.addEventListener('click', goDisputes);
+    heldTile.addEventListener('click', (e) => {
+      if (e.target.closest('.money-card__info, button, a')) return;
+      goDisputes();
+    });
     heldTile.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goDisputes(); }
     });

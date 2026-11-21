@@ -68,6 +68,18 @@ const serviceSchema = new mongoose.Schema(
       required: [true, 'Price unit is required'],
     },
 
+    serviceType: {
+      type:    String,
+      enum:    ['immediate', 'inspection'],
+      default: 'immediate',
+    },
+    seedRange: {
+      min: { type: Number, default: 0, min: 0 },
+      max: { type: Number, default: 0, min: 0 },
+    },
+    // Type B inspection fee AND Type A callout fee on 'customer_declined_work' outcome
+    inspectionFee: { type: Number, default: 0, min: 0 },
+
     images: {
       type: [String],
       default: [],

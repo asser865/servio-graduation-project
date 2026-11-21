@@ -1,4 +1,5 @@
 import { getServices } from '../api/services.js';
+import { getWorkers } from '../api/users.js';
 
 // ── 6 main service categories shown on the homepage ───────────────────────
 const HOME_CATEGORIES = [
@@ -80,6 +81,81 @@ function loadServicesGrid() {
   });
 
   if (typeof window.initScrollReveal === 'function') window.initScrollReveal();
+}
+
+// ── Elite Network — real technicians from backend ─────────────────────────
+const ELITE_STAR_SVG = `<svg viewBox="0 0 24 24" width="16" height="16" fill="#F59E0B" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>`;
+const ELITE_PIN_SVG = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3"></circle></svg>`;
+const ELITE_CHECK_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+
+// category → role label (en/ar), used when a worker has no explicit title
+const ELITE_ROLES = {
+  plumbing:   { en: 'Master Plumber',          ar: 'سباك محترف' },
+  electrical: { en: 'Licensed Electrician',    ar: 'كهربائي مرخص' },
+  hvac:       { en: 'HVAC Specialist',         ar: 'متخصص تكييف' },
+  cleaning:   { en: 'Cleaning Specialist',     ar: 'متخصص تنظيف' },
+  painting:   { en: 'Professional Painter',    ar: 'دهان محترف' },
+  carpentry:  { en: 'Master Carpenter',        ar: 'نجار محترف' },
+};
+
+function eliteEscape(s) {
+  return (s == null ? '' : String(s))
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function buildEliteCard(w, i) {
+  const isAr = (window.__lang || document.documentElement.lang || 'en').toLowerCase().startsWith('ar');
+  const id = encodeURIComponent(w._id || '');
+  const name = eliteEscape(w.name || 'Technician');
+  const cat = (Array.isArray(w.categories) && w.categories[0]) ? String(w.categories[0]).toLowerCase() : '';
+  const roleMap = ELITE_ROLES[cat];
+  const role = eliteEscape(
+    roleMap ? (isAr ? roleMap.ar : roleMap.en)
+            : (cat ? cat.charAt(0).toUpperCase() + cat.slice(1) : (isAr ? 'فني خدمات' : 'Service Pro'))
+  );
+  const avatarFallback = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(w.name || 'T') + '&background=6366f1&color=fff&size=256';
+  const avatar = eliteEscape(w.profileImage || avatarFallback);
+  const rating = (parseFloat(w.averageRating) || 0).toFixed(1);
+  const reviews = w.totalReviews || 0;
+  const loc = eliteEscape(
+    w.locationLabel || w.serviceArea ||
+    (Array.isArray(w.coverageAreas) ? w.coverageAreas.slice(0, 2).join(' & ') : '') ||
+    (isAr ? 'القاهرة' : 'Cairo')
+  );
+  const profileHref = `./technician-profile.html?id=${id}`;
+
+  const tagSource = (Array.isArray(w.skills) && w.skills.length) ? w.skills
+                  : (Array.isArray(w.categories) ? w.categories : []);
+  const tags = tagSource.slice(0, 3)
+    .map(tg => `<span class="elite-tag">${eliteEscape(tg)}</span>`).join('');
+
+  const badges = w.isVerified
+    ? `<span class="elite-badge elite-badge--verify" data-i18n="home_badge_verify">Verified ID</span>
+       <span class="elite-badge elite-badge--bg" data-i18n="home_badge_bg">Background Checked</span>`
+    : '';
+
+  return `
+    <article class="elite-card" data-reveal data-reveal-delay="${40 + i * 80}">
+      <a href="${profileHref}" class="elite-card__header-link">
+        <div class="elite-card__avatar-wrap">
+          <img class="elite-card__avatar" src="${avatar}" alt="${name}"
+               onerror="this.onerror=null;this.src='${avatarFallback}'" />
+          ${w.isVerified ? `<span class="elite-verified-badge" title="Verified Technician">${ELITE_CHECK_SVG}</span>` : ''}
+        </div>
+        <div class="elite-card__info">
+          <h3>${name}</h3>
+          <p class="elite-card__role">${role}</p>
+        </div>
+      </a>
+      <div class="elite-card__stats">
+        <div>${ELITE_STAR_SVG}<span>${rating} <span data-i18n="home_reviews_count" data-i18n-n="${reviews}">(${reviews} reviews)</span></span></div>
+      </div>
+      <div class="elite-card__location">${ELITE_PIN_SVG}<span>${loc}</span></div>
+      ${badges ? `<div class="elite-card__badges">${badges}</div>` : ''}
+      ${tags ? `<div class="elite-card__tags">${tags}</div>` : ''}
+      <a href="${profileHref}" class="elite-card__cta" data-i18n="home_elite_cta">Request Booking</a>
+    </article>`;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -283,6 +359,20 @@ document.addEventListener('DOMContentLoaded', () => {
     eliteScroll.addEventListener('scroll', () => requestAnimationFrame(updateEliteCarouselButtons), { passive: true });
     window.addEventListener('resize', () => requestAnimationFrame(updateEliteCarouselButtons), { passive: true });
     updateEliteCarouselButtons();
+  }
+
+  // Replace static demo cards with real top-rated, verified technicians.
+  // On empty/error, keep the static markup as a graceful fallback.
+  if (eliteScroll) {
+    getWorkers({ limit: 8 })
+      .then(resp => {
+        const workers = resp?.workers || resp?.data?.workers || [];
+        if (!workers.length) return;
+        eliteScroll.innerHTML = workers.map(buildEliteCard).join('');
+        if (typeof window.initScrollReveal === 'function') window.initScrollReveal();
+        requestAnimationFrame(updateEliteCarouselButtons);
+      })
+      .catch(err => console.warn('[home] Elite Network load failed, keeping static cards:', err));
   }
 
   // ── Section indicator scroll spy ───────────────────────────────────────

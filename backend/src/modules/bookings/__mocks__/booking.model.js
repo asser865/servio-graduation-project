@@ -2,6 +2,7 @@ const COMPLETION_OUTCOME_VALUES = ['customer_paid', 'customer_refused_payment', 
 
 module.exports = {
   findById: jest.fn(),
+  findOneAndUpdate: jest.fn(),
   COMPLETION_OUTCOME_VALUES,
   CUSTOMER_FEEDBACK_ACTIONS: ['confirmed', 'reported_issue', 'system_auto_confirmed'],
   CUSTOMER_ISSUE_REASONS: [

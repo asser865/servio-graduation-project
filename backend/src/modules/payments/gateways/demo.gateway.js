@@ -18,13 +18,13 @@ class DemoGateway extends PaymentGateway {
     }, RETRY_OPTS);
   }
 
-  async capture({ intentId }) {
+  async capture({ intentId, amount }) {
     return retry(async () => {
       if (!intentId || !intentId.startsWith('demo_pi_')) throw new Error('Invalid intent');
       return {
         chargeId: `demo_ch_${nanoid(21)}`,
         status: 'captured',
-        raw: { intentId, capturedAt: new Date() },
+        raw: { intentId, amount, capturedAt: new Date() },
       };
     }, RETRY_OPTS);
   }

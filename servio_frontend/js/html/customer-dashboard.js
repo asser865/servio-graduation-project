@@ -2,6 +2,7 @@
    customer-dashboard.js
    ═══════════════════════════════════════════════════════════ */
 import { showToast } from '../components/toast.js';
+import { confirmDialog, promptDialog, alertDialog } from '../components/confirm-dialog.js';
 import { revealAll } from '../components/scroll-reveal.js';
 import { getInitials } from '../utils/string.js';
 import { getMe, updateMe, updateEmail, deleteMe, updatePassword, addAddress, updateAddress, deleteAddress } from '../api/users.js';
@@ -217,7 +218,13 @@ function initPaymentMethods() {
     list.querySelectorAll('.pm-delete').forEach(btn => {
       btn.addEventListener('click', async () => {
         if (_cardOpInFlight) return;
-        if (!confirm('Remove this card from your saved cards?')) return;
+        const okRemoveCard = await confirmDialog({
+          title: 'Remove saved card?',
+          body: 'This card will be removed from your saved cards.',
+          confirmLabel: 'Remove card',
+          tone: 'danger',
+        });
+        if (!okRemoveCard) return;
         _cardOpInFlight = true;
         btn.disabled = true;
         try {
@@ -421,8 +428,21 @@ function initTabs() {
         type === 'pending'
           ? (typeof window.t === 'function' ? window.t('confirm_withdraw') : 'Withdraw this pending request? You can submit a new booking anytime.')
           : (typeof window.t === 'function' ? window.t('confirm_cancel') : 'Cancel this confirmed visit? You may need to book a new slot if you still need the service.');
-      if (!window.confirm(msg)) return;
-      const reason = window.prompt('Optional reason (e.g. changed mind, found alternative):', '') || '';
+      const okCancel = await confirmDialog({
+        title: type === 'pending' ? 'Withdraw request?' : 'Cancel visit?',
+        body: msg,
+        confirmLabel: type === 'pending' ? 'Withdraw request' : 'Cancel visit',
+        cancelLabel: 'Keep it',
+        tone: 'danger',
+      });
+      if (!okCancel) return;
+      const reason = (await promptDialog({
+        title: 'Reason (optional)',
+        label: 'Reason',
+        placeholder: 'e.g. changed mind, found alternative',
+        confirmLabel: 'Continue',
+        required: false,
+      })) ?? '';
       try {
         if (bookingId) {
           // Plan 3 — use new cancellation endpoint that handles refund/late-fee
@@ -1409,8 +1429,9 @@ function buildBookingCard(b) {
 
   // Avatar
   let avatarHTML;
-  if (b.worker?.profileImage) {
-    avatarHTML = `<img src="${b.worker.profileImage}" alt="${workerName}" class="provider-avatar">`;
+  const workerPhoto = b.worker?.profileImage || b.worker?.avatar || b.worker?.photo;
+  if (workerPhoto) {
+    avatarHTML = `<img src="${workerPhoto}" alt="${workerName}" class="provider-avatar">`;
   } else if (b.worker?.name) {
     const initials = b.worker.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
     avatarHTML = `<span class="provider-avatar provider-avatar--initials">${initials}</span>`;
@@ -1435,6 +1456,12 @@ function buildBookingCard(b) {
     : isPinVerified
       ? '<div class="pin-code__locked pin-code__locked--verified">PIN verified</div>'
       : '<div class="pin-code__locked"><span class="pin-code__lock-icon" aria-hidden="true">••••</span><span>Unlocks on arrival</span></div>';
+  const pinCopyHTML = canRevealPin
+    ? `<button class="pin-copy-mini" type="button" data-copy-pin="${pinStr}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+        <span class="pin-copy-mini__label">Copy PIN</span>
+      </button>`
+    : '';
 
   // Stepper
   const checkSVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="20 6 9 17 4 12"/></svg>`;
@@ -1562,6 +1589,7 @@ function buildBookingCard(b) {
         ${hidePinBlock ? '' : `<div class="sidebar-box">
           <div class="sidebar-box__header">Arrival PIN</div>
           <div class="pin-code">${pinHTML}</div>
+          ${pinCopyHTML}
         </div>`}
         <div class="sidebar-box sidebar-box--amount">
           <div class="sidebar-box__header">Amount</div>
@@ -1816,6 +1844,23 @@ function wireBookingCardEvents(root) {
   root.dataset.eventsWired = 'true';
 
   root.addEventListener('click', async (e) => {
+    const copyPin = e.target.closest('[data-copy-pin]');
+    if (copyPin) {
+      const pin = copyPin.dataset.copyPin || '';
+      if (pin) {
+        try { await navigator.clipboard.writeText(pin); } catch (_) {}
+        copyPin.classList.add('is-copied');
+        const lbl = copyPin.querySelector('.pin-copy-mini__label');
+        if (lbl) lbl.textContent = 'Copied!';
+        setTimeout(() => {
+          copyPin.classList.remove('is-copied');
+          if (lbl) lbl.textContent = 'Copy PIN';
+        }, 1800);
+        showToast('Arrival PIN copied.', 'success');
+      }
+      return;
+    }
+
     const tabLink = e.target.closest('[data-tab-link]');
     if (tabLink) {
       document.querySelector(`[data-tab="${tabLink.dataset.tabLink}"]`)?.click();
@@ -1841,8 +1886,21 @@ function wireBookingCardEvents(root) {
     const msg = type === 'pending'
       ? (typeof window.t === 'function' ? window.t('confirm_withdraw') : 'Withdraw this pending request? You can submit a new booking anytime.')
       : (typeof window.t === 'function' ? window.t('confirm_cancel') : 'Cancel this confirmed visit? You may need to book a new slot if you still need the service.');
-    if (!confirm(msg)) return;
-    const reason2 = window.prompt('Optional reason:', '') || '';
+    const okCancel2 = await confirmDialog({
+      title: type === 'pending' ? 'Withdraw request?' : 'Cancel visit?',
+      body: msg,
+      confirmLabel: type === 'pending' ? 'Withdraw request' : 'Cancel visit',
+      cancelLabel: 'Keep it',
+      tone: 'danger',
+    });
+    if (!okCancel2) return;
+    const reason2 = (await promptDialog({
+      title: 'Reason (optional)',
+      label: 'Reason',
+      placeholder: 'e.g. changed mind, found alternative',
+      confirmLabel: 'Continue',
+      required: false,
+    })) ?? '';
     btn.disabled = true;
     try {
       try {
@@ -3497,7 +3555,13 @@ function renderAddressList() {
   list.querySelectorAll('.btn-addr-delete').forEach(btn => {
     btn.addEventListener('click', async () => {
       const id = btn.dataset.addrId;
-      if (!confirm('Delete this address?')) return;
+      const okDelAddr = await confirmDialog({
+        title: 'Delete address?',
+        body: 'This saved address will be permanently removed.',
+        confirmLabel: 'Delete address',
+        tone: 'danger',
+      });
+      if (!okDelAddr) return;
       try {
         await deleteAddress(id);
         window.__servio_user_addresses = (window.__servio_user_addresses || []).filter(a => a._id !== id);
@@ -3775,7 +3839,7 @@ document.addEventListener('DOMContentLoaded', refreshDynamicText, { once: true }
     document.getElementById('postJobModal').hidden = true;
     e.target.reset();
     const _msg = typeof window.t === 'function' ? window.t('toast_job_posted') : 'Job posted successfully!';
-    showToast?.(_msg, 'success') || alert(_msg);
+    showToast(_msg, 'success');
   });
 
   // ── View Proposals — switch tab ────────────
@@ -3787,9 +3851,15 @@ document.addEventListener('DOMContentLoaded', refreshDynamicText, { once: true }
 
   // ── Close Job ─────────────────────────────
   document.querySelectorAll('[data-close-job]').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const _t = typeof window.t === 'function' ? window.t : (k) => k;
-      if (confirm(_t('confirm_close_job'))) {
+      const okClose = await confirmDialog({
+        title: 'Close this job post?',
+        body: _t('confirm_close_job') || 'Closing this job post will stop new proposals.',
+        confirmLabel: 'Close job',
+        tone: 'danger',
+      });
+      if (okClose) {
         const card = btn.closest('.job-post-card');
         const openBadge = card?.querySelector('.jpc-badge--open');
         if (openBadge) {

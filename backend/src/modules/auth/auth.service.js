@@ -143,14 +143,24 @@ const registerUser = async (data) => {
   const { slugs: coverageAreaSlugs, matchSlugs: coverageMatchSlugs } = expandCoverage(normalizedCoverageAreas);
   const initialServiceArea = serviceArea !== undefined ? serviceArea : locationLabel;
 
-  // Validate submitted service IDs for workers
+  // Validate submitted service IDs for workers and normalize to the
+  // [{serviceId, startsFrom}] subdoc shape the schema expects (mirrors the
+  // same transform used by `updateProfile` in user.controller.js).
   let validatedServices = [];
   if (isWorker && Array.isArray(services) && services.length > 0) {
-    const count = await Service.countDocuments({ _id: { $in: services }, isActive: true });
-    if (count !== services.length) {
+    const submittedServiceIds = services.map((entry) =>
+      (entry && typeof entry === 'object' && entry.serviceId !== undefined) ? entry.serviceId : entry
+    );
+
+    const svcDocsForRegister = await Service.find({ _id: { $in: submittedServiceIds }, isActive: true }).select('basePrice');
+    if (svcDocsForRegister.length !== submittedServiceIds.length) {
       throw new ApiError(StatusCodes.BAD_REQUEST, 'One or more selected services are invalid or inactive.');
     }
-    validatedServices = services;
+    const basePriceById = new Map(svcDocsForRegister.map((s) => [s._id.toString(), s.basePrice]));
+    validatedServices = submittedServiceIds.map((id) => ({
+      serviceId: id,
+      startsFrom: basePriceById.get(id.toString()) || 0,
+    }));
   }
 
   // Password hashing is handled by the pre-save hook in user.model.js

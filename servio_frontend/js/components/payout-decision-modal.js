@@ -1,6 +1,8 @@
 import { adminApprovePayout, adminMarkPayoutPaid, adminRejectPayout } from '../api/payments.js';
+import { alertDialog } from './confirm-dialog.js';
 
 export function openPayoutDecisionModal({ payoutId, currentStatus, onSuccess, onError } = {}) {
+  const notify = (m) => alertDialog({ title: 'Action failed', body: String(m?.message || m), tone: 'danger' });
   const w = document.createElement('div');
   w.className = 'modal modal--center';
   w.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:9999;';
@@ -45,19 +47,19 @@ export function openPayoutDecisionModal({ payoutId, currentStatus, onSuccess, on
         await adminApprovePayout(payoutId, { note: w.querySelector('#note').value.trim() });
       } else if (chosen === 'mark_paid') {
         const transactionRef = w.querySelector('#txn').value.trim();
-        if (transactionRef.length < 3) return alert('Transaction reference required');
+        if (transactionRef.length < 3) return alertDialog({ title: 'Reference required', body: 'Enter a transaction reference of at least 3 characters.', tone: 'warning' });
         await adminMarkPayoutPaid(payoutId, { transactionRef });
       } else if (chosen === 'reject') {
         const reason = w.querySelector('#reason').value.trim();
-        if (reason.length < 5) return alert('Reason 5+ chars');
+        if (reason.length < 5) return alertDialog({ title: 'Reason too short', body: 'Enter at least 5 characters explaining the rejection.', tone: 'warning' });
         await adminRejectPayout(payoutId, { reason });
       } else {
-        return alert('Pick an action');
+        return alertDialog({ title: 'No action selected', body: 'Pick an action before confirming.', tone: 'warning' });
       }
       close();
       onSuccess?.();
     } catch (e) {
-      (onError || alert)(e.message || e);
+      (onError || notify)(e.message || e);
     }
   };
 }

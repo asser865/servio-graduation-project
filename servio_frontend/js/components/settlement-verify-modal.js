@@ -1,6 +1,8 @@
 import { adminVerifySettlement, adminRejectSettlement } from '../api/payments.js';
+import { alertDialog } from './confirm-dialog.js';
 
 export function openSettlementVerifyModal({ settlementId, onSuccess, onError } = {}) {
+  const notify = (m) => alertDialog({ title: 'Action failed', body: String(m?.message || m), tone: 'danger' });
   const w = document.createElement('div');
   w.className = 'modal modal--center';
   w.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:9999;';
@@ -29,7 +31,7 @@ export function openSettlementVerifyModal({ settlementId, onSuccess, onError } =
 
   w.querySelector('[data-act="verify"]').onclick = async () => {
     try { await adminVerifySettlement(settlementId); close(); onSuccess?.(); }
-    catch (e) { (onError || alert)(e.message || e); }
+    catch (e) { (onError || notify)(e.message || e); }
   };
   w.querySelector('[data-act="reject"]').onclick = () => {
     w.querySelector('#rejectReasonWrap').hidden = false;
@@ -37,8 +39,8 @@ export function openSettlementVerifyModal({ settlementId, onSuccess, onError } =
   };
   w.querySelector('[data-act="confirm-reject"]').onclick = async () => {
     const reason = w.querySelector('#rejReason').value.trim();
-    if (reason.length < 5) return alert('Reason 5+ chars');
+    if (reason.length < 5) return alertDialog({ title: 'Reason too short', body: 'Enter at least 5 characters explaining the rejection.', tone: 'warning' });
     try { await adminRejectSettlement(settlementId, { reason }); close(); onSuccess?.(); }
-    catch (e) { (onError || alert)(e.message || e); }
+    catch (e) { (onError || notify)(e.message || e); }
   };
 }

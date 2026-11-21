@@ -28,21 +28,22 @@ function buildCardItem(card) {
   item.dataset.cardId = card._id;
   item.style.cssText = `
     display:flex;align-items:center;gap:12px;padding:12px 14px;
-    border-radius:10px;cursor:pointer;transition:border-color .2s,background .2s;
-    border:2px solid ${isSelected ? '#f5a623' : '#2a2a2a'};
-    background:${isSelected ? 'rgba(245,166,35,.07)' : '#111'};
+    border-radius:10px;cursor:pointer;transition:border-color .2s,background .2s,box-shadow .2s;
+    border:2px solid ${isSelected ? '#f5a623' : 'var(--color-border)'};
+    background:${isSelected ? 'rgba(245,166,35,.10)' : 'var(--color-surface-alt)'};
+    box-shadow:${isSelected ? '0 4px 14px rgba(245,166,35,.18)' : 'var(--shadow-sm)'};
   `;
   item.innerHTML = `
     <span style="flex-shrink:0">${icon}</span>
     <div style="flex:1;min-width:0">
-      <div style="font-weight:600;font-size:14px">•••• •••• •••• ${card.last4}</div>
-      <div style="font-size:12px;color:#aaa;margin-top:2px">
+      <div style="font-weight:600;font-size:14px;color:var(--color-text)">•••• •••• •••• ${card.last4}</div>
+      <div style="font-size:12px;color:var(--color-text-light);margin-top:2px">
         ${card.label ? card.label + ' · ' : ''}Exp ${card.expiry}
       </div>
     </div>
-    ${card.isDefault ? '<span style="font-size:11px;background:rgba(245,166,35,.15);color:#f5a623;border:1px solid rgba(245,166,35,.3);border-radius:4px;padding:2px 7px;flex-shrink:0">Default</span>' : ''}
-    <div style="width:18px;height:18px;border-radius:50%;border:2px solid ${isSelected ? '#f5a623' : '#555'};background:${isSelected ? '#f5a623' : 'transparent'};flex-shrink:0;display:flex;align-items:center;justify-content:center;">
-      ${isSelected ? '<svg viewBox="0 0 10 8" width="10" height="8" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1,4 4,7 9,1"/></svg>' : ''}
+    ${card.isDefault ? '<span style="font-size:11px;background:rgba(245,166,35,.15);color:#b8791a;border:1px solid rgba(245,166,35,.4);border-radius:4px;padding:2px 7px;flex-shrink:0;font-weight:600">Default</span>' : ''}
+    <div style="width:18px;height:18px;border-radius:50%;border:2px solid ${isSelected ? '#f5a623' : 'var(--color-text-light)'};background:${isSelected ? '#f5a623' : 'transparent'};flex-shrink:0;display:flex;align-items:center;justify-content:center;">
+      ${isSelected ? '<svg viewBox="0 0 10 8" width="10" height="8" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1,4 4,7 9,1"/></svg>' : ''}
     </div>
   `;
   item.addEventListener('click', () => selectCard(card._id));

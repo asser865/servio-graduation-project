@@ -4,12 +4,13 @@
  */
 
 import { initScrollReveal } from '../components/scroll-reveal.js';
-import { SERVICES } from '../data/services-data.js';
+import { SERVICES, getSubserviceForKey, getSubserviceLabel } from '../data/services-data.js';
 import { getWorkers } from '../api/users.js';
 import { subscribeNotify }  from '../api/notify.js';
 import { getSession }       from '../api/client.js';
 import { createHeartToggle } from '../components/heart-toggle.js';
 import { listMyFavoriteIds } from '../api/favorites.js';
+import { alertDialog } from '../components/confirm-dialog.js';
 import { renderBusyBadge } from '../components/busy-badge.js';
 
 // Module-level cache so langchange re-renders without re-fetching
@@ -30,6 +31,22 @@ function getParam(key) {
   return new URLSearchParams(window.location.search).get(key);
 }
 
+// Last-resort display name for a subservice slug that isn't in the hardcoded
+// `included` list (e.g. a backend service title): "pipe-repair" → "Pipe Repair".
+function humanizeSlug(slug) {
+  return String(slug || '')
+    .split('-')
+    .filter(Boolean)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
+function buildProfileHref(id, serviceKey, subserviceKey = '') {
+  const params = new URLSearchParams({ id, service: serviceKey });
+  if (subserviceKey) params.set('subservice', subserviceKey);
+  return `./technician-profile.html?${params.toString()}`;
+}
+
 const BADGE_VERIFIED_SVG = `<span class="badge-verified" title="Verified Professional"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 12.5l2 2 4-4m-3-9l2.39 4.84L20 7.27l-3.64 3.55.86 5.01L12 13.27l-4.22 2.22.86-5.01L5 6.73l5.61-.43L12 2z"/></svg> Verified</span>`;
 const LOC_SVG = `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>`;
 
@@ -46,29 +63,34 @@ function buildStars(rating) {
 
 // ── Render hero ───────────────────────────────────────────────────────────────
 
-function renderHero(svc, serviceKey, lang) {
+function renderHero(svc, serviceKey, subserviceKey, lang) {
   const t = svc[lang] || svc.en;
   const isAr = lang === 'ar';
   const serviceName = isAr ? svc.ar.title : svc.en.title;
+  const subservice = getSubserviceForKey(serviceKey, subserviceKey);
+  const subserviceName = getSubserviceLabel(serviceKey, subserviceKey, lang)
+    || (subserviceKey ? humanizeSlug(subserviceKey) : '');
+  const pageName = subserviceName || serviceName;
+  const subserviceDesc = subservice ? (subservice[lang] || subservice.en)?.desc : '';
 
-  document.title = `${serviceName} | SERVIO`;
+  document.title = `${pageName} | SERVIO`;
 
   const heroImg = document.querySelector('[data-listing-target="hero-img"]');
-  if (heroImg) { heroImg.src = svc.heroImage; heroImg.alt = serviceName; }
+  if (heroImg) { heroImg.src = svc.heroImage; heroImg.alt = pageName; }
 
   const breadcrumb = document.querySelector('[data-listing-target="breadcrumb-current"]');
-  if (breadcrumb) breadcrumb.textContent = serviceName;
+  if (breadcrumb) breadcrumb.textContent = subserviceName ? `${serviceName} / ${subserviceName}` : serviceName;
 
   const title = document.querySelector('[data-listing-target="title"]');
-  if (title) title.textContent = serviceName;
+  if (title) title.textContent = pageName;
 
   const lead = document.querySelector('[data-listing-target="lead"]');
-  if (lead) lead.textContent = t.lead;
+  if (lead) lead.textContent = subserviceDesc || t.lead;
 }
 
 // ── Build card HTML ───────────────────────────────────────────────────────────
 
-function buildCardFromAPI(worker, serviceKey, lang, delay) {
+function buildCardFromAPI(worker, serviceKey, subserviceKey, lang, delay) {
   const isAr = lang === 'ar';
   const id = worker._id;
   const name = escapeHtml(worker.name || 'Technician');
@@ -76,8 +98,8 @@ function buildCardFromAPI(worker, serviceKey, lang, delay) {
   const rating = ratingNum.toFixed(1);
   const reviewCount = worker.totalReviews || 0;
   const price = worker.hourlyRate || 0;
-  const avatar = worker.profileImage || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(worker.name || 'T') + '&background=6366f1&color=fff&size=128';
-  const profileHref = `./technician-profile.html?id=${id}&service=${serviceKey}`;
+  const avatar = worker.profileImage || worker.avatar || worker.photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(worker.name || 'T') + '&background=6366f1&color=fff&size=128';
+  const profileHref = buildProfileHref(id, serviceKey, subserviceKey);
 
   // Labels
   const viewLabel      = isAr ? 'عرض الملف الشخصي' : 'View Profile';
@@ -165,7 +187,7 @@ function initNotifyMe(serviceKey) {
         btn.style.display   = 'none';
         confirm.style.display = 'block';
       } else {
-        alert('Could not subscribe. Please try again.');
+        alertDialog({ title: 'Subscription failed', body: 'Could not subscribe. Please try again.', tone: 'danger' });
       }
     }
   });
@@ -173,7 +195,7 @@ function initNotifyMe(serviceKey) {
 
 // ── Render cards ──────────────────────────────────────────────────────────────
 
-async function renderCards(serviceKey, lang) {
+async function renderCards(serviceKey, subserviceKey, lang) {
   const techGrid      = document.getElementById('tech-grid');
   if (!techGrid) return;
 
@@ -219,11 +241,11 @@ async function renderCards(serviceKey, lang) {
 
   const noOnlineState = document.getElementById('no-online-state');
   if (noOnlineState) noOnlineState.style.display = 'none';
-  if (pagination)    pagination.style.display    = '';
+  if (pagination)    pagination.style.display    = 'none';
   if (resultsHeader) resultsHeader.style.display = '';
 
   _cachedWorkers = workers;
-  techGrid.innerHTML = workers.map((worker, i) => buildCardFromAPI(worker, serviceKey, lang, i * 50)).join('');
+  techGrid.innerHTML = workers.map((worker, i) => buildCardFromAPI(worker, serviceKey, subserviceKey, lang, i * 50)).join('');
 
   // Attach heart-toggle and busy badge — wrapped so a failure never hides cards
   try {
@@ -268,7 +290,7 @@ async function renderCards(serviceKey, lang) {
     card.addEventListener('click', e => {
       if (e.target.closest('a')) return;
       const id = card.getAttribute('data-tech-id');
-      window.location.href = `./technician-profile.html?id=${id}&service=${serviceKey}`;
+      window.location.href = buildProfileHref(id, serviceKey, subserviceKey);
     });
   });
 
@@ -282,6 +304,7 @@ async function renderCards(serviceKey, lang) {
 
 document.addEventListener('DOMContentLoaded', async () => {
   const serviceKey = getParam('service');
+  const subserviceKey = getParam('subservice') || '';
   const svc = serviceKey && SERVICES[serviceKey];
 
   if (!svc) {
@@ -291,28 +314,28 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const getLang = () => window.__lang || document.documentElement.lang || 'en';
 
-  renderHero(svc, serviceKey, getLang());
-  await renderCards(serviceKey, getLang());
+  renderHero(svc, serviceKey, subserviceKey, getLang());
+  await renderCards(serviceKey, subserviceKey, getLang());
   initNotifyMe(serviceKey);
 
   document.addEventListener('langchange', async e => {
     const lang = e.detail?.lang || getLang();
-    renderHero(svc, serviceKey, lang);
+    renderHero(svc, serviceKey, subserviceKey, lang);
     if (_cachedWorkers.length) {
       const techGrid = document.getElementById('tech-grid');
       if (techGrid) {
-        techGrid.innerHTML = _cachedWorkers.map((w, i) => buildCardFromAPI(w, serviceKey, lang, i * 50)).join('');
+        techGrid.innerHTML = _cachedWorkers.map((w, i) => buildCardFromAPI(w, serviceKey, subserviceKey, lang, i * 50)).join('');
         techGrid.querySelectorAll('.tech-card').forEach(card => {
           card.style.cursor = 'pointer';
           card.addEventListener('click', ev => {
             if (ev.target.closest('a')) return;
-            window.location.href = `./technician-profile.html?id=${card.getAttribute('data-tech-id')}&service=${serviceKey}`;
+            window.location.href = buildProfileHref(card.getAttribute('data-tech-id'), serviceKey, subserviceKey);
           });
         });
         initScrollReveal();
       }
     } else {
-      await renderCards(serviceKey, lang);
+      await renderCards(serviceKey, subserviceKey, lang);
     }
     applyFilters();
   });

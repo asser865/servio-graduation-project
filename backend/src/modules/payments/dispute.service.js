@@ -17,6 +17,37 @@ const getPaymentService = () => {
   return paymentService;
 };
 
+let customerCreditService;
+const getCustomerCreditService = () => {
+  if (!customerCreditService) customerCreditService = require('./customer-credit.service');
+  return customerCreditService;
+};
+
+const { money } = require('../../utils/rounding');
+
+/**
+ * I-C: return credit consumed at hold time (`holdPayment` -> customerCreditSvc.consume)
+ * back to the customer. The hold splits funds across gateway + credit (Task 10's
+ * `creditApplied`); a customer-win refund must give back BOTH, not just the gateway
+ * portion. Issued as a fresh CustomerCredit grant (not an "un-consume" of the original
+ * credit rows) because those rows may have been partially consumed by other bookings
+ * since — this is intentionally outside the settle transaction (issueCredit owns its
+ * own session) and is the dispute-resolution mirror of the consume() call at hold time.
+ */
+async function returnCreditIfAny(payment, booking, adminId, resolution) {
+  const creditApplied = Number(payment.creditApplied || 0);
+  if (!(creditApplied > 0)) return null;
+  return getCustomerCreditService().issueCredit({
+    customer: payment.user || booking.user,
+    amount: creditApplied,
+    source: 'refund_fallback',
+    reason: `Dispute resolution credit return for booking ${booking._id}: ${String(resolution).slice(0, 100)}`,
+    issuedBy: adminId,
+    relatedBooking: booking._id,
+    relatedPayment: payment._id,
+  });
+}
+
 const ACTIVE_DISPUTE_STATUSES = ['open', 'reviewing', 'awaiting_evidence', 'escalated'];
 const RESOLVED_STATUSES = ['resolved_refund', 'resolved_release', 'resolved_partial', 'resolved_redo', 'closed'];
 const DISPUTABLE_BOOKING_STATUSES = ['awaiting_customer_confirmation'];
@@ -225,8 +256,13 @@ class DisputeService {
     const ps = getPaymentService();
 
     if (decision === 'refund') {
+      // Customer wins outright: no capture, hold lapses, payment marked refunded.
+      // The hold split funds across gateway + credit (Task 10's creditApplied) — a
+      // customer-win refund must give back BOTH (I-C), so we return any creditApplied
+      // after the gateway-facing refund completes.
       if (hasPayment) {
         await ps.refundPayment(payment._id.toString(), adminId, resolution);
+        await returnCreditIfAny(payment, booking, adminId, resolution);
       } else {
         booking.status = 'cancelled';
         booking.paymentStatus = 'not_required';
@@ -236,6 +272,14 @@ class DisputeService {
       dispute.status = 'resolved_refund';
       dispute.refundAmount = hasPayment ? payment.amount : 0;
     } else if (decision === 'release') {
+      // Customer loses outright: settle to the final grandTotal exactly like a normal
+      // release (Task 10's settleToAmount, via releaseHeldPayment) — capture
+      // min(grandTotal, hold). This IS the resolution of the open issue, so it is the
+      // narrow, intentional exception to the "cannot release while issue open" guard
+      // (payment.service.js assertAdminApprovalBookingEligible) — dispute resolution
+      // never routes through that guard (it calls releaseHeldPayment directly, not
+      // adminApproveCompletion), but allowOpenIssue exists precisely to make that
+      // exception explicit and safe if a future caller wires the guard in here too.
       const session = await mongoose.startSession();
       try {
         await session.withTransaction(async () => {
@@ -246,7 +290,11 @@ class DisputeService {
             const freshPayment = await Payment.findById(payment._id).session(session);
             freshBooking.paymentStatus = 'released';
             await freshBooking.save({ session });
-            await ps.releaseHeldPayment(freshPayment, freshBooking, adminId, session);
+            await ps.releaseHeldPayment(freshPayment, freshBooking, adminId, session, {
+              reasonCode: 'dispute_resolution',
+              note: resolution,
+              allowOpenIssue: true,
+            });
             return;
           }
 
@@ -271,62 +319,96 @@ class DisputeService {
       if (!hasPayment) {
         throw new ApiError(StatusCodes.BAD_REQUEST, 'Partial refund requires an escrow payment (online/card booking).');
       }
+      // The refundable ceiling is the FINAL invoice (grandTotal), not the hold —
+      // the hold authorizes the worst-case ceiling (C-B) and is always >= grandTotal,
+      // so bounding against payment.amount (the hold) would let an admin enter a
+      // refundAmount larger than the invoice itself, driving settleTarget negative.
+      const grand = booking.grandTotal || payment.amount; // I6: in-flight/legacy fallback
       const amt = Number(refundAmount);
-      if (!Number.isFinite(amt) || amt <= 0 || amt >= payment.amount) {
+      if (!Number.isFinite(amt) || amt <= 0 || amt >= grand) {
         throw new ApiError(
           StatusCodes.BAD_REQUEST,
-          `refundAmount must be > 0 and < ${payment.amount} for partial refund.`
+          `refundAmount must be > 0 and < ${grand} for partial refund.`
         );
       }
 
-      const workerShareGross = payment.amount - amt;
-      const platformFeePct = payment.amount > 0 ? payment.platformFee / payment.amount : 0;
-      const workerFee = Math.round(workerShareGross * platformFeePct);
-      const workerNet = workerShareGross - workerFee;
+      // Settle to grandTotal minus the refunded slice, via the SAME settleToAmount
+      // helper release uses (Task 10/12 shared logic) — captures
+      // money(grandTotal - refundAmount), clamped to the hold.
+      const settleTarget = money(grand - amt);
 
       const session = await mongoose.startSession();
+      let captureAmount;
       try {
         await session.withTransaction(async () => {
-          payment.status = 'refunded';
-          payment.refundedAt = new Date();
-          await payment.save({ session });
+          const freshBooking = await Booking.findById(booking._id).session(session);
+          const freshPayment = await Payment.findById(payment._id).session(session);
 
-          await Booking.findByIdAndUpdate(
-            payment.booking,
-            { status: 'completed', paymentStatus: 'refunded' },
-            { session }
-          );
+          const result = await ps.settleToAmount(freshPayment, freshBooking, settleTarget, session);
+          captureAmount = result.captureAmount;
 
-          const { wallet } = await ps.reconcileWorkerWalletState(payment.worker, session);
-          wallet.balance += workerNet;
-          wallet.totalEarned += workerNet;
-          await wallet.save({ session });
+          freshPayment.status = 'released';
+          freshPayment.releasedAt = new Date();
+          freshPayment.releaseApprovedAt = new Date();
+          freshPayment.releaseApprovedBy = adminId;
+          freshPayment.refundedAmount = money((freshPayment.refundedAmount || 0) + amt);
+          await freshPayment.save({ session });
+
+          freshBooking.status = 'completed';
+          freshBooking.paymentStatus = 'released';
+          await freshBooking.save({ session });
+
+          const { wallet } = await ps.reconcileWorkerWalletState(freshPayment.worker, session);
+          await wallet.credit(result.remainingAmount);
 
           await Transaction.create([{
-            payment: payment._id,
+            payment: freshPayment._id,
             wallet: wallet._id,
             type: 'refund',
             amount: amt,
-            currency: payment.currency,
+            currency: freshPayment.currency,
             direction: 'credit',
             actor: adminId,
             note: `Partial refund to customer: ${resolution.substring(0, 60)}`,
           }], { session });
 
           await Transaction.create([{
-            payment: payment._id,
+            payment: freshPayment._id,
             wallet: wallet._id,
             type: 'release',
-            amount: workerNet,
-            currency: payment.currency,
+            amount: result.remainingAmount,
+            currency: freshPayment.currency,
             direction: 'credit',
             actor: adminId,
-            note: `Partial release to worker (gross ${workerShareGross}, fee ${workerFee})`,
+            note: `Partial release to worker (worker earning ${result.workerEarning}, after debt offset ${result.remainingAmount})`,
           }], { session });
         });
       } finally {
         await session.endSession();
       }
+
+      // I-C: if the refunded slice exceeds what the gateway actually captured, the
+      // shortfall was covered out of creditApplied at hold time — return that portion
+      // to the customer's credit balance (the hold split funds across gateway + credit).
+      const refreshedPayment = await Payment.findById(payment._id);
+      const creditApplied = Number(refreshedPayment.creditApplied || 0);
+      if (creditApplied > 0) {
+        const gatewayCharged = Number(refreshedPayment.gatewayChargeAmount ?? (payment.amount - creditApplied));
+        const shortfall = money(Math.max(0, gatewayCharged - captureAmount));
+        const creditToReturn = money(Math.min(creditApplied, shortfall));
+        if (creditToReturn > 0) {
+          await getCustomerCreditService().issueCredit({
+            customer: refreshedPayment.user || booking.user,
+            amount: creditToReturn,
+            source: 'refund_fallback',
+            reason: `Dispute partial-refund credit return for booking ${booking._id}: ${String(resolution).slice(0, 100)}`,
+            issuedBy: adminId,
+            relatedBooking: booking._id,
+            relatedPayment: refreshedPayment._id,
+          });
+        }
+      }
+
       dispute.status = 'resolved_partial';
       dispute.refundAmount = amt;
     } else if (decision === 'redo') {

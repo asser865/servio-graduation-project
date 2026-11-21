@@ -25,6 +25,21 @@ function getParam(key) {
   return new URLSearchParams(window.location.search).get(key);
 }
 
+function buildListingHref(serviceKey, subserviceKey = '') {
+  const params = new URLSearchParams();
+  if (serviceKey) params.set('service', serviceKey);
+  if (subserviceKey) params.set('subservice', subserviceKey);
+  const query = params.toString();
+  return `./technician-listing.html${query ? '?' + query : ''}`;
+}
+
+function buildBookingHref(techId, serviceKey, subserviceKey = '') {
+  const params = new URLSearchParams({ worker: techId });
+  if (serviceKey) params.set('service', serviceKey);
+  if (subserviceKey) params.set('subservice', subserviceKey);
+  return `./booking.html?${params.toString()}`;
+}
+
 function el(target) {
   return document.querySelector(`[data-profile-target="${target}"]`);
 }
@@ -142,7 +157,7 @@ function render(worker, lang) {
   const categories = (worker.categories || []).join(', ') || '—';
   const rating = worker.averageRating?.toFixed(1) || '0.0';
   const reviewCount = worker.totalReviews || 0;
-  const avatarUrl = worker.profileImage || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(worker.name || 'T') + '&background=0d6efd&color=fff&size=256';
+  const avatarUrl = worker.profileImage || worker.avatar || worker.photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(worker.name || 'T') + '&background=0d6efd&color=fff&size=256';
   const memberSince = worker.createdAt
     ? new Date(worker.createdAt).toLocaleDateString(isAr ? 'ar-EG' : 'en-US', { year: 'numeric', month: 'long' })
     : '—';
@@ -494,6 +509,7 @@ function applyPreviewMode() {
 document.addEventListener('DOMContentLoaded', async () => {
   const techId = getParam('id');
   const serviceKey = getParam('service') || '';
+  const subserviceKey = getParam('subservice') || '';
   const isPreview = getParam('preview') === '1';
 
   if (!techId) {
@@ -512,7 +528,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (!worker) {
       console.error('Worker not found in response:', res);
-      window.location.replace('./technician-listing.html' + (serviceKey ? `?service=${serviceKey}` : ''));
+      window.location.replace(buildListingHref(serviceKey, subserviceKey));
       return;
     }
 
@@ -568,7 +584,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       applyPreviewMode();
     } else {
       // Wire all Book Now buttons
-      const bookingHref = `./booking.html?worker=${techId}${serviceKey ? '&service=' + serviceKey : ''}`;
+      const bookingHref = buildBookingHref(techId, serviceKey, subserviceKey);
       const bookNowBtn = document.getElementById('bookNowBtn');
       const bookServiceBtn = document.getElementById('bookServiceBtn');
       if (bookNowBtn) bookNowBtn.href = bookingHref;

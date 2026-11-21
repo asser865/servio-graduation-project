@@ -23,6 +23,7 @@ import { getRefusalsAwaitingResponse } from '../api/bookings.js';
 import { getAdminRevenue } from '../api/admin.js';
 import { openFinanceDrawer } from '../components/finance-drawer.js';
 import { showToast } from '../components/toast.js';
+import { confirmDialog, promptDialog } from '../components/confirm-dialog.js';
 import { createPoller } from '../utils/live-poll.js';
 import { classify } from '../utils/queue-priority.js';
 import { REASONS } from '../utils/queue-priority.constants.js';
@@ -486,7 +487,7 @@ function row(item, hidden) {
       <td>${sla(item.slaDueAt)}</td>
       <td><span class="finance-console__row-actions">
         ${selectable ? `<button type="button" class="finance-row-btn finance-row-btn--ok" data-finance-quick-release="${escapeHtml(item.sourceId)}">Release</button>` : ''}
-        <button type="button" class="finance-row-btn ${btnCls}" data-finance-open="${escapeHtml(item.id)}">${escapeHtml(btnLabel)}</button>
+        <button type="button" class="finance-row-btn ${selectable ? '' : btnCls}" data-finance-open="${escapeHtml(item.id)}">${escapeHtml(selectable ? 'Review' : btnLabel)}</button>
       </span></td>
     </tr>`;
 }
@@ -1112,20 +1113,42 @@ async function handleDrawerAction(event) {
   const bookingId = item.sourceId || item.bookingId;
   try {
     if (action === 'release') {
-      if (!window.confirm('Release funds to technician after reviewing the evidence?')) return;
+      const ok = await confirmDialog({
+        title: 'Release funds to technician?',
+        body: 'Confirm that you have reviewed the evidence. The held payment will be released to the technician.',
+        confirmLabel: 'Release funds',
+      });
+      if (!ok) return;
       await adminApprovePayment(bookingId, { reasonCode: 'customer_confirmed' });
     } else if (action === 'refund' || action === 'approve_refund') {
-      const reason = window.prompt('Refund reason:');
+      const reason = await promptDialog({
+        title: 'Refund customer',
+        label: 'Refund reason',
+        placeholder: 'Explain why this payment is being refunded…',
+        confirmLabel: 'Issue refund',
+        tone: 'danger',
+      });
       if (!reason) return;
       await adminRefund(item.paymentId || id, { reason });
     } else if (action === 'approve_payout') {
       await adminApprovePayout(id);
     } else if (action === 'reject_payout') {
-      const reason = window.prompt('Payout rejection reason:');
+      const reason = await promptDialog({
+        title: 'Reject payout',
+        label: 'Rejection reason',
+        placeholder: 'Explain why this payout is being rejected…',
+        confirmLabel: 'Reject payout',
+        tone: 'danger',
+      });
       if (!reason) return;
       await adminRejectPayout(id, { reason });
     } else if (['tech_at_fault', 'customer_at_fault', 'order_revisit', 'split_50_50'].includes(action)) {
-      const resolution = window.prompt('Resolution note for both parties:');
+      const resolution = await promptDialog({
+        title: 'Resolve dispute',
+        label: 'Resolution note for both parties',
+        placeholder: 'Describe the resolution shared with the customer and technician…',
+        confirmLabel: 'Submit resolution',
+      });
       if (!resolution) return;
       const decisions = {
         tech_at_fault: { decision: 'refund', refundAmount: number(item.amount) },
@@ -1268,7 +1291,12 @@ function bindEvents(root) {
     const quickRelease = event.target.closest('[data-finance-quick-release]');
     if (quickRelease) {
       const bookingId = quickRelease.dataset.financeQuickRelease;
-      if (!window.confirm(`Approve low-risk card release #${shortId(bookingId)}?`)) return;
+      const ok = await confirmDialog({
+        title: 'Approve card release?',
+        body: `Release the low-risk card payment for booking #${shortId(bookingId)}.`,
+        confirmLabel: 'Approve release',
+      });
+      if (!ok) return;
       try {
         await adminApprovePayment(bookingId, { reasonCode: 'customer_confirmed' });
         showToast('Payment released.', 'success');
@@ -1283,7 +1311,12 @@ function bindEvents(root) {
       const item = itemForId(review.dataset.financeOpen) || state.data.disputes.map(mapDisputeItem).find(row => row.id === review.dataset.financeOpen);
       if (!item) return;
       if (review.dataset.financeAction === 'escalate') {
-        if (!window.confirm(`Escalate dispute #${shortId(item.sourceId)} to senior review?\n\nThis flags it for the senior team and notifies both parties.`)) return;
+        const ok = await confirmDialog({
+          title: `Escalate dispute #${shortId(item.sourceId)}?`,
+          body: 'This flags the dispute for the senior team and notifies both parties.',
+          confirmLabel: 'Escalate to senior review',
+        });
+        if (!ok) return;
         showToast(`Escalated #${shortId(item.sourceId)} - opening review drawer.`, 'info');
       }
       openUniversalDrawer(item);
@@ -1301,7 +1334,13 @@ function bindEvents(root) {
       const ids = [...state.selected];
       const selected = queueItems().filter(item => state.selected.has(item.sourceId));
       const summary = selected.map(item => `#${shortId(item.sourceId)} - ${item.worker} - ${money(item.amount)}`).join('\n');
-      if (!ids.length || !window.confirm(`Release ${ids.length} low-risk card payment(s)?\n\n${summary}`)) return;
+      if (!ids.length) return;
+      const ok = await confirmDialog({
+        title: `Release ${ids.length} card payment${ids.length === 1 ? '' : 's'}?`,
+        body: `These low-risk card payments will be released to technicians:\n${summary}`,
+        confirmLabel: `Release ${ids.length} payment${ids.length === 1 ? '' : 's'}`,
+      });
+      if (!ok) return;
       try {
         await bulkReleaseFinance(ids);
         state.selected.clear();
@@ -1318,7 +1357,7 @@ function bindEvents(root) {
     checkbox.checked ? state.selected.add(checkbox.dataset.financeSelect) : state.selected.delete(checkbox.dataset.financeSelect);
     renderBulkBar(root);
   });
-  root.addEventListener('click', event => {
+  root.addEventListener('click', async event => {
     const tab = event.target.closest('[data-finance-tab]');
     if (tab) {
       state.activeTab = tab.dataset.financeTab;
@@ -1345,7 +1384,13 @@ function bindEvents(root) {
     if (verifySettlementBtn) {
       const settlementId = verifySettlementBtn.dataset.debtSettlementVerify;
       const workerId = verifySettlementBtn.dataset.debtWorker;
-      if (!settlementId || !window.confirm('Verify this payment proof and apply it to the worker debt?')) return;
+      if (!settlementId) return;
+      const ok = await confirmDialog({
+        title: 'Verify payment proof?',
+        body: 'This confirms the payment proof and applies it to the technician\'s outstanding debt.',
+        confirmLabel: 'Verify proof',
+      });
+      if (!ok) return;
       verifySettlementBtn.disabled = true;
       adminVerifySettlement(settlementId)
         .then(async () => {
@@ -1361,8 +1406,16 @@ function bindEvents(root) {
     if (rejectSettlementBtn) {
       const settlementId = rejectSettlementBtn.dataset.debtSettlementReject;
       const workerId = rejectSettlementBtn.dataset.debtWorker;
-      const reason = window.prompt('Why are you rejecting this payment proof?');
-      if (!settlementId || !reason) return;
+      if (!settlementId) return;
+      const reason = await promptDialog({
+        title: 'Reject payment proof',
+        label: 'Rejection reason',
+        placeholder: 'Explain why this proof is being rejected…',
+        body: 'The technician will be able to resubmit a corrected proof.',
+        confirmLabel: 'Reject proof',
+        tone: 'danger',
+      });
+      if (!reason) return;
       rejectSettlementBtn.disabled = true;
       adminRejectSettlement(settlementId, { reason })
         .then(async () => {
@@ -1388,7 +1441,13 @@ function bindEvents(root) {
     if (suspendBtn) {
       const workerId = suspendBtn.dataset.debtSuspend;
       const workerName = suspendBtn.closest('article')?.querySelector('.finance-console__debt-worker strong')?.textContent || 'this worker';
-      if (!window.confirm(`Suspend ${workerName}?\n\nThey will be blocked from accepting new jobs until their debt is cleared and you reactivate them.`)) return;
+      const ok = await confirmDialog({
+        title: `Suspend ${workerName}?`,
+        body: 'They will be blocked from accepting new jobs until their debt is cleared and you reactivate them.',
+        confirmLabel: 'Suspend technician',
+        tone: 'danger',
+      });
+      if (!ok) return;
       updateUserStatus(workerId, false)
         .then(() => {
           showToast(`${workerName} suspended.`, 'success');

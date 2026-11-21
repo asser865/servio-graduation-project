@@ -26,12 +26,17 @@ import { holdPayment } from '../api/payments.js';
 import { openCardPickerModal, closeCardPickerModal } from '../components/card-picker-modal.js';
 import { showToast } from '../components/toast.js';
 import { calculateBookingFee, formatMoney, DEFAULT_PLATFORM_FEE_RATE } from '../utils/fee.js';
+import { getSubserviceLabel, slugifyServiceLabel } from '../data/services-data.js';
 
 // ─── URL params ───────────────────────────────────────────────────────────────
 
 const params     = new URLSearchParams(window.location.search);
 const workerId   = params.get('worker') || '';
 const serviceIdParam = params.get('service') || '';
+const subserviceParam = params.get('subservice') || '';
+// Customer's own problem text, forwarded from Smart Match (or any deep link) so the
+// technician sees the real issue instead of a blank booking.
+const notesParam = params.get('notes') || params.get('description') || '';
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -81,9 +86,11 @@ const reviewDate     = document.getElementById('reviewDate');
 const reviewTime     = document.getElementById('reviewTime');
 const reviewAddress  = document.getElementById('reviewAddress');
 const reviewPayment  = document.getElementById('reviewPayment');
-const reviewBaseRate = document.getElementById('reviewBaseRate');
-const reviewFee      = document.getElementById('reviewFee');
-const reviewTotal    = document.getElementById('reviewTotal');
+const reviewBaseRate = document.getElementById('reviewBaseRate'); // now: "Starts from" amount
+const reviewFee      = document.getElementById('reviewFee');      // now: "Typical range" min-max
+const reviewBandRow  = document.getElementById('reviewBandRow');  // band row wrapper (hidden when no band)
+const reviewTotal    = document.getElementById('reviewTotal');    // now: the §9.0 reassurance line (hero text)
+const reviewHoldAmount = document.getElementById('reviewHoldAmount'); // subordinate hold explainer amount
 const reviewCard     = document.getElementById('reviewCard');
 const reviewNotes    = document.getElementById('reviewNotes');
 
@@ -109,6 +116,11 @@ function setPickerSelection(catKey, svcId, label) {
   if (confirmed) confirmed.hidden = false;
   if (cats)      cats.hidden = true;
   if (subs)      subs.hidden = true;
+
+  // Sidebar must reflect the band model as soon as a specific service is chosen,
+  // not just once the user reaches the review step (finding #1).
+  state.data.serviceId = svcId;
+  renderSidebarPricing();
 }
 
 function resetPicker() {
@@ -122,6 +134,9 @@ function resetPicker() {
   if (confirmed) confirmed.hidden = true;
   if (cats)      cats.hidden      = false;
   if (subs)      subs.hidden      = true;
+
+  state.data.serviceId = '';
+  renderSidebarPricing();
 }
 
 // ─── Date validation helpers ──────────────────────────────────────────────────
@@ -305,6 +320,14 @@ document.querySelectorAll('[data-note-prompt]').forEach((btn) => {
 });
 updateNotesCounter();
 
+// Prefill the description from a deep link (e.g. Smart Match → Book) so the
+// customer's own words travel into the booking and reach the technician.
+if (notesParam && bookNotes && !bookNotes.value) {
+  const max = Number(bookNotes.getAttribute('maxlength')) || 1000;
+  bookNotes.value = notesParam.slice(0, max);
+  updateNotesCounter();
+}
+
 paymentOpts.forEach((opt) => {
   opt.addEventListener('click', () => {
     if (opt.classList.contains('is-disabled')) return;
@@ -382,9 +405,10 @@ confirmBtn?.addEventListener('click', async (e) => {
 });
 
 function promptCardThenSubmit() {
-  const rate  = state.worker?.hourlyRate || 0;
-  const total = calculateBookingFee(rate, state.platformSettings.commissionRate).estimatedTotal.toFixed(2);
-  openCardPickerModal(total, async (paymentMeta) => {
+  // Card picker shows the authorization HOLD (band ceiling + fee-on-ceiling), not the
+  // hourly estimate — matches the backend hold formula in payment.service.js.
+  const hold = resolvePricingSnapshot().holdAmount.toFixed(2);
+  openCardPickerModal(hold, async (paymentMeta) => {
     state.data.paymentMeta = paymentMeta;
     populateReview();
     await submitOnlineBooking();
@@ -392,9 +416,8 @@ function promptCardThenSubmit() {
 }
 
 function promptCardOnly() {
-  const rate  = state.worker?.hourlyRate || 0;
-  const total = calculateBookingFee(rate, state.platformSettings.commissionRate).estimatedTotal.toFixed(2);
-  openCardPickerModal(total, (paymentMeta) => {
+  const hold = resolvePricingSnapshot().holdAmount.toFixed(2);
+  openCardPickerModal(hold, (paymentMeta) => {
     state.data.paymentMeta = paymentMeta;
     populateReview();
   });
@@ -420,6 +443,7 @@ async function submitOnlineBooking() {
 
 function validateStep1() {
   const errors = [];
+  const missing = [];
 
   // Service picker — must have a category selected
   if (!pickerState.category) {
@@ -429,9 +453,11 @@ function validateStep1() {
       picker.scrollIntoView({ behavior: 'smooth', block: 'center' });
       setTimeout(() => { picker.style.borderColor = ''; }, 2000);
     }
+    missing.push('a service type');
     errors.push(null);
   }
   if (!bookDate?.value) {
+    missing.push('a date');
     errors.push(bookDate);
   } else {
     const dateErr = validateBookingDate(bookDate.value, state.worker?.availability || []);
@@ -447,11 +473,13 @@ function validateStep1() {
       animate(list, { x: [0, -5, 5, -3, 3, 0] }, { duration: 0.35 });
       list.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
+    missing.push('a service address');
     errors.push(null);
   }
   if (!state.selectedTime) {
     const grid = document.querySelector('.timeslot-grid');
     if (grid) animate(grid, { x: [0, -5, 5, -3, 3, 0] }, { duration: 0.35 });
+    missing.push('a time slot');
     errors.push(null);
   } else if (bookDate?.value) {
     const _t = new Date();
@@ -475,6 +503,17 @@ function validateStep1() {
     el.addEventListener('input', () => { el.style.borderColor = ''; }, { once: true });
   });
 
+  if (missing.length > 0) {
+    let msg;
+    if (missing.length === 1) {
+      msg = `Please select ${missing[0]} to continue.`;
+    } else {
+      const last = missing[missing.length - 1];
+      msg = `Please select ${missing.slice(0, -1).join(', ')} and ${last} to continue.`;
+    }
+    showToast(msg, 'error');
+  }
+
   return errors.length === 0;
 }
 
@@ -493,6 +532,99 @@ function collectStep1() {
 function collectStep2() {
   const selected = document.querySelector('.payment-option.is-selected input[type="radio"]');
   state.data.payment = selected?.value || 'online';
+}
+
+// ─── Worker service-subdoc id resolution ──────────────────────────────────────
+// worker.services entries are [{serviceId, startsFrom}] subdocs where serviceId may
+// arrive either as a populated object ({_id,...}, when the API populates the ref)
+// or as a raw id string/ObjectId (when it doesn't). Calling .toString() directly on
+// a populated object yields "[object Object]", which silently fails to match any
+// real id — always unwrap ._id first.
+function resolveSubServiceId(sub) {
+  const raw = sub?.serviceId?._id || sub?.serviceId || sub;
+  return (raw || '').toString();
+}
+
+// ─── Pricing snapshot resolution (Task 18 — replaces hourlyRate/estimatedTotal) ───
+// Mirrors the backend resolution in booking.service.js: startsFrom comes from the
+// worker's per-service subdoc (worker.services[].startsFrom), falling back to the
+// service's seedRange.min, then basePrice. The band is the service's seedRange, and
+// the hold ceiling+fee mirrors payment.service.js's holdPayment formula exactly
+// (holdCeiling * (1 + feeRate/100)), falling back to the plain estimate when the
+// service has no seeded band yet (seedRange.max === 0).
+function resolvePricingSnapshot() {
+  const feeRate = state.platformSettings?.commissionRate ?? DEFAULT_PLATFORM_FEE_RATE;
+  const serviceId = state.data.serviceId || pickerState.serviceId || '';
+
+  const service = serviceId
+    ? (state.allServices || []).find(s => (s._id || s.id || '').toString() === serviceId.toString())
+    : null;
+
+  // See resolveSubServiceId — handles both populated and raw serviceId shapes.
+  // This was the bug: the previous lookup never matched a populated serviceId, so
+  // startsFrom always fell back to the band min (300) instead of the worker's
+  // actual per-service price (e.g. 380).
+  const workerSub = serviceId
+    ? (state.workerServices || []).find(s => resolveSubServiceId(s) === serviceId.toString())
+    : null;
+
+  const seedRange = { min: service?.seedRange?.min || 0, max: service?.seedRange?.max || 0 };
+
+  const startsFrom =
+    (workerSub && workerSub.startsFrom != null && workerSub.startsFrom > 0) ? workerSub.startsFrom
+    : seedRange.min > 0 ? seedRange.min
+    : (service?.basePrice ?? state.worker?.hourlyRate ?? 0);
+
+  const hasBand = seedRange.max > 0;
+  const holdCeiling = hasBand ? seedRange.max : 0;
+
+  // Estimate fallback (no band yet) — same shape as the legacy hourlyRate-based total.
+  const estimate = calculateBookingFee(startsFrom, feeRate);
+
+  const holdAmount = hasBand
+    ? Number((holdCeiling * (1 + feeRate / 100)).toFixed(2))
+    : estimate.estimatedTotal;
+
+  return { startsFrom, seedRange, hasBand, holdCeiling, holdAmount, feeRate };
+}
+
+// ─── Sidebar "Order Summary" pricing (Task 18 fix wave 1) ─────────────────────
+// The sidebar persists across all 3 steps, so it must never show the legacy
+// hourly model ("Base rate (1 hr min.)" / "Platform fee" / "Estimated Total")
+// once a specific Type-A service is selected — only the general/no-service-yet
+// path keeps the hourly fallback. Driven by the same resolvePricingSnapshot()
+// the review step uses, so the two never disagree.
+function renderSidebarPricing() {
+  const hourlyBlock = document.getElementById('sidebarPricingHourly');
+  const bandBlock   = document.getElementById('sidebarPricingBand');
+  const serviceId   = state.data.serviceId || pickerState.serviceId || '';
+
+  if (!serviceId) {
+    // No specific seeded service selected yet (general category booking) — hourly
+    // fallback is acceptable per spec.
+    if (bandBlock)   bandBlock.hidden   = true;
+    if (hourlyBlock) hourlyBlock.hidden = false;
+    const rate = state.worker?.hourlyRate || 0;
+    const totals = calculateBookingFee(rate, state.platformSettings.commissionRate);
+    setText('sidebarFeeLabel', `Platform fee (${totals.feeRate}%)`);
+    setText('sidebarBaseRate', formatMoney(totals.base));
+    setText('sidebarFee',      formatMoney(totals.feeAmount));
+    setText('sidebarTotal',    `${formatMoney(totals.estimatedTotal)}+`);
+    return;
+  }
+
+  // A specific Type-A service is selected — switch to the band model.
+  if (hourlyBlock) hourlyBlock.hidden = true;
+  if (bandBlock)   bandBlock.hidden   = false;
+
+  const pricing = resolvePricingSnapshot();
+  setText('sidebarStartsFrom', formatMoney(pricing.startsFrom));
+
+  const bandRow = document.getElementById('sidebarBandRow');
+  if (bandRow) bandRow.hidden = !pricing.hasBand;
+  if (pricing.hasBand) {
+    setText('sidebarBandRange', `${formatMoney(pricing.seedRange.min)} – ${formatMoney(pricing.seedRange.max)}`);
+  }
 }
 
 // ─── Populate review step ─────────────────────────────────────────────────────
@@ -519,13 +651,26 @@ function populateReview() {
   }
   if (reviewNotes)    reviewNotes.textContent     = state.data.notes || 'No additional notes added.';
 
-  const rate = state.worker?.hourlyRate || 0;
-  const totals = calculateBookingFee(rate, state.platformSettings.commissionRate);
+  // ── Snapshot pricing (Task 18): starts-from + band + escrow + subordinate hold ──
+  const pricing = resolvePricingSnapshot();
 
-  setText('reviewFeeLabel', `Platform Fee (${totals.feeRate}%)`);
-  if (reviewBaseRate) reviewBaseRate.textContent = `${formatMoney(totals.base)} / hr`;
-  if (reviewFee)      reviewFee.textContent      = formatMoney(totals.feeAmount);
-  if (reviewTotal)    reviewTotal.textContent    = `${formatMoney(totals.estimatedTotal)}+`;
+  setText('reviewFeeLabel', window.t?.('booking_review_starts_from') || 'Starts from');
+  if (reviewBaseRate) reviewBaseRate.textContent = formatMoney(pricing.startsFrom);
+
+  if (reviewBandRow) reviewBandRow.hidden = !pricing.hasBand;
+  if (pricing.hasBand && reviewFee) {
+    reviewFee.textContent = `${formatMoney(pricing.seedRange.min)} – ${formatMoney(pricing.seedRange.max)}`;
+  }
+
+  // §9.0 trust rule: the reassurance line is the hero text; the held amount is
+  // visually subordinate (smaller, muted) directly beneath it — never the other way.
+  if (reviewTotal) reviewTotal.textContent = window.t?.('booking_review_charge_reassurance')
+    || "You're only charged the final amount you approve.";
+  if (reviewHoldAmount) reviewHoldAmount.textContent = formatMoney(pricing.holdAmount);
+
+  // Keep the Order Summary sidebar (visible on all 3 steps) in lockstep with the
+  // review step's pricing snapshot — see finding #1.
+  renderSidebarPricing();
 }
 
 function formatDate(raw) {
@@ -642,9 +787,9 @@ function renderTimeSlotsForDate(dateString, availability) {
   const eveningSlots   = allSlots.filter(s => { const h = parseInt(s); return h >= 18 && h < 22; });
 
   const groups = [
-    { label: 'Morning (6 AM – 12 PM)',   slots: morningSlots },
-    { label: 'Afternoon (12 PM – 6 PM)', slots: afternoonSlots },
-    { label: 'Evening (6 PM – 10 PM)',   slots: eveningSlots },
+    { label: 'Morning',   slots: morningSlots },
+    { label: 'Afternoon', slots: afternoonSlots },
+    { label: 'Evening',   slots: eveningSlots },
   ].filter(g => g.slots.length > 0);
 
   if (groups.length === 0) {
@@ -726,6 +871,8 @@ function updateWorkerUI(worker) {
   const specialty= (Array.isArray(worker.categories) && worker.categories[0]) || 'Home Services';
   const location = worker.locationLabel || '';
   const initials = name.split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2).toUpperCase() || '?';
+  // Photo may arrive under any of these keys (backend `profileImage`, seed `avatar`, legacy `photo`).
+  const avatarUrl = worker.profileImage || worker.avatar || worker.photo || '';
 
   // Page title
   document.title = `Book Service – ${name} | SERVIO`;
@@ -744,8 +891,8 @@ function updateWorkerUI(worker) {
   // Hero card
   const avatarEl = document.getElementById('heroCardAvatar');
   if (avatarEl) {
-    if (worker.profileImage) {
-      avatarEl.innerHTML = `<img src="${worker.profileImage}" alt="${name}" style="width:48px;height:48px;border-radius:12px;object-fit:cover;" />`;
+    if (avatarUrl) {
+      avatarEl.innerHTML = `<img src="${avatarUrl}" alt="${name}" style="width:48px;height:48px;border-radius:12px;object-fit:cover;" />`;
     } else {
       avatarEl.textContent = initials;
     }
@@ -761,8 +908,8 @@ function updateWorkerUI(worker) {
   // Service strip
   const stripImg = document.getElementById('stripAvatar');
   const stripInit = document.getElementById('stripAvatarInitials');
-  if (worker.profileImage && stripImg && stripInit) {
-    stripImg.src = worker.profileImage;
+  if (avatarUrl && stripImg && stripInit) {
+    stripImg.src = avatarUrl;
     stripImg.alt = name;
     stripImg.style.display = '';
     stripInit.style.display = 'none';
@@ -776,8 +923,8 @@ function updateWorkerUI(worker) {
   // Sidebar
   const sidebarImg  = document.getElementById('sidebarAvatar');
   const sidebarInit = document.getElementById('sidebarAvatarInitials');
-  if (worker.profileImage && sidebarImg && sidebarInit) {
-    sidebarImg.src = worker.profileImage;
+  if (avatarUrl && sidebarImg && sidebarInit) {
+    sidebarImg.src = avatarUrl;
     sidebarImg.alt = name;
     sidebarImg.style.display = '';
     sidebarInit.style.display = 'none';
@@ -794,11 +941,7 @@ function updateWorkerUI(worker) {
   const starPill = document.querySelector('.trust-pill--star');
   if (starPill) starPill.style.display = hasReviews && Number(worker.averageRating) >= 4.8 ? '' : 'none';
 
-  const totals = calculateBookingFee(rate, state.platformSettings.commissionRate);
-  setText('sidebarFeeLabel', `Platform fee (${totals.feeRate}%)`);
-  setText('sidebarBaseRate', formatMoney(totals.base));
-  setText('sidebarFee',      formatMoney(totals.feeAmount));
-  setText('sidebarTotal',    `${formatMoney(totals.estimatedTotal)}+`);
+  renderSidebarPricing();
 }
 
 function setText(id, val) {
@@ -863,8 +1006,14 @@ async function initServicePicker(worker) {
   }
 
   // Only show services the worker explicitly selected in their dashboard
-  const workerServiceIds = new Set((worker.services || []).map(s => (s._id || s).toString()));
+  // (worker.services is a [{serviceId, startsFrom}] subdoc array — no _id of its own).
+  const workerServiceIds = new Set((worker.services || []).map(s => resolveSubServiceId(s)));
   const workerCategories = new Set(worker.categories || []);
+
+  // Cache the full catalog + worker pricing subdocs so populateReview()/the card
+  // picker can resolve startsFrom + seedRange for whichever service gets selected.
+  state.allServices = allServices;
+  state.workerServices = worker.services || [];
 
   const grouped = {};
   allServices.forEach(svc => {
@@ -951,8 +1100,20 @@ async function initServicePicker(worker) {
 
       // Pre-select if URL param matches one of these subs
       if (serviceIdParam) {
-        const match = subs.find(s => (s._id || s.id || '').toString() === serviceIdParam);
-        if (match) setPickerSelection(cat, serviceIdParam, match.title);
+        const requestedLabel = getSubserviceLabel(cat, subserviceParam, 'en');
+        const match = subs.find(s => (
+          (s._id || s.id || '').toString() === serviceIdParam ||
+          (() => {
+            const serviceSlug = slugifyServiceLabel(s.title);
+            const requestedSlug = slugifyServiceLabel(requestedLabel || subserviceParam);
+            return requestedSlug && (
+              serviceSlug === requestedSlug ||
+              serviceSlug.includes(requestedSlug) ||
+              requestedSlug.includes(serviceSlug)
+            );
+          })()
+        ));
+        if (match) setPickerSelection(cat, (match._id || match.id || '').toString(), match.title);
       }
     });
   });
@@ -967,6 +1128,18 @@ async function initServicePicker(worker) {
       catsEl.querySelector(`[data-cat="${serviceIdParam}"]`)?.click();
     }
   }
+
+  // Re-sync the sidebar now that state.workerServices/state.allServices are populated
+  // (Task 18 — fix wave 2). updateWorkerUI() already calls renderSidebarPricing() at
+  // L~931, but that runs synchronously in init() before this async function's
+  // `await getServices()` resolves, so it always sees an empty state.workerServices —
+  // any already-selected serviceId (e.g. via setPickerSelection() above, or the
+  // serviceIdParam auto-select just above) would still find no workerSub at that point
+  // and silently fall back to seedRange.min. Calling it again here, after the worker
+  // subdocs are cached, guarantees the sidebar resolves the exact same
+  // resolvePricingSnapshot() value the review step will later show — no stale render
+  // is left on screen regardless of click/await ordering.
+  renderSidebarPricing();
 }
 
 // ─── Address prefill ──────────────────────────────────────────────────────────
@@ -1294,6 +1467,8 @@ async function finalizeBooking({ returnBooking = false } = {}) {
     workerId,
     workerName: state.worker?.name || '',
     service:    state.data.serviceType,
+    serviceName: state.data.serviceType,
+    serviceCategory: state.data.serviceCategory,
     category:   state.data.serviceType,
     payment:    state.data.payment,
     paymentMethod,

@@ -28,6 +28,14 @@ test('demo.refund returns refund record', async () => {
   expect(r.refundId).toMatch(/^demo_rf_/);
 });
 
+test('demo.capture accepts a partial amount and echoes it', async () => {
+  const gw = getGateway();
+  const a = await gw.authorize({ amount: 700, currency: 'EGP', customerId: 'c1' });
+  const c = await gw.capture({ intentId: a.intentId, amount: 410 });
+  expect(c.status).toBe('captured');
+  expect(c.raw.amount).toBe(410);
+});
+
 test('stripe gateway raises NotImplemented', () => {
   process.env.PAYMENT_GATEWAY = 'stripe';
   const gw = getGateway();

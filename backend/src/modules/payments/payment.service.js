@@ -86,7 +86,13 @@ function validPendingBooking(booking) {
   return !['released', 'refunded', 'cash_pending_settlement', 'cash_settled', 'not_required'].includes(booking.paymentStatus);
 }
 
-function assertAdminApprovalBookingEligible(booking) {
+// `allowOpenIssue`: narrow exception for dispute resolution (Task 12). The "cannot
+// release while a customer-reported issue is open" rule exists to stop a *routine*
+// admin approval from rubber-stamping a release out from under an unresolved
+// complaint. It must NOT apply when the release IS the act of resolving that issue
+// (dispute.service resolveDispute -> decision 'release'/'partial_refund') — otherwise
+// disputes could never be resolved in the customer's or worker's favor.
+function assertAdminApprovalBookingEligible(booking, { allowOpenIssue = false } = {}) {
   if (booking.status !== 'pending_admin_review') {
     throw new ApiError(
       StatusCodes.BAD_REQUEST,
@@ -106,7 +112,7 @@ function assertAdminApprovalBookingEligible(booking) {
         'Missing completion evidence. At least one after photo is required before releasing card funds.'
       );
     }
-    if (booking.customerFeedback?.action === 'reported_issue') {
+    if (!allowOpenIssue && booking.customerFeedback?.action === 'reported_issue') {
       throw new ApiError(
         StatusCodes.BAD_REQUEST,
         'Cannot release card funds while a customer-reported issue is open.'
@@ -165,14 +171,22 @@ class PaymentService {
       throw new ApiError(StatusCodes.PAYMENT_REQUIRED, 'Card was declined (demo).');
     }
 
+    // Hold the ceiling PLUS the fee computed on the ceiling (worst in-band case), so any
+    // final invoice <= band fits under the authorization. (C-B)
+    // P3: unseeded band (holdCeiling 0) falls back to the estimate — never money(0*...).
+    const rate = (booking.platformFeeRate ?? 10) / 100;
+    const holdAmount = booking.holdCeiling > 0
+      ? roundMoney(booking.holdCeiling * (1 + rate))
+      : booking.estimatedTotal; // legacy/in-flight or unseeded band (I6/P3)
+
     // Credit pre-apply (Plan 3 Task 10)
     let creditApplied = 0;
     if (useCredit) {
       const customerCreditSvc = require('./customer-credit.service');
       const available = await customerCreditSvc.balance(customerId);
-      creditApplied = Math.min(available, booking.estimatedTotal);
+      creditApplied = Math.min(available, holdAmount);
     }
-    const gatewayChargeAmount = Math.max(0, booking.estimatedTotal - creditApplied);
+    const gatewayChargeAmount = Math.max(0, holdAmount - creditApplied);
 
     // Success path — call gateway first (for remaining amount)
     const gateway = getGateway();
@@ -191,9 +205,9 @@ class PaymentService {
       booking: bookingId,
       user: customerId,
       worker: booking.worker,
-      amount: booking.estimatedTotal,
+      amount: holdAmount,
       platformFee: booking.platformFeeAmount,
-      workerEarning: booking.totalPrice,
+      workerEarning: booking.totalPrice, // estimate; reconciled at release.
       gateway: 'demo',
       gatewayId: gateway.id,
       gatewayIntentId: authz.intentId,
@@ -389,24 +403,125 @@ class PaymentService {
     return booking;
   }
 
-  async releaseHeldPayment(payment, booking, adminId, session, { reasonCode = 'customer_confirmed', note = '' } = {}) {
-    if (payment.lockedAt) {
-      throw new ApiError(StatusCodes.CONFLICT, 'Payment is locked by admin.');
-    }
+  /**
+   * Shared settle-to-final helper (Task 10, extracted for Task 12/13 reuse).
+   *
+   * Clamps `amount` to the authorized hold, captures via the gateway, derives the
+   * worker earning from the captured amount (never blindly from the final subtotal
+   * when above-hold — R7), settles outstanding cash debts from that earning, and
+   * stamps the payment's capture fields. Does NOT change payment.status, save the
+   * payment, touch the booking, or emit events/notifications/audit — callers own
+   * those side effects so release and dispute-resolution can apply them differently.
+   *
+   * @param {Payment} payment - mongoose Payment document (mutated in place: workerEarning,
+   *   gatewayChargeId, capturedAmount, capturedAt).
+   * @param {Booking} booking - mongoose Booking document (read-only here).
+   * @param {number} amount - target settlement amount (e.g. grandTotal, or grandTotal - partialRefund).
+   * @param {mongoose.ClientSession} session
+   * @returns {Promise<{captureAmount: number, workerEarning: number, remainingAmount: number, aboveHold: boolean}>}
+   */
+  async settleToAmount(payment, booking, amount, session) {
     const workerId = payment.worker || booking.worker;
+    const authorizedHold = payment.amount;
+    const target = roundMoney(amount);
+    const captureAmount = roundMoney(Math.max(0, Math.min(target, authorizedHold)));
+    const aboveHold = target > authorizedHold;
+    // Worker earning is ALWAYS derived from the CAPTURED amount, never blindly from
+    // the final subtotal (R7). This is correct in all three settlement shapes:
+    //  - normal release (captureAmount === grandTotal === subtotal + fee): nets out
+    //    to exactly subtotal, so behavior is unchanged from before.
+    //  - above-hold (captureAmount clamped to the hold, < grandTotal): unchanged,
+    //    this branch was already capture-based.
+    //  - reduced capture (dispute partial_refund, or a flat callout fee with no
+    //    labor invoice at all): the worker must NOT be credited the full subtotal/
+    //    estimate when less than that was actually captured — doing so silently
+    //    drains the platform's share (partial_refund) or over-credits the worker
+    //    the original estimate instead of the captured flat fee (callout).
+    // Fee fallback to payment.platformFee is scoped to bookings that DO have a real
+    // invoice (booking.grandTotal > 0) but whose booking.platformFee field itself
+    // wasn't populated (I6 legacy/in-flight shape) — it must NOT apply to genuinely
+    // invoice-less captures (e.g. the Task 13 callout/inspection fee on a declined
+    // booking), where payment.platformFee is just the stale pre-invoice hold-time
+    // estimate and falling back to it would resurrect exactly the over-credit bug
+    // this fix removes.
+    const hasInvoice = booking.grandTotal > 0;
+    const fee = booking.platformFee || (hasInvoice ? (payment.platformFee || 0) : 0);
+    // Legacy/in-flight guard (I3/I6): a booking with NO invoice at all (no grandTotal)
+    // whose capture target is the FULL hold (no reduction requested — the caller had
+    // no itemized invoice to settle to and is just releasing everything) keeps the
+    // original held-time estimate, exactly like before this fix. This is distinct
+    // from a genuinely reduced capture against an invoice-less booking (the callout
+    // fee, where captureAmount is deliberately far below the hold) — that case MUST
+    // use the captured-amount formula below, or the worker is over-credited the
+    // stale estimate instead of the amount actually captured.
+    const isLegacyFullReleaseFallback = !hasInvoice && captureAmount === authorizedHold;
+    const workerEarning = isLegacyFullReleaseFallback
+      ? roundMoney(payment.workerEarning || 0)
+      : roundMoney(Math.max(0, captureAmount - fee));
+    payment.workerEarning = workerEarning;
 
     const { remainingAmount } = await getCashDebtSvc().settleCashDebtsFromAmount(
       workerId,
-      payment.workerEarning,
+      workerEarning,
       session
     );
 
     if (payment.gatewayIntentId) {
       const gw = getGateway();
-      const capture = await gw.capture({ intentId: payment.gatewayIntentId });
+      const capture = await gw.capture({ intentId: payment.gatewayIntentId, amount: captureAmount });
       payment.gatewayChargeId = capture.chargeId;
+      payment.capturedAmount = captureAmount;
       payment.capturedAt = new Date();
     }
+
+    return { captureAmount, workerEarning, remainingAmount, aboveHold };
+  }
+
+  // `allowOpenIssue` is accepted (and ignored by this function's own logic) so callers
+  // can pass it uniformly; releaseHeldPayment never enforced the "issue open" guard
+  // itself (only assertAdminApprovalBookingEligible/adminApproveCompletion does, and
+  // it runs BEFORE this is reached), so there's nothing to bypass here today. The flag
+  // exists to make the exception explicit and to keep payment.service the single place
+  // that decides whether dispute resolution is allowed to proceed despite an open issue,
+  // without forceRelease/other direct callers silently inheriting a new restriction.
+  async releaseHeldPayment(payment, booking, adminId, session, { reasonCode = 'customer_confirmed', note = '', allowOpenIssue = false } = {}) {
+    if (payment.lockedAt) {
+      throw new ApiError(StatusCodes.CONFLICT, 'Payment is locked by admin.');
+    }
+    const workerId = payment.worker || booking.worker;
+
+    // Settle-to-final (Task 10): the hold authorized the worst-case ceiling (C-B);
+    // the actual capture/credit must reflect the FINAL itemized invoice, clamped to
+    // the hold so we never attempt to capture more than was authorized.
+    const authorizedHold = payment.amount;
+    const grand = booking.grandTotal || payment.amount; // I6: in-flight/legacy fallback
+    const aboveHold = grand > authorizedHold;
+
+    const { captureAmount, workerEarning, remainingAmount } = await this.settleToAmount(
+      payment,
+      booking,
+      grand,
+      session
+    );
+
+    if (aboveHold) {
+      booking.flaggedForReview = true;
+      await adminAction.record({
+        adminId,
+        actionType: 'above_hold_manual_collection',
+        targetType: 'payment',
+        targetId: payment._id,
+        details: {
+          authorizedHold,
+          grandTotal: grand,
+          capturedAmount: captureAmount,
+          shortfall: roundMoney(grand - captureAmount),
+          bookingId: booking._id,
+        },
+        session,
+      });
+    }
+
     payment.status = 'released';
     payment.releasedAt = new Date();
     payment.releaseApprovedAt = new Date();
@@ -426,7 +541,7 @@ class PaymentService {
       const invoiceSvc = require('./invoice.service');
       const cfg = await getAdminSettingsSvc().get();
       const VAT_RATE = cfg?.vat?.rate ?? 0.14;
-      const subtotal = roundMoney(payment.amount / (1 + VAT_RATE));
+      const subtotal = roundMoney((booking.grandTotal || payment.amount) / (1 + VAT_RATE));
       const inv = await invoiceSvc.create({
         payment: payment._id,
         booking: payment.booking,

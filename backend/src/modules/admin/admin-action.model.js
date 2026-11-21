@@ -8,6 +8,8 @@ const ACTION_TYPES = [
   'restriction_clear', 'emergency_release', 'emergency_lock', 'emergency_unlock',
   'system_auto_confirm', 'system_apology_credit', 'system_migration',
   'credit_issue',
+  'above_hold_manual_collection',
+  'callout_fee_captured',
 ];
 
 const TARGET_TYPES = ['payment', 'debt', 'payout', 'dispute', 'user', 'settlement', 'booking'];

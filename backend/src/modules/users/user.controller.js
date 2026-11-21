@@ -150,7 +150,7 @@ const getWorkers = async (req, res) => {
     if (!serviceCategory) return emptyWorkerDiscovery(res, page, limit);
 
     andClauses.push({ $or: [
-      { services: serviceId },
+      { 'services.serviceId': serviceId },
       { categories: { $in: [serviceCategory] } },
     ]});
   } else if (category) {
@@ -164,7 +164,7 @@ const getWorkers = async (req, res) => {
 
     andClauses.push({ $or: [
       { categories: { $in: [normalizedCategory] } },
-      ...(serviceIds.length ? [{ services: { $in: serviceIds } }] : []),
+      ...(serviceIds.length ? [{ 'services.serviceId': { $in: serviceIds } }] : []),
     ]});
   }
 
@@ -192,7 +192,7 @@ const getWorkers = async (req, res) => {
   const [workers, total] = await Promise.all([
     User.find(filter)
       .select('name profileImage categories services skills averageRating totalReviews location locationLabel hourlyRate isVerified isAvailable serviceArea coverageAreas availability completedJobs yearsExperience bio')
-      .populate('services', 'title category basePrice priceUnit')
+      .populate('services.serviceId', 'title category basePrice priceUnit')
       .sort({ averageRating: -1 })
       .skip(skip)
       .limit(Number(limit)),
@@ -212,7 +212,7 @@ const getWorkers = async (req, res) => {
 const getWorkerProfile = async (req, res) => {
   const worker = await User.findOne({ _id: req.params.id, role: 'worker' })
     .select('-password')
-    .populate('services', 'title category basePrice priceUnit description');
+    .populate('services.serviceId', 'title category basePrice priceUnit description');
 
   if (!worker) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Worker not found.');
@@ -221,7 +221,7 @@ const getWorkerProfile = async (req, res) => {
   // Hide services from categories not yet approved by admin
   const pendingCats = worker.pendingCategories || [];
   if (pendingCats.length && Array.isArray(worker.services)) {
-    worker.services = worker.services.filter(s => !pendingCats.includes(s.category));
+    worker.services = worker.services.filter(s => !pendingCats.includes(s.serviceId?.category));
   }
 
   // Fetch the worker's reviews to embed in the profile response
@@ -283,12 +283,37 @@ const updateProfile = async (req, res) => {
   const user = await User.findById(req.user.id);
   if (!user) throw new ApiError(StatusCodes.NOT_FOUND, 'User not found.');
 
-  // Validate submitted service IDs for workers
+  // The client may submit services as a flat array of service IDs (legacy shape)
+  // or as [{serviceId, startsFrom}] subdocs (canonical shape, used by the tech
+  // pricing UI to set a per-worker starting price). Normalize to the subdoc
+  // shape the schema expects, defaulting startsFrom to the service's own
+  // basePrice only when the worker didn't submit a custom one.
+  let submittedServiceIds = [];
   if (updates.services !== undefined && Array.isArray(updates.services) && updates.services.length > 0) {
-    const count = await Service.countDocuments({ _id: { $in: updates.services }, isActive: true });
-    if (count !== updates.services.length) {
+    const startsFromById = new Map();
+    submittedServiceIds = updates.services.map((entry) => {
+      if (entry && typeof entry === 'object' && entry.serviceId !== undefined) {
+        if (entry.startsFrom !== undefined && entry.startsFrom !== null && entry.startsFrom !== '') {
+          startsFromById.set(String(entry.serviceId), Number(entry.startsFrom));
+        }
+        return entry.serviceId;
+      }
+      return entry;
+    });
+
+    const svcDocsForUpdate = await Service.find({ _id: { $in: submittedServiceIds }, isActive: true }).select('basePrice');
+    if (svcDocsForUpdate.length !== submittedServiceIds.length) {
       throw new ApiError(StatusCodes.BAD_REQUEST, 'One or more selected services are invalid or inactive.');
     }
+    const basePriceById = new Map(svcDocsForUpdate.map((s) => [s._id.toString(), s.basePrice]));
+    updates.services = submittedServiceIds.map((id) => {
+      const key = String(id);
+      const customStartsFrom = startsFromById.get(key);
+      return {
+        serviceId: id,
+        startsFrom: customStartsFrom !== undefined ? customStartsFrom : (basePriceById.get(key) || 0),
+      };
+    });
   }
 
   if (req.user?.role === 'worker') {
@@ -328,8 +353,8 @@ const updateProfile = async (req, res) => {
   }
 
   // Detect new categories in submitted services and route to pendingCategories
-  if (req.user?.role === 'worker' && Array.isArray(updates.services) && updates.services.length > 0) {
-    const svcDocs      = await Service.find({ _id: { $in: updates.services } }).select('category');
+  if (req.user?.role === 'worker' && submittedServiceIds.length > 0) {
+    const svcDocs      = await Service.find({ _id: { $in: submittedServiceIds } }).select('category');
     const requestedCats = [...new Set(svcDocs.map(s => s.category).filter(Boolean))];
     const verifiedCats  = user.categories || [];
     const alreadyPending = user.pendingCategories || [];
@@ -507,8 +532,36 @@ const getAllUsers = async (req, res) => {
     User.countDocuments(filter),
   ]);
 
+  // For the admin Technicians table: completedJobs + revenue are NOT stored on the
+  // user doc (the legacy completedJobs counter was never incremented). Compute them
+  // live from completed bookings so the table reflects reality.
+  let payload = users;
+  if (role === 'worker' && users.length) {
+    const ids = users.map((u) => u._id);
+    const stats = await Booking.aggregate([
+      { $match: { worker: { $in: ids }, status: 'completed' } },
+      {
+        $group: {
+          _id: '$worker',
+          completedJobs: { $sum: 1 },
+          revenue: { $sum: { $ifNull: ['$grandTotal', { $ifNull: ['$totalPrice', 0] }] } },
+        },
+      },
+    ]);
+    const statMap = new Map(stats.map((s) => [String(s._id), s]));
+    payload = users.map((u) => {
+      const plain = typeof u.toObject === 'function' ? u.toObject() : u;
+      const s = statMap.get(String(u._id));
+      plain.completedJobs = s ? s.completedJobs : 0;
+      plain.revenue = s ? s.revenue : 0;
+      return plain;
+    });
+    // Sort technicians by most completed jobs (revenue as tiebreaker), highest first.
+    payload.sort((a, b) => (b.completedJobs - a.completedJobs) || (b.revenue - a.revenue));
+  }
+
   return ApiResponse.success(res, StatusCodes.OK, 'Users retrieved.', {
-    users,
+    users: payload,
     pagination: { total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) },
   });
 };

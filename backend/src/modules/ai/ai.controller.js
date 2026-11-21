@@ -49,6 +49,37 @@ function isRoomOnlyLocation(location) {
   return ROOM_LOCATION_TOKENS.has(normalized);
 }
 
+// Deictic / relative phrases ("near me", "nearby") are NOT real places — they mean
+// "use my saved address". The Python LLM extracts them literally, so we must reject
+// them and fall back to req.body.location (the user's address pill). Otherwise the
+// literal words filter worker coverage areas and match nobody.
+const DEICTIC_LOCATION_PHRASES = [
+  'near me', 'nearby', 'near here', 'near by', 'around me', 'around here',
+  'close to me', 'close by', 'next to me', 'my area', 'my location', 'my place',
+  'قريب مني', 'بالقرب مني', 'جنبي', 'حواليا', 'في منطقتي', 'قريب منى',
+];
+
+function isDeicticLocation(location) {
+  if (!location || typeof location !== 'string') return false;
+  const normalized = location
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^[\s,._-]+|[\s,._-]+$/g, '');
+  if (!normalized) return false;
+  return DEICTIC_LOCATION_PHRASES.some((p) =>
+    normalized === p ||
+    normalized.startsWith(`${p} `) ||
+    normalized.endsWith(` ${p}`) ||
+    normalized.includes(` ${p} `)
+  );
+}
+
+// A location string the matcher can't use as a real geographic filter.
+function isUnusableLocation(location) {
+  return isRoomOnlyLocation(location) || isDeicticLocation(location);
+}
+
 function extractAreaKeywords(location) {
   if (!location || typeof location !== 'string') return [];
 
@@ -83,7 +114,7 @@ function categoryForService(service) {
 async function findMatchingWorkers(aiData, bodyLocation) {
   // Compute effectiveLocation BEFORE any early return so it is always in the response.
   const aiLocation = String(aiData.extracted?.location || '').trim();
-  const usableAiLocation = isRoomOnlyLocation(aiLocation) ? '' : aiLocation;
+  const usableAiLocation = isUnusableLocation(aiLocation) ? '' : aiLocation;
   const effectiveLocation = String(usableAiLocation || bodyLocation || '').trim();
 
   const services = Array.isArray(aiData.steps) && aiData.steps.length
@@ -136,10 +167,10 @@ async function findMatchingWorkers(aiData, bodyLocation) {
 // Upgrade scenario from vague → issue_mode when location was the only blocking field.
 function postProcessAiData(aiData, effectiveLocation) {
   const aiLocation = String(aiData.extracted?.location || '').trim();
-  const shouldReplaceLocation = !aiLocation || isRoomOnlyLocation(aiLocation);
+  const shouldReplaceLocation = !aiLocation || isUnusableLocation(aiLocation);
 
   if (!effectiveLocation) {
-    return isRoomOnlyLocation(aiLocation)
+    return isUnusableLocation(aiLocation)
       ? { ...aiData, extracted: { ...(aiData.extracted || {}), location: null } }
       : aiData;
   }

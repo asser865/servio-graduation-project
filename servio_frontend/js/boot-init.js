@@ -130,3 +130,88 @@
     if (e.persisted) finishBoot();
   });
 })();
+
+/* ═══════════════════════════════════════════════════════════
+   Sitewide broken-image fallback
+   ─────────────────────────────────────────────
+   Any <img> whose src fails to load (404, dead URL, offline)
+   is swapped for a generated initials avatar rendered as an
+   inline SVG data URI — no network dependency, always paints.
+
+   Scoped to avatar-style images (class / id hints at
+   avatar / tech / provider / profile / photo / worker) so genuine
+   content images (hero art, banners) are left untouched.
+
+   Uses a capture-phase listener on <document>: `error` events
+   from resources do not bubble, but they DO propagate during the
+   capture phase — this catches both static markup and any imgs
+   injected later by ES modules.
+
+   Deliberately does NOT toggle display or sibling "--initials"
+   placeholders: it only rewrites the broken src. A hidden
+   placeholder img therefore stays hidden (the page's own
+   initials logic still governs), while a visible broken avatar
+   gets the generated SVG.
+   ═══════════════════════════════════════════════════════════ */
+(function installAvatarFallback() {
+  var PALETTE = ['#2563eb','#7c3aed','#db2777','#ea580c','#0891b2','#16a34a','#ca8a04','#dc2626'];
+
+  function initialsFrom(name) {
+    if (!name) return '?';
+    var parts = String(name).trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return '?';
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+
+  function colorFor(seed) {
+    var h = 0;
+    for (var i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+    return PALETTE[h % PALETTE.length];
+  }
+
+  function escapeXml(s) {
+    return String(s).replace(/[<>&'"]/g, function (c) {
+      return { '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[c];
+    });
+  }
+
+  function svgAvatar(name) {
+    var initials = escapeXml(initialsFrom(name));
+    var bg = colorFor(name || 'servio');
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">'
+      + '<rect width="128" height="128" fill="' + bg + '"/>'
+      + '<text x="50%" y="50%" dy=".35em" text-anchor="middle" '
+      + 'font-family="-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif" '
+      + 'font-size="52" font-weight="700" fill="#ffffff">' + initials + '</text></svg>';
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  }
+
+  var AVATAR_RE = /avatar|tech|provider|profile|photo|worker/i;
+
+  function hintOf(el) {
+    var cls = (el.className && el.className.baseVal !== undefined ? el.className.baseVal : el.className || '');
+    return cls + ' ' + (el.id || '');
+  }
+
+  function isAvatar(img) {
+    // The <img> itself often carries no class — the hint lives on a wrapper
+    // (e.g. .header-avatar > img, #heroCardAvatar > img). Climb a few levels.
+    var el = img;
+    for (var i = 0; i < 4 && el; i++) {
+      if (AVATAR_RE.test(hintOf(el))) return true;
+      el = el.parentElement;
+    }
+    return false;
+  }
+
+  document.addEventListener('error', function (e) {
+    var img = e.target;
+    if (!img || img.tagName !== 'IMG') return;       // only <img> resource errors
+    if (img.src.slice(0, 5) === 'data:') return;     // our SVG never errors — loop guard
+    if (!isAvatar(img)) return;                       // leave non-avatar imgs alone
+    // Re-fires correctly if the page later swaps in a fresh (also-broken) src,
+    // since the guard keys on the live src, not a one-shot flag.
+    img.src = svgAvatar(img.alt || img.getAttribute('data-name') || '');
+  }, true); // capture phase — resource `error` events don't bubble
+})();

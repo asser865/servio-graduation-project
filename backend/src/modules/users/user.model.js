@@ -166,14 +166,14 @@ const userSchema = new mongoose.Schema(
     },
 
     // Canonical service references — the source of truth for which services this worker offers.
-    // Populated from the admin-managed `services` collection.
+    // Each entry pairs the Service ref with this worker's own starting price for it
+    // (startsFrom), since per-worker pricing can differ from the service's basePrice.
     services: {
-      type: [
-        {
-          type: mongoose.Schema.Types.ObjectId,
-          ref:  'Service',
-        },
-      ],
+      type: [{
+        serviceId:  { type: mongoose.Schema.Types.ObjectId, ref: 'Service', required: true },
+        startsFrom: { type: Number, default: 0, min: 0 },
+        _id: false,
+      }],
       default: [],
     },
 
@@ -344,7 +344,7 @@ userSchema.index({ location: '2dsphere' });
 
 // ── Service index ─────────────────────────────────────────────────────────────
 // Speeds up worker-discovery queries filtered by a specific service ID.
-userSchema.index({ services: 1 });
+userSchema.index({ 'services.serviceId': 1 });
 
 // ── Availability index ────────────────────────────────────────────────────────
 // Allows fast filtering of available workers in listing + booking flows.

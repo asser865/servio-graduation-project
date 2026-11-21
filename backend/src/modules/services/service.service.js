@@ -5,7 +5,74 @@
 
 const { StatusCodes } = require('http-status-codes');
 const Service        = require('./service.model');
+const User           = require('../users/user.model');
 const ApiError       = require('../../utils/ApiError');
+
+// ── Technician aggregate (Option B) ──────────────────────────────────────────
+// WHAT: A per-service techStats aggregate computed over the SAME "available
+//       verified technician" filter used by user.controller.js#getWorkers, so
+//       the marketplace card and the service drawer/modal read ONE backend
+//       source and never disagree (card used to show service-level "New"
+//       while the modal showed a client-side category aggregate).
+// HOW:  Single Mongoose aggregation over the User collection — unwind each
+//       worker's offered services, group by serviceId, attach the result to
+//       each service as `techStats: { pros, reviews, rating, minStartsFrom }`.
+async function buildTechStatsMap() {
+  const rows = await User.aggregate([
+    {
+      $match: {
+        role: 'worker',
+        isActive: true,
+        isVerified: true,
+        isAvailable: true,
+        'availability.0': { $exists: true },
+        $or: [
+          { suspendedUntil: { $exists: false } },
+          { suspendedUntil: null },
+          { suspendedUntil: { $lte: new Date() } },
+        ],
+      },
+    },
+    { $unwind: '$services' },
+    {
+      $group: {
+        _id: '$services.serviceId',
+        pros: { $sum: 1 },
+        reviews: { $sum: { $ifNull: ['$totalReviews', 0] } },
+        ratingWeighted: {
+          $sum: {
+            $multiply: [
+              { $ifNull: ['$averageRating', 0] },
+              { $ifNull: ['$totalReviews', 0] },
+            ],
+          },
+        },
+        minStartsFrom: { $min: '$services.startsFrom' },
+      },
+    },
+  ]);
+
+  const map = new Map();
+  rows.forEach((row) => {
+    map.set(String(row._id), {
+      pros: row.pros,
+      reviews: row.reviews,
+      rating: row.reviews > 0 ? row.ratingWeighted / row.reviews : 0,
+      minStartsFrom: row.minStartsFrom ?? null,
+    });
+  });
+  return map;
+}
+
+function emptyTechStats() {
+  return { pros: 0, reviews: 0, rating: 0, minStartsFrom: null };
+}
+
+function attachTechStats(service, techStatsMap) {
+  const plain = typeof service.toObject === 'function' ? service.toObject() : service;
+  plain.techStats = techStatsMap.get(String(plain._id)) || emptyTechStats();
+  return plain;
+}
 
 /**
  * LIST ALL SERVICES
@@ -18,17 +85,20 @@ const getAllServices = async ({ category, page = 1, limit = 100 }) => {
 
   const skip = (Number(page) - 1) * Number(limit);
 
-  const [services, total] = await Promise.all([
+  const [services, total, techStatsMap] = await Promise.all([
     Service.find(filter)
       .populate('createdBy', 'name email')
       .sort({ createdAt: 1 })
       .skip(skip)
       .limit(Number(limit)),
     Service.countDocuments(filter),
+    buildTechStatsMap(),
   ]);
 
+  const servicesWithStats = services.map((service) => attachTechStats(service, techStatsMap));
+
   return {
-    services,
+    services: servicesWithStats,
     pagination: {
       total,
       page:       Number(page),
@@ -47,7 +117,8 @@ const getServiceById = async (id) => {
   if (!service) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Service not found.');
   }
-  return service;
+  const techStatsMap = await buildTechStatsMap();
+  return attachTechStats(service, techStatsMap);
 };
 
 /**

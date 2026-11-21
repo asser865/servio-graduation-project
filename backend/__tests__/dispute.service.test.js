@@ -275,7 +275,11 @@ describe('disputeService.resolveDispute', () => {
     expect(freshBooking.status).toBe('completed');
     expect(freshBooking.paymentStatus).toBe('released');
     expect(freshBooking.save).toHaveBeenCalledWith({ session });
-    expect(paymentService.releaseHeldPayment).toHaveBeenCalledWith(freshPayment, freshBooking, ADMIN_ID, session);
+    expect(paymentService.releaseHeldPayment).toHaveBeenCalledWith(freshPayment, freshBooking, ADMIN_ID, session, {
+      reasonCode: 'dispute_resolution',
+      note: 'Release approved after review.',
+      allowOpenIssue: true,
+    });
     expect(dispute.status).toBe('resolved_release');
     expect(dispute.decision).toBe('release');
     expect(session.endSession).toHaveBeenCalled();

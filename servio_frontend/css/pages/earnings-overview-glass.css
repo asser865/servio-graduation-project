@@ -586,11 +586,11 @@
 [data-pending-busy], [data-held-busy], [data-owing-only] {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 .eog-tile--debt[data-state="settled"] [data-owing-only] { display: none; }
 .eog-tile--debt[data-state="owing"] [data-settled-only]  { display: none; }
-.eog-tile__cta { margin-top: 6px; align-self: flex-start; padding: 9px 14px; font-size: 12.5px; }
+.eog-tile__cta { margin-top: 2px; align-self: flex-start; padding: 8px 14px; font-size: 12.5px; }
 
 .eog-tile__settled {
   display: flex;
@@ -657,6 +657,199 @@
 .eog-debt__stats dd em {
   font-style: normal; font-size: 10px; color: var(--color-text-light);
   text-transform: uppercase; letter-spacing: .08em;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   MINI TILES — UI/UX ENHANCEMENT PASS
+   Status-driven accent rail, gradient icon chips, sharper hierarchy,
+   live status pill, shimmer CTA, stat chips, staggered entrance.
+   Single source of truth: per-card --rail (state-derived RGB triplet).
+   ════════════════════════════════════════════════════════════════════ */
+
+/* Equal heights (debt card drives the row), no rigid 250px floor.
+   Short cards distribute their content vertically so they read as
+   intentional rather than clumped-at-top with a void below. */
+.earn-view--glass .eog-minis-row             { align-items: stretch; }
+.earn-view--glass .eog-tile--mini            { min-height: 0; gap: 10px; }
+.earn-view--glass .eog-tile--mini [data-pending-busy],
+.earn-view--glass .eog-tile--mini [data-held-busy],
+.earn-view--glass .eog-tile--mini [data-owing-only] {
+  flex: 1 1 auto;
+  justify-content: space-between;
+}
+
+/* --rail = semantic status color as bare "r,g,b" for rgba() composition */
+.earn-view--glass .eog-tile--mini            { --rail: 52,152,219; padding-top: 14px; }
+.earn-view--glass .eog-tile--pending         { --rail: 52,152,219; }  /* in review  → info  */
+.earn-view--glass .eog-tile--held            { --rail: 243,156,18; }  /* held       → warn  */
+.earn-view--glass .eog-tile--debt[data-state="owing"]      { --rail: 192,57,43; }  /* due → danger */
+.earn-view--glass .eog-tile--pending[data-state="settled"],
+.earn-view--glass .eog-tile--held[data-state="settled"],
+.earn-view--glass .eog-tile--debt[data-state="settled"]    { --rail: 39,174,96; }  /* clear → success */
+
+/* Top status rail — instant scannability across the row */
+.earn-view--glass .eog-tile--mini::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  z-index: 2;
+  background: linear-gradient(90deg,
+    transparent, rgba(var(--rail), .95) 18%, rgba(var(--rail), .95) 82%, transparent);
+  opacity: .85;
+  transition: height .25s ease, opacity .25s ease;
+}
+.earn-view--glass .eog-tile--mini:hover { border-color: rgba(var(--rail), .5); }
+.earn-view--glass .eog-tile--mini:hover::before { height: 4px; opacity: 1; }
+
+/* Header divider tinted to status */
+.earn-view--glass .eog-tile--mini .eog-tile__head {
+  border-bottom-color: rgba(var(--rail), .20);
+}
+
+/* Gradient icon chip, state-colored, lifts on hover */
+.earn-view--glass .eog-tile--mini .eog-tile__icon {
+  background: linear-gradient(140deg, rgba(var(--rail), .22), rgba(var(--rail), .08));
+  border: 1px solid rgba(var(--rail), .34);
+  color: rgb(var(--rail));
+  box-shadow: 0 6px 14px -8px rgba(var(--rail), .6), inset 0 1px 0 rgba(255,255,255,.25);
+  border-radius: 11px;
+  transition: transform .25s ease, box-shadow .25s ease;
+}
+.earn-view--glass .eog-tile--mini:hover .eog-tile__icon {
+  transform: scale(1.06) rotate(-3deg);
+  box-shadow: 0 9px 18px -8px rgba(var(--rail), .7), inset 0 1px 0 rgba(255,255,255,.3);
+}
+
+/* Amount hierarchy — bigger, aligned digits */
+.earn-view--glass .eog-tile--mini .eog-tile__amount strong {
+  font-size: clamp(24px, 2vw, 30px);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.earn-view--glass .eog-tile--debt .eog-tile__amount--debt strong { color: rgb(var(--rail)); font-size: clamp(24px, 2vw, 30px); }
+
+/* Status pill — tinted to rail; live pulse dot on "in review".
+   Covers both header tag (debt) and meta-row tag (pending). */
+.earn-view--glass .eog-tile--mini .money-card__tag {
+  background: rgba(var(--rail), .14);
+  color: rgb(var(--rail));
+  border: 1px solid rgba(var(--rail), .30);
+  padding: 5px 11px;
+}
+.earn-view--glass .money-card__tag--info::before {
+  content: "";
+  width: 6px; height: 6px; flex: 0 0 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: eogTagPulse 2s ease-in-out infinite;
+}
+@keyframes eogTagPulse {
+  0%, 100% { opacity: 1;  box-shadow: 0 0 0 0 rgba(var(--rail), .55); }
+  50%      { opacity: .5; box-shadow: 0 0 0 5px rgba(var(--rail), 0); }
+}
+
+/* Settle Fees — full-width primary CTA with hover shimmer sweep */
+.earn-view--glass .eog-tile__cta.eog-btn--warn {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  align-self: stretch;
+  background: linear-gradient(135deg, #e05a4a, #c0392b);
+  box-shadow: 0 12px 24px -12px rgba(192,57,43,.7);
+}
+.earn-view--glass .eog-tile__cta.eog-btn--warn::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(120deg, transparent 32%, rgba(255,255,255,.38) 50%, transparent 68%);
+  transform: translateX(-130%);
+  transition: transform .6s ease;
+}
+.earn-view--glass .eog-tile__cta.eog-btn--warn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 30px -12px rgba(192,57,43,.85);
+}
+.earn-view--glass .eog-tile__cta.eog-btn--warn:hover::after { transform: translateX(130%); }
+
+/* Debt mini-stats — two full-width chips STACKED vertically. Each chip is a clean
+   key→value row: label on the left, amount on the right. Full width means labels
+   render in full ("Paid lifetime", "Avg fee / job") with no ellipsis. */
+.earn-view--glass .eog-debt__stats {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 0;
+  padding-top: 8px;
+}
+.earn-view--glass .eog-debt__stats > div {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: rgba(var(--color-accent-rgb), .06);
+  border: 1px solid rgba(var(--color-accent-rgb), .14);
+}
+.earn-view--glass .eog-debt__stats dt {
+  font-size: 10px;
+  letter-spacing: .06em;
+  white-space: nowrap;
+  line-height: 1.2;
+  color: var(--color-text-light);
+}
+.earn-view--glass .eog-debt__stats dd {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
+}
+.earn-view--glass .eog-debt__stats dd strong {
+  font-size: 15px;
+  line-height: 1.15;
+  color: var(--color-text);
+}
+.earn-view--glass .eog-debt__stats dd em {
+  font-size: 9.5px;
+  letter-spacing: .06em;
+}
+
+/* "See breakdown" rows were authored for a DARK card (#fff / light-tan text) so on
+   the light glass card they rendered near-invisible. Re-color to theme tokens so
+   they read in both light and dark. */
+.earn-view--glass .jq-premium-liability-id,
+.earn-view--glass .jq-premium-liability-val { color: var(--color-text); }
+.earn-view--glass .jq-premium-liability-tag,
+.earn-view--glass .jq-premium-liability-breakdown { color: var(--color-text-light); }
+.earn-view--glass .jq-premium-liability-val { white-space: nowrap; }
+.earn-view--glass .jq-premium-liability-row {
+  border-bottom-color: rgba(var(--color-accent-rgb), .14);
+}
+
+/* Settled (all-clear) panel — soft success gradient */
+.earn-view--glass .eog-tile--mini .eog-tile__settled {
+  background: linear-gradient(140deg, rgba(39,174,96,.12), rgba(39,174,96,.04));
+  border-color: rgba(39,174,96,.26);
+}
+
+/* Staggered entrance */
+.earn-view--glass .eog-minis-row .eog-tile--mini { animation: eogRise .5s ease both; }
+.earn-view--glass .eog-minis-row .eog-tile--mini:nth-child(1) { animation-delay: .05s; }
+.earn-view--glass .eog-minis-row .eog-tile--mini:nth-child(2) { animation-delay: .12s; }
+.earn-view--glass .eog-minis-row .eog-tile--mini:nth-child(3) { animation-delay: .19s; }
+@keyframes eogRise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .earn-view--glass .eog-minis-row .eog-tile--mini { animation: none; }
+  .earn-view--glass .money-card__tag--info::before { animation: none; }
+  .earn-view--glass .eog-tile__cta.eog-btn--warn::after { transition: none; }
+}
+
+[data-theme="dark"] .earn-view--glass .eog-debt__stats > div {
+  background: rgba(255,255,255,.04);
+  border-color: rgba(255,255,255,.08);
 }
 
 /* Section title */
@@ -958,4 +1151,157 @@
     radial-gradient(60% 50% at 18% 12%, rgba(var(--color-accent-rgb), 0.14), transparent 70%),
     radial-gradient(50% 45% at 88% 18%, rgba(var(--color-accent-rgb), 0.10), transparent 75%),
     radial-gradient(70% 60% at 50% 95%, rgba(var(--color-primary-rgb), 0.12), transparent 80%);
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   B+ CONSISTENCY PASS — status-adaptive mini tiles
+   · locked header height so all three dividers align (card 3 wraps 2 lines)
+   · solid status-tinted info badge ("i") on every card label
+   · centered "all-clear" hero for every settled / empty state
+   · liability: header gains a fee icon-chip; "Outstanding" pill drops by the amount
+   · pending: slim hold-window track fills the mid-card void (honest, no fake %)
+   ════════════════════════════════════════════════════════════════════ */
+
+/* 1 — lock the title slot: 1-line and 2-line labels reserve the same height,
+   so the status divider lands on one shared Y across the whole row */
+.earn-view--glass .eog-tile--mini .eog-tile__head  { align-items: flex-start; }
+.earn-view--glass .eog-tile--mini .eog-tile__label { min-height: 34px; align-items: center; }
+
+/* 2 — info badge (style B): solid rail-tinted circle + white "i".
+   Scoped to the mini tiles; other money-cards keep their muted glyph. */
+.earn-view--glass .eog-tile--mini .money-card__info {
+  position: relative;
+  width: 16px; height: 16px; flex: 0 0 16px;
+  margin: 0 0 0 6px; padding: 0;
+  border: none; border-radius: 50%;
+  background: rgb(var(--rail)); color: #fff;
+  box-shadow: 0 2px 5px -1px rgba(var(--rail), .55);
+  transition: filter .2s ease, transform .2s ease;
+}
+.earn-view--glass .eog-tile--mini .money-card__info:hover,
+.earn-view--glass .eog-tile--mini .money-card__info.is-open {
+  background: rgb(var(--rail)); color: #fff;
+  /* NB: no transform/filter here — either would turn this 16px button into the
+     tooltip's containing block and crush it into a 1-word-wide sliver. */
+  box-shadow: 0 4px 10px -2px rgba(var(--rail), .7);
+}
+.earn-view--glass .eog-tile--mini .money-card__info svg { width: 11px; height: 11px; }
+/* let the tooltip escape the clipped card while it's open (graceful no-op pre-:has) */
+.earn-view--glass .eog-tile--mini:has(.money-card__info:hover),
+.earn-view--glass .eog-tile--mini:has(.money-card__info:focus-visible),
+.earn-view--glass .eog-tile--mini:has(.money-card__info.is-open) { overflow: visible; }
+.earn-view--glass .eog-tile--mini .money-card__info[data-tooltip]:hover::after,
+.earn-view--glass .eog-tile--mini .money-card__info[data-tooltip].is-open::after {
+  width: min(230px, 78vw);
+}
+
+/* 3 — settled / empty → centered "all clear" hero. Every good state reads
+   identically: pending cleared, no disputes, no fees due. */
+.earn-view--glass .eog-tile--mini .eog-tile__settled {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 9px;
+  width: 100%;
+  margin: auto 0;
+  padding: 6px 8px;
+  border: none;
+  background: none;
+}
+.earn-view--glass .eog-tile--mini .eog-tile__settled-icon {
+  width: 52px; height: 52px;
+  background: radial-gradient(circle at 50% 35%, rgba(39,174,96,.22), rgba(39,174,96,.08));
+  border: 1px solid rgba(39,174,96,.34);
+  box-shadow: 0 10px 22px -12px rgba(39,174,96,.6);
+}
+.earn-view--glass .eog-tile--mini .eog-tile__settled-icon svg { width: 24px; height: 24px; }
+.earn-view--glass .eog-tile--mini .eog-tile__settled strong   { font-size: 15px; line-height: 1.35; }
+.earn-view--glass .eog-tile--mini .eog-tile__settled-sub {
+  font-size: 11.5px; color: var(--color-text-light); font-weight: 500; line-height: 1.4;
+}
+
+/* 4 — liability: "Outstanding" pill now lives beside the amount, not in the header.
+   Wrap-on-tight so the pill drops to its own right-aligned line instead of being
+   clipped by the card edge; stays inline beside the amount whenever there's room. */
+.earn-view--glass .eog-tile--debt .eog-tile__amount {
+  flex-wrap: wrap; align-items: center; gap: 8px; row-gap: 6px; min-width: 0;
+}
+/* Amount stays one line ("34.50 EGP" never breaks); EGP rendered small + muted inline */
+.earn-view--glass .eog-tile--debt .eog-tile__amount strong {
+  flex: 0 0 auto; white-space: nowrap;
+}
+.earn-view--glass .eog-tile--debt .eog-tile__amount strong span {
+  font-size: 11px; font-weight: 600; color: var(--color-text-light);
+  letter-spacing: .06em; margin-left: 3px;
+}
+/* Compact "Outstanding" pill — right-aligned, inline beside amount, never its own line */
+.earn-view--glass .eog-tile--debt .eog-tile__amount .money-card__tag {
+  margin-left: auto;
+  flex: 0 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 3px 8px;
+  font-size: 10px;
+  line-height: 1.4;
+  gap: 4px;
+}
+.earn-view--glass .eog-tile--debt .eog-tile__amount .money-card__tag svg { width: 9px; height: 9px; flex: 0 0 auto; }
+
+/* 5 — pending hold-window track: honest "processing" shimmer fills the void */
+.earn-view--glass .eog-tile--pending .eog-hold {
+  position: relative;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(var(--rail), .16);
+  overflow: hidden;
+}
+.earn-view--glass .eog-tile--pending .eog-hold::after {
+  content: "";
+  position: absolute; top: 0; bottom: 0; left: 0;
+  width: 40%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(var(--rail), .35), rgba(var(--rail), .95));
+  animation: eogHold 1.9s ease-in-out infinite;
+}
+@keyframes eogHold {
+  0%   { transform: translateX(-60%); }
+  50%  { transform: translateX(185%); }
+  100% { transform: translateX(-60%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .earn-view--glass .eog-tile--pending .eog-hold::after { animation: none; width: 100%; opacity: .5; }
+}
+
+/* 6 — info tooltip: anchored to the card HEAD (not the tiny inline "i" button) and
+   floated ABOVE the card so it is never clipped by the card's overflow:hidden nor
+   squeezed into a vertical sliver. Width is content-driven via min/max — it stays a
+   proper panel regardless of the offset parent's size. */
+.earn-view--glass .eog-tile--mini .eog-tile__head  { position: relative; }
+.earn-view--glass .eog-tile--mini .money-card__info { position: static; }
+.earn-view--glass .eog-tile--mini .money-card__info[data-tooltip]:hover::after,
+.earn-view--glass .eog-tile--mini .money-card__info[data-tooltip]:focus-visible::after,
+.earn-view--glass .eog-tile--mini .money-card__info[data-tooltip].is-open::after {
+  left: 0;
+  right: auto;
+  top: calc(100% + 10px);
+  bottom: auto;
+  width: max-content;
+  /* min-width is the safety floor: per CSS, min-width beats max-width, so even if
+     the containing block is ever tiny the panel can never collapse to a sliver. */
+  min-width: 170px;
+  max-width: min(230px, 100%);
+  z-index: 20;
+  white-space: normal;
+  box-shadow: 0 14px 30px -10px rgba(0, 0, 0, .4);
+}
+/* Rightmost (Platform Fees) card hugs the column edge — anchor the panel's RIGHT
+   side so it grows leftward and stays inside the card (no spill, no clipping). */
+.earn-view--glass .eog-tile--debt .money-card__info[data-tooltip]:hover::after,
+.earn-view--glass .eog-tile--debt .money-card__info[data-tooltip]:focus-visible::after,
+.earn-view--glass .eog-tile--debt .money-card__info[data-tooltip].is-open::after {
+  left: auto;
+  right: 0;
 }

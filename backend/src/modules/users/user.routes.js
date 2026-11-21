@@ -1,5 +1,6 @@
 const { Router } = require('express');
 const { body } = require('express-validator');
+const mongoose = require('mongoose');
 const userController = require('./user.controller');
 const { protect } = require('../../middleware/auth.middleware');
 const { authorize } = require('../../middleware/role.middleware');
@@ -44,8 +45,25 @@ const profileUpdateValidation = [
     'installation',
     'other',
   ]).withMessage('Invalid category'),
+  // Accepts either the legacy flat shape (array of service ObjectIds) or the
+  // canonical [{ serviceId, startsFrom }] subdoc shape used for per-worker pricing.
   body('services').optional().isArray().withMessage('Services must be an array'),
-  body('services.*').optional().isMongoId().withMessage('Each service must be a valid MongoDB ObjectId'),
+  body('services.*')
+    .optional()
+    .custom((entry) => {
+      if (typeof entry === 'string') {
+        return mongoose.Types.ObjectId.isValid(entry);
+      }
+      if (entry && typeof entry === 'object') {
+        return mongoose.Types.ObjectId.isValid(entry.serviceId);
+      }
+      return false;
+    })
+    .withMessage('Each service must be a valid MongoDB ObjectId, or an object with a valid serviceId'),
+  body('services.*.startsFrom')
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage('startsFrom must be a non-negative number'),
 ];
 
 const emailUpdateValidation = [

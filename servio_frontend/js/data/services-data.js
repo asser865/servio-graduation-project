@@ -93,7 +93,7 @@ export const SERVICES = {
   hvac: {
     en: { title: 'A/C Maintenance & HVAC', lead: 'Professional air conditioning installation, servicing, and repair by certified HVAC technicians.', priceBadge: 'avg. 400 – 2,500 EGP', findBtn: 'Find an HVAC Technician →', ctaTitle: 'Ready to book AC service?', ctaSub: 'Browse our certified HVAC specialists available today.', ctaBtn: 'Browse Available Technicians →' },
     ar: { title: 'صيانة التكييف والتبريد', lead: 'تركيب وصيانة وإصلاح أجهزة التكييف من قبل فنيين مخصصين معتمدين.', priceBadge: 'متوسط 400 – 2,500 جنيه', findBtn: 'ابحث عن فني تكييف →', ctaTitle: 'جاهز لحجز صيانة تكييف؟', ctaSub: 'تصفح متخصصي التكييف المعتمدين المتاحين اليوم.', ctaBtn: 'تصفح الفنيين المتاحين →' },
-    heroImage: 'https://images.unsplash.com/photo-1631545806609-5a1e3d9d5ff4?auto=format&fit=crop&w=1600&q=80',
+    heroImage: 'https://images.unsplash.com/photo-1642749776312-aa42ce20c9f5?auto=format&fit=crop&w=1600&q=80',
     included: [
       { icon: I.temp,   en: { title: 'AC Installation', desc: 'Full installation of split, window, and cassette AC units.' }, ar: { title: 'تركيب التكييف', desc: 'تركيب كامل لوحدات التكييف المنشق والنافذة والكاسيت.' } },
       { icon: I.gear,   en: { title: 'Annual Servicing', desc: 'Cleaning, gas refill checks, and performance optimization.' }, ar: { title: 'الصيانة السنوية', desc: 'تنظيف وفحص شحن الغاز وتحسين الأداء.' } },
@@ -243,7 +243,7 @@ export const SERVICES = {
   flooring: {
     en: { title: 'Flooring Services', lead: 'Installation and repair of hardwood, tile, marble, and vinyl flooring by specialist craftsmen.', priceBadge: 'avg. 500 – 5,000 EGP', findBtn: 'Find a Flooring Specialist →', ctaTitle: 'Ready to book flooring service?', ctaSub: 'Browse our certified flooring installation specialists.', ctaBtn: 'Browse Available Specialists →' },
     ar: { title: 'خدمات الأرضيات', lead: 'تركيب وإصلاح أرضيات الخشب والبلاط والرخام والفينيل من قبل حرفيين متخصصين.', priceBadge: 'متوسط 500 – 5,000 جنيه', findBtn: 'ابحث عن متخصص أرضيات →', ctaTitle: 'جاهز لحجز خدمة أرضيات؟', ctaSub: 'تصفح متخصصي تركيب الأرضيات المعتمدين.', ctaBtn: 'تصفح المتخصصين المتاحين →' },
-    heroImage: 'https://images.unsplash.com/photo-1581783898377-1c624d3c9620?auto=format&fit=crop&w=1600&q=80',
+    heroImage: 'https://images.unsplash.com/photo-1564060710225-c738ca922168?auto=format&fit=crop&w=1600&q=80',
     included: [
       { icon: I.home,   en: { title: 'Tile & Marble Installation', desc: 'Precision laying of ceramic, porcelain, and marble tiles.' }, ar: { title: 'تركيب البلاط والرخام', desc: 'تركيب دقيق للبلاط الخزفي والبورسلان والرخام.' } },
       { icon: I.wrench, en: { title: 'Hardwood & Parquet', desc: 'Installation and refinishing of solid and engineered wood floors.' }, ar: { title: 'الباركيه والخشب الصلب', desc: 'تركيب وإعادة تشطيب أرضيات الخشب الصلب والمهندس.' } },
@@ -293,7 +293,7 @@ export const SERVICES = {
   roofing: {
     en: { title: 'Roofing Services', lead: 'Professional roof leak repair, tile replacement, and waterproofing by experienced roofing specialists.', priceBadge: 'avg. 500 – 5,000 EGP', findBtn: 'Find a Roofing Specialist →', ctaTitle: 'Ready to book roofing service?', ctaSub: 'Browse our certified roofing specialists.', ctaBtn: 'Browse Available Specialists →' },
     ar: { title: 'أعمال الأسقف', lead: 'إصلاح تسربات الأسقف واستبدال البلاط والعزل المائي من قبل متخصصين ذوي خبرة.', priceBadge: 'متوسط 500 – 5,000 جنيه', findBtn: 'ابحث عن متخصص أسقف →', ctaTitle: 'جاهز لحجز خدمة أسقف؟', ctaSub: 'تصفح متخصصي الأسقف المعتمدين.', ctaBtn: 'تصفح المتخصصين المتاحين →' },
-    heroImage: 'https://images.unsplash.com/photo-1591854272024-0e12e4c07a7c?auto=format&fit=crop&w=1600&q=80',
+    heroImage: 'https://images.unsplash.com/photo-1635424824849-1b09bdcc55b1?auto=format&fit=crop&w=1600&q=80',
     included: [
       { icon: I.shield, en: { title: 'Leak Detection & Repair', desc: 'Finding and sealing all roof leak sources permanently.' }, ar: { title: 'كشف وإصلاح التسربات', desc: 'إيجاد وإغلاق جميع مصادر تسربات الأسقف بشكل دائم.' } },
       { icon: I.wrench, en: { title: 'Tile Replacement', desc: 'Broken and missing roof tile replacement.' }, ar: { title: 'استبدال القرميد', desc: 'استبدال القرميد المكسور والمفقود.' } },
@@ -432,4 +432,29 @@ export const SERVICE_TECHNICIANS = {
 /** Returns the technician IDs to show for a given service key. */
 export function getTechsForService(serviceKey) {
   return SERVICE_TECHNICIANS[serviceKey] || [1, 2, 3, 4, 5];
+}
+
+export function slugifyServiceLabel(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+export function getSubserviceForKey(serviceKey, subserviceKey) {
+  const svc = SERVICES[serviceKey];
+  const normalized = slugifyServiceLabel(subserviceKey);
+  if (!svc || !normalized) return null;
+  return (svc.included || []).find(item => (
+    slugifyServiceLabel(item.en?.title) === normalized ||
+    slugifyServiceLabel(item.ar?.title) === normalized
+  )) || null;
+}
+
+export function getSubserviceLabel(serviceKey, subserviceKey, lang = 'en') {
+  const item = getSubserviceForKey(serviceKey, subserviceKey);
+  if (!item) return '';
+  return (item[lang] || item.en)?.title || '';
 }

@@ -526,16 +526,25 @@
                   <span class="review-row__value" id="reviewNotes">&nbsp;</span>
                 </div>
                 <div class="review-row">
-                  <span class="review-row__label" data-i18n="booking_review_base_rate">Base Rate</span>
+                  <span class="review-row__label" id="reviewFeeLabel" data-i18n="booking_review_starts_from">Starts from</span>
                   <span class="review-row__value" id="reviewBaseRate">&nbsp;</span>
                 </div>
-                <div class="review-row">
-                  <span class="review-row__label" id="reviewFeeLabel" data-i18n="booking_review_fee">Platform Fee (10%)</span>
+                <div class="review-row" id="reviewBandRow" hidden>
+                  <span class="review-row__label" data-i18n="booking_review_typical_range">Typical range</span>
                   <span class="review-row__value" id="reviewFee">&nbsp;</span>
                 </div>
-                <div class="review-row" style="padding-top:0.5rem;border-top:1px solid var(--color-border);margin-top:0.25rem">
-                  <span class="review-row__label" style="font-weight:700;color:var(--color-text)" data-i18n="booking_review_total">Estimated Total</span>
-                  <span class="review-row__value" id="reviewTotal" style="font-family:var(--font-heading);font-size:1.05rem;color:var(--color-accent)">&nbsp;</span>
+                <div class="review-row" style="padding-top:0.35rem">
+                  <span class="review-escrow-chip" id="reviewEscrowChip" style="display:inline-flex;align-items:center;gap:6px;font-size:0.75rem;font-weight:600;color:var(--color-success);background:var(--color-success-bg);border-radius:999px;padding:4px 10px;">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.5 8.5 8 11 4.5-2.5 8-6 8-11V5l-8-3Z"/><path d="m9 12 2 2 4-4"/></svg>
+                    <span data-i18n="booking_review_escrow_chip">Escrow protected</span>
+                  </span>
+                </div>
+                <div class="review-row" style="padding-top:0.6rem;border-top:1px solid var(--color-border);margin-top:0.35rem;flex-direction:column;align-items:flex-start;gap:0.3rem">
+                  <span style="font-weight:700;color:var(--color-text);font-size:0.95rem" data-i18n="booking_review_charge_reassurance" id="reviewTotal">You're only charged the final amount you approve.</span>
+                  <span style="font-size:0.75rem;color:var(--color-text-light)">
+                    <span data-i18n="booking_review_hold_label">Card hold (released if unused)</span>:
+                    <span id="reviewHoldAmount">&nbsp;</span>
+                  </span>
                 </div>
               </div>
             </div>
@@ -592,8 +601,8 @@
             </div>
           </div>
 
-          <!-- Pricing -->
-          <div class="summary-card__pricing">
+          <!-- Pricing — hourly fallback (no specific Type-A service selected yet) -->
+          <div class="summary-card__pricing" id="sidebarPricingHourly">
             <div class="price-row">
               <span class="price-row__label" data-i18n="booking_base_rate_label">Base rate (1 hr min.)</span>
               <span class="price-row__value" id="sidebarBaseRate">&nbsp;</span>
@@ -609,6 +618,27 @@
             <div class="price-row price-row--total">
               <span class="price-row__label" data-i18n="booking_est_total">Estimated Total</span>
               <span class="price-row__value" id="sidebarTotal">&nbsp;</span>
+            </div>
+          </div>
+
+          <!-- Pricing — Type-A band model (specific seeded service selected) -->
+          <div class="summary-card__pricing" id="sidebarPricingBand" hidden>
+            <div class="price-row price-row--total">
+              <span class="price-row__label" data-i18n="booking_sidebar_starts_from">Starts from</span>
+              <span class="price-row__value" id="sidebarStartsFrom">&nbsp;</span>
+            </div>
+            <div class="price-row" id="sidebarBandRow" hidden>
+              <span class="price-row__label" data-i18n="booking_sidebar_typical_range">Typical range</span>
+              <span class="price-row__value" id="sidebarBandRange">&nbsp;</span>
+            </div>
+            <div class="price-row" style="padding-top:0.35rem">
+              <span class="review-escrow-chip" style="display:inline-flex;align-items:center;gap:6px;font-size:0.75rem;font-weight:600;color:var(--color-success);background:var(--color-success-bg);border-radius:999px;padding:4px 10px;">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.5 8.5 8 11 4.5-2.5 8-6 8-11V5l-8-3Z"/><path d="m9 12 2 2 4-4"/></svg>
+                <span data-i18n="booking_review_escrow_chip">Escrow protected</span>
+              </span>
+            </div>
+            <div class="price-row" style="flex-direction:column;align-items:flex-start;gap:0.3rem;padding-top:0.4rem">
+              <span style="font-weight:700;color:var(--color-text);font-size:0.85rem" data-i18n="booking_sidebar_trust_line">Final price confirmed after the job — you're only charged the amount you approve.</span>
             </div>
           </div>
 
@@ -781,7 +811,7 @@
 
   <!-- ══════════════════════════ ADDRESS MODAL ══════════════════════════ -->
   <div class="modal-overlay" id="addressModalOverlay" hidden aria-modal="true" role="dialog" aria-labelledby="addrModalTitle">
-    <div class="modal-content address-modal" id="addressModal">
+    <div class="modal-content addr-modal" id="addressModal">
       <div class="modal-header">
         <div class="modal-title-wrap">
           <div class="modal-icon-bg">

@@ -252,7 +252,7 @@ const createBooking = async (userId, data) => {
     if (!service) throw new ApiError(StatusCodes.NOT_FOUND, 'Service not found or no longer available.');
 
     const workerSupportsService = Array.isArray(worker.services) &&
-      worker.services.some((id) => id.toString() === service._id.toString());
+      worker.services.some((s) => s.serviceId && s.serviceId.toString() === service._id.toString());
     const legacyCategoryMatches = !workerSupportsService &&
       Array.isArray(worker.categories) &&
       worker.categories.includes(service.category);
@@ -260,9 +260,13 @@ const createBooking = async (userId, data) => {
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Selected worker does not support this service.');
     }
 
-    bookingPrice     = service.basePrice;
+    const priced = (worker.services || []).find(
+      (s) => s.serviceId && s.serviceId.toString() === service._id.toString()
+    );
+    // Use `!= null` so a legitimate startsFrom of 0 is honored, not treated as unset.
+    bookingPrice     = (priced && priced.startsFrom != null) ? priced.startsFrom : service.basePrice;
     resolvedCategory = service.category;
-    resolvedName     = service.title;
+    resolvedName     = resolvedName || service.title;
   } else if (serviceCategory) {
     // General category path — no specific sub-service selected
     const workerCoversCategory = (worker.categories || []).includes(serviceCategory);
@@ -305,6 +309,15 @@ const createBooking = async (userId, data) => {
     ? new Date(Date.now() + 30 * 60 * 1000)
     : undefined;
   const paymentData = await resolvePaymentData(userId, paymentMethod, savedCardId, inputPaymentMeta);
+
+  // ── Type A specific-service price snapshots (P3: graceful degradation when
+  // the service's seedRange is not yet configured — holdCeiling falls to 0,
+  // estimatedTotal remains set via feeSnapshot above) ─────────────────────
+  const seedRange = service
+    ? { min: service.seedRange?.min || 0, max: service.seedRange?.max || 0 }
+    : { min: 0, max: 0 };
+  const startsFromSnapshot = service ? bookingPrice : 0;
+  const holdCeiling = seedRange.max || 0;
 
   // ── Session-wrapped overlap check + create ───────────────────────────────
   const session = await mongoose.startSession();
@@ -359,6 +372,7 @@ const createBooking = async (userId, data) => {
         paymentStatus:    paymentData.paymentStatus,
         paymentDeadline,
         ...feeSnapshot,
+        ...(service ? { startsFromSnapshot, seedRangeSnapshot: seedRange, holdCeiling } : {}),
       }], { session });
       booking = docs[0];
     } catch (err) {

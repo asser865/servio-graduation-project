@@ -108,7 +108,7 @@ async function seed() {
       verificationStatus: 'approved',
       verificationSubmittedAt: new Date(),
       verificationReviewedAt:  new Date(),
-      services:           [service._id],
+      services:           [{ serviceId: service._id, startsFrom: service.basePrice }],
       categories:         [tech.category],
       bio:                tech.bio,
       hourlyRate:         tech.hourlyRate,

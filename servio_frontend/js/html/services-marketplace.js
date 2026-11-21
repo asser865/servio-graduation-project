@@ -1,12 +1,17 @@
 import { getServices } from '../api/services.js';
+import { getWorkers } from '../api/users.js';
+import { getWorkerReviews } from '../api/reviews.js';
 import { initScrollReveal } from '../components/scroll-reveal.js';
 import { initShowcaseAtmosphere } from '../components/showcase-atmosphere.js';
+import { slugifyServiceLabel } from '../data/services-data.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   // ── DOM refs ──────────────────────────────────────────────────────────────
   const searchInput      = document.getElementById('service-search');
   const searchClear      = document.getElementById('serviceSearchClear');
   const filterBtns       = document.querySelectorAll('.filter-chip[data-filter]');
+  const controlsSecondary = document.querySelector('.controls-row--secondary');
+  const controlsMeta      = document.querySelector('.controls-row--meta');
   // productCards and categoryGroups will be dynamically managed now
   const resultsContainer = document.querySelector('.marketplace-results');
   const featuredSection  = document.querySelector('.featured-section');
@@ -28,10 +33,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const svcDrawerOverlay      = document.getElementById('svcDrawerOverlay');
   const svcDrawer             = document.getElementById('svcDrawer');
   const svcDrawerClose        = document.getElementById('svcDrawerClose');
-  const svcDrawerTopbar       = document.getElementById('svcDrawerTopbar');
-  const svcDrawerTopbarTitle  = document.getElementById('svcDrawerTopbarTitle');
-  const svcDrawerTopbarEyebrow = document.getElementById('svcDrawerTopbarEyebrow');
-  const svcDrawerTopbarIcon   = document.getElementById('svcDrawerTopbarIcon');
   const svcDrawerScroller     = document.getElementById('svcDrawerScroller');
   const svcDrawerImg          = document.getElementById('svcDrawerImg');
   const svcDrawerCategory     = document.getElementById('svcDrawerCategory');
@@ -39,10 +40,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const svcDrawerStats        = document.getElementById('svcDrawerStats');
   const svcDrawerFeatures     = document.getElementById('svcDrawerFeatures');
   const svcDrawerPricing      = document.getElementById('svcDrawerPricing');
-  const svcDrawerReviewText   = document.getElementById('svcDrawerReviewText');
-  const svcDrawerReviewerName = document.getElementById('svcDrawerReviewerName');
-  const svcDrawerAvatar       = document.getElementById('svcDrawerAvatar');
+  const svcDrawerReview       = document.getElementById('svcDrawerReview');
+  const svcDrawerReviewSection = document.getElementById('svcDrawerReviewSection');
+  const svcDrawerReviewSub    = document.getElementById('svcDrawerReviewSub');
   const svcDrawerCta          = document.getElementById('svcDrawerCta');
+  const svcDrawerCtaCount     = document.getElementById('svcDrawerCtaCount');
+
+  // Guards stale async fills when the user opens services in quick succession.
+  let drawerReqId = 0;
+  let priceRevealObserver = null;
 
   // Custom Dropdown & Panel Refs
   const sortDropdown     = document.getElementById('sort-dropdown');
@@ -258,9 +264,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const rating   = parseFloat(svc.averageRating) || 0;
     const reviews  = parseInt(svc.totalReviews)    || 0;
     const price    = parseFloat(svc.basePrice)      || 0;
-    const isNew    = svc.createdAt
-      ? (Date.now() - new Date(svc.createdAt).getTime()) < 30 * 24 * 60 * 60 * 1000
-      : false;
 
     // Primary: professional category label (always shown)
     const categoryMeta = {
@@ -289,8 +292,6 @@ document.addEventListener('DOMContentLoaded', () => {
       secondary = { label: 'Top Rated', labelAr: 'الأعلى تقييماً', cls: 'tag--gold',    i18n: 'badge_top_rated'       };
     } else if (reviews >= 10) {
       secondary = { label: 'Popular',   labelAr: 'الأكثر طلباً',  cls: 'tag--popular', i18n: 'badge_popular'         };
-    } else if (isNew) {
-      secondary = { label: 'New',       labelAr: 'جديد',           cls: 'tag--new',     i18n: 'badge_new'             };
     } else if (svc.priceUnit === 'fixed') {
       secondary = { label: 'Fixed Price', labelAr: 'سعر ثابت',     cls: 'tag--outline', i18n: 'badge_fixed_price'     };
     } else if (price > 0 && price <= 80) {
@@ -317,9 +318,6 @@ document.addEventListener('DOMContentLoaded', () => {
       ? 'product-card__icon--primary'
       : 'product-card__icon--secondary';
 
-    const price     = svc.basePrice || 0;
-    const priceUnit = { per_hour: '/hr', per_sqm: '/m²', fixed: '' }[svc.priceUnit] || '';
-
     const article = document.createElement('article');
     article.className = 'product-card';
     article.dataset.id       = svc._id;
@@ -332,20 +330,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const finalIcon = getBestIcon(svc);
 
-    const priceLabel = price > 0
-      ? `from <strong>${price} EGP${priceUnit}</strong>`
-      : '<strong>On Request</strong>';
+    const priceLabel = priceBlock(svc);
+
+    // Honest rating: never invent a number when there are no real reviews —
+    // and read from the SAME backend aggregate (svc.techStats) the drawer/
+    // modal uses, so the card and modal never contradict each other for the
+    // same service (techStats is computed once, server-side, over the
+    // available verified technicians who offer this service).
+    const ratingNum    = parseFloat(svc.techStats?.rating) || 0;
+    const reviewCount  = parseInt(svc.techStats?.reviews) || 0;
+    const ratingMarkup = reviewCount > 0 && ratingNum > 0
+      ? `${ratingNum.toFixed(1)}<span class="product-card__rating-count">(${reviewCount})</span>`
+      : `<span class="product-card__rating-count">No reviews yet</span>`;
 
     article.innerHTML = `
       <div class="product-card__icon ${iconClass}">${finalIcon}</div>
       <h4 class="product-card__title" data-i18n="${nameKey}">${displayTitle}</h4>
       <p class="product-card__desc" data-i18n="${descKey}">${svc.description || ''}</p>
-      
+
       <div class="product-card__info">
         <span class="product-card__rating">
           <svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-          ${svc.averageRating || '4.5'}
-          <span class="product-card__rating-count">(${svc.totalReviews || '0'})</span>
+          ${ratingMarkup}
         </span>
         <span class="product-card__response">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -364,6 +370,35 @@ document.addEventListener('DOMContentLoaded', () => {
     return article;
   }
 
+  // Escape hatch appended after the sub-service cards: a customer who doesn't see their
+  // exact issue describes it in their own words on Smart Match instead of dead-ending.
+  function generateDescribeCard(catKey, index = 0) {
+    const isAr = (window.__lang || document.documentElement.lang) === 'ar';
+    const title = isAr ? 'لم تجد مشكلتك؟' : "Can't find your issue?";
+    const desc  = isAr
+      ? 'صِف المشكلة بكلماتك وسنطابقك مع الخدمة والفني المناسب.'
+      : 'Describe it in your own words — we’ll match the right service and technician.';
+    const cta   = isAr ? 'صف مشكلتك ←' : 'Describe your problem →';
+
+    const article = document.createElement('article');
+    article.className = 'product-card product-card--describe';
+    article.style.cursor = 'pointer';
+    article.dataset.reveal = '';
+    article.dataset.revealDelay = index * 60;
+    article.innerHTML = `
+      <div class="product-card__icon product-card__icon--secondary">✦</div>
+      <h4 class="product-card__title">${title}</h4>
+      <p class="product-card__desc">${desc}</p>
+      <div class="product-card__footer">
+        <span class="product-card__action">${cta}</span>
+      </div>
+    `;
+    article.addEventListener('click', () => {
+      window.location.href = `./smart-match.html?service=${encodeURIComponent(catKey)}`;
+    });
+    return article;
+  }
+
   // ── Drawer Data & Logic ───────────────────────────────────────────────────
   const DRAWER_FEATURES = {
     plumbing:    ['Pipe Repair & Replacement', 'Drain Cleaning', 'Fixture Installation', 'Water Heater Service', 'Leak Detection', 'Full Inspections'],
@@ -377,16 +412,6 @@ document.addEventListener('DOMContentLoaded', () => {
     roofing:     ['Roof Inspection', 'Leak Repair', 'Shingle Replacement', 'Gutter Cleaning', 'Waterproofing', 'Full Roof Replacement'],
     landscaping: ['Lawn Mowing & Edging', 'Tree Trimming', 'Garden Design', 'Irrigation Setup', 'Pest Control', 'Seasonal Cleanup'],
     default:     ['Professional Service', 'Licensed Technicians', 'Quality Guarantee', 'Transparent Pricing', 'Background Checked', 'Fully Insured'],
-  };
-
-  const DRAWER_REVIEWS = {
-    plumbing:   { text: 'Fixed our burst pipe within an hour. Incredibly professional and transparent pricing — no surprises.', reviewer: 'Sara M.', avatarId: 12 },
-    electrical: { text: 'Had our entire kitchen rewired safely and on time. Explained every step clearly — highly recommend.', reviewer: 'Karim A.', avatarId: 33 },
-    hvac:       { text: 'Diagnosed and fixed our AC in under 2 hours during the hottest week of summer. Lifesavers!', reviewer: 'Nour H.', avatarId: 47 },
-    cleaning:   { text: 'Transformed our apartment before move-in. Every surface spotless — even cleaned inside the cabinets.', reviewer: 'Dina F.', avatarId: 21 },
-    painting:   { text: 'Clean lines, no mess, perfect finish. The color consultation alone was worth it.', reviewer: 'Omar T.', avatarId: 68 },
-    carpentry:  { text: 'Built us a stunning custom bookcase. Precise craftsmanship and a great eye for detail.', reviewer: 'Layla R.', avatarId: 56 },
-    default:    { text: 'Outstanding work from start to finish. Punctual, professional, and genuinely quality service.', reviewer: 'Ahmed K.', avatarId: 15 },
   };
 
   const DRAWER_HERO_IMGS = {
@@ -406,27 +431,25 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!svcDrawer) return;
     const category = (svc.category || 'other').toLowerCase();
     const title     = svc.title ? (svc.title.charAt(0).toUpperCase() + svc.title.slice(1)) : 'Service';
-    const rating    = parseFloat(svc.averageRating) || 0;
-    const reviews   = parseInt(svc.totalReviews) || 0;
-    const price     = svc.basePrice || 0;
-    const priceUnit = svc.priceUnit === 'per_hour' ? '/hr' : svc.priceUnit === 'per_sqm' ? '/m²' : '';
+    // Single backend source: techStats is the SAME aggregate the marketplace
+    // card reads (svc.techStats), so the card and this modal can never disagree.
+    const techStats = svc.techStats || { pros: 0, rating: 0, reviews: 0, minStartsFrom: null };
+    const rating    = parseFloat(techStats.rating) || 0;
+    const reviews   = parseInt(techStats.reviews) || 0;
+    const pros      = parseInt(techStats.pros) || 0;
+    const priceBand = resolvePriceBand(svc);
+    const price     = priceBand.startsFrom;
 
     svcDrawerImg.src          = DRAWER_HERO_IMGS[category] || DRAWER_HERO_IMGS.default;
     svcDrawerImg.alt          = title;
     svcDrawerCategory.textContent = (svc.category || 'Service').charAt(0).toUpperCase() + (svc.category || 'Service').slice(1) + ' Service';
     svcDrawerTitle.textContent    = title;
 
-    svcDrawerStats.innerHTML = [
-      { icon: '★', value: rating > 0 ? rating.toFixed(1) : '—', label: 'Rating' },
-      { icon: '💬', value: reviews > 0 ? reviews : '—', label: 'Reviews' },
-      { icon: '💰', value: price > 0 ? `${price} EGP${priceUnit}` : '—', label: 'Starting From' },
-    ].map(s => `
-      <div class="svc-drawer__stat">
-        <div class="svc-drawer__stat-icon">${s.icon}</div>
-        <div class="svc-drawer__stat-value">${s.value}</div>
-        <div class="svc-drawer__stat-label">${s.label}</div>
-      </div>
-    `).join('');
+    // Stats are about the TECHNICIANS who deliver this service. techStats
+    // comes from the service object itself (server-computed, same source the
+    // marketplace card reads) so pros/rating/reviews are available instantly —
+    // no need to wait on a worker fetch, and no risk of disagreeing with the card.
+    renderStats({ pros, rating, reviews, fromPrice: price });
 
     const features = DRAWER_FEATURES[category] || DRAWER_FEATURES.default;
     svcDrawerFeatures.innerHTML = features.map(f => `
@@ -438,75 +461,453 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
     `).join('');
 
-    const base = price || 50;
-    svcDrawerPricing.innerHTML = [
-      { tier: 'Basic',    amount: base,              unit: priceUnit, desc: 'Minor repairs & fixes' },
-      { tier: 'Standard', amount: Math.round(base * 1.4), unit: priceUnit, desc: 'Installations & overhauls', featured: true },
-      { tier: 'Premium',  amount: Math.round(base * 2),   unit: priceUnit, desc: 'Full renovation scope' },
-    ].map(p => `
-      <div class="svc-drawer__price-card${p.featured ? ' is-featured' : ''}">
-        <div class="svc-drawer__price-tier">${p.tier}</div>
-        <div class="svc-drawer__price-amount">${p.amount} EGP<sub>${p.unit}</sub></div>
-        <div class="svc-drawer__price-desc">${p.desc}</div>
-      </div>
-    `).join('');
+    // Pricing + individual review quote + CTA count are still derived from
+    // REAL technicians (async) — the worker fetch is kept ONLY for those, not
+    // for the headline pros/rating/reviews stat (that's techStats, above).
+    // Snapshot a request id so a slow fetch can't overwrite a newer drawer open.
+    const reqId = ++drawerReqId;
+    renderPriceSkeleton();
+    renderReviewSkeleton();
+    setReviewSubtitle(null);
+    if (svcDrawerCtaCount) { svcDrawerCtaCount.hidden = true; svcDrawerCtaCount.textContent = ''; }
 
-    const rev = DRAWER_REVIEWS[category] || DRAWER_REVIEWS.default;
-    svcDrawerReviewText.textContent   = rev.text;
-    svcDrawerReviewerName.textContent = rev.reviewer;
-    svcDrawerAvatar.src = `https://i.pravatar.cc/68?img=${rev.avatarId}`;
-
-    if (svcDrawerCta) svcDrawerCta.href = `./technician-listing.html?service=${category}`;
-
-    // Reset scroll-collapse state
-    if (svcDrawerImg)         svcDrawerImg.style.transform = 'scale(1.08) translateY(0)';
-    if (svcDrawerTopbar)      svcDrawerTopbar.classList.remove('is-solid');
-    if (svcDrawerTopbarTitle) svcDrawerTopbarTitle.textContent = title;
-    if (svcDrawerTopbarEyebrow) {
-      const cat = (svc.category || 'service');
-      svcDrawerTopbarEyebrow.textContent = cat.charAt(0).toUpperCase() + cat.slice(1) + ' · SERVIO';
+    if (svcDrawerCta) {
+      // Carry the specific service the user picked through to the listing (and on
+      // to booking) as a subservice slug — without it the listing header and the
+      // booking record fall back to the generic category ("General Plumbing").
+      const subSlug = svc.title ? slugifyServiceLabel(svc.title) : '';
+      const ctaParams = new URLSearchParams({ service: category });
+      if (subSlug) ctaParams.set('subservice', subSlug);
+      svcDrawerCta.href = `./technician-listing.html?${ctaParams.toString()}`;
     }
-    if (svcDrawerTopbarIcon) {
-      const TOPBAR_ICONS = {
-        plumbing:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"/><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"/></svg>`,
-        electrical:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>`,
-        hvac:        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20"/><path d="M12 2v20"/><path d="m20 16-4-4 4-4"/><path d="m4 8 4 4-4 4"/><path d="m16 4-4 4-4-4"/><path d="m8 20 4-4 4 4"/></svg>`,
-        cleaning:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>`,
-        painting:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>`,
-        carpentry:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 12-8.373 8.373a1 1 0 1 1-3-3L12 9"/><path d="m18 15 4-4"/><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172V7l-2.26-2.26a6 6 0 0 0-4.202-1.756L9 2.96l.92.82A6.18 6.18 0 0 1 12 8.4V10l2 2h1.172a2 2 0 0 1 1.414.586L18 14"/></svg>`,
-        flooring:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>`,
-        appliance:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="20" x="3" y="2" rx="2"/><circle cx="12" cy="13" r="5"/><path d="M6 6h.01"/><path d="M9 6h.01"/></svg>`,
-        handyman:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`,
-        renovation:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
-        roofing:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7"/><path d="M3 9v13h18V9"/><path d="M9 22V12h6v10"/></svg>`,
-        landscaping: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-7l-2-2"/><path d="M17 8v.8A6 6 0 0 1 13.8 20v0H10v0A6.5 6.5 0 0 1 7 8h0a5 5 0 0 1 10 0z"/><path d="m14 14-2 2-2-2"/></svg>`,
-        installation:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>`,
-      };
-      svcDrawerTopbarIcon.innerHTML = TOPBAR_ICONS[category] || `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`;
-    }
+
+    // Fire-and-forget: the modal is already open; live data fills in when ready.
+    loadDrawerDynamics({ svc, category, price, priceBand, techStats, reqId });
+
     if (svcDrawerScroller)    svcDrawerScroller.scrollTop = 0;
-    svcDrawerScroller?.addEventListener('scroll', handleDrawerScroll);
 
     svcDrawerOverlay?.classList.add('is-open');
     svcDrawer.classList.add('is-open');
     document.body.style.overflow = 'hidden';
+    document.body.classList.add('svc-modal-open');
     document.querySelector('[data-chat-fab]')?.style.setProperty('display', 'none');
+    // back-to-top FAB sets its own inline !important styles, so a stylesheet
+    // rule can't beat it — override inline directly while the modal is open.
+    document.querySelector('.back-to-top')?.style.setProperty('display', 'none', 'important');
+
+    // A11y: remember opener, move focus into the modal, trap Tab inside it.
+    lastFocusedEl = document.activeElement;
+    document.addEventListener('keydown', trapDrawerFocus, true);
+    requestAnimationFrame(() => svcDrawerClose?.focus());
+  }
+
+  // ── Focus trap (modal is a true dialog now) ──────────────────────────────
+  let lastFocusedEl = null;
+  function trapDrawerFocus(e) {
+    if (e.key !== 'Tab' || !svcDrawer?.classList.contains('is-open')) return;
+    const focusables = svcDrawer.querySelectorAll(
+      'a[href], button:not([disabled]), input, [tabindex]:not([tabindex="-1"])'
+    );
+    if (!focusables.length) return;
+    const first = focusables[0];
+    const last  = focusables[focusables.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
   }
 
   function closeServiceDrawer() {
+    disconnectPriceRevealObserver();
     svcDrawerOverlay?.classList.remove('is-open');
     svcDrawer?.classList.remove('is-open');
     document.body.style.overflow = '';
+    document.body.classList.remove('svc-modal-open');
     document.querySelector('[data-chat-fab]')?.style.removeProperty('display');
-    svcDrawerScroller?.removeEventListener('scroll', handleDrawerScroll);
+    // Restore the back-to-top FAB; its own scroll handler re-manages visibility.
+    document.querySelector('.back-to-top')?.style.removeProperty('display');
+    document.removeEventListener('keydown', trapDrawerFocus, true);
+    if (lastFocusedEl?.focus) lastFocusedEl.focus();
+    lastFocusedEl = null;
   }
 
-  // ── Drawer Hero Parallax on Scroll (GPU-only, zero reflow) ───────────────
-  function handleDrawerScroll() {
-    if (!svcDrawerScroller || !svcDrawerImg || !svcDrawerTopbar) return;
-    const scrollY = svcDrawerScroller.scrollTop;
-    svcDrawerImg.style.transform = `scale(1.08) translateY(${scrollY * 0.25}px)`;
-    svcDrawerTopbar.classList.toggle('is-solid', scrollY > 140);
+  // ── Drawer dynamic data (real pricing range + real review + tech count) ──
+  function escapeHtml(str) {
+    return String(str ?? '').replace(/[&<>"']/g, c => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+    ));
+  }
+
+  function avatarFallback(name) {
+    return 'https://ui-avatars.com/api/?name=' + encodeURIComponent(name || 'C')
+      + '&background=9A8C73&color=fff&size=128';
+  }
+
+  // ── Price band helpers (band-based "starts from / typical range") ────────
+  // A service's seed band (seedRange) describes the spread of technician
+  // rates seeded for it; basePrice is the honest fallback when no band is
+  // configured yet. Never render NaN/undefined/"0 EGP" from a missing band.
+  function resolvePriceBand(svc) {
+    const seedMin = parseFloat(svc?.seedRange?.min) || 0;
+    const seedMax = parseFloat(svc?.seedRange?.max) || 0;
+    const basePrice = parseFloat(svc?.basePrice) || 0;
+    const startsFrom = seedMin > 0 ? seedMin : basePrice;
+    const hasTypicalRange = seedMin > 0 && seedMax > 0;
+    return { startsFrom, hasTypicalRange, min: seedMin, max: seedMax };
+  }
+
+  // Builds the two-line "Starts from / typical range" markup shared by the
+  // marketplace card and the service drawer/detail views.
+  function priceBlock(svc, { tag = 'span' } = {}) {
+    const { startsFrom, hasTypicalRange, min, max } = resolvePriceBand(svc);
+    if (!(startsFrom > 0)) {
+      return `<${tag} class="price-block"><strong class="price-block__from">On Request</strong></${tag}>`;
+    }
+    const typicalLine = hasTypicalRange
+      ? `<small class="price-block__typical">typical ${min}–${max} EGP</small>`
+      : '';
+    return `<${tag} class="price-block">` +
+      `<strong class="price-block__from">Starts from ${startsFrom} EGP</strong>` +
+      typicalLine +
+      `</${tag}>`;
+  }
+
+  function starString(rating) {
+    const r = Math.round(parseFloat(rating) || 0);
+    return '★★★★★'.slice(0, r) + '☆☆☆☆☆'.slice(0, 5 - r);
+  }
+
+  // ── Stat strip (subject = the technicians who deliver this service) ───────
+  const STAT_ICONS = {
+    pros: `<svg class="svc-stat-ic svc-stat-ic--line" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+    star: `<svg class="svc-stat-ic svc-stat-ic--star" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`,
+    price: `<svg class="svc-stat-ic svc-stat-ic--line" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>`,
+  };
+  const STAT_SKEL = '<span class="svc-skel" style="display:inline-block;width:30px;height:15px"></span>';
+
+  function renderStats({ pending = false, pros = 0, rating = 0, reviews = 0, fromPrice = 0 }) {
+    if (!svcDrawerStats) return;
+    const priceVal = fromPrice > 0
+      ? `${fromPrice} <small>EGP</small>`
+      : 'On Request';
+    const cells = [
+      {
+        icon:  STAT_ICONS.pros,
+        value: pending ? STAT_SKEL : pros,
+        label: 'Verified Pros',
+      },
+      {
+        icon:  STAT_ICONS.star,
+        value: pending ? STAT_SKEL : (rating > 0 ? rating.toFixed(1) : '-'),
+        label: pending ? 'Rating' : (reviews > 0 ? `${reviews} review${reviews !== 1 ? 's' : ''}` : 'No reviews yet'),
+      },
+      {
+        icon:  STAT_ICONS.price,
+        value: priceVal,
+        label: 'Starting From',
+      },
+    ];
+    svcDrawerStats.innerHTML = cells.map(c => `
+      <div class="svc-drawer__stat">
+        <div class="svc-drawer__stat-icon">${c.icon}</div>
+        <div class="svc-drawer__stat-value">${c.value}</div>
+        <div class="svc-drawer__stat-label">${c.label}</div>
+      </div>
+    `).join('');
+  }
+
+  function renderPriceSkeleton() {
+    if (!svcDrawerPricing) return;
+    disconnectPriceRevealObserver();
+    svcDrawerPricing.innerHTML = `
+      <div class="svc-price-range is-loading">
+        <div class="svc-skel" style="width:38%;height:10px"></div>
+        <div class="svc-skel" style="width:58%;height:24px;margin-top:12px"></div>
+        <div class="svc-skel" style="width:100%;height:6px;margin-top:14px"></div>
+        <div class="svc-skel" style="width:72%;height:11px;margin-top:12px"></div>
+      </div>`;
+  }
+
+  function renderReviewSkeleton() {
+    if (!svcDrawerReview) return;
+    svcDrawerReview.className = 'svc-drawer__review is-loading';
+    svcDrawerReview.innerHTML = `
+      <div class="svc-skel" style="width:30%;height:12px"></div>
+      <div class="svc-skel" style="width:100%;height:12px"></div>
+      <div class="svc-skel" style="width:85%;height:12px"></div>
+      <div class="svc-skel" style="width:45%;height:12px"></div>`;
+  }
+
+  // Honest range from the actual technicians' own hourly rates.
+  function computePriceRange(workers) {
+    const rates = (workers || [])
+      .map(w => parseFloat(w.hourlyRate))
+      .filter(n => Number.isFinite(n) && n > 0);
+    if (!rates.length) return null;
+    return { min: Math.min(...rates), max: Math.max(...rates), count: workers.length };
+  }
+
+  function disconnectPriceRevealObserver() {
+    if (!priceRevealObserver) return;
+    priceRevealObserver.disconnect();
+    priceRevealObserver = null;
+  }
+
+  function preparePriceReveal() {
+    const card = svcDrawerPricing?.querySelector('[data-price-reveal]');
+    if (!card) return;
+
+    card.classList.remove('is-revealed');
+    disconnectPriceRevealObserver();
+
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      card.classList.add('is-revealed');
+      return;
+    }
+
+    const reveal = () => card.classList.add('is-revealed');
+    if (!('IntersectionObserver' in window) || !svcDrawerScroller) {
+      requestAnimationFrame(reveal);
+      return;
+    }
+
+    priceRevealObserver = new IntersectionObserver(entries => {
+      if (!entries.some(entry => entry.isIntersecting)) return;
+      reveal();
+      disconnectPriceRevealObserver();
+    }, {
+      root: svcDrawerScroller,
+      threshold: 0.42,
+      rootMargin: '0px 0px -12% 0px',
+    });
+
+    requestAnimationFrame(() => priceRevealObserver?.observe(card));
+  }
+
+  function renderPricingRange(range) {
+    if (!svcDrawerPricing) return;
+    const sameValue = range.min === range.max;
+    const headline = sameValue
+      ? `${range.min} <small>EGP</small>`
+      : `${range.min} <span>–</span> ${range.max} <small>EGP</small>`;
+    svcDrawerPricing.innerHTML = `
+      <div class="svc-price-range">
+        <div class="svc-price-range__label">${sameValue ? 'Starting from' : 'Typical range'}</div>
+        <div class="svc-price-range__value">${headline}</div>
+        <div class="svc-price-range__bar"><span class="svc-price-range__fill"></span></div>
+        <div class="svc-price-range__meta">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          based on <strong>${range.count}</strong> verified technician${range.count !== 1 ? 's' : ''}
+        </div>
+        <div class="svc-price-range__note">Final price is set by the technician you choose.</div>
+      </div>`;
+  }
+
+  // Fallback when no technician rates exist yet: honest "starting from" base price,
+  // plus the service's seeded "typical" band when one is configured.
+  function renderPricingBase(price, typicalRange = null) {
+    if (!svcDrawerPricing) return;
+    const value = price > 0
+      ? `${price} <small>EGP</small>`
+      : `On Request`;
+    const typicalLine = typicalRange
+      ? `<div class="svc-price-range__typical">typical ${typicalRange.min}–${typicalRange.max} EGP</div>`
+      : '';
+    svcDrawerPricing.innerHTML = `
+      <div class="svc-price-range">
+        <div class="svc-price-range__label">Starting from</div>
+        <div class="svc-price-range__value">${value}</div>
+        ${typicalLine}
+        <div class="svc-price-range__note">Each technician quotes their own rate — compare them on the next step.</div>
+      </div>`;
+  }
+
+  function renderPricingRangeAnimated(range) {
+    if (!svcDrawerPricing) return;
+    const sameValue = range.min === range.max;
+    const headline = sameValue
+      ? `
+        <span class="svc-price-range__endpoint svc-price-range__endpoint--start">
+          <span class="svc-price-range__amount">${range.min}</span>
+          <small class="svc-price-range__unit">EGP</small>
+        </span>
+      `
+      : `
+        <span class="svc-price-range__endpoint svc-price-range__endpoint--start">
+          <span class="svc-price-range__amount">${range.min}</span>
+          <small class="svc-price-range__unit">EGP</small>
+        </span>
+        <span class="svc-price-range__endpoint svc-price-range__endpoint--end">
+          <span class="svc-price-range__amount">${range.max}</span>
+          <small class="svc-price-range__unit">EGP</small>
+        </span>
+      `;
+
+    svcDrawerPricing.innerHTML = `
+      <div class="svc-price-range ${sameValue ? 'svc-price-range--single' : 'svc-price-range--range'}" data-price-reveal>
+        <div class="svc-price-range__label">${sameValue ? 'Hourly rate' : 'Typical range'}</div>
+        <div class="svc-price-range__value">${headline}</div>
+        <div class="svc-price-range__bar" aria-hidden="true">
+          <span class="svc-price-range__fill"></span>
+          <span class="svc-price-range__marker svc-price-range__marker--start"></span>
+          <span class="svc-price-range__marker svc-price-range__marker--end"></span>
+        </div>
+        <div class="svc-price-range__meta">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          based on <strong>${range.count}</strong> verified technician${range.count !== 1 ? 's' : ''}
+        </div>
+        <div class="svc-price-range__note">Final price is set by the technician you choose.</div>
+      </div>`;
+    preparePriceReveal();
+  }
+
+  function renderPricingBaseAnimated(price, typicalRange = null) {
+    if (!svcDrawerPricing) return;
+    const value = price > 0
+      ? `${price} <small>EGP</small>`
+      : `On Request`;
+    const typicalLine = typicalRange
+      ? `<div class="svc-price-range__typical">typical ${typicalRange.min}–${typicalRange.max} EGP</div>`
+      : '';
+
+    svcDrawerPricing.innerHTML = `
+      <div class="svc-price-range svc-price-range--single" data-price-reveal>
+        <div class="svc-price-range__label">Starting from</div>
+        <div class="svc-price-range__value">
+          <span class="svc-price-range__amount svc-price-range__amount--start">${value}</span>
+        </div>
+        ${typicalLine}
+        <div class="svc-price-range__bar" aria-hidden="true">
+          <span class="svc-price-range__fill"></span>
+          <span class="svc-price-range__marker svc-price-range__marker--start"></span>
+          <span class="svc-price-range__marker svc-price-range__marker--end"></span>
+        </div>
+        <div class="svc-price-range__note">Each technician quotes their own rate - compare them on the next step.</div>
+      </div>`;
+    preparePriceReveal();
+  }
+
+  function renderReviewReal(review) {
+    if (!svcDrawerReview) return;
+    const rawName = review.user?.name || 'Verified customer';
+    const name    = escapeHtml(rawName);
+    const avatar  = review.user?.profileImage || avatarFallback(rawName);
+    svcDrawerReview.className = 'svc-drawer__review';
+    svcDrawerReview.innerHTML = `
+      <div class="svc-drawer__review-quote">"</div>
+      <div class="svc-drawer__review-stars">${starString(review.rating)}</div>
+      <div class="svc-drawer__review-text">${escapeHtml(review.comment)}</div>
+      <div class="svc-drawer__review-author">
+        <div>
+          <div class="svc-drawer__review-name">${name}</div>
+          <div class="svc-drawer__review-tag">Verified Customer</div>
+        </div>
+      </div>`;
+
+    // Build the avatar <img> as a DOM node (no inline onerror string) and
+    // prepend it before the name/tag block. alt is set via .alt (not HTML),
+    // so a hostile name like `"><img onerror=alert(1)>` renders as inert text.
+    const authorRow = svcDrawerReview.querySelector('.svc-drawer__review-author');
+    if (authorRow) {
+      const img = document.createElement('img');
+      img.className = 'svc-drawer__review-avatar';
+      img.src = avatar;
+      img.alt = rawName;
+      img.addEventListener('error', () => { img.src = avatarFallback(rawName); });
+      authorRow.insertBefore(img, authorRow.firstChild);
+    }
+  }
+
+  function setReviewSubtitle(text) {
+    if (!svcDrawerReviewSub) return;
+    if (text) { svcDrawerReviewSub.textContent = text; svcDrawerReviewSub.hidden = false; }
+    else { svcDrawerReviewSub.hidden = true; }
+  }
+
+  // Aggregate fallback: always accurate, no individual quote required.
+  // Numbers come from techStats (the SAME backend aggregate as the card and
+  // the stat strip) so the review-aggregate text never disagrees with either.
+  function renderReviewAggregate(techStats) {
+    if (!svcDrawerReview) return;
+    const pros = parseInt(techStats?.pros) || 0;
+    const avg = parseFloat(techStats?.rating) || 0;
+    const totalReviews = parseInt(techStats?.reviews) || 0;
+    if (!totalReviews || avg <= 0) {
+      // Nothing real to show — hide the section entirely rather than fake it.
+      setReviewSubtitle(null);
+      if (svcDrawerReviewSection) svcDrawerReviewSection.hidden = true;
+      return;
+    }
+    setReviewSubtitle(null); // aggregate text already names its subject
+    svcDrawerReview.className = 'svc-drawer__review';
+    svcDrawerReview.innerHTML = `
+      <div class="svc-review-aggregate">
+        <div class="svc-review-aggregate__score">
+          <svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          ${avg.toFixed(1)}
+        </div>
+        <div class="svc-review-aggregate__text">
+          <strong>${avg.toFixed(1)} average</strong> from ${totalReviews} review${totalReviews !== 1 ? 's' : ''}${pros ? ` across ${pros} technician${pros !== 1 ? 's' : ''}` : ''}.
+        </div>
+      </div>`;
+  }
+
+  function updateCtaCount(count) {
+    if (!svcDrawerCtaCount) return;
+    if (count > 0) {
+      svcDrawerCtaCount.textContent = `${count} available now`;
+      svcDrawerCtaCount.hidden = false;
+    } else {
+      svcDrawerCtaCount.hidden = true;
+    }
+  }
+
+  async function loadDrawerDynamics({ svc, category, price, priceBand, techStats, reqId }) {
+    // The worker fetch is now ONLY needed for the "Browse Technicians (N
+    // available)" CTA count and to find a real review quote to feature —
+    // the headline pros/rating/reviews stat is techStats (rendered
+    // synchronously in openServiceDrawer, already matching the card).
+    let workers = [];
+    try {
+      const res = await getWorkers({ category, limit: 50 });
+      workers = res?.workers || res?.data?.workers || [];
+    } catch (err) {
+      console.error('[marketplace] failed to load technicians for drawer:', err);
+    }
+    if (reqId !== drawerReqId) return; // a newer drawer opened — discard
+
+    if (svcDrawerReviewSection) svcDrawerReviewSection.hidden = false;
+    const categoryLabel = CATEGORY_LABELS[category] || (category.charAt(0).toUpperCase() + category.slice(1));
+
+    // Pricing headline must match the marketplace card exactly: both render
+    // the same band ("starts from" + typical range), never the technicians'
+    // own hourly rates — that legacy range caused card/modal to disagree.
+    const typicalRange = priceBand?.hasTypicalRange ? { min: priceBand.min, max: priceBand.max } : null;
+    renderPricingBaseAnimated(price, typicalRange);
+
+    // CTA live count (still real-time from the worker fetch).
+    updateCtaCount(workers.length);
+
+    // Review: real review from the top-rated technician, else the techStats
+    // aggregate (NOT a client-side recompute — same numbers as the card/strip).
+    const top = [...workers]
+      .filter(w => (parseInt(w.totalReviews) || 0) > 0)
+      .sort((a, b) => (parseFloat(b.averageRating) || 0) - (parseFloat(a.averageRating) || 0))[0];
+
+    if (!top) { renderReviewAggregate(techStats); return; }
+
+    try {
+      const list = await getWorkerReviews(top._id);
+      if (reqId !== drawerReqId) return;
+      const real = (Array.isArray(list) ? list : []).find(r => (r.comment || '').trim().length > 0);
+      if (real) {
+        setReviewSubtitle(`Recent review for ${top.name || 'a top-rated technician'} — a top-rated ${categoryLabel} pro on Servio.`);
+        renderReviewReal(real);
+      } else {
+        renderReviewAggregate(techStats);
+      }
+    } catch (err) {
+      console.error('[marketplace] failed to load review for drawer:', err);
+      if (reqId === drawerReqId) renderReviewAggregate(techStats);
+    }
   }
 
   svcDrawerClose?.addEventListener('click', closeServiceDrawer);
@@ -560,6 +961,10 @@ document.addEventListener('DOMContentLoaded', () => {
       filterCountBadge.textContent = count;
       filterCountBadge.hidden = count === 0;
     }
+
+    // Collapse the meta row entirely when there are no active filter tokens —
+    // otherwise it renders as an empty divider strip.
+    if (controlsMeta) controlsMeta.style.display = count > 0 ? '' : 'none';
 
     activeFiltersContainer.querySelectorAll('.filter-token__remove').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -794,9 +1199,13 @@ document.addEventListener('DOMContentLoaded', () => {
     header.innerHTML = `
       <button type="button" class="cat-back-btn" id="catBackBtn">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-        All Categories
+        <span data-i18n="smp_all_categories">All Categories</span>
       </button>
-      <h3 class="cat-browse-title">${label}</h3>
+      <svg class="cat-browse-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      <span class="cat-browse-current">
+        <span class="cat-browse-icon">${CATEGORY_ICONS[catKey] || CATEGORY_ICONS.other}</span>
+        <h3 class="cat-browse-title">${label}</h3>
+      </span>
     `;
     resultsContainer.appendChild(header);
 
@@ -809,18 +1218,39 @@ document.addEventListener('DOMContentLoaded', () => {
       scrollMarketplaceToTop();
     });
 
-    const services = (state.apiServices || []).filter(svc => (svc.category || '').toLowerCase() === catKey);
+    // Search + advanced filters stay SCOPED to this category instead of
+    // bouncing the user back to the full catalogue.
+    const services = (state.apiServices || []).filter(svc => {
+      if ((svc.category || '').toLowerCase() !== catKey) return false;
+
+      const title = (svc.title || '').toLowerCase();
+      const desc  = (svc.description || svc.desc || '').toLowerCase();
+      if (state.query && !title.includes(state.query) && !desc.includes(state.query)) return false;
+
+      const adv = state.advanced;
+      if (adv.scope && adv.scope.length > 0 && svc.scope && !adv.scope.includes(svc.scope)) return false;
+      if (adv.cert && adv.cert.length > 0 && svc.cert && !adv.cert.includes(svc.cert)) return false;
+      if (adv.price.min !== null && svc.basePrice < adv.price.min) return false;
+      if (adv.price.max !== null && svc.basePrice > adv.price.max) return false;
+      return true;
+    });
 
     if (pagination) pagination.hidden = true;
 
-    const grid = document.createElement('div');
-    grid.className = 'product-grid';
-    if (state.view === 'list') grid.classList.add('is-list-view');
-
-    services.forEach((svc, index) => grid.appendChild(generateServiceCard(svc, index)));
-    resultsContainer.appendChild(grid);
-
     const total = services.length;
+    if (total === 0) {
+      resultsContainer.appendChild(emptyState);
+      emptyState.classList.add('is-visible');
+    } else {
+      emptyState.classList.remove('is-visible');
+      const grid = document.createElement('div');
+      grid.className = 'product-grid';
+      if (state.view === 'list') grid.classList.add('is-list-view');
+      services.forEach((svc, index) => grid.appendChild(generateServiceCard(svc, index)));
+      grid.appendChild(generateDescribeCard(catKey, services.length));
+      resultsContainer.appendChild(grid);
+    }
+
     if (resultCount) animateCount(resultCount, total);
     if (resultLabel) resultLabel.textContent = `service${total !== 1 ? 's' : ''} in ${label}`;
 
@@ -845,18 +1275,27 @@ document.addEventListener('DOMContentLoaded', () => {
       || state.advanced.price.max !== null;
     const isFiltering = state.query !== '' || state.filter !== 'all' || hasAdvancedFilters;
 
-    // When the user starts filtering/searching, exit category drill-down
-    if (isFiltering) state.browseCategory = null;
+    // Only a MACRO category pill (Maintenance/Improvement/Specialty) switches
+    // context out of a drill-down. Search + advanced filters stay scoped to the
+    // category the user is browsing.
+    if (state.filter !== 'all') state.browseCategory = null;
 
-    if (featuredSection) featuredSection.style.display = isFiltering ? 'none' : '';
+    // Collapse the whole secondary controls row while drilled into one category —
+    // the macro pills belong to top-level browsing, and a lone toggle bar just
+    // leaves a barren empty band.
+    if (controlsSecondary) controlsSecondary.style.display = state.browseCategory ? 'none' : '';
 
-    // Category-first browsing: no active filters → show category grid or drill-down
+    if (featuredSection) featuredSection.style.display = (isFiltering || state.browseCategory) ? 'none' : '';
+
+    // Inside a category: render it (scoped by search/advanced filters).
+    if (state.browseCategory) {
+      renderCategoryServices(state.browseCategory);
+      return;
+    }
+
+    // No category context and nothing filtering → show the category grid.
     if (!isFiltering) {
-      if (state.browseCategory) {
-        renderCategoryServices(state.browseCategory);
-      } else {
-        renderCategoryGrid();
-      }
+      renderCategoryGrid();
       return;
     }
 
@@ -1175,5 +1614,3 @@ document.addEventListener('DOMContentLoaded', () => {
   // Init
   fetchServices();
 });
-
-

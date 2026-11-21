@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="../css/main.css" />
   <link rel="stylesheet" href="../css/pages/booking-details.css" />
   <link rel="stylesheet" href="../css/components/customer-feedback.css" />
+  <link rel="stylesheet" href="../css/components/invoice-table.css" />
 </head>
 <body>
   <div class="scroll-progress" data-scroll-progress aria-hidden="true"></div>
@@ -125,12 +126,6 @@
           </div>
         </div>
 
-        <!-- Professional Separation Divider (Elegant Curve) -->
-        <div class="bk-hero__divider" aria-hidden="true">
-          <svg preserveAspectRatio="none" viewBox="0 0 1200 120" xmlns="http://www.w3.org/2000/svg">
-            <path d="M0,120 C400,0 800,0 1200,120 L0,120 Z" fill="currentColor"></path>
-          </svg>
-        </div>
       </section>
 
 
@@ -223,6 +218,10 @@
             <p class="bk-card__kicker">Secure verification</p>
             <h2 id="bkPinLabel" data-i18n="bkd_pin_label">Your Arrival PIN</h2>
             <div class="bk-pin-value" id="bkPinValue" aria-live="polite">PIN locked</div>
+            <button class="bk-pin-copy" type="button" id="bkCopyPinBtn" hidden>
+              <svg class="bk-pin-copy__icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+              <span class="bk-pin-copy__label">Copy PIN</span>
+            </button>
             <p id="bkPinHelp">The PIN unlocks when your technician arrives.</p>
             <button class="btn btn--primary btn--full" type="button" id="bkRevealPinBtn" hidden>Reveal PIN</button>
           </section>
@@ -242,6 +241,11 @@
               <div><dt data-i18n="bkd_dt_status">Status</dt><dd><span class="bk-pay-status" id="bkPayStatus">-</span></dd></div>
             </dl>
             <p class="bk-note" id="bkPaymentNote">Final price may change if approved parts or extra work are required.</p>
+
+          <!-- Itemized invoice (Task 20) — shown when an invoice is available for
+               an awaiting_customer_confirmation booking. 5 states handled in JS:
+               loading / empty / error / success / success+over-band. -->
+          <div id="bkInvoiceCard" class="invoice-card" hidden></div>
 
           <!-- Escrow action bar — shown for awaiting_customer_confirmation -->
           <div id="bkEscrowActions" class="bk-escrow-actions" hidden>

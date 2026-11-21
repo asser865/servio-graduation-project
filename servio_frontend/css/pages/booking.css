@@ -19,9 +19,6 @@
   background: var(--color-primary);
   overflow: hidden;
   isolation: isolate;
-  /* Mask to create a buttery smooth blend at the bottom */
-  -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
-  mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
 }
 
 /* â”€â”€ Background decoration â”€â”€ */
@@ -131,7 +128,7 @@
 /* â”€â”€ Split layout â”€â”€ */
 .booking-hero__inner {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 3rem;
@@ -410,9 +407,6 @@
 /* â”€â”€ Dark mode tweaks (hero is already dark, just fine-tune) â”€â”€ */
 [data-theme="dark"] .booking-hero {
   background: #181c21;
-  /* Sharper blend for dark mode to match deep surface colors */
-  -webkit-mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
-  mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
 }
 
 [data-theme="dark"] .booking-hero__bg-glow--1 {
@@ -2049,13 +2043,13 @@
 }
 
 /* Address Modal Form Spacing */
-.address-modal .modal-form {
+.addr-modal .modal-form {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
 }
 
-.address-modal .form-row {
+.addr-modal .form-row {
   margin-bottom: 0; /* Reset since parent has gap */
 }
 
@@ -2516,4 +2510,96 @@
   font-size: 0.75rem;
   color: var(--color-warning, #e67e22);
   margin-top: 0.25rem;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   BOOKING PAGE — LIGHT MODE NOTES CARD OVERRIDES
+   Overrides hardcoded dark rgba values so the "Tell the
+   technician what is happening" box looks great in light mode.
+   Palette: bg #FAF8F5 · surface #fff · border #DDD5CC
+            text #222831 · text-light #6B6560 · accent #9A8C73
+   ═══════════════════════════════════════════════════════════ */
+
+/* Card wrapper */
+:root .notes-card,
+[data-theme="light"] .notes-card {
+  background: var(--color-surface-alt, #F7F3EF);
+  border: 1px solid var(--color-border, #DDD5CC);
+  box-shadow: 0 2px 12px rgba(34, 40, 49, 0.06);
+}
+
+/* Label (heading text + icon) */
+:root .notes-card__label,
+[data-theme="light"] .notes-card__label {
+  color: var(--color-text, #222831);
+}
+
+:root .notes-card__label svg,
+[data-theme="light"] .notes-card__label svg {
+  color: var(--color-accent, #9A8C73);
+}
+
+/* Description line */
+:root .notes-card__desc,
+[data-theme="light"] .notes-card__desc {
+  color: var(--color-text-light, #6B6560);
+}
+
+/* Textarea */
+:root .notes-card__right textarea,
+[data-theme="light"] .notes-card__right textarea {
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #DDD5CC);
+  color: var(--color-text, #222831);
+  box-shadow:
+    inset 0 1px 3px rgba(34, 40, 49, 0.06),
+    0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+:root .notes-card__right textarea::placeholder,
+[data-theme="light"] .notes-card__right textarea::placeholder {
+  color: var(--color-text-light, #6B6560);
+  opacity: 0.7;
+}
+
+:root .notes-card__right textarea:focus,
+[data-theme="light"] .notes-card__right textarea:focus {
+  background: var(--color-surface, #ffffff);
+  border-color: var(--color-accent, #9A8C73);
+  box-shadow:
+    0 0 0 3px rgba(154, 140, 115, 0.18),
+    inset 0 1px 3px rgba(34, 40, 49, 0.05);
+}
+
+/* Scrollbar */
+:root .notes-card__right textarea::-webkit-scrollbar-thumb,
+[data-theme="light"] .notes-card__right textarea::-webkit-scrollbar-thumb {
+  background: rgba(154, 140, 115, 0.45);
+}
+
+/* Prompt chips */
+:root .notes-prompt-chip,
+[data-theme="light"] .notes-prompt-chip {
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #DDD5CC);
+  color: var(--color-text, #222831);
+}
+
+:root .notes-prompt-chip:hover,
+[data-theme="light"] .notes-prompt-chip:hover {
+  background: var(--color-bg-soft, #F3EDE7);
+  border-color: var(--color-accent, #9A8C73);
+}
+
+/* Character meter */
+:root .notes-meter,
+[data-theme="light"] .notes-meter {
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #DDD5CC);
+  color: var(--color-text-light, #6B6560);
+}
+
+:root .notes-meter #bookNotesCounter,
+[data-theme="light"] .notes-meter #bookNotesCounter {
+  color: var(--color-text, #222831);
 }

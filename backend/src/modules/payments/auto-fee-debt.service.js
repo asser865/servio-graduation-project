@@ -53,12 +53,18 @@ async function createIfClean(bookingId) {
         booking.paymentStatus = 'cash_pending_settlement';
         await booking.save({ session });
 
+        // P5: the debt must be the FINAL platform fee (labor-only, Adj.14, set by
+        // completion-outcome.service at invoice time), not the pre-completion
+        // estimate (platformFeeAmount). Fall back to the estimate only for
+        // in-flight/legacy bookings that never got an itemized invoice (I3).
+        const feeBase = booking.grandTotal > 0 ? booking.platformFee : booking.platformFeeAmount;
+
         let debt = null;
-        if (booking.platformFeeAmount > 0) {
+        if (feeBase > 0) {
           [debt] = await CashDebt.create([{
             worker: booking.worker,
             booking: booking._id,
-            amount: booking.platformFeeAmount,
+            amount: feeBase,
             debtType: 'platform_fee',
           }], { session });
         }

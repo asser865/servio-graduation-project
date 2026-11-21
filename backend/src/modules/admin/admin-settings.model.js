@@ -46,6 +46,9 @@ const adminSettingsSchema = new mongoose.Schema({
     registrationNumber: { type: String, default: '' },
     label:              { type: String, default: 'VAT' },
   },
+  pricing: {
+    overBandMultiplier: { type: Number, default: 1.5 },
+  },
   payout: {
     minAmount:              { type: Number, default: 50 },
     processingBusinessDays: { type: Number, default: 3 },

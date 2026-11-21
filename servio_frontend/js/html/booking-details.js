@@ -23,6 +23,10 @@ import { createSupportIssue } from '../api/support.js';
 import { openCardPickerModal } from '../components/card-picker-modal.js';
 import { uploadPublicFile } from '../api/uploads.js';
 import openCustomerFeedbackModal from '../components/customer-feedback-modal.js';
+import { promptDialog } from '../components/confirm-dialog.js';
+import { renderInvoice } from '../components/invoice-table.js';
+import { openConfirmCompletionModal } from '../components/confirm-completion-modal.js';
+import { openDisputeModal } from '../components/dispute-modal.js';
 
 const POLL_MS = 45000;
 const FINAL_STATUSES = new Set(['completed', 'cancelled', 'rejected', 'disputed']);
@@ -360,6 +364,8 @@ function showContent() {
 function showLoading() {
   showContent();
   ['bkId', 'bkService', 'bkDate', 'bkTime', 'bkStatusText', 'bkTechnicianName'].forEach((id) => setText(id, '...'));
+  const invoiceCard = $('bkInvoiceCard');
+  if (invoiceCard && !invoiceCard.hidden) renderInvoice(invoiceCard, null, { loading: true });
 }
 
 async function loadBooking() {
@@ -419,7 +425,14 @@ function renderEscrowActions(booking) {
       <button id="bkDisputeRefusalBtn" class="btn btn--primary">This report is incorrect</button>
     `;
     const respond = async (customerConfirmsRefusal) => {
-      const customerResponse = window.prompt('Add a short note for the finance review:');
+      const customerResponse = await promptDialog({
+        title: 'Confirm what happened',
+        body: 'Add a short note for the finance review.',
+        label: 'Your note',
+        placeholder: 'Describe what happened with the payment…',
+        confirmLabel: 'Submit response',
+        required: false,
+      });
       if (customerResponse === null) return;
       try {
         await verifyRefusal(booking._id || booking.bookingId, {
@@ -480,8 +493,27 @@ function renderEscrowActions(booking) {
       </button>
     `;
 
+    const hasInvoice = booking.grandTotal !== undefined && booking.grandTotal !== null;
+
     document.getElementById('bkConfirmCompleteBtn')?.addEventListener('click', async () => {
       const bookingId = booking._id || booking.bookingId;
+      if (hasInvoice) {
+        // Itemized-invoice path (Task 20): show the breakdown above the
+        // confirm button, then call the existing confirm/release-request
+        // endpoint (confirmBooking → POST /payments/confirm/:id).
+        openConfirmCompletionModal({
+          bookingId,
+          booking,
+          onSuccess: async () => {
+            showToast('Booking confirmed. Payment is moving to review.', 'success');
+            await refreshBooking();
+          },
+          onError: (err) => {
+            showToast(err?.data?.message || err?.message || 'Failed to confirm completion. Please try again.', 'error');
+          },
+        });
+        return;
+      }
       try {
         await openCustomerFeedbackModal({
           bookingId,
@@ -495,7 +527,25 @@ function renderEscrowActions(booking) {
       }
     });
 
-    document.getElementById('bkReportIssueBtn')?.addEventListener('click', () => openDisputeDialog());
+    document.getElementById('bkReportIssueBtn')?.addEventListener('click', () => {
+      if (hasInvoice) {
+        // Pricing dispute path (Task 20): preselect the 'pricing' category.
+        const bookingId = booking._id || booking.bookingId;
+        openDisputeModal({
+          bookingId,
+          category: 'pricing',
+          onSuccess: async () => {
+            showToast('Dispute opened. SERVIO support is reviewing it.', 'info');
+            await refreshBooking();
+          },
+          onError: (err) => {
+            showToast(err?.data?.message || err?.message || 'Failed to open dispute.', 'error');
+          },
+        });
+        return;
+      }
+      openDisputeDialog();
+    });
   } else if (SUPPORT_ISSUE_STATUSES.has(status)) {
     const completedAt = new Date(booking.updatedAt || booking.customerConfirmedAt || 0).getTime();
     const withinCompletedWindow = status !== 'completed' || (completedAt && Date.now() - completedAt <= 48 * 60 * 60 * 1000);
@@ -600,11 +650,38 @@ function renderBooking() {
   renderTechnician(workerName, phone);
   renderPin(status);
   renderPayment(totals.base, totals.feeAmount, totals.estimatedTotal, status, totals.feeRate);
+  renderInvoiceCard(booking, status);
   renderActions(status);
   renderTerminalBanner(status, ui);
   renderEscrowActions(booking);
   renderPaymentNote(booking);
   attachRetryHandler(booking);
+}
+
+/**
+ * Itemized invoice card (Task 20 / §9). Shown only while the booking is
+ * awaiting customer confirmation and an invoice (grandTotal) is present.
+ * Handles 5 states: loading / empty / error+retry / success / over-band.
+ */
+function renderInvoiceCard(bk, status) {
+  const card = $('bkInvoiceCard');
+  if (!card) return;
+
+  if (status !== 'awaiting_customer_confirmation') {
+    card.hidden = true;
+    return;
+  }
+
+  renderInvoice(card, bk, {
+    onRetry: async () => {
+      renderInvoice(card, null, { loading: true });
+      try {
+        await refreshBooking();
+      } catch (_) {
+        renderInvoice(card, null, { error: 'Could not load your invoice. Please try again.', onRetry: () => renderInvoiceCard(booking, getStatus()) });
+      }
+    },
+  });
 }
 
 function renderSummary(date, time, total) {
@@ -619,7 +696,8 @@ function renderSummary(date, time, total) {
 
 function renderTechnician(workerName, phone) {
   const initials = getInitials(workerName);
-  const avatar = getWorker().profileImage || booking?.workerAvatar || '';
+  const w = getWorker() || {};
+  const avatar = w.profileImage || w.avatar || w.photo || booking?.workerAvatar || '';
   const avatarImg = $('bkTechAvatarImg');
 
   setText('bkTechInitials', initials);
@@ -684,10 +762,12 @@ function renderPin(status) {
   const value = $('bkPinValue');
   const help = $('bkPinHelp');
   const label = $('bkPinState');
+  const copy = $('bkCopyPinBtn');
   if (!card || !value || !help || !label) return;
 
   card.classList.remove('is-ready', 'is-open', 'is-verified', 'is-disabled');
   if (action) action.hidden = true;
+  if (copy) { copy.hidden = true; copy.dataset.pin = ''; }
 
   if (status === 'arrived') {
     card.classList.add(pinRevealed ? 'is-open' : 'is-ready');
@@ -697,6 +777,7 @@ function renderPin(status) {
       : 'Reveal the PIN only when the technician is physically with you.';
     label.textContent = pinRevealed ? 'Revealed' : 'Ready';
     if (action) action.hidden = pinRevealed || !pin;
+    if (copy && pinRevealed && pin) { copy.hidden = false; copy.dataset.pin = pin; }
     return;
   }
 
@@ -733,11 +814,30 @@ function renderPin(status) {
 
 function renderPayment(rate, fee, total, status, feeRate = 10) {
   setText('bkPaySummaryMethod', getPaymentMethod());
+  setText('bkPaymentMethodDetail', getPaymentMethod());
+
+  // Task 20 (fix wave 1): when an itemized invoice is being shown for this
+  // booking (#bkInvoiceCard — same gating condition as renderInvoiceCard /
+  // renderInvoice: awaiting_customer_confirmation + booking.grandTotal
+  // present), the invoice's Grand Total is the single source of truth for
+  // money. Hide this legacy panel's estimate breakdown (Base rate /
+  // Platform fee / Estimated total) so it can't contradict the invoice.
+  // Method and Status rows are NOT shown on the invoice card, so they stay.
+  const hasInvoice = status === 'awaiting_customer_confirmation'
+    && booking?.grandTotal !== undefined && booking?.grandTotal !== null;
+
+  const baseRow = $('bkPayBase')?.closest('div');
+  const feeRow = $('bkPayFee')?.closest('div');
+  const amountRow = $('bkPayAmount')?.closest('div');
+
+  if (baseRow) baseRow.hidden = hasInvoice;
+  if (feeRow) feeRow.hidden = hasInvoice;
+  if (amountRow) amountRow.hidden = hasInvoice;
+
   setText('bkPayBase', formatFeeMoney(rate));
   setText('bkPayFee', `${formatFeeMoney(fee)} (${feeRate}%)`);
   setText('bkPayAmount', formatFeeMoney(total));
   setText('bkPayStatus', paymentStatusText(status));
-  setText('bkPaymentMethodDetail', getPaymentMethod());
 
   const note = $('bkPaymentNote');
   if (note) {
@@ -1086,6 +1186,21 @@ function wireEvents() {
     const ref = `Booking #${getDisplayId()}`;
     try { await navigator.clipboard.writeText(ref); } catch (_) {}
     showToast('Booking reference copied.', 'success');
+  });
+
+  $('bkCopyPinBtn')?.addEventListener('click', async (event) => {
+    const btn = event.currentTarget;
+    const pin = btn.dataset.pin || '';
+    if (!pin) return;
+    try { await navigator.clipboard.writeText(pin); } catch (_) {}
+    btn.classList.add('is-copied');
+    const lbl = btn.querySelector('.bk-pin-copy__label');
+    if (lbl) lbl.textContent = 'Copied!';
+    setTimeout(() => {
+      btn.classList.remove('is-copied');
+      if (lbl) lbl.textContent = 'Copy PIN';
+    }, 1800);
+    showToast('Arrival PIN copied.', 'success');
   });
 
   $('bkCancelBtn')?.addEventListener('click', () => {

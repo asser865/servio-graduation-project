@@ -1136,7 +1136,7 @@ function renderBentoTechHero(worker, selectedService) {
   const service = selectedService || serviceLabelFromWorker(worker);
   const profileHref = worker._id ? `./technician-profile.html?id=${encodeURIComponent(worker._id)}` : './technician-profile.html';
   const bookHref = worker._id
-    ? `./booking.html?worker=${encodeURIComponent(worker._id)}&service=${encodeURIComponent(serviceCategoryForService(service) || service)}`
+    ? `./booking.html?worker=${encodeURIComponent(worker._id)}&service=${encodeURIComponent(serviceCategoryForService(service) || service)}${bookingNotesQuery()}`
     : profileHref;
 
   return `
@@ -1186,7 +1186,7 @@ function renderBentoAltRow(worker, selectedService) {
   const service = selectedService || serviceLabelFromWorker(worker);
   const profileHref = worker._id ? `./technician-profile.html?id=${encodeURIComponent(worker._id)}` : './technician-profile.html';
   const bookHref = worker._id
-    ? `./booking.html?worker=${encodeURIComponent(worker._id)}&service=${encodeURIComponent(serviceCategoryForService(service) || service)}`
+    ? `./booking.html?worker=${encodeURIComponent(worker._id)}&service=${encodeURIComponent(serviceCategoryForService(service) || service)}${bookingNotesQuery()}`
     : profileHref;
 
   return `
@@ -1258,6 +1258,13 @@ function normalizeSteps(data) {
 
 function serviceCategoryForService(service) {
   return SERVICE_META[service]?.category || null;
+}
+
+// Forward the customer's original prompt into the booking as &notes=... so their own
+// description of the problem reaches the technician instead of being dropped at handoff.
+function bookingNotesQuery() {
+  const prompt = (lastSmartMatchRender?.prompt || '').trim();
+  return prompt ? `&notes=${encodeURIComponent(prompt.slice(0, 1000))}` : '';
 }
 
 function filterMatchesForService(matches, service) {

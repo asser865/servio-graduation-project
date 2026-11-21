@@ -190,12 +190,7 @@
       rgba(15, 10, 5, 0.82) 0%,
       rgba(15, 10, 5, 0.6) 40%,
       rgba(15, 10, 5, 0.25) 70%,
-      rgba(15, 10, 5, 0.15) 100%),
-    linear-gradient(to bottom,
-      transparent 0%,
-      rgba(20, 16, 11, 0) 50%,
-      rgba(20, 16, 11, 0.4) 75%,
-      #14100B 100%);
+      rgba(15, 10, 5, 0.15) 100%);
   z-index: 1;
 }
 
@@ -806,21 +801,50 @@
 }
 
 .elite-card {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03) 55%),
+    linear-gradient(0deg, rgba(42, 26, 14, 0.55), rgba(42, 26, 14, 0.18));
+  border: 1px solid rgba(200, 182, 142, 0.22);
   border-radius: 28px;
   padding: 28px;
-  transition: all 400ms ease;
+  transition: transform 400ms ease, border-color 400ms ease, box-shadow 400ms ease, background 400ms ease;
   position: relative;
   transform-origin: center top;
-  box-shadow: inset 0 -70px 50px -20px rgba(42, 26, 14, 0.45);
+  box-shadow:
+    inset 0 -70px 50px -20px rgba(42, 26, 14, 0.45),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
+    0 18px 40px -22px rgba(0, 0, 0, 0.7);
+}
+
+/* Gold accent rail along the top edge — signals "premium / top tech" */
+.elite-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 28px;
+  right: 28px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, rgba(200, 182, 142, 0.9), transparent);
+  opacity: 0.55;
+  transition: opacity 400ms ease;
 }
 
 .elite-card:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.2);
-  transform: translateY(-4px) scale(1.02);
+  border-color: rgba(200, 182, 142, 0.5);
+  transform: translateY(-6px);
   z-index: 1;
+  box-shadow:
+    inset 0 -70px 50px -20px rgba(42, 26, 14, 0.45),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.12),
+    0 28px 60px -20px rgba(0, 0, 0, 0.75),
+    0 0 0 1px rgba(200, 182, 142, 0.25);
+}
+
+.elite-card:hover::before {
+  opacity: 1;
 }
 
 .elite-card__header-link {
@@ -975,16 +999,16 @@
 .elite-card__cta {
   display: block;
   width: 100%;
+  margin-top: auto;       /* pin CTA to the bottom — equal level across all cards */
   padding: 0.88em 1.65em;
   border-radius: 10em;
   background-color: var(--color-surface);
   color: var(--color-text);
   border: 1px solid var(--color-text);
-  box-shadow: 0 0 0 0 var(--color-text);
   font-weight: 600;
   font-size: 0.94rem;
   cursor: pointer;
-  transition: all 0.3s ease-in-out;
+  transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
   text-decoration: none;
   text-align: center;
 }
@@ -995,14 +1019,13 @@
   border-color: var(--color-accent);
 }
 
+/* Smooth glow on direct button hover — no positional jump */
 .elite-card__cta:hover {
-  transform: translateY(-4px) translateX(-2px);
-  box-shadow: 2px 5px 0 0 rgba(154, 140, 115, 0.5);
+  box-shadow: 0 8px 24px -6px rgba(200, 182, 142, 0.55);
 }
 
 .elite-card__cta:active {
-  transform: translateY(2px) translateX(1px);
-  box-shadow: 0 0 0 0 var(--color-text);
+  box-shadow: 0 3px 10px -4px rgba(200, 182, 142, 0.5);
 }
 
 .elite-carousel {

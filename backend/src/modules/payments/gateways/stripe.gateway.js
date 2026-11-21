@@ -17,7 +17,7 @@ class StripeGateway extends PaymentGateway {
   }
 
   async _authorize() { throw new Error('NotImplemented: StripeGateway.authorize'); }
-  async _capture()   { throw new Error('NotImplemented: StripeGateway.capture'); }
+  async _capture()   { throw new Error('NotImplemented: StripeGateway.capture (amount maps to amount_to_capture)'); }
   async _refund()    { throw new Error('NotImplemented: StripeGateway.refund'); }
   async verifyWebhook() { throw new Error('NotImplemented: StripeGateway.verifyWebhook'); }
   async attachPaymentMethod() { throw new Error('NotImplemented: StripeGateway.attachPaymentMethod'); }

@@ -95,6 +95,7 @@ const paymentSchema = new mongoose.Schema(
     refundAttempts:  { type: Number, default: 0 },
     refundedAmount:  { type: Number, default: 0 },
     capturedAt:      { type: Date },
+    capturedAmount:  { type: Number },
     creditApplied:       { type: Number, default: 0 },
     gatewayChargeAmount: { type: Number },
     heldAt:          { type: Date },

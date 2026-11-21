@@ -1,5 +1,5 @@
 import { initScrollReveal } from '../components/scroll-reveal.js';
-import { SERVICES } from '../data/services-data.js';
+import { SERVICES, slugifyServiceLabel } from '../data/services-data.js';
 import { getServices } from '../api/services.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -12,8 +12,30 @@ function el(target) {
   return document.querySelector(`[data-svc-target="${target}"]`);
 }
 
+function listingHref(serviceKey, subserviceKey = '') {
+  const params = new URLSearchParams({ service: serviceKey });
+  if (subserviceKey) params.set('subservice', subserviceKey);
+  return `./technician-listing.html?${params.toString()}`;
+}
+
 function stars(n) {
   return '★'.repeat(n) + '☆'.repeat(5 - n);
+}
+
+// "Can't find your issue?" escape hatch appended to the sub-service grid. serviceKey is
+// the only dynamic value and is URL-encoded into the href; all visible text is static.
+function describeCard(serviceKey, delayIndex = 0, isAr = false) {
+  const title = isAr ? 'لم تجد مشكلتك؟' : "Can't find your issue?";
+  const desc  = isAr
+    ? 'صِف المشكلة بكلماتك وسنطابقك مع الخدمة والفني المناسب.'
+    : 'Describe it in your own words — we’ll match the right service and technician.';
+  const href = `./smart-match.html?service=${encodeURIComponent(serviceKey)}`;
+  return `
+      <a class="svc-card svc-card--describe" href="${href}" data-reveal data-reveal-delay="${delayIndex * 100}">
+        <div class="svc-card__icon">✦</div>
+        <h3 class="svc-card__title">${title}</h3>
+        <p class="svc-card__desc">${desc}</p>
+      </a>`;
 }
 
 // ── Render ─────────────────────────────────────────────────────────────────
@@ -34,21 +56,25 @@ function render(svc, serviceKey, lang) {
   const findBtn = el('find-btn');
   if (findBtn) {
     findBtn.textContent = t.findBtn;
-    findBtn.href = `./technician-listing.html?service=${serviceKey}`;
+    findBtn.href = listingHref(serviceKey);
   }
 
   // Included grid — data shape: { icon, en: { title, desc }, ar: { title, desc } }
   const grid = el('included-grid');
   if (grid) {
-    grid.innerHTML = svc.included.map((item, i) => {
+    const cards = svc.included.map((item, i) => {
       const lang2 = isAr ? item.ar : item.en;
+      const subserviceKey = slugifyServiceLabel(item.en?.title || lang2.title);
       return `
-      <div class="svc-card" data-reveal data-reveal-delay="${i * 100}">
+      <a class="svc-card" href="${listingHref(serviceKey, subserviceKey)}" data-reveal data-reveal-delay="${i * 100}">
         <div class="svc-card__icon">${item.icon}</div>
         <h3 class="svc-card__title">${lang2.title}</h3>
         <p class="svc-card__desc">${lang2.desc}</p>
-      </div>`;
+      </a>`;
     }).join('');
+    // Escape hatch: a customer who doesn't see their exact issue describes it in their
+    // own words on Smart Match, which matches a service + technician instead of dead-ending.
+    grid.innerHTML = cards + describeCard(serviceKey, svc.included.length, isAr);
   }
 
   // Pricing grid — data shape: { featured?, en: { tier, price, jobs }, ar: { tier, price, jobs } }
@@ -111,7 +137,7 @@ function render(svc, serviceKey, lang) {
   const ctaBtn = el('cta-btn');
   if (ctaBtn) {
     ctaBtn.textContent = t.ctaBtn;
-    ctaBtn.href = `./technician-listing.html?service=${serviceKey}`;
+    ctaBtn.href = listingHref(serviceKey);
   }
 }
 

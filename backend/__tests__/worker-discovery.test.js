@@ -76,7 +76,7 @@ describe('getWorkers — serviceId filter (canonical)', () => {
         $and: expect.arrayContaining([
           expect.objectContaining({
             $or: expect.arrayContaining([
-              { services: PLUMBING_ID },
+              { 'services.serviceId': PLUMBING_ID },
               { categories: { $in: ['plumbing'] } },
             ]),
           }),
@@ -142,7 +142,7 @@ describe('getWorkers — category filter (legacy backward compat)', () => {
           expect.objectContaining({
             $or: expect.arrayContaining([
               { categories: { $in: ['plumbing'] } },
-              { services: { $in: [PLUMBING_ID] } },
+              { 'services.serviceId': { $in: [PLUMBING_ID] } },
             ]),
           }),
         ]),
@@ -166,7 +166,7 @@ describe('getWorkers — category filter (legacy backward compat)', () => {
           expect.objectContaining({
             $or: expect.arrayContaining([
               { categories: { $in: ['electrical'] } },
-              { services: { $in: [ELECTRICAL_ID] } },
+              { 'services.serviceId': { $in: [ELECTRICAL_ID] } },
             ]),
           }),
         ]),
@@ -192,7 +192,7 @@ describe('getWorkers — serviceId takes priority over category', () => {
         $and: expect.arrayContaining([
           expect.objectContaining({
             $or: expect.arrayContaining([
-              { services: PLUMBING_ID },
+              { 'services.serviceId': PLUMBING_ID },
               { categories: { $in: ['plumbing'] } },
             ]),
           }),
@@ -290,7 +290,7 @@ describe('getWorkers — area filter', () => {
         $and: expect.arrayContaining([
           expect.objectContaining({
             $or: expect.arrayContaining([
-              { services: PLUMBING_ID },
+              { 'services.serviceId': PLUMBING_ID },
               { categories: { $in: ['plumbing'] } },
             ]),
           }),
@@ -318,6 +318,9 @@ describe('getWorkers — no filters', () => {
     );
     expect(User.find).toHaveBeenCalledWith(
       expect.not.objectContaining({ services: expect.anything(), categories: expect.anything() })
+    );
+    expect(User.find).toHaveBeenCalledWith(
+      expect.not.objectContaining({ 'services.serviceId': expect.anything() })
     );
     // Suspended workers always excluded via $and clause
     expect(User.find).toHaveBeenCalledWith(

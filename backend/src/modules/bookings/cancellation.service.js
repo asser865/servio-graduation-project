@@ -48,8 +48,9 @@ async function customerCancel(bookingId, { reason, by }) {
         if (isPreAccept || inGrace) {
           refundAmount = payment.amount;
         } else {
-          lateFee = r2(payment.amount * (cfg.cancellation.customerLateFeePercent / 100));
-          refundAmount = r2(payment.amount - lateFee);
+          const feeBase = booking.estimatedTotal || payment.amount; // estimate, not the hold ceiling (R8)
+          lateFee = r2(feeBase * (cfg.cancellation.customerLateFeePercent / 100));
+          refundAmount = r2(payment.amount - lateFee); // refund = full hold minus fee-on-estimate
         }
 
         if (refundAmount > 0) {

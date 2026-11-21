@@ -59,7 +59,7 @@ const getTechnicians = async (req, res) => {
     isAvailable: true,
     'availability.0': { $exists: true },
     $or: [
-      { services: serviceId },
+      { 'services.serviceId': serviceId },
       { categories: { $in: [service.category] } },
     ],
   };
@@ -68,7 +68,7 @@ const getTechnicians = async (req, res) => {
   const [workers, total] = await Promise.all([
     User.find(filter)
       .select('name profileImage categories services skills averageRating totalReviews location locationLabel serviceArea coverageAreas hourlyRate isVerified availability')
-      .populate('services', 'title category basePrice priceUnit')
+      .populate('services.serviceId', 'title category basePrice priceUnit')
       .sort({ averageRating: -1 })
       .skip(skip)
       .limit(Number(limit)),

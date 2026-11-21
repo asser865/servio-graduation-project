@@ -1,4 +1,5 @@
 import { showToast } from '../components/toast.js';
+import { confirmDialog } from '../components/confirm-dialog.js';
 import { cancelBooking, getBooking } from '../api/bookings.js';
 import { snapshotFeeFromBooking, formatMoney, paymentMethodLabel } from '../utils/fee.js';
 
@@ -350,11 +351,13 @@ function renderPin(booking, status) {
   const visual = $('pinVisual');
   const label = $('pinStateLabel');
   const revealBtn = $('revealPinBtn');
+  const copyBtn = $('copyPinBtn');
   const pin = booking?.pin ? String(booking.pin).replace(/\D/g, '').slice(0, 4) : '';
 
   visual?.classList.remove('is-revealed');
   label?.classList.remove('is-open');
   if (revealBtn) revealBtn.hidden = true;
+  if (copyBtn) { copyBtn.hidden = true; copyBtn.dataset.pin = ''; }
 
   if (status === 'arrived') {
     if (pinRevealed && pin) {
@@ -363,6 +366,7 @@ function renderPin(booking, status) {
       setText('pinStateLabel', 'Revealed');
       visual?.classList.add('is-revealed');
       label?.classList.add('is-open');
+      if (copyBtn) { copyBtn.hidden = false; copyBtn.dataset.pin = pin; }
     } else {
       setText('confirmationPin', 'PIN ready');
       setText('pinHelpText', 'Reveal the PIN only when the technician is physically with you.');
@@ -463,7 +467,8 @@ function renderBooking(booking) {
   setText('conf-tech-rating', getRating(booking));
 
   const avatar = $('conf-tech-avatar');
-  const avatarSrc = booking.workerAvatar || booking.workerPhoto || getWorker(booking).profileImage;
+  const w = getWorker(booking) || {};
+  const avatarSrc = booking.workerAvatar || booking.workerPhoto || w.profileImage || w.avatar || w.photo;
   if (avatar) {
     avatar.src = avatarSrc || '../assets/images/avatar-placeholder.svg';
     avatar.alt = techName;
@@ -547,6 +552,21 @@ function wireEvents() {
     renderPin(currentBooking, getStatus(currentBooking));
   });
 
+  const copyPinBtn = $('copyPinBtn');
+  copyPinBtn?.addEventListener('click', async () => {
+    const pin = copyPinBtn.dataset.pin || '';
+    if (!pin) return;
+    try { await navigator.clipboard.writeText(pin); } catch { /* clipboard may be unavailable */ }
+    copyPinBtn.classList.add('is-copied');
+    const lbl = copyPinBtn.querySelector('.pin-copy-btn__label');
+    if (lbl) lbl.textContent = 'Copied!';
+    setTimeout(() => {
+      copyPinBtn.classList.remove('is-copied');
+      if (lbl) lbl.textContent = 'Copy PIN';
+    }, 1800);
+    showToast('Arrival PIN copied.', 'success');
+  });
+
   const refBtn = $('refCopyBtn');
   refBtn?.addEventListener('click', async () => {
     const refText = `#${currentBooking?.id || currentBooking?._id || '-'}`;
@@ -562,7 +582,14 @@ function wireEvents() {
     }
 
     const msg = t('conf_cancel_confirm', 'Cancel this pending request? You can submit a new booking anytime.');
-    if (!confirm(msg)) return;
+    const ok = await confirmDialog({
+      title: 'Cancel booking request?',
+      body: msg,
+      confirmLabel: 'Cancel request',
+      cancelLabel: 'Keep request',
+      tone: 'danger',
+    });
+    if (!ok) return;
 
     const id = getApiId(currentBooking);
     try {

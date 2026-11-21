@@ -3,6 +3,7 @@
    ─────────────────────────────────────────────── */
 
 import { showToast } from '../components/toast.js';
+import { confirmDialog, promptDialog, alertDialog } from '../components/confirm-dialog.js';
 import { skList, skTableRows } from '../components/skeleton.js';
 import { getAllUsers, deleteUser, updateUserStatus, updatePassword, reviewWorker, approveWorkerCategory } from '../api/users.js';
 import { createPoller, snapshotFocus, restoreFocus } from '../utils/live-poll.js';
@@ -903,34 +904,54 @@ function initAdminDashboard() {
   // ── Technicians: Table Filters & Actions ───────────────
   const techSearch = document.getElementById('techSearch');
   const techStatusFilter = document.getElementById('techStatusFilter');
+  const techAvailFilter = document.getElementById('techAvailFilter');
+  const techCategoryFilter = document.getElementById('techCategoryFilter');
+  const techSortFilter = document.getElementById('techSortFilter');
   const techsTableBody = document.querySelector('#allTechsTable tbody');
 
   function _applyTechFilters() {
     if (!techsTableBody) return;
     const q = (techSearch?.value || '').toLowerCase();
     const status = techStatusFilter?.value || 'All';
+    const avail = techAvailFilter?.value || 'All';
+    const category = techCategoryFilter?.value || 'All';
+    const sortBy = techSortFilter?.value || 'jobs';
     let visibleCount = 0;
-    
-    document.querySelectorAll('#allTechsTable tbody tr').forEach(row => {
+
+    const rows = Array.from(techsTableBody.querySelectorAll('tr'));
+
+    // 1) Filter
+    rows.forEach(row => {
       const name = row.querySelector('.t-name')?.textContent.toLowerCase() || '';
       const specialty = row.querySelector('.t-specialty')?.textContent.toLowerCase() || '';
-      // table doesn't have email column in mock, just name and specialty
       const rowStatus = row.dataset.status || '';
+      const rowAvail = row.dataset.availability || '';
+      const rowCategory = row.dataset.category || '';
 
       const matchQ = q === '' || name.includes(q) || specialty.includes(q);
       const matchStatus = status === 'All' || rowStatus === status;
+      const matchAvail = avail === 'All' || rowAvail === avail;
+      const matchCategory = category === 'All' || rowCategory.includes(category);
 
-      row.classList.toggle('is-hidden', !matchQ || !matchStatus);
-      if (matchQ && matchStatus) {
-        visibleCount++;
-        row.style.display = '';
-      } else {
-        row.style.display = 'none';
-      }
+      const show = matchQ && matchStatus && matchAvail && matchCategory;
+      row.classList.toggle('is-hidden', !show);
+      row.style.display = show ? '' : 'none';
+      if (show) visibleCount++;
     });
 
+    // 2) Sort (reorder DOM). Skip placeholder rows (no data attributes).
+    const dataRows = rows.filter(r => r.dataset.jobs !== undefined);
+    const sorters = {
+      jobs:    (a, b) => (Number(b.dataset.jobs) - Number(a.dataset.jobs)) || (Number(b.dataset.revenue) - Number(a.dataset.revenue)),
+      revenue: (a, b) => (Number(b.dataset.revenue) - Number(a.dataset.revenue)) || (Number(b.dataset.jobs) - Number(a.dataset.jobs)),
+      rating:  (a, b) => (Number(b.dataset.rating) - Number(a.dataset.rating)) || (Number(b.dataset.jobs) - Number(a.dataset.jobs)),
+      name:    (a, b) => (a.querySelector('.t-name')?.textContent || '').localeCompare(b.querySelector('.t-name')?.textContent || ''),
+    };
+    dataRows.sort(sorters[sortBy] || sorters.jobs);
+    dataRows.forEach(r => techsTableBody.appendChild(r));
+
     const infoEl = document.getElementById('techPaginationInfo');
-    const total = document.querySelectorAll('#allTechsTable tbody tr').length;
+    const total = techsTableBody.querySelectorAll('tr').length;
     if (infoEl) {
       const t = (typeof window.t === 'function') ? window.t : (k) => k;
       infoEl.textContent = t('admin_pagination_techs')
@@ -938,9 +959,14 @@ function initAdminDashboard() {
         .replace('{n}', total);
     }
   }
+  // Expose so the table renderer can re-apply filters/sort after async data loads.
+  window._applyTechFilters = _applyTechFilters;
 
   techSearch?.addEventListener('input', _applyTechFilters);
   techStatusFilter?.addEventListener('change', _applyTechFilters);
+  techAvailFilter?.addEventListener('change', _applyTechFilters);
+  techCategoryFilter?.addEventListener('change', _applyTechFilters);
+  techSortFilter?.addEventListener('change', _applyTechFilters);
   _applyTechFilters(); // run on init to set correct count
 
   document.getElementById('exportTechsBtn')?.addEventListener('click', () => {
@@ -1074,6 +1100,33 @@ function initAdminDashboard() {
     document.getElementById('techModalAvatar').textContent = initials;
     document.getElementById('techModalName').textContent = data.name || '—';
     document.getElementById('techModalEmail').textContent = data.email || '—';
+    // Contact: email value + Copy / Open-mail buttons
+    const email = (data.email && data.email !== '—') ? data.email : '';
+    const emailValEl = document.getElementById('techModalEmailVal');
+    const emailCopyEl = document.getElementById('techModalEmailCopy');
+    const emailMailEl = document.getElementById('techModalEmailMail');
+    if (emailValEl) emailValEl.textContent = email || '—';
+    if (emailMailEl) {
+      if (email) { emailMailEl.href = `mailto:${email}`; emailMailEl.style.pointerEvents = ''; emailMailEl.style.opacity = ''; }
+      else { emailMailEl.removeAttribute('href'); emailMailEl.style.pointerEvents = 'none'; emailMailEl.style.opacity = '0.5'; }
+    }
+    if (emailCopyEl) {
+      emailCopyEl.disabled = !email;
+      const copyLabel = (typeof window.t === 'function' ? window.t('admin_contact_copy') : 'Copy') || 'Copy';
+      emailCopyEl.textContent = copyLabel;
+      emailCopyEl.onclick = async () => {
+        if (!email) return;
+        try { await navigator.clipboard.writeText(email); }
+        catch (_) {
+          const ta = document.createElement('textarea');
+          ta.value = email; document.body.appendChild(ta); ta.select();
+          try { document.execCommand('copy'); } catch (e) {}
+          ta.remove();
+        }
+        emailCopyEl.textContent = (typeof window.t === 'function' ? window.t('admin_contact_copied') : 'Copied!') || 'Copied!';
+        setTimeout(() => { emailCopyEl.textContent = copyLabel; }, 1500);
+      };
+    }
     document.getElementById('techModalSkills').textContent = data.skills || '—';
     document.getElementById('techModalArea').textContent = data.area || '—';
     document.getElementById('techModalPhone').textContent = data.phone || '—';
@@ -1254,12 +1307,60 @@ function initAdminDashboard() {
     showToast(typeof window.t === 'function' ? window.t('toast_booking_exported') : 'Booking data exported', 'success');
   });
 
-  document.querySelectorAll('[data-action="view-booking"]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const id = btn.dataset.id;
-      showToast(typeof window.t === 'function' ? window.t('toast_view_booking') : `Viewing booking S-${id} — feature coming soon`, 'info');
-    });
+  // Booking "View" is wired via event delegation (rows render async) + opens the
+  // booking-details modal. Booking objects are cached in window._adminBookingsById
+  // by the bookings renderer below.
+  const bkTableHost = document.querySelector('[data-panel="bookings"]') || document;
+  bkTableHost.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action="view-booking"]');
+    if (!btn) return;
+    const id = btn.dataset.id;
+    const b = (window._adminBookingsById && window._adminBookingsById[id]) || null;
+    if (b) openBookingModal(b);
+    else showToast(typeof window.t === 'function' ? window.t('toast_view_booking') : `Booking ${id}`, 'info');
   });
+
+  function _bkmSet(id, val) { const el = document.getElementById(id); if (el) el.textContent = (val == null || val === '') ? '—' : val; }
+  function openBookingModal(b) {
+    const money = (n) => `${Number(n).toLocaleString()} EGP`;
+    _bkmSet('bkmService', b.serviceName || b.service?.title || b.serviceKey || b.serviceCategory || '—');
+    _bkmSet('bkmId', b._id ? `ID: ${b._id}` : '');
+    _bkmSet('bkmStatus', b.status || '—');
+    const hasInvoice = Number(b.grandTotal) > 0;
+    _bkmSet('bkmAmount', (hasInvoice ? money(b.grandTotal) : (b.totalPrice != null ? money(b.totalPrice) : '—')));
+    _bkmSet('bkmCustomer', b.user?.name || '—');
+    _bkmSet('bkmCustomerContact', [b.user?.email, b.user?.phone].filter(Boolean).join(' · '));
+    _bkmSet('bkmTech', b.worker?.name || '—');
+    const d = b.scheduledDate ? new Date(b.scheduledDate) : null;
+    _bkmSet('bkmDate', d ? `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · ${b.scheduledTime || d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}` : '—');
+    _bkmSet('bkmAddress', typeof b.address === 'string' ? b.address : (b.address?.label || b.address?.street || '—'));
+    _bkmSet('bkmPayMethod', b.paymentMethod || '—');
+    _bkmSet('bkmPayStatus', b.paymentStatus || 'pending');
+
+    // Invoice breakdown (only when an itemized invoice exists)
+    const wrap = document.getElementById('bkmInvoiceWrap');
+    const rowsEl = document.getElementById('bkmInvoiceRows');
+    if (wrap && rowsEl && hasInvoice) {
+      const line = (label, val, strong) => `<div class="apm-invoice__row${strong ? ' apm-invoice__row--total' : ''}"><span>${escapeHtml(label)}</span><span>${val}</span></div>`;
+      let html = '';
+      if (b.laborAmount != null) html += line('Labor', money(b.laborAmount));
+      (b.materials || []).forEach((m) => {
+        const amt = (Number(m.qty) || 1) * (Number(m.unitPrice) || 0);
+        html += line(`${escapeHtml(m.name || 'Material')} ×${Number(m.qty) || 1}`, money(amt));
+      });
+      if (b.subtotal != null) html += line('Subtotal', money(b.subtotal));
+      if (b.platformFee != null) html += line('Platform fee', money(b.platformFee));
+      if (b.vat != null) html += line('VAT', money(b.vat));
+      html += line('Grand Total', money(b.grandTotal), true);
+      rowsEl.innerHTML = html;
+      wrap.style.display = 'block';
+    } else if (wrap) {
+      wrap.style.display = 'none';
+    }
+
+    openProfileModal('bookingDetailsModal');
+  }
+  window.openBookingModal = openBookingModal;
 
 
   // ── Disputes: more info ───────────────────
@@ -1476,7 +1577,13 @@ function initAdminDashboard() {
   }
 
   async function deleteService(id) {
-    if (confirm('Are you sure you want to delete this service?')) {
+    const ok = await confirmDialog({
+      title: 'Delete service?',
+      body: 'This service will be permanently removed.',
+      confirmLabel: 'Delete service',
+      tone: 'danger',
+    });
+    if (ok) {
       try {
         await apiDeleteService(id);
         renderServicesList();
@@ -1883,7 +1990,7 @@ function initAdminDashboard() {
            } else {
              const rows = [['Booking ID', 'Customer', 'Service', 'Status', 'Total Price', 'Date']];
              bookings.forEach(b => rows.push([
-               b._id || '—', b.customer?.name || '—', b.service?.title || '—', b.status || '—', b.totalPrice || '—', b.createdAt ? new Date(b.createdAt).toLocaleDateString() : '—'
+               b._id || '—', b.customer?.name || '—', b.serviceName || b.service?.title || '—', b.status || '—', b.totalPrice || '—', b.createdAt ? new Date(b.createdAt).toLocaleDateString() : '—'
              ]));
              fileContent = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
              fileExt = 'csv';
@@ -2183,7 +2290,8 @@ function initAdminDashboard() {
     const ids = _getSelectedAuditIds();
     if (!ids.length) return;
     const msg = `Delete ${ids.length} selected log entr${ids.length === 1 ? 'y' : 'ies'}? This cannot be undone.`;
-    if (!confirm(msg)) return;
+    const ok = await confirmDialog({ title: 'Delete log entries?', body: msg, confirmLabel: 'Delete', tone: 'danger' });
+    if (!ok) return;
     try {
       await deleteSelectedAuditLogs(ids);
       showToast(`${ids.length} log entr${ids.length === 1 ? 'y' : 'ies'} deleted`, 'success');
@@ -2196,7 +2304,13 @@ function initAdminDashboard() {
 
   // Delete All
   document.getElementById('auditDeleteAllBtn')?.addEventListener('click', async () => {
-    if (!confirm('Delete ALL audit log entries? This will permanently clear the entire log and cannot be undone.')) return;
+    const okAll = await confirmDialog({
+      title: 'Clear entire audit log?',
+      body: 'Delete ALL audit log entries? This permanently clears the entire log and cannot be undone.',
+      confirmLabel: 'Delete all logs',
+      tone: 'danger',
+    });
+    if (!okAll) return;
     try {
       await deleteAllAuditLogs();
       showToast('All audit logs cleared', 'success');
@@ -2221,7 +2335,8 @@ function initAdminDashboard() {
     
     const id = delBtn.dataset.auditDelete;
     const confirmMsg = _T('admin_audit_delete_confirm') || 'Are you sure you want to remove this log entry?';
-    if (!confirm(confirmMsg)) return;
+    const okDel = await confirmDialog({ title: 'Remove log entry?', body: confirmMsg, confirmLabel: 'Remove', tone: 'danger' });
+    if (!okDel) return;
 
     try {
       await deleteAuditLog(id);
@@ -2404,14 +2519,15 @@ async function loadAdminData() {
         techsRoot.innerHTML = techs.map((u) => {
           const status = getTechStatusLabel(u);
           const badgeClass = getTechStatusBadgeClass(u);
+          const catStr = ((u.skills && u.skills.length ? u.skills : (u.categories || [])).join(',')).toLowerCase();
           return `
-          <tr class="booking-row" data-status="${status}">
+          <tr class="booking-row" data-status="${status}" data-availability="${u.isAvailable ? 'Live' : 'Offline'}" data-jobs="${Number(u.completedJobs) || 0}" data-revenue="${Number(u.revenue) || 0}" data-rating="${Number(u.averageRating) || 0}" data-category="${escapeHtml(catStr)}">
             <td><div class="t-name" style="font-weight:600;">${escapeHtml(u.name || '—')}</div></td>
             <td class="t-specialty">${escapeHtml((u.skills || []).join(', ') || (u.categories || []).join(', ') || 'General')}</td>
             <td><div style="color:var(--color-text-muted);text-transform:capitalize;">${escapeHtml(u.locationLabel || '—')}</div></td>
             <td><div class="th-rating">★ ${u.averageRating ?? '—'}</div></td>
-            <td class="center-align" style="font-weight:700;color:var(--color-text);">${u.completedJobs ?? '—'}</td>
-            <td class="bk-amount">— EGP</td>
+            <td class="center-align" style="font-weight:700;color:var(--color-text);">${Number(u.completedJobs) || 0}</td>
+            <td class="bk-amount right-align">${Number(u.revenue) ? `${Number(u.revenue).toLocaleString()} EGP` : '— EGP'}</td>
             <td style="white-space:nowrap;"><span class="bk-badge ${badgeClass} status-badge">${status}</span></td>
             <td style="white-space:nowrap;">
               ${u.isAvailable
@@ -2438,6 +2554,9 @@ async function loadAdminData() {
             _openTechProfileModal(buildTechProfileData(user));
           });
         });
+
+        // Re-apply filters + sort now that real rows exist (listeners were bound earlier).
+        if (typeof window._applyTechFilters === 'function') window._applyTechFilters();
       }
 
       const pendingGrid = document.querySelector('.pending-cards-grid');
@@ -2517,7 +2636,7 @@ async function loadAdminData() {
               btn.disabled = true;
               btn.style.opacity = '0.5';
             } catch (e) {
-              alert('Failed to approve category: ' + (e.message || e));
+              alertDialog({ title: 'Approval failed', body: 'Failed to approve category: ' + (e.message || e), tone: 'danger' });
             }
           });
         });
@@ -2542,6 +2661,10 @@ async function loadAdminData() {
     const bCompleted = bookings.filter(b => b.status === 'completed').length;
     const bDisputed = bookings.filter(b => b.status === 'disputed').length;
 
+    // Cache by id so the "View" delegated handler can open the details modal.
+    window._adminBookingsById = {};
+    bookings.forEach((b) => { window._adminBookingsById[b._id] = b; });
+
     const bkRoot = document.querySelector('[data-panel="bookings"] tbody');
     if (bkRoot) {
       bkRoot.style.visibility = '';
@@ -2554,7 +2677,7 @@ async function loadAdminData() {
           return `<tr class="booking-row" data-status="${b.status}">
             <td><div style="font-weight:600;">${b.user?.name || '—'}</div></td>
             <td><div style="color:var(--color-text-muted);">${b.worker?.name || '—'}</div></td>
-            <td>${b.service?.title || b.serviceKey || '—'}</td>
+            <td>${escapeHtml(b.serviceName || b.service?.title || b.serviceKey || '—')}</td>
             <td>
               <div style="font-weight:500; margin-bottom:2px;">${date}</div>
               <div style="font-size:0.75rem; color:var(--color-text-light);">${b.scheduledDate ? new Date(b.scheduledDate).toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit'}) : '—'}</div>
@@ -2606,7 +2729,15 @@ function bindAdminActions() {
     btn.onclick = async () => {
       const id = btn.dataset.adminToggleUser;
       const currentActive = btn.dataset.active === 'true';
-      if (!confirm(`Are you sure you want to ${currentActive ? 'suspend' : 'activate'} this user?`)) return;
+      const okToggle = await confirmDialog({
+        title: currentActive ? 'Suspend user?' : 'Activate user?',
+        body: currentActive
+          ? 'This user will be blocked from using the platform until reactivated.'
+          : 'This user will regain access to the platform.',
+        confirmLabel: currentActive ? 'Suspend user' : 'Activate user',
+        tone: currentActive ? 'danger' : 'primary',
+      });
+      if (!okToggle) return;
       try {
         await updateUserStatus(id, !currentActive);
         showToast(`User ${currentActive ? 'suspended' : 'activated'} successfully.`, 'success');
@@ -2620,7 +2751,12 @@ function bindAdminActions() {
   document.querySelectorAll('[data-approve-tech]').forEach((btn) => {
     btn.onclick = async () => {
       const id = btn.dataset.approveTech;
-      if (!confirm('Approve this technician for the platform?')) return;
+      const okApprove = await confirmDialog({
+        title: 'Approve technician?',
+        body: 'This technician will be verified and able to accept jobs on the platform.',
+        confirmLabel: 'Approve technician',
+      });
+      if (!okApprove) return;
       try {
         await reviewWorker(id, { decision: 'approved' });
         showToast('Technician approved and verified!', 'success');
@@ -2677,7 +2813,13 @@ function bindAdminActions() {
   document.querySelectorAll('[data-admin-delete-user]').forEach((btn) => {
     btn.onclick = async () => {
       const id = btn.dataset.adminDeleteUser;
-      if (!confirm('Delete this user permanently?')) return;
+      const okDelUser = await confirmDialog({
+        title: 'Delete user permanently?',
+        body: 'This permanently removes the user account and cannot be undone.',
+        confirmLabel: 'Delete user',
+        tone: 'danger',
+      });
+      if (!okDelUser) return;
       try {
         await deleteUser(id);
         showToast('User deleted.', 'success');
@@ -2691,7 +2833,13 @@ function bindAdminActions() {
   document.querySelectorAll('[data-admin-delete-service]').forEach((btn) => {
     btn.onclick = async () => {
       const id = btn.dataset.adminDeleteService;
-      if (!confirm('Delete this service permanently?')) return;
+      const okDelSvc = await confirmDialog({
+        title: 'Delete service permanently?',
+        body: 'This permanently removes the service and cannot be undone.',
+        confirmLabel: 'Delete service',
+        tone: 'danger',
+      });
+      if (!okDelSvc) return;
       try {
         await apiDeleteService(id);
         showToast('Service deleted.', 'success');
@@ -2725,7 +2873,7 @@ function getDisputeWorker(dispute) {
 
 function getDisputeService(dispute) {
   const booking = getDisputeBooking(dispute);
-  return booking.service?.title || booking.serviceCategory || 'Service booking';
+  return booking.serviceName || booking.service?.title || booking.serviceCategory || 'Service booking';
 }
 
 function formatDisputeStatusAdmin(status) {
@@ -3227,7 +3375,12 @@ function wireDisputeModalActions(disputeId) {
       : decision === 'release' ? 'release payment to technician'
       : decision === 'partial_refund' ? `partially refund ${payload.refundAmount} EGP`
       : 'send job back for redo';
-    if (!confirm(`Confirm: ${label}?`)) return;
+    const okResolve = await confirmDialog({
+      title: 'Confirm dispute resolution',
+      body: `You are about to ${label}.`,
+      confirmLabel: 'Confirm',
+    });
+    if (!okResolve) return;
     await resolveDispute(disputeId, payload);
     showToast('Dispute resolved.', 'success');
     await renderDisputes({ force: true });
@@ -3236,13 +3389,26 @@ function wireDisputeModalActions(disputeId) {
   }));
 
   body.querySelector('[data-action="appeal-uphold"]')?.addEventListener('click', () => safeRun(async () => {
-    const note = prompt('Optional note for upholding appeal:') || '';
+    const note = (await promptDialog({
+      title: 'Uphold appeal',
+      label: 'Note (optional)',
+      placeholder: 'Add a note for upholding the appeal…',
+      confirmLabel: 'Uphold appeal',
+      required: false,
+    })) ?? '';
     await resolveDisputeAppeal(disputeId, 'upheld', note);
     showToast('Appeal upheld.', 'success');
     await refreshDisputeAndModal(disputeId);
   }));
   body.querySelector('[data-action="appeal-overturn"]')?.addEventListener('click', () => safeRun(async () => {
-    const note = prompt('Optional note for overturning appeal:') || '';
+    const note = (await promptDialog({
+      title: 'Overturn appeal',
+      body: 'The case will be re-opened for review.',
+      label: 'Note (optional)',
+      placeholder: 'Add a note for overturning the appeal…',
+      confirmLabel: 'Overturn appeal',
+      required: false,
+    })) ?? '';
     await resolveDisputeAppeal(disputeId, 'overturned', note);
     showToast('Appeal overturned. Case re-opened for review.', 'success');
     await refreshDisputeAndModal(disputeId);
@@ -3306,6 +3472,7 @@ function supportIssueMatchesSearch(issue, query) {
     issue.customer?.email,
     issue.worker?.name,
     issue.worker?.email,
+    booking.serviceName,
     booking.service?.title,
     booking.serviceCategory,
     issue.type,
@@ -3367,7 +3534,7 @@ async function renderSupportIssues(options = {}) {
 
   tbody.innerHTML = visible.map(issue => {
     const booking = getSupportBooking(issue);
-    const service = booking.service?.title || booking.serviceCategory || 'Service booking';
+    const service = booking.serviceName || booking.service?.title || booking.serviceCategory || 'Service booking';
     const canAct = !['resolved', 'closed'].includes(issue.status);
     return `
       <tr class="admin-support-row admin-support-row--${escapeHtml(issue.priority || 'normal')}">
@@ -3412,7 +3579,12 @@ function bindSupportIssueActions() {
   });
   document.querySelectorAll('[data-support-resolve]').forEach(btn => {
     btn.onclick = async () => {
-      const resolution = prompt('Resolution note for this support issue:');
+      const resolution = await promptDialog({
+        title: 'Resolve support issue',
+        label: 'Resolution note',
+        placeholder: 'Describe how this support issue was resolved…',
+        confirmLabel: 'Resolve issue',
+      });
       if (!resolution) return;
       try {
         await resolveSupportIssue(btn.dataset.supportResolve, { resolution });
@@ -3425,7 +3597,12 @@ function bindSupportIssueActions() {
   });
   document.querySelectorAll('[data-support-escalate]').forEach(btn => {
     btn.onclick = async () => {
-      if (!confirm('Escalate this support issue into a payment dispute?')) return;
+      const okEscalate = await confirmDialog({
+        title: 'Escalate to payment dispute?',
+        body: 'This support issue will be escalated into a formal payment dispute.',
+        confirmLabel: 'Escalate to dispute',
+      });
+      if (!okEscalate) return;
       try {
         await escalateSupportIssueToDispute(btn.dataset.supportEscalate, {});
         showToast('Support issue escalated to dispute.', 'success');
@@ -3490,7 +3667,14 @@ async function renderProblemReports(options = {}) {
   // bind actions
   document.querySelectorAll('[data-problem-resolve]').forEach(btn => {
     btn.onclick = async () => {
-      const notes = prompt('Add a resolution note (optional):');
+      const notes = await promptDialog({
+        title: 'Resolve problem report',
+        label: 'Resolution note (optional)',
+        placeholder: 'Add a resolution note…',
+        confirmLabel: 'Mark resolved',
+        required: false,
+      });
+      if (notes === null) return;
       try {
         await updateProblemReport(btn.dataset.problemResolve, { status: 'resolved', adminNotes: notes || '' });
         showToast('Problem report resolved.', 'success');
@@ -3596,7 +3780,7 @@ function openAdminSupportModal(issueId) {
   const body = document.getElementById('adminSupportBody');
   if (!issue || !body) return;
   const booking = getSupportBooking(issue);
-  const service = booking.service?.title || booking.serviceCategory || 'Service booking';
+  const service = booking.serviceName || booking.service?.title || booking.serviceCategory || 'Service booking';
   const evidence = Array.isArray(issue.evidence) ? issue.evidence : [];
   body.innerHTML = `
     <div class="admin-dispute-detail">
@@ -3778,7 +3962,12 @@ async function renderPendingApprovals(filter = {}) {
 
     container.querySelectorAll('.js-approve-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
-        if (!confirm(window.t?.('admin_approve_confirm') || 'Approve this payment release? This cannot be undone.')) return;
+        const okApprovePay = await confirmDialog({
+          title: 'Approve payment release?',
+          body: window.t?.('admin_approve_confirm') || 'Approve this payment release? This cannot be undone.',
+          confirmLabel: 'Approve release',
+        });
+        if (!okApprovePay) return;
         try {
           await adminApprovePayment(btn.dataset.id);
           showToast('Approved.', 'success');
@@ -3791,7 +3980,13 @@ async function renderPendingApprovals(filter = {}) {
 
     container.querySelectorAll('.js-reject-cash-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
-        const reason = prompt('Reason for rejection (required):');
+        const reason = await promptDialog({
+          title: 'Reject cash payment',
+          label: 'Rejection reason',
+          placeholder: 'Explain why this cash payment is being rejected…',
+          confirmLabel: 'Reject payment',
+          tone: 'danger',
+        });
         if (!reason) return;
         try {
           await adminRejectCash(btn.dataset.id, { reason });
@@ -3805,8 +4000,20 @@ async function renderPendingApprovals(filter = {}) {
 
     container.querySelectorAll('.js-refund-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
-        if (!confirm(window.t?.('admin_refund_confirm') || 'Issue a refund? Booking will be cancelled.')) return;
-        const reason = prompt('Refund reason:');
+        const okRefund = await confirmDialog({
+          title: 'Issue refund?',
+          body: window.t?.('admin_refund_confirm') || 'Issue a refund? The booking will be cancelled.',
+          confirmLabel: 'Continue',
+          tone: 'danger',
+        });
+        if (!okRefund) return;
+        const reason = await promptDialog({
+          title: 'Refund reason',
+          label: 'Reason',
+          placeholder: 'Explain why this payment is being refunded…',
+          confirmLabel: 'Issue refund',
+          tone: 'danger',
+        });
         if (!reason) return;
         try {
           await adminRefund(btn.dataset.id, { reason });

@@ -4,6 +4,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 import { getMyDebtsV2, settleMyDebt } from '../api/payments.js';
 import { uploadImage } from '../utils/upload-image.js';
+import { alertDialog } from './confirm-dialog.js';
 
 const STYLE_ID = 'settle-debt-modal-styles';
 
@@ -216,7 +217,7 @@ export async function openSettleDebtModal({ onSuccess, onError } = {}) {
   } catch (e) {
     loading.remove();
     const msg = "Couldn't load your debt details: " + (e?.message || e);
-    if (onError) onError(msg); else alert(msg);
+    if (onError) onError(msg); else alertDialog({ title: 'Could not load debts', body: msg, tone: 'danger' });
     return;
   }
   loading.remove();
@@ -224,7 +225,7 @@ export async function openSettleDebtModal({ onSuccess, onError } = {}) {
   const totalOwed = Number(summary.totalOutstanding) || 0;
   if (totalOwed <= 0) {
     const msg = "No outstanding platform fees to settle. You're all clear.";
-    if (onError) onError(msg); else alert(msg);
+    if (onError) onError(msg); else alertDialog({ title: 'All clear', body: msg, tone: 'success' });
     return;
   }
 

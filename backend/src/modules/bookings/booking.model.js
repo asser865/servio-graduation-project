@@ -12,10 +12,11 @@ const BOOKING_STATUSES = [
   'completed', 'cancelled', 'disputed',
   'cancelled_no_show', 'customer_no_show', 'worker_no_show', 're_pooling',
   'payment_refused', 'refusal_under_investigation', 'incomplete_review', 'customer_disputed',
+  'customer_declined',
 ];
 const PAYMENT_METHODS = ['cash', 'card', 'online'];
 
-const COMPLETION_OUTCOME_VALUES = ['customer_paid', 'customer_refused_payment', 'could_not_complete'];
+const COMPLETION_OUTCOME_VALUES = ['customer_paid', 'customer_refused_payment', 'could_not_complete', 'customer_declined_work'];
 const CUSTOMER_FEEDBACK_ACTIONS = ['confirmed', 'reported_issue', 'system_auto_confirmed'];
 const CUSTOMER_ISSUE_REASONS = [
   'work_not_done',
@@ -158,6 +159,26 @@ const bookingSchema = new mongoose.Schema(
       min:     [0, 'Estimated total cannot be negative'],
       default: 0,
     },
+
+    // ── Pricing snapshots (immutable, set at creation) ─────────────────────
+    startsFromSnapshot: { type: Number, default: 0, min: 0 },
+    seedRangeSnapshot:  { min: { type: Number, default: 0 }, max: { type: Number, default: 0 } },
+    holdCeiling:        { type: Number, default: 0, min: 0 },
+
+    // ── Final itemized invoice (set at completion) ─────────────────────────
+    laborAmount: { type: Number, default: 0, min: 0 },
+    materials: [{
+      name:      { type: String, trim: true, required: true },
+      qty:       { type: Number, default: 1, min: 0 },
+      unitPrice: { type: Number, default: 0, min: 0 },
+      reason:    { type: String, trim: true },
+      photo:     { type: String },
+    }],
+    subtotal:    { type: Number, default: 0, min: 0 },   // money(labor + Σ materials) = worker earning
+    platformFee: { type: Number, default: 0, min: 0 },   // money(labor × rate) — LABOR ONLY (Adj.14)
+    vat:         { type: Number, default: 0, min: 0 },   // VAT inside grandTotal: money(grandTotal − grandTotal/(1+rate)) — reporting only (Guard B)
+    grandTotal:  { type: Number, default: 0, min: 0 },   // money(subtotal + platformFee) = captured amount (VAT-inclusive)
+    isOverBand:  { type: Boolean, default: false, index: true },
 
     scheduledTime: {
       type:    String,

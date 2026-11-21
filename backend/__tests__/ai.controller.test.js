@@ -200,6 +200,30 @@ describe('getServiceRecommendation — effectiveLocation', () => {
     expect(orPatterns.some((p) => /bathroom/i.test(p))).toBe(false);
   });
 
+  test('deictic "near me" AI location falls back to req.body.location', async () => {
+    axios.post = jest.fn().mockResolvedValue({
+      data: {
+        scenario: 'single', recommended_service: 'Plumbing',
+        extracted: { location: 'Near Me', budget: null, time_range: null },
+        missing_fields: [], missing_field_labels: [], needs_follow_up: false, issue_mode: 'single',
+      },
+    });
+    User.find = jest.fn().mockReturnValue(buildQuery([]));
+
+    const req = { body: { prompt: 'i need plumber near me now', location: 'Maadi St, B12, Cairo' } };
+    const res = mockRes();
+
+    await getServiceRecommendation(req, res);
+
+    const envelope = res.json.mock.calls[0][0];
+    expect(envelope.data.effectiveLocation).toBe('Maadi St, B12, Cairo');
+    expect(envelope.data.extracted.location).toBe('Maadi St, B12, Cairo');
+    const filterArg = User.find.mock.calls[0][0];
+    const orPatterns = filterArg.$or.map((clause) => Object.values(clause)[0].toString());
+    expect(orPatterns.some((p) => /Maadi/i.test(p))).toBe(true);
+    expect(orPatterns.some((p) => /near me/i.test(p))).toBe(false);
+  });
+
   test('multi-service AI response keeps all service categories for matching', async () => {
     axios.post = jest.fn().mockResolvedValue({
       data: {

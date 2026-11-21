@@ -40,10 +40,19 @@ beforeEach(() => {
 });
 
 describe('registerUser — services validation', () => {
-  test('worker registration with valid service IDs succeeds and stores them', async () => {
-    Service.countDocuments = jest.fn().mockResolvedValue(2); // both IDs valid
+  test('worker registration with valid service IDs succeeds and stores [{serviceId, startsFrom}] subdocs', async () => {
+    const select = jest.fn().mockResolvedValue([
+      { _id: PLUMBING_ID, basePrice: 200 },
+      { _id: HVAC_ID, basePrice: 350 },
+    ]);
+    Service.find = jest.fn().mockReturnValue({ select });
     User.create = jest.fn().mockResolvedValue(
-      makeCreatedUser({ services: [PLUMBING_ID, HVAC_ID] })
+      makeCreatedUser({
+        services: [
+          { serviceId: PLUMBING_ID, startsFrom: 200 },
+          { serviceId: HVAC_ID, startsFrom: 350 },
+        ],
+      })
     );
 
     const { user } = await registerUser({
@@ -54,18 +63,25 @@ describe('registerUser — services validation', () => {
       services: [PLUMBING_ID, HVAC_ID],
     });
 
-    expect(Service.countDocuments).toHaveBeenCalledWith({
+    expect(Service.find).toHaveBeenCalledWith({
       _id:      { $in: [PLUMBING_ID, HVAC_ID] },
       isActive: true,
     });
+    expect(select).toHaveBeenCalledWith('basePrice');
     expect(User.create).toHaveBeenCalledWith(
-      expect.objectContaining({ services: [PLUMBING_ID, HVAC_ID] })
+      expect.objectContaining({
+        services: [
+          { serviceId: PLUMBING_ID, startsFrom: 200 },
+          { serviceId: HVAC_ID, startsFrom: 350 },
+        ],
+      })
     );
   });
 
   test('worker registration rejects invalid service IDs', async () => {
-    // Only 1 of the 2 submitted IDs exists
-    Service.countDocuments = jest.fn().mockResolvedValue(1);
+    // Only 1 of the 2 submitted IDs resolves to an active service
+    const select = jest.fn().mockResolvedValue([{ _id: PLUMBING_ID, basePrice: 200 }]);
+    Service.find = jest.fn().mockReturnValue({ select });
 
     await expect(
       registerUser({
@@ -84,7 +100,7 @@ describe('registerUser — services validation', () => {
   });
 
   test('worker registration with no services skips validation', async () => {
-    Service.countDocuments = jest.fn();
+    Service.find = jest.fn();
 
     await registerUser({
       name:     'Ali Samir',
@@ -93,14 +109,14 @@ describe('registerUser — services validation', () => {
       role:     'worker',
     });
 
-    expect(Service.countDocuments).not.toHaveBeenCalled();
+    expect(Service.find).not.toHaveBeenCalled();
     expect(User.create).toHaveBeenCalledWith(
       expect.not.objectContaining({ services: expect.anything() })
     );
   });
 
   test('customer registration ignores services field', async () => {
-    Service.countDocuments = jest.fn();
+    Service.find = jest.fn();
 
     await registerUser({
       name:     'Nour Ahmed',
@@ -111,7 +127,7 @@ describe('registerUser — services validation', () => {
     });
 
     // Non-workers: services are not validated and not stored
-    expect(Service.countDocuments).not.toHaveBeenCalled();
+    expect(Service.find).not.toHaveBeenCalled();
     expect(User.create).toHaveBeenCalledWith(
       expect.not.objectContaining({ services: expect.anything() })
     );

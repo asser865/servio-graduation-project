@@ -547,6 +547,26 @@
                 <option value="Rejected">Rejected</option>
                 <option value="Suspended" data-i18n="status_suspended">Suspended</option>
               </select>
+              <select id="techAvailFilter" class="bk-select">
+                <option value="All" data-i18n="admin_filter_all_availability">All Availability</option>
+                <option value="Live" data-i18n="admin_filter_live">● Live</option>
+                <option value="Offline" data-i18n="admin_filter_offline">○ Offline</option>
+              </select>
+              <select id="techCategoryFilter" class="bk-select">
+                <option value="All" data-i18n="admin_filter_all_categories">All Categories</option>
+                <option value="plumbing" data-i18n="cat_plumbing">Plumbing</option>
+                <option value="electrical" data-i18n="cat_electrical">Electrical</option>
+                <option value="hvac" data-i18n="cat_hvac">HVAC</option>
+                <option value="carpentry" data-i18n="cat_carpentry">Carpentry</option>
+                <option value="cleaning" data-i18n="cat_cleaning">Cleaning</option>
+                <option value="painting" data-i18n="cat_painting">Painting</option>
+              </select>
+              <select id="techSortFilter" class="bk-select">
+                <option value="jobs" data-i18n="admin_sort_jobs">Most Jobs</option>
+                <option value="revenue" data-i18n="admin_sort_revenue">Highest Revenue</option>
+                <option value="rating" data-i18n="admin_sort_rating">Highest Rating</option>
+                <option value="name" data-i18n="admin_sort_name">Name (A–Z)</option>
+              </select>
             </div>
           </div>
 
@@ -2376,6 +2396,66 @@
   <script type="module" src="../js/html/admin-dashboard.js"></script>
 
   <!-- ══════════════════════════════════════════════════════
+       ADMIN: Booking Details Modal
+  ══════════════════════════════════════════════════════ -->
+  <div id="bookingDetailsModal" class="admin-modal-backdrop" hidden aria-modal="true" role="dialog" aria-labelledby="bkmTitle">
+    <div class="admin-modal admin-modal--wide">
+      <div class="admin-modal__header">
+        <h3 class="admin-modal__title" id="bkmTitle" data-i18n="admin_booking_details_title">Booking Details</h3>
+        <button class="admin-modal__close" data-modal-close="bookingDetailsModal" aria-label="Close">&times;</button>
+      </div>
+      <div class="admin-modal__body">
+        <div class="apm-hero">
+          <div class="apm-hero__info">
+            <div class="apm-hero__name" id="bkmService">—</div>
+            <div class="apm-hero__email" id="bkmId">—</div>
+            <span class="bk-badge apm-hero__badge" id="bkmStatus">—</span>
+          </div>
+          <div class="apm-hero__stats">
+            <div class="apm-stat">
+              <span class="apm-stat__val" id="bkmAmount">—</span>
+              <span class="apm-stat__lbl" data-i18n="admin_th_amount">Amount</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="apm-section-label" data-i18n="admin_booking_parties">Parties</div>
+        <div class="apm-grid">
+          <div class="apm-field">
+            <span class="apm-field__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+            <div style="min-width:0;"><span class="apm-label" data-i18n="admin_th_customer">Customer</span><span class="apm-value" id="bkmCustomer">—</span><span class="apm-value" id="bkmCustomerContact" style="font-weight:400;font-size:0.8rem;color:var(--color-text-light);word-break:break-all;"></span></div>
+          </div>
+          <div class="apm-field">
+            <span class="apm-field__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span>
+            <div style="min-width:0;"><span class="apm-label" data-i18n="admin_th_technician">Technician</span><span class="apm-value" id="bkmTech">—</span></div>
+          </div>
+          <div class="apm-field">
+            <span class="apm-field__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+            <div style="min-width:0;"><span class="apm-label" data-i18n="admin_th_date_time">Date &amp; Time</span><span class="apm-value" id="bkmDate">—</span></div>
+          </div>
+          <div class="apm-field">
+            <span class="apm-field__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
+            <div style="min-width:0;"><span class="apm-label" data-i18n="admin_th_area">Address</span><span class="apm-value" id="bkmAddress">—</span></div>
+          </div>
+          <div class="apm-field">
+            <span class="apm-field__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></span>
+            <div style="min-width:0;"><span class="apm-label" data-i18n="admin_th_payment">Payment</span><span class="apm-value" id="bkmPayMethod">—</span></div>
+          </div>
+          <div class="apm-field">
+            <span class="apm-field__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
+            <div style="min-width:0;"><span class="apm-label" data-i18n="admin_th_payment_status">Payment Status</span><span class="apm-value" id="bkmPayStatus">—</span></div>
+          </div>
+        </div>
+
+        <div id="bkmInvoiceWrap" style="display:none;">
+          <div class="apm-section-label" data-i18n="admin_booking_invoice">Invoice Breakdown</div>
+          <div id="bkmInvoiceRows" class="apm-invoice"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
        ADMIN: Technician Profile Modal
   ══════════════════════════════════════════════════════ -->
   <div id="techProfileModal" class="admin-modal-backdrop" hidden aria-modal="true" role="dialog" aria-labelledby="techModalTitle">
@@ -2427,6 +2507,17 @@
           <div class="apm-field">
             <span class="apm-field__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12.4 19.79 19.79 0 0 1 1.59 3.8 2 2 0 0 1 3.56 1.59h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.1a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.5 16.92z"/></svg></span>
             <div><span class="apm-label">Phone</span><span class="apm-value" id="techModalPhone">—</span></div>
+          </div>
+          <div class="apm-field apm-field--contact">
+            <span class="apm-field__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></svg></span>
+            <div style="min-width:0;flex:1;">
+              <span class="apm-label" data-i18n="admin_th_email">Email</span>
+              <span class="apm-value" id="techModalEmailVal" style="word-break:break-all;">—</span>
+              <div class="apm-contact-actions">
+                <button type="button" class="apm-contact-btn" id="techModalEmailCopy" data-i18n="admin_contact_copy">Copy</button>
+                <a class="apm-contact-btn apm-contact-btn--primary" id="techModalEmailMail" href="#" data-i18n="admin_contact_email">Open mail</a>
+              </div>
+            </div>
           </div>
           <div class="apm-field">
             <span class="apm-field__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
@@ -2783,6 +2874,38 @@
       color: var(--color-text, #1a1a1a); display: block;
     }
     .apm-value--reason { line-height: 1.5; white-space: pre-wrap; }
+
+    /* Contact (email) actions inside the tech profile modal */
+    .apm-field--contact { align-items: flex-start; }
+    .apm-contact-actions { display: flex; gap: 0.4rem; margin-top: 0.45rem; flex-wrap: wrap; }
+    .apm-contact-btn {
+      font-size: 0.72rem; font-weight: 600; line-height: 1;
+      padding: 0.4rem 0.7rem; border-radius: 7px; cursor: pointer;
+      border: 1px solid var(--color-border, #e8e2dc);
+      background: var(--color-surface, #fff); color: var(--color-text, #1a1a1a);
+      text-decoration: none; display: inline-flex; align-items: center; gap: 0.3rem;
+      transition: background .15s, border-color .15s, opacity .15s;
+    }
+    .apm-contact-btn:hover { background: var(--color-surface-alt, #F7F3EF); border-color: var(--color-accent, #9A8C73); }
+    .apm-contact-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .apm-contact-btn--primary { background: var(--color-accent, #9A8C73); border-color: var(--color-accent, #9A8C73); color: #fff; }
+    .apm-contact-btn--primary:hover { filter: brightness(0.95); background: var(--color-accent, #9A8C73); color: #fff; }
+    [data-theme="dark"] .apm-contact-btn { background: var(--color-surface, #15181D); }
+
+    /* Booking invoice breakdown inside the booking-details modal */
+    .apm-invoice {
+      border: 1px solid var(--color-border, #e8e2dc); border-radius: 10px;
+      overflow: hidden; background: var(--color-surface-alt, #F7F3EF);
+    }
+    .apm-invoice__row {
+      display: flex; justify-content: space-between; gap: 1rem;
+      padding: 0.55rem 0.85rem; font-size: 0.85rem; color: var(--color-text, #1a1a1a);
+      border-bottom: 1px solid var(--color-border, #ece6df);
+    }
+    .apm-invoice__row:last-child { border-bottom: none; }
+    .apm-invoice__row span:first-child { color: var(--color-text-light, #777); }
+    .apm-invoice__row--total { font-weight: 700; font-size: 0.95rem; background: var(--color-surface, #fff); }
+    .apm-invoice__row--total span:first-child { color: var(--color-text, #1a1a1a); }
 
     /* Bio */
     .apm-bio {

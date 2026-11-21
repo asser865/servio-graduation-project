@@ -458,7 +458,7 @@ function renderShell(config, id) {
       <div class="finance-review-drawer__content">
         ${TABS.map((tab, index) => `
           <section
-            class="finance-review-drawer__panel"
+            class="finance-review-drawer__panel finance-review-drawer__panel--${tab.id}"
             id="financeDrawerPanel-${tab.id}"
             role="tabpanel"
             aria-labelledby="financeDrawerTab-${tab.id}"
